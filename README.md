@@ -4,11 +4,11 @@ docker-map
 Utilities for building and managing Docker images and containers in Python.
 ---------------------------------------------------------------------------
 
-Project:
+Project: https://github.com/merll/docker-map
 
 
 Overview
---------
+========
 This package provides additional tools for building Docker images, create containers,
 connect dependent resources, and run them in development as well as production
 environments.
@@ -19,7 +19,7 @@ The library can be seen as an extension to the Docker Remote API client for Pyth
 
 
 Building images
----------------
+===============
 Writing Dockerfiles is not hard. However, it only allows for using variable context to a
 limited extent. For example, you may want to re-define directory paths in your project,
 without having to adjust it in multiple places; or you keep frequently reoccurring tasks
@@ -27,20 +27,20 @@ without having to adjust it in multiple places; or you keep frequently reoccurri
 rather than copy & paste.
 
 `DockerFile`
-============
+------------
 Generates a Dockerfile, that can either be saved locally or sent off to Docker
 through the remote API. Supports common commands such as `addfile` (`ADD`) or `run`, but
 also formats `CMD` and `ENTRYPOINT` appropriately for running a shell or exec command.
 
 `DockerContext`
-===============
+---------------
 Generates a Docker context tarball, that can be sent to the remote API.
 Its main purpose is to add files from `DockerFile` automatically, so that the Dockerfile
 and the context tarball are consistent.
 
 
 Creating, connecting, and running containers
---------------------------------------------
+============================================
 Containers can be created easily on the command line or using the Remote API, but managing
 dependencies can be tedious. Whereas the path and links may be quite individual to the
 local configuration, directory paths are typically constant within the containers.
@@ -53,7 +53,7 @@ between containers.
 * Automatically create and start containers when their dependent containers are started.
 
 `ContainerAssignment`
-=====================
+---------------------
 Keeps the elements of a configured container. Its main elements are:
 * `image`: Docker image to base the container on (default is identical to container name).
 * `instances`: Can generate multiple instances of a container with varying host mappings;
@@ -71,11 +71,11 @@ one, assigns file system permissions as set in `permissions` and `user`. This ma
 configuration of sockets very easy.
 
 `ContainerMap`
-==============
+--------------
 Contains three sets of elements:
-# Container names, associated with a `ContainerAssignment`.
-# Volumes, mapping shared directory paths to alias names.
-# Host shares, mapping host directory paths to alias names.
+1. Container names, associated with a `ContainerAssignment`.
+2. Volumes, mapping shared directory paths to alias names.
+3. Host shares, mapping host directory paths to alias names.
 
 `ContainerAssignment` instances and their elements can be created and used in a
 dictionary-like or attribute syntax, e.g.
@@ -85,17 +85,17 @@ Volume aliases are stored in `container_map.volumes` and host binds in
 `container_map.host`.
 
 `MappingDockerClient`
-=====================
+---------------------
 Applies a `ContainerMap` to a Docker client. A container on the map can easily be created
 with all its dependencies by running
 `client.create('container_name').
 
 Running the container can be as easy as
-`client.start('container_name')
+`client.start('container_name')`
 or can be enhanced with custom parameters such as
 `client.start('container_name', expose={80: 80})`.
 
 Todo
-----
+====
 * More detailed introduction with examples.
 * Possibly add more Docker container configuration elements, e.g. command.
