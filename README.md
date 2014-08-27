@@ -1,22 +1,21 @@
 docker-map
 ==========
 
-Utilities for programmatically building and managing Docker images and containers.
-----------------------------------------------------------------------------------
+Utilities for building and managing Docker images and containers in Python.
+---------------------------------------------------------------------------
 
 Project:
 
 
 Overview
 --------
-Docker provides an elegant way of running various applications and services inside
-of containers. This package provides additional tools for building images for these
-containers, connect dependent resources, and run them in development as well as production
+This package provides additional tools for building Docker images, create containers,
+connect dependent resources, and run them in development as well as production
 environments.
 
 The library can be seen as an extension to the Docker Remote API client for Python,
 `docker-py`. Based on it, available deployment tools can be enhanced
-(see dockerfabric) or custom orchestration can be implemented.
+(see docker-fabric) or custom orchestration can be implemented.
 
 
 Building images
