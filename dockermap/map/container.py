@@ -138,7 +138,7 @@ class ContainerMap(object):
         """
         attached = dict((attaches, c_name) for c_name, c_config in self for attaches in c_config.attaches)
         for c_name, c_config in self:
-            dep_set = set(attached.get(u, u) for u in c_config.uses).union(l.container for l in c_config.links_to)
+            dep_set = set(attached.get(u, u) for u in c_config.uses).union(l.container for l in c_config.links)
             for i in c_config.instances:
                 yield '.'.join((c_name, i)), dep_set
             yield c_name, dep_set
@@ -226,7 +226,7 @@ class ContainerMap(object):
             instance_names = _get_instance_names(c_name, container.instances)
             shared = instance_names[:] if container.shares or container.binds else []
             bind = [b.volume for b in container.binds]
-            link = [l.container for l in container.links_to]
+            link = [l.container for l in container.links]
             return instance_names, container.uses, container.attaches, shared, bind, link
 
         all_instances, all_used, all_attached, all_shared, all_binds, all_links = zip(*[_get_container_items(k, v) for k, v in self])

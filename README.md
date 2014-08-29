@@ -65,10 +65,13 @@ to another.
 * `uses`: Can be names of other containers, or volumes shared by another volume through
 `attaches`. Has the same effect as the `volumes_from` argument in the API, but using alias
 names.
-* `links_to`: For container linking.
+* `links`: For container linking. Container names are translated to instance name on the map.
 * `attaches`: Generates a separate container for the purpose of sharing data with another
 one, assigns file system permissions as set in `permissions` and `user`. This makes
 configuration of sockets very easy.
+* `create_options` and `start_options` provide the possibility to add additional keyword
+arguments such as `command` or `entrypoint`, which are passed through to the `docker-py`
+client.
 
 `ContainerMap`
 --------------

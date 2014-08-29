@@ -121,12 +121,17 @@ class MappingDockerClient(object):
         shared_volumes = list(itertools.chain(volumes or [], config.shares,
                                               (self._get_volume_path(b.volume) for b in config.binds))) or None
         c_user = user or config.user
-        c_environment = environment or config.environment
+        if config.create_options:
+            c_kwargs = config.create_options.copy()
+            c_kwargs.update(kwargs)
+        else:
+            c_kwargs = kwargs
+
         self._ensure_images(image)
         for i in c_instances:
             c_name = self._cname(container, i)
             if c_name not in self._get_container_names():
-                self._create_named_container(image, c_name, volumes=shared_volumes, user=c_user, environment=c_environment, **kwargs)
+                self._create_named_container(image, c_name, volumes=shared_volumes, user=c_user, **c_kwargs)
                 self._container_names.add(c_name)
             else:
                 self._client.push_log("Container '{0}' exists.".format(c_name))
@@ -148,7 +153,12 @@ class MappingDockerClient(object):
         c_instances = instances or config.instances or [None]
         used_volumes = (self._cname(n) for n in itertools.chain(config.uses, config.attaches))
         c_volumes_from = list(itertools.chain(volumes_from or [], used_volumes)) or None
-        c_links = dict((self._cname(name), alias) for name, alias in config.links_to) or None
+        c_links = dict((self._cname(name), alias) for name, alias in config.links) or None
+        if config.start_options:
+            c_kwargs = config.start_options.copy()
+            c_kwargs.update(kwargs)
+        else:
+            c_kwargs = kwargs
 
         for i in c_instances:
             c_name = self._cname(container, i)
@@ -156,7 +166,7 @@ class MappingDockerClient(object):
             if binds:
                 host_binds.update(binds)
             c_binds = host_binds or None
-            self._client.start(c_name, binds=c_binds, volumes_from=c_volumes_from, links=c_links, **kwargs)
+            self._client.start(c_name, binds=c_binds, volumes_from=c_volumes_from, links=c_links, **c_kwargs)
 
     def create_attached_volumes(self, container, baseimage=DEFAULT_BASEIMAGE, coreimage=DEFAULT_COREIMAGE):
         """

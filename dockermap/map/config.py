@@ -37,7 +37,8 @@ class ContainerConfiguration(object):
         self._attaches = []
         self._user = None
         self._permissions = None
-        self._environment = None
+        self._create_kwargs = None
+        self._start_kwargs = None
         self.update(kwargs)
 
     def __repr__(self):
@@ -154,11 +155,24 @@ class ContainerConfiguration(object):
         self._uses = _get_list(value)
 
     @property
-    def links_to(self):
+    def links(self):
+        """
+        Returns linked containers.
+
+        :return: Containers to be linked to when the container is started.
+        :rtype: list
+        """
         return self._links_to
 
-    @links_to.setter
-    def links_to(self, value):
+    @links.setter
+    def links(self, value):
+        """
+        Sets linked containers. Links are set in the format `ContainerLink(name, alias)`, where the name is the linked
+        container's name, and the alias name the alias to use for this container instance.
+
+        :param value: Containers to be linked to when the container is started.
+        :type value: list, tuple, ContainerLink, or None
+        """
         if isinstance(value, ContainerLink):
             self._links_to = [value]
         else:
@@ -230,12 +244,44 @@ class ContainerConfiguration(object):
         self._permissions = value
 
     @property
-    def environment(self):
-        return self._environment
+    def create_options(self):
+        """
+        Returns additional keyword args for :func:`docker.client.Client.create_container`.
 
-    @environment.setter
-    def environment(self, value):
-        self._environment = value
+        :return: Kwargs for creating the container.
+        :rtype: dict
+        """
+        return self._create_kwargs
+
+    @create_options.setter
+    def create_options(self, value):
+        """
+        Sets additional keyword args for :func:`docker.client.Client.create_container`.
+
+        :param value: Kwargs for creating the container.
+        :type value: dict
+        """
+        self._create_kwargs = value
+
+    @property
+    def start_options(self):
+        """
+        Returns additional keyword args for :func:`docker.client.Client.start`.
+
+        :return: Kwargs for starting the container.
+        :rtype: dict
+        """
+        return self._start_kwargs
+
+    @start_options.setter
+    def start_options(self, value):
+        """
+        Sets additional keyword args for :func:`docker.client.Client.start`.
+
+        :param value: Kwargs for starting the container.
+        :type value: dict
+        """
+        self._start_kwargs = value
 
     def update(self, values):
         """
