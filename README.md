@@ -52,7 +52,7 @@ between containers.
 * Use alias names instead of paths to bind host volumes to container shares.
 * Automatically create and start containers when their dependent containers are started.
 
-`ContainerAssignment`
+`ContainerConfiguration`
 ---------------------
 Keeps the elements of a configured container. Its main elements are:
 * `image`: Docker image to base the container on (default is identical to container name).
@@ -73,16 +73,16 @@ configuration of sockets very easy.
 `ContainerMap`
 --------------
 Contains three sets of elements:
-1. Container names, associated with a `ContainerAssignment`.
+1. Container names, associated with a `ContainerConfiguration`.
 2. Volumes, mapping shared directory paths to alias names.
 3. Host shares, mapping host directory paths to alias names.
 
-`ContainerAssignment` instances and their elements can be created and used in a
+`ContainerConfiguration` instances and their elements can be created and used in a
 dictionary-like or attribute syntax, e.g.
-`container_map.container_name.uses` or
-`container_map['container_name']['uses']`.
+`container_map.containers.container_name.uses` or
+`container_map.containers['container_name']['uses']`.
 Volume aliases are stored in `container_map.volumes` and host binds in
-`container_map.host`.
+`container_map.host`; they support the same syntax variations as containers.
 
 `MappingDockerClient`
 ---------------------

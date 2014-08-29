@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 from abc import abstractmethod, ABCMeta
 from collections import namedtuple, defaultdict
+import six
 
 
 Dependency = namedtuple('Dependency', ('parent', 'dependency_found'))
@@ -12,7 +13,7 @@ def _dependency_dict(items):
     if items is None:
         return {}
     if isinstance(items, dict):
-        iterator = items.items
+        iterator = six.iteritems(items)
     else:
         iterator = items
     return dict((item, Dependency(parent, None)) for item, parent in iterator)

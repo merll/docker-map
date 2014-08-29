@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import six
+
 
 class DictMap(object):
     """
@@ -16,8 +18,7 @@ class DictMap(object):
         return self.get(item)
 
     def __iter__(self):
-        for item in self._map.items():
-            yield item
+        return six.iteritems(self._map)
 
     def keys(self):
         """

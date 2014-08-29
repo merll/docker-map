@@ -3,15 +3,17 @@ from __future__ import unicode_literals
 
 from collections import Counter, defaultdict
 import itertools
+import six
 
 from . import DictMap
-from .assignment import ContainerAssignment, HostVolumeAssignment
+from .config import ContainerConfiguration, HostVolumeConfiguration
 from .dep import MultiDependencyResolver
 
 
 class ContainerDependencyResolver(MultiDependencyResolver):
     """
-    Resolves dependencies between :class:`ContainerAssignment` instances, based on shared and used volumes.
+    Resolves dependencies between :class:`dockermap.map.config.ContainerConfiguration` instances, based on shared and
+    used volumes.
 
     :param container_map: Optional :class:`ContainerMap` instance for initialization.
     :type container_map: ContainerMap
@@ -60,27 +62,30 @@ class ContainerDependencyResolver(MultiDependencyResolver):
         super(ContainerDependencyResolver, self).update_backward(container_map.dependency_items)
 
 
-class ContainerMap(DictMap):
+class ContainerMap(object):
     """
-    Class for merging container assignments, host shared volumes and volume alias names.
+    Class for merging container configurations, host shared volumes and volume alias names.
 
     :param name: Name for this container map.
     :type name: unicode
-    :param initial: Initial container assignments, host shares, and volumes.
+    :param initial: Initial container configurations, host shares, and volumes.
     :type initial: dict
     :param check_integrity: If initial values are given, the container integrity is checked by default at the end of
      this constructor. Setting this to `False` deactivates it.
     :type check_integrity: bool
-    :param kwargs: Kwargs with initial container assignments, host shares, and volumes.
+    :param kwargs: Kwargs with initial container configurations, host shares, and volumes.
     """
     def __init__(self, name, initial=None, check_integrity=True, **kwargs):
         self._name = name
-        self._host = HostVolumeAssignment()
+        self._host = HostVolumeConfiguration()
         self._volumes = DictMap()
-        self._map = defaultdict(ContainerAssignment)
+        self._containers = defaultdict(ContainerConfiguration)
         self.update(initial, **kwargs)
         if (initial or kwargs) and check_integrity:
             self.check_integrity()
+
+    def __iter__(self):
+        return six.iteritems(self._containers)
 
     @property
     def name(self):
@@ -93,14 +98,34 @@ class ContainerMap(DictMap):
         return self._name
 
     @property
-    def assignments(self):
+    def containers(self):
         """
-        Returns all assignments, without their container aliases, from the map.
+        Container configurations of the map.
 
-        :return: Container assignments.
-        :rtype: list
+        :return: Container configurations.
+        :rtype: dict
         """
-        return self._map.values()
+        return self._containers
+
+    @property
+    def volumes(self):
+        """
+        Volume alias assignments of the map.
+
+        :return: Volume alias assignments.
+        :rtype: DictMap
+        """
+        return self._volumes
+
+    @property
+    def host(self):
+        """
+        Host volume configuration of the map.
+
+        :return: Host volume configuration.
+        :rtype: HostVolumeConfiguration
+        """
+        return self._host
 
     @property
     def dependency_items(self):
@@ -111,10 +136,10 @@ class ContainerMap(DictMap):
         :return: Container dependencies.
         :rtype: iterator
         """
-        attached = dict((attaches, c_name) for c_name, c_assignment in self for attaches in c_assignment.attaches)
-        for c_name, c_assignment in self:
-            dep_set = set(attached.get(u, u) for u in c_assignment.uses).union(l.container for l in c_assignment.links_to)
-            for i in c_assignment.instances:
+        attached = dict((attaches, c_name) for c_name, c_config in self for attaches in c_config.attaches)
+        for c_name, c_config in self:
+            dep_set = set(attached.get(u, u) for u in c_config.uses).union(l.container for l in c_config.links_to)
+            for i in c_config.instances:
                 yield '.'.join((c_name, i)), dep_set
             yield c_name, dep_set
 
@@ -134,51 +159,50 @@ class ContainerMap(DictMap):
 
     def get(self, item):
         """
-        Returns a container assignment from the map; if it does not yet exist, an initial assignment is created and
+        Returns a container configuration from the map; if it does not yet exist, an initial config is created and
         returned (to avoid this, use :func:`get_existing` instead). `item` can be any valid Docker container name.
-        The values of `host` are however reserved for host bindings, and `volumes` is reserved for volume-path mapping.
 
         :param item: Container name.
         :type item: unicode
-        :return: A container assignment; in case of `host` the host-assigned volumes, in case of
-        :rtype: ContainerAssignment, HostVolumeAssignment, or unicode
+        :return: A container configuration.
+        :rtype: ContainerConfiguration
         """
-        if item == 'host':
-            return self._host
-        elif item == 'volumes':
-            return self._volumes
-        return super(ContainerMap, self).get(item)
+        return self._containers[item]
 
     def get_existing(self, item):
         """
-        Same as :func:`get`, except for that non-existing container assignments will not be created; `None` is returned
-        instead in this case.
+        Same as :func:`get`, except for that non-existing container configurations will not be created; `None` is
+        returned instead in this case.
 
         :param item: Container name.
         :type item: unicode
-        :return: A container assignment; in case of `host` the host-assigned volumes, in case of
-        :rtype: ContainerAssignment, HostVolumeAssignment, or unicode
+        :return: A container configuration
+        :rtype: ContainerConfiguration
         """
-        if item == 'host':
-            return self._host
-        elif item == 'volumes':
-            return self._volumes
-        return self._map.get(item)
+        return self._containers.get(item)
 
     def update(self, other=None, **kwargs):
         """
         Updates the container map with a dictionary. The keys need to be container names, the values should be a
-        dictionary structure of :class:`ContainerAssignment` properties. `host` and `volumes` can also be included.
+        dictionary structure of :class:`dockermap.map.config.ContainerConfiguration` properties. `host` and `volumes`
+        can also be included.
 
         :item other: Dictionary to update the map with.
         :type other: dict
         :param kwargs: Kwargs to update the map with
         """
+        def _update(items):
+            for container, config in six.iteritems(items):
+                if container == 'volumes':
+                    self._volumes.update(config)
+                elif container == 'host':
+                    self._host.update(config)
+                else:
+                    self._containers[container].update(config)
+
         if isinstance(other, dict):
-            for container, assignments in other.items():
-                self.get(container).update(assignments)
-        for container, assignments in kwargs.items():
-            self.get(container).update(assignments)
+            _update(other)
+        _update(kwargs)
 
     def check_integrity(self, check_duplicates=True):
         """
@@ -208,7 +232,7 @@ class ContainerMap(DictMap):
         all_instances, all_used, all_attached, all_shared, all_binds, all_links = zip(*[_get_container_items(k, v) for k, v in self])
         volume_shared = tuple(itertools.chain.from_iterable(all_shared + all_attached))
         if check_duplicates:
-            duplicated = [name for name, count in Counter(volume_shared).items() if count > 1]
+            duplicated = [name for name, count in six.iteritems(Counter(volume_shared)) if count > 1]
             if duplicated:
                 dup_str = ', '.join(duplicated)
                 raise ValueError("Duplicated shared or attached volumes found with name(s): {0}.".format(dup_str))

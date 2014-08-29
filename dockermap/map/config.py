@@ -21,7 +21,7 @@ HostBind = namedtuple('HostBind', ('volume', 'writeable'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 
 
-class ContainerAssignment(object):
+class ContainerConfiguration(object):
     """
     Class to maintain resources that are associated with a container.
 
@@ -239,21 +239,20 @@ class ContainerAssignment(object):
 
     def update(self, values):
         """
-        Updates the container assignments with the contents of the given dictionary, if keys are valid attributes for
+        Updates the container configuration with the contents of the given dictionary, if keys are valid attributes for
         this class.
 
-        :param values: Dictionary to update this container assignment with.
+        :param values: Dictionary to update this container configuration with.
         :type values: dict
         """
-        for key, value in values.items():
+        for key, value in six.iteritems(values):
             if hasattr(self, key):
                 self.__setattr__(key, value)
 
 
-class HostVolumeAssignment(DictMap):
+class HostVolumeConfiguration(DictMap):
     """
     Class for storing volumes, as shared from the host with Docker containers.
     """
     def __repr__(self):
         return '{0} shares: {1}'.format(self.__class__.__name__, self._map)
-

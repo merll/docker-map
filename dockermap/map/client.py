@@ -30,10 +30,10 @@ class MappingDockerClient(object):
         self._image_tags = None
 
     def _get(self, container):
-        assignments = self._map.get_existing(container)
-        if not assignments:
-            raise ValueError("No assignments found for container '{0}'.".format(container))
-        return assignments
+        config = self._map.get_existing(container)
+        if not config:
+            raise ValueError("No configurations found for container '{0}'.".format(container))
+        return config
 
     def _cname(self, container, instance=None):
         return self._map.cname(container, instance)
@@ -115,13 +115,13 @@ class MappingDockerClient(object):
         return path
 
     def _get_instance_containers(self, container, instances=None, volumes=None, user=None, environment=None, **kwargs):
-        assignments = self._get(container)
-        c_instances = instances or assignments.instances or [None]
-        image = assignments.image or container
-        shared_volumes = list(itertools.chain(volumes or [], assignments.shares,
-                                              (self._get_volume_path(b.volume) for b in assignments.binds))) or None
-        c_user = user or assignments.user
-        c_environment = environment or assignments.environment
+        config = self._get(container)
+        c_instances = instances or config.instances or [None]
+        image = config.image or container
+        shared_volumes = list(itertools.chain(volumes or [], config.shares,
+                                              (self._get_volume_path(b.volume) for b in config.binds))) or None
+        c_user = user or config.user
+        c_environment = environment or config.environment
         self._ensure_images(image)
         for i in c_instances:
             c_name = self._cname(container, i)
@@ -134,7 +134,7 @@ class MappingDockerClient(object):
 
     def _start_instance_containers(self, container, instances=None, binds=None, volumes_from=None, links=None, **kwargs):
         def _get_host_binds(instance):
-            for alias, rw in assignments.binds:
+            for alias, rw in config.binds:
                 bind = {'bind': self._get_volume_path(alias), 'ro': not rw}
                 share = self._map.host.get(alias)
                 if share is not None:
@@ -144,11 +144,11 @@ class MappingDockerClient(object):
                     else:
                         yield share, bind
 
-        assignments = self._get(container)
-        c_instances = instances or assignments.instances or [None]
-        used_volumes = (self._cname(n) for n in itertools.chain(assignments.uses, assignments.attaches))
+        config = self._get(container)
+        c_instances = instances or config.instances or [None]
+        used_volumes = (self._cname(n) for n in itertools.chain(config.uses, config.attaches))
         c_volumes_from = list(itertools.chain(volumes_from or [], used_volumes)) or None
-        c_links = dict((self._cname(name), alias) for name, alias in assignments.links_to) or None
+        c_links = dict((self._cname(name), alias) for name, alias in config.links_to) or None
 
         for i in c_instances:
             c_name = self._cname(container, i)
@@ -160,7 +160,7 @@ class MappingDockerClient(object):
 
     def create_attached_volumes(self, container, baseimage=DEFAULT_BASEIMAGE, coreimage=DEFAULT_COREIMAGE):
         """
-        Creates attached volumes for a container assignment; that means that a minimal container image will
+        Creates attached volumes for a container configuration; that means that a minimal container image will
         be created for the purpose of sharing the volumes as set in the `attaches` property. Multiple instances share
         the same attached container.
 
@@ -170,20 +170,20 @@ class MappingDockerClient(object):
         :return: A dictionary with container aliases, mapping them to names of the instantiated Docker container.
         :rtype: dict
         """
-        assignment = self._get(container)
+        config = self._get(container)
         self._ensure_images(baseimage, coreimage)
-        return dict(self._get_or_create_volume(baseimage, coreimage, a, assignment.user, assignment.permissions)
-                    for a in assignment.attaches)
+        return dict(self._get_or_create_volume(baseimage, coreimage, a, config.user, config.permissions)
+                    for a in config.attaches)
 
     def create(self, container, instances=None, autocreate_dependencies=True, autocreate_attached=True,
                autocreate_baseimage=DEFAULT_BASEIMAGE, **kwargs):
         """
-        Creates container instances for a container assignment.
+        Creates container instances for a container configuration.
 
         :param container: Container name.
         :type container: unicode
         :param instances: Instance name to create. If not specified, will create all instances as specified in the
-         assignment (or just one default instance).
+         configuration (or just one default instance).
         :type instances: tuple or list
         :param autocreate_dependencies: Resolve and create dependency containers.
         :type autocreate_dependencies: bool
@@ -192,7 +192,7 @@ class MappingDockerClient(object):
         :param autocreate_baseimage: Base image for creating attached volumes.
         :type autocreate_baseimage: unicode
         :param kwargs: Additional kwargs for creating the container. `volumes` and `environment` enhance the generated
-         arguments; `user` overrides the user from the container assignment.
+         arguments; `user` overrides the user from the container configuration.
         :return: List of tuples with container aliases and names of container instances. Does not include attached
          containers.
         """
@@ -221,12 +221,12 @@ class MappingDockerClient(object):
 
     def start(self, container, instances=None, autostart_dependencies=True, **kwargs):
         """
-        Starts instances for a container assignment.
+        Starts instances for a container configuration.
 
         :param container: Container name.
         :type container: unicode
         :param instances: Instance names to start. If not specified, will start all instances as specified in the
-         assignment (or just one default instance).
+         configuration (or just one default instance).
         :type instances: iterable
         :param autostart_dependencies: Resolve and start dependency containers.
         :type autostart_dependencies: bool
@@ -244,12 +244,12 @@ class MappingDockerClient(object):
 
     def stop(self, container, instances=None, autostop_dependent=True, **kwargs):
         """
-        Stops instances for a container assignment.
+        Stops instances for a container configuration.
 
         :param container: Container name.
         :type container: unicode
         :param instances: Instance names to stop. If not specified, will stop all instances as specified in the
-         assignment (or just one default instance).
+         configuration (or just one default instance).
         :type instances: iterable
         :param autostop_dependent: Resolve and stop dependent containers.
         :type autostop_dependent: bool
@@ -276,12 +276,12 @@ class MappingDockerClient(object):
 
     def remove(self, container, instances=None):
         """
-        Remove instances from a container assignment.
+        Remove instances from a container configuration.
 
         :param container: Container name.
         :type container: unicode
         :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
-         assignment (or just one default instance).
+         configuration (or just one default instance).
         :type instances: iterable
         """
         c_instances = instances or [None]
