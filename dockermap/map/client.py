@@ -114,7 +114,7 @@ class MappingDockerClient(object):
             raise ValueError("No path found for volume '{0}'.".format(alias))
         return path
 
-    def _get_instance_containers(self, container, instances=None, volumes=None, user=None, environment=None, **kwargs):
+    def _get_instance_containers(self, container, instances=None, volumes=None, user=None, **kwargs):
         config = self._get(container)
         c_instances = instances or config.instances or [None]
         image = config.image or container
@@ -154,6 +154,8 @@ class MappingDockerClient(object):
         used_volumes = (self._cname(n) for n in itertools.chain(config.uses, config.attaches))
         c_volumes_from = list(itertools.chain(volumes_from or [], used_volumes)) or None
         c_links = dict((self._cname(name), alias) for name, alias in config.links) or None
+        if links:
+            c_links.update(links)
         if config.start_options:
             c_kwargs = config.start_options.copy()
             c_kwargs.update(kwargs)
@@ -210,7 +212,7 @@ class MappingDockerClient(object):
         def _create_main_container():
             if autocreate_attached:
                 self.create_attached_volumes(container, autocreate_baseimage)
-            return [ci for ci in self._get_instance_containers(container, instances, default_volumes, default_user, default_env, **kwargs)]
+            return [ci for ci in self._get_instance_containers(container, instances, default_volumes, default_user, **kwargs)]
 
         def _create_dependent_containers(c_name):
             if autocreate_attached:
@@ -219,7 +221,6 @@ class MappingDockerClient(object):
 
         default_volumes = kwargs.pop('volumes', None)
         default_user = kwargs.pop('user', None)
-        default_env = kwargs.pop('environment', None)
         if autocreate_dependencies:
             dependencies = ContainerDependencyResolver(self._map).get_dependencies(container)
             created_containers = [_create_dependent_containers(dependent_container)
