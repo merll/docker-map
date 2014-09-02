@@ -90,7 +90,7 @@ class ContainerMap(object):
     @property
     def name(self):
         """
-        Returns the container map name.
+        Container map name.
 
         :return: Container map name.
         :rtype: unicode

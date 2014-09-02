@@ -35,7 +35,7 @@ def get_user_group(user_group):
     :param user_group: User name, user id, user and group in format `user:group`, `user_id:group_id`, or tuple of (user, group).
     :type user_group: unicode, int, or tuple
     :return: Formatted string with in the format `user:group`.
-    :rtype : unicode
+    :rtype: unicode
     """
     if isinstance(user_group, tuple):
         return '{0}:{1}'.format(*user_group)
@@ -112,7 +112,7 @@ def mkdir_chown(paths, user_group=None, permissions='ug=rwX,o=rX', create_parent
     :param check_if_exists: Prior to creating the directory, checks if it already exists.
     :type check_if_exists: bool
     :param recursive: Apply permissions and owner change recursively.
-    :type recursive bool
+    :type recursive: bool
     :return: Unix shell command line.
     :rtype: unicode
     """

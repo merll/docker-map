@@ -56,7 +56,7 @@ class BaseDependencyResolver(object):
         :param parent: Parent node(s).
         :type parent: any
         :return: Result of the dependency merge. May be just boolean, a set, or anything else. Should return `False`
-        if there are no dependencies, not `None`.
+            if there are no dependencies, not `None`.
         :rtype: bool
         """
         return parent is not None and resolve_parent(parent)
@@ -70,8 +70,8 @@ class BaseDependencyResolver(object):
 
         :param start_item: Node that the dependency check started with.
         :type start_item: any
-        :return Function that checks if interdependent items have been found.
-        :rtype __builtin__.function
+        :return: Function that checks if interdependent items have been found.
+        :rtype: __builtin__.function
         """
         pass
 
@@ -123,7 +123,7 @@ class SingleDependencyResolver(BaseDependencyResolver):
 
         :type start_item: any
         :return: Function with argument `item` that checks for `item == start_item`.
-        :rtype : __builtin__.function
+        :rtype: __builtin__.function
         """
         return lambda item: item == start_item
 
@@ -156,7 +156,7 @@ class MultiDependencyResolver(BaseDependencyResolver):
 
         :type start_item: any
         :return: Function with argument `items` that checks for `start_item in items`.
-        :rtype : __builtin__.function
+        :rtype: __builtin__.function
         """
         return lambda items: start_item in items
 
@@ -172,7 +172,7 @@ class MultiDependencyResolver(BaseDependencyResolver):
         :param parents: Parent nodes.
         :type parents: iterable
         :return: Result of the dependency merge. May be just boolean, a set, or anything else. Should return `False`
-        if there are no dependencies, not `None`.
+            if there are no dependencies, not `None`.
         :rtype: bool
         """
         return parents is not None and any(resolve_parent(parent) for parent in parents)

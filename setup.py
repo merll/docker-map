@@ -1,5 +1,13 @@
+import os
 from setuptools import setup, find_packages
 from dockermap import __version__
+
+
+def include_readme():
+    readme_file = os.path.join(os.path.dirname(__file__), 'README.md')
+    with open(readme_file, 'r') as rf:
+        return rf.read()
+
 
 setup(
     name='docker-map',
@@ -9,7 +17,22 @@ setup(
     license='MIT',
     author='Matthias Erll',
     author_email='matthias@erll.de',
-    description='Integration for Docker into Fabric.',
+    description='Utilities for building and managing Docker images and containers in Python.',
+    long_description=include_readme(),
     platforms=['OS Independent'],
+    keywords=['docker', 'deployment'],
+    classifiers=[
+        'Environment :: Web Environment',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python',
+        'Topic :: Software Development :: Libraries :: Python Modules',
+        'Topic :: Software Development :: Build Tools'
+        'Topic :: System :: Software Distribution'
+        'Development Status :: 4 - Beta',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.4',
+    ],
     include_package_data=True,
 )

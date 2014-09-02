@@ -49,7 +49,8 @@ class ContainerConfiguration(object):
     @property
     def image(self):
         """
-        Returns the base image of the container.
+        The base image of the container. If set to `None`, the containers will be instantiated with an image that
+        has the same name.
 
         :return: Base image name.
         :rtype: unicode
@@ -58,19 +59,13 @@ class ContainerConfiguration(object):
 
     @image.setter
     def image(self, value):
-        """
-        Sets the base image of the container. If set to `None`, the containers will be instantiated with an image that
-        has the same name.
-
-        :param value: Base image name.
-        :type value: unicode
-        """
         self._image = value
 
     @property
     def instances(self):
         """
-        Returns the separate instances of a container, if any.
+        Separate instances of a container, if any. By default there is one instance of each container. If set,
+        containers will be created for each instance in the format `map_name.container_name.instance`.
 
         :return: Instance names.
         :rtype: list
@@ -79,19 +74,12 @@ class ContainerConfiguration(object):
 
     @instances.setter
     def instances(self, value):
-        """
-        Sets separate instances for a container. By default there is one instance of each container. If set, containers
-        will be created for each instance in the format `map_name.container_name.instance`.
-
-        :param value: Instance names.
-        :type value: list, tuple, unicode, or None
-        """
         self._instances = _get_list(value)
 
     @property
     def shares(self):
         """
-        Returns the shared volumes for a container.
+        Shared volumes for a container.
 
         :return: Shared volumes.
         :rtype: list
@@ -100,18 +88,14 @@ class ContainerConfiguration(object):
 
     @shares.setter
     def shares(self, value):
-        """
-        Sets the shared volumes for a container.
-
-        :param value: Shared volumes
-        :type value: list, tuple, unicode, or None
-        """
         self._shares = _get_list(value)
 
     @property
     def binds(self):
         """
-        Returns the host volume binds for a container.
+        Returns the host volume binds for a container. These will be added to the shared volumes, and mapped to a host
+        volume on container start. Each bind should be an instance of :class:`HostBind` with parameters
+        `(volume_alias: unicode, write_access: bool)`.
 
         :return: Host binds.
         :rtype: list
@@ -120,14 +104,6 @@ class ContainerConfiguration(object):
 
     @binds.setter
     def binds(self, value):
-        """
-        Sets the host volume binds for a container. These will be added to the shared volumes, and mapped to a host
-        volume on container start. Each bind should be an instance of :class:`HostBind` with parameters
-        `(volume_alias: unicode, write_access: bool)`.
-
-        :param value: Host binds.
-        :type value: list, tuple, HostBind, or None
-        """
         if isinstance(value, HostBind):
             self._binds = [value]
         else:
@@ -136,7 +112,8 @@ class ContainerConfiguration(object):
     @property
     def uses(self):
         """
-        Returns the volumes used from other containers.
+        Volumes used from other containers. This can be a combination of attached volume aliases, and container
+        names if all volumes are to be used of that container.
 
         :return: Used volumes.
         :rtype: list
@@ -145,19 +122,13 @@ class ContainerConfiguration(object):
 
     @uses.setter
     def uses(self, value):
-        """
-        Sets the volumes used from other containers. This can be a combination of attached volume aliases, and container
-        names if all volumes are to be used of that container.
-
-        :param value: Used volumes.
-        :type value: list, tuple, unicode or None
-        """
         self._uses = _get_list(value)
 
     @property
     def links(self):
         """
-        Returns linked containers.
+        Linked containers. Links are set in the format `ContainerLink(name, alias)`, where the name is the linked
+        container's name, and the alias name the alias to use for this container instance.
 
         :return: Containers to be linked to when the container is started.
         :rtype: list
@@ -166,13 +137,6 @@ class ContainerConfiguration(object):
 
     @links.setter
     def links(self, value):
-        """
-        Sets linked containers. Links are set in the format `ContainerLink(name, alias)`, where the name is the linked
-        container's name, and the alias name the alias to use for this container instance.
-
-        :param value: Containers to be linked to when the container is started.
-        :type value: list, tuple, ContainerLink, or None
-        """
         if isinstance(value, ContainerLink):
             self._links_to = [value]
         else:
@@ -181,7 +145,9 @@ class ContainerConfiguration(object):
     @property
     def attaches(self):
         """
-        Returns the names of containers that are attached to instances of this one.
+        Names of containers that are attached to instances of this one. If set, an empty container will be
+        created with the purpose of sharing a volume. This volume is automatically shared with this one, but also
+        available to other containers.
 
         :return: Attached containers.
         :rtype: list
@@ -190,21 +156,14 @@ class ContainerConfiguration(object):
 
     @attaches.setter
     def attaches(self, value):
-        """
-        Sets the names of container that are attached to instances of this one. If set, an empty container will be
-        created with the purpose of sharing a volume. This volume is automatically shared with this one, but also
-        available to other containers.
-
-        :param value: Attached containers.
-        :type value: list, tuple, unicode, or None
-        """
         self._attaches = _get_list(value)
 
     @property
     def user(self):
         """
-        Returns the user name / group or id to launch the container with and to which the owner is set in attached
-        containers.
+        User name / group or id to launch the container with and to which the owner is set in attached
+        containers. Can be set as a string (`user_name` or `user_name:group`), ids (e.g. `user_id:group_id`), tuple
+        (`(user_name, group_name)`), or int (`user_id`).
 
         :return: User name and (optional) group.
         :rtype: unicode, tuple, or int
@@ -213,20 +172,12 @@ class ContainerConfiguration(object):
 
     @user.setter
     def user(self, value):
-        """
-        Sets the user name / group or id to launch the container with and to which the owner is set in attached
-        containers. Can be set as a string (`user_name` or `user_name:group`), ids (e.g. `user_id:group_id`), tuple
-        (`(user_name, group_name)`), or int (`user_id`).
-
-        :param value: User name and (optional) group.
-        :type value: unicode, tuple, or int
-        """
         self._user = value
 
     @property
     def permissions(self):
         """
-        Returns the permission flags to be set for attached volumes.
+        Permission flags to be set for attached volumes. Can be in any notation accepted by `chmod`.
 
         :return: Permission flags.
         :rtype: unicode
@@ -235,18 +186,12 @@ class ContainerConfiguration(object):
 
     @permissions.setter
     def permissions(self, value):
-        """
-        Sets the permission flags to be set for attached volumes. Can be in any notation accepted by `chmod`.
-
-        :param value: Permission flags.
-        :type value: unicode
-        """
         self._permissions = value
 
     @property
     def create_options(self):
         """
-        Returns additional keyword args for :func:`docker.client.Client.create_container`.
+        Additional keyword args for :func:`docker.client.Client.create_container`.
 
         :return: Kwargs for creating the container.
         :rtype: dict
@@ -255,18 +200,12 @@ class ContainerConfiguration(object):
 
     @create_options.setter
     def create_options(self, value):
-        """
-        Sets additional keyword args for :func:`docker.client.Client.create_container`.
-
-        :param value: Kwargs for creating the container.
-        :type value: dict
-        """
         self._create_kwargs = value
 
     @property
     def start_options(self):
         """
-        Returns additional keyword args for :func:`docker.client.Client.start`.
+        Additional keyword args for :func:`docker.client.Client.start`.
 
         :return: Kwargs for starting the container.
         :rtype: dict
@@ -275,12 +214,6 @@ class ContainerConfiguration(object):
 
     @start_options.setter
     def start_options(self, value):
-        """
-        Sets additional keyword args for :func:`docker.client.Client.start`.
-
-        :param value: Kwargs for starting the container.
-        :type value: dict
-        """
         self._start_kwargs = value
 
     def update(self, values):
