@@ -53,8 +53,9 @@ between containers.
 * Automatically create and start containers when their dependent containers are started.
 
 `ContainerConfiguration`
----------------------
+------------------------
 Keeps the elements of a configured container. Its main elements are:
+
 * `image`: Docker image to base the container on (default is identical to container name).
 * `instances`: Can generate multiple instances of a container with varying host mappings;
 by default there is one main instance of each container.
@@ -91,7 +92,7 @@ Volume aliases are stored in `container_map.volumes` and host binds in
 ---------------------
 Applies a `ContainerMap` to a Docker client. A container on the map can easily be created
 with all its dependencies by running
-`client.create('container_name').
+`client.create('container_name')`.
 
 Running the container can be as easy as
 `client.start('container_name')`
