@@ -13,7 +13,7 @@ This package provides additional tools for building Docker images, create contai
 connect dependent resources, and run them in development as well as production
 environments.
 
-The library can be seen as an extension to the Docker Remote API client for Python,
+The library builds on functionality of the Docker Remote API client for Python,
 `docker-py`. Based on it, available deployment tools can be enhanced
 (see docker-fabric) or custom orchestration can be implemented.
 
@@ -48,7 +48,7 @@ This package therefore intends to reduce repetitions of names and paths in API c
 by introducing the following main features:
 
 * Automatically create and assign shared volumes, where the only purpose is to share data
-between containers.
+  between containers.
 * Use alias names instead of paths to bind host volumes to container shares.
 * Automatically create and start containers when their dependent containers are started.
 
@@ -58,21 +58,21 @@ Keeps the elements of a configured container. Its main elements are:
 
 * `image`: Docker image to base the container on (default is identical to container name).
 * `instances`: Can generate multiple instances of a container with varying host mappings;
-by default there is one main instance of each container.
+  by default there is one main instance of each container.
 * `shares`: Volumes that are simply shared by the container, only for the purpose of
-keeping data separate from the container instance, or for linking the entire container
-to another.
+  keeping data separate from the container instance, or for linking the entire container
+  to another.
 * `binds`: Host volume mappings. Uses alias names instead of directory paths.
 * `uses`: Can be names of other containers, or volumes shared by another volume through
-`attaches`. Has the same effect as the `volumes_from` argument in the API, but using alias
-names.
+  `attaches`. Has the same effect as the `volumes_from` argument in the API, but using alias
+  names.
 * `links`: For container linking. Container names are translated to instance name on the map.
 * `attaches`: Generates a separate container for the purpose of sharing data with another
-one, assigns file system permissions as set in `permissions` and `user`. This makes
-configuration of sockets very easy.
+  one, assigns file system permissions as set in `permissions` and `user`. This makes
+  configuration of sockets very easy.
 * `create_options` and `start_options` provide the possibility to add additional keyword
-arguments such as `command` or `entrypoint`, which are passed through to the `docker-py`
-client.
+  arguments such as `command` or `entrypoint`, which are passed through to the `docker-py`
+  client.
 
 `ContainerMap`
 --------------

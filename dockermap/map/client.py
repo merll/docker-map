@@ -120,11 +120,15 @@ class MappingDockerClient(object):
         image = config.image or container
         shared_volumes = list(itertools.chain(volumes or [], config.shares,
                                               (self._get_volume_path(b.volume) for b in config.binds))) or None
-        c_user = user or config.user
         if config.create_options:
-            c_kwargs = config.create_options.copy()
+            if callable(config.create_options):
+                c_kwargs = config.create_options()
+            else:
+                c_kwargs = config.create_options.copy()
+            c_user = user or c_kwargs.pop('user', config.user)
             c_kwargs.update(kwargs)
         else:
+            c_user = user or config.user
             c_kwargs = kwargs
 
         self._ensure_images(image)
@@ -157,7 +161,10 @@ class MappingDockerClient(object):
         if links:
             c_links.update(links)
         if config.start_options:
-            c_kwargs = config.start_options.copy()
+            if callable(config.start_options):
+                c_kwargs = config.start_options()
+            else:
+                c_kwargs = config.start_options.copy()
             c_kwargs.update(kwargs)
         else:
             c_kwargs = kwargs

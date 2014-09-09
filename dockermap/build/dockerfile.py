@@ -87,7 +87,7 @@ def format_expose(expose):
     :rtype: tuple
     """
     if isinstance(expose, (list, tuple)):
-        return tuple(six.string_types(e) for e in expose)
+        return map(six.text_type, expose)
     elif isinstance(expose, six.string_types):
         return expose,
     return six.text_type(expose),
