@@ -67,10 +67,27 @@ class DockerClientWrapper(docker.Client):
         log_str = None
         for e in response:
             output = parse_response(e)
-            log_str = output['stream'][:-1] if output is not None and 'stream' in output else None
-            if log_str is not None:
+            log_str = output['stream'][:-1] if output and 'stream' in output else None
+            if log_str:
                 self.push_log(log_str)
         return log_str  # Last line written to stdout
+
+    def _docker_status_stream(self, response):
+        result = {}
+        for e in response:
+            output = parse_response(e)
+            if output:
+                result.update(output)
+                if 'status' in output:
+                    id = output.get('id')
+                    progress = output.get('progress', '')
+                    if id:
+                        self.push_log("{0} {1} {2}".format(output['status'], id, progress))
+                    else:
+                        self.push_log(output['status'])
+                elif 'error' in output:
+                    self.push_log(output['error'])
+        return result
 
     def push_log(self, info):
         """
@@ -81,7 +98,7 @@ class DockerClientWrapper(docker.Client):
         """
         print(info)
 
-    def build(self, tag, **kwargs):
+    def build(self, tag, add_latest_tag=False, **kwargs):
         """
         Overrides the superclass `build()` and filters the output. Messages are deferred to `push_log`, whereas the
         final message is checked for a success message. If the latter is found, only the new image id is returned.
@@ -95,8 +112,32 @@ class DockerClientWrapper(docker.Client):
         response = super(DockerClientWrapper, self).build(tag=tag, **kwargs)
         last_log = self._docker_log_stream(response)
         if last_log is not None and last_log.startswith('Successfully built '):
-            return last_log[19:]  # Remove prefix
+            image_id = last_log[19:]  # Remove prefix
+            repo, __, i_tag = tag.partition(':')
+            if i_tag and i_tag != 'latest':
+                self.tag(image_id, repo, 'latest')
+            return image_id
         return None
+
+    def login(self, username, password=None, email=None, registry=None, reauth=False, **kwargs):
+        response = super(DockerClientWrapper, self).login(username, password, email, registry, reauth=reauth, **kwargs)
+        return response.get('Status') == 'Login Succeeded' or response.get('username') == username
+
+    def pull(self, repository, tag=None, stream=False, **kwargs):
+        response = super(DockerClientWrapper, self).pull(repository, tag=tag, stream=stream, **kwargs)
+        if stream:
+            result = self._docker_status_stream(response)
+        else:
+            result = self._docker_status_stream(response.split('\r\n') if response else ())
+        return result and not result.get('error')
+
+    def push(self, repository, stream=False, **kwargs):
+        response = super(DockerClientWrapper, self).push(repository, stream=stream, **kwargs)
+        if stream:
+            result = self._docker_status_stream(response)
+        else:
+            result = self._docker_status_stream(response.split('\r\n') if response else ())
+        return result and not result.get('error')
 
     def build_from_context(self, ctx, tag, **kwargs):
         """
