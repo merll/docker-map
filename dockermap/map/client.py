@@ -62,11 +62,12 @@ class MappingDockerClient(object):
             else:
                 i_name = ':'.join((image, 'latest'))
             if i_name not in self._get_image_tags():
-                self._client.import_image(image=image, tag=tag)
+                self._client.import_image(image=image, tag=tag or 'latest')
                 return True
             return False
 
-        if any(_check_image(image) for image in images):
+        new_images = [_check_image(image) for image in images]
+        if any(new_images):
             self._check_refresh_images(True)
 
     def _create_named_container(self, image, name, **kwargs):
