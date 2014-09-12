@@ -104,6 +104,7 @@ class MappingDockerClient(object):
             path = self._get_volume_path(alias)
             self._create_named_container(baseimage, c_name, volumes=[path], user=user)
             self._client.start(c_name)
+            self._client.wait(c_name)
             self._adjust_permissions(coreimage, c_name, path, user, permissions)
         else:
             self._client.push_log("Container '{0}' exists.".format(c_name))
