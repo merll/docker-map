@@ -18,10 +18,10 @@ class MappingDockerClient(object):
 
     Image names and container names are cached. In order to force a refresh, use :func:`refresh_names`.
 
-    :param container_map: :class:`.volumes.ContainerMap` instance.
-    :type container_map: utils.docker.volumes.ContainerMap
-    :param docker_client: :class:`.client.DockerClientWrapper` instance.
-    :type docker_client: utils.docker.client.DockerClientWrapper
+    :param container_map: :class:`.container.ContainerMap` instance.
+    :type container_map: dockermap.map.container.ContainerMap
+    :param docker_client: :class:`.base.DockerClientWrapper` instance.
+    :type docker_client: dockermap.map.base.DockerClientWrapper
     """
     def __init__(self, container_map=None, docker_client=None):
         self._map = container_map
@@ -37,6 +37,9 @@ class MappingDockerClient(object):
 
     def _cname(self, container, instance=None):
         return self._map.cname(container, instance)
+
+    def _iname(self, image):
+        return self._map.iname(image)
 
     def _check_refresh_containers(self, force=False):
         if force or self._container_names is None:
@@ -119,7 +122,7 @@ class MappingDockerClient(object):
     def _get_instance_containers(self, container, instances=None, volumes=None, user=None, **kwargs):
         config = self._get(container)
         c_instances = instances or config.instances or [None]
-        image = config.image or container
+        image = self._iname(config.image or container)
         shared_volumes = list(itertools.chain(volumes or [], config.shares,
                                               (self._get_volume_path(b.volume) for b in config.binds))) or None
         if config.create_options:
@@ -145,15 +148,11 @@ class MappingDockerClient(object):
 
     def _start_instance_containers(self, container, instances=None, binds=None, volumes_from=None, links=None, **kwargs):
         def _get_host_binds(instance):
-            for alias, rw in config.binds:
-                bind = {'bind': self._get_volume_path(alias), 'ro': not rw}
-                share = self._map.host.get(alias)
-                if share is not None:
-                    if isinstance(share, dict):
-                        if instance is not None:
-                            yield share.get(instance), bind
-                    else:
-                        yield share, bind
+            for alias, readonly in config.binds:
+                share = self._map.host.get(alias, instance)
+                if share:
+                    bind = {'bind': self._get_volume_path(alias), 'ro': readonly}
+                    yield share, bind
 
         config = self._get(container)
         c_instances = instances or config.instances or [None]
@@ -349,21 +348,15 @@ class MappingDockerClient(object):
     @property
     def client(self):
         """
-        Returns the Docker client.
+        Docker client.
 
-        :return: :class:`.client.DockerClientWrapper` instance.
-        :rtype: utils.docker.client.DockerClientWrapper
+        :return: :class:`.base.DockerClientWrapper` instance.
+        :rtype: dockermap.map.base.DockerClientWrapper
         """
         return self._client
 
     @client.setter
     def client(self, value):
-        """
-        Sets the Docker client.
-
-        :param value: :class:`.client.DockerClientWrapper` instance.
-        :type value: utils.docker.client.DockerClientWrapper
-        """
         self._client = value
         self._container_names = None
         self._image_tags = None
@@ -371,19 +364,13 @@ class MappingDockerClient(object):
     @property
     def map(self):
         """
-        Returns the container map.
+        Container map.
 
-        :return: :class:`.volumes.ContainerMap` instance.
-        :rtype: utils.docker.volumes.ContainerMap
+        :return: :class:`.container.ContainerMap` instance.
+        :rtype: dockermap.map.container.ContainerMap
         """
         return self._map
 
     @map.setter
     def map(self, value):
-        """
-        Sets the container map.
-
-        :param value: :class:`.volumes.ContainerMap` instance.
-        :type value: utils.docker.volumes.ContainerMap
-        """
         self._map = value

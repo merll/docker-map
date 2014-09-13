@@ -1,30 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import json
-
 from docker import client as docker
 from docker.errors import APIError
 
 from .dep import SingleDependencyResolver
 from ..build.context import DockerContext
-
-
-def parse_response(response):
-    """
-    Decodes the JSON response, simply ignoring syntax errors. Therefore it should be used for filtering visible output
-    only.
-
-    :param response: Server response as a JSON string.
-    :type response: unicode
-    :return: Decoded object from the JSON string. Returns `None` if input was invalid.
-    :rtype: object
-    """
-    try:
-        obj = json.loads(response, encoding='utf-8')
-    except ValueError:
-        return None
-    return obj
+from ..utils import parse_response
 
 
 class ContainerImageResolver(SingleDependencyResolver):
@@ -144,7 +126,7 @@ class DockerClientWrapper(docker.Client):
         Builds a docker image from the given docker context with a `Dockerfile` file object.
 
         :param ctx: An instance of :class:`~.context.DockerContext`.
-        :type ctx: utils.docker.context.DockerContext
+        :type ctx: dockermap.build.context.DockerContext
         :param tag: New image tag.
         :type tag: unicode
         :param kwargs: See :func:`docker.client.Client.build`.
@@ -158,8 +140,8 @@ class DockerClientWrapper(docker.Client):
         Builds a docker image from the given :class:`~.context.DockerFile`. Use this as a shortcut to
         :func:`~build_from_context`, if no extra data is added to the context.
 
-        :param dockerfile: An instance of :class:`~.context.DockerFile`.
-        :type dockerfile: utils.docker.context.DockerFile
+        :param dockerfile: An instance of :class:`~.dockerfile.DockerFile`.
+        :type dockerfile: dockermap.build.dockerfile.DockerFile
         :param tag: New image tag.
         :type tag: unicode
         :param kwargs: See :func:`docker.client.Client.build`.

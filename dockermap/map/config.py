@@ -1,10 +1,15 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import posixpath
 from collections import namedtuple
 import six
 
 from . import DictMap
+
+
+HostShare = namedtuple('HostShare', ('volume', 'readonly'))
+ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 
 
 def _get_list(value):
@@ -17,8 +22,41 @@ def _get_list(value):
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value)))
 
 
-HostBind = namedtuple('HostBind', ('volume', 'writeable'))
-ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
+def _get_listed_tuples(value, element_type, conversion_func):
+    if isinstance(value, element_type):
+        return [value]
+    elif isinstance(value, six.string_types):
+        return [conversion_func(value)]
+    elif isinstance(value, (list, tuple)):
+        return [conversion_func(e) for e in value]
+    elif isinstance(value, dict):
+        return [conversion_func(e) for e in six.iteritems(value)]
+    raise ValueError("Invalid type; expected {0}, list, tuple, or dict; found {1}.".format(element_type.__name__, type(value)))
+
+
+def _get_host_share(value):
+    if isinstance(value, six.string_types):
+        return HostShare(value, False)
+    elif isinstance(value, (list, tuple)):
+        if len(value) == 2:
+            return HostShare(value[0], bool(value[1]))
+        raise ValueError("Invalid element length; only tuples and lists of length 2 can be converted to a HostShare tuple.")
+    elif isinstance(value, dict):
+        if len(value) == 1:
+            k, v = value.items()[0]
+            return HostShare(k, bool(v))
+        raise ValueError("Invalid element length; only dicts with one element can be converted to a HostShare tuple.")
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value)))
+
+
+def _get_container_link(value):
+    if isinstance(value, six.string_types):
+        return ContainerLink(value, value)
+    elif isinstance(value, (list, tuple)):
+        if len(value) == 2:
+            return ContainerLink(*value)
+        raise ValueError("Invalid element length; only tuples and lists of length 2 can be converted to a ContainerLink tuple.")
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value)))
 
 
 class ContainerConfiguration(object):
@@ -93,21 +131,18 @@ class ContainerConfiguration(object):
     @property
     def binds(self):
         """
-        Returns the host volume binds for a container. These will be added to the shared volumes, and mapped to a host
-        volume on container start. Each bind should be an instance of :class:`HostBind` with parameters
-        `(volume_alias: unicode, write_access: bool)`.
+        Returns the host volume shares for a container. These will be added to the shared volumes, and mapped to a host
+        volume on container start. Each bind should be an instance of :class:`HostShare` with parameters
+        `(volume_alias: unicode, readonly: bool)`.
 
-        :return: Host binds.
+        :return: Host volumes.
         :rtype: list
         """
         return self._binds
 
     @binds.setter
     def binds(self, value):
-        if isinstance(value, HostBind):
-            self._binds = [value]
-        else:
-            self._binds = _get_list(value)
+        self._binds = _get_listed_tuples(value, HostShare, _get_host_share)
 
     @property
     def uses(self):
@@ -137,10 +172,7 @@ class ContainerConfiguration(object):
 
     @links.setter
     def links(self, value):
-        if isinstance(value, ContainerLink):
-            self._links_to = [value]
-        else:
-            self._links_to = _get_list(value)
+        self._links_to = _get_listed_tuples(value, ContainerLink, _get_container_link)
 
     @property
     def attaches(self):
@@ -232,6 +264,45 @@ class ContainerConfiguration(object):
 class HostVolumeConfiguration(DictMap):
     """
     Class for storing volumes, as shared from the host with Docker containers.
+
+    :param volume_root: Optional root directory for host volumes.
+    :type volume_root: unicode
     """
+    def __init__(self, volume_root=None):
+        self._root = volume_root
+        super(HostVolumeConfiguration, self).__init__()
+
     def __repr__(self):
         return '{0} shares: {1}'.format(self.__class__.__name__, self._map)
+
+    @property
+    def root(self):
+        """
+        Root directory for host volumes; if set, relative paths of host-shared directories will be prefixed with
+        this.
+
+        :return: Root directory for host volumes.
+        :rtype: unicode
+        """
+        return self._root
+
+    @root.setter
+    def root(self, value):
+        self._root = value
+
+    def get(self, item, instance=None):
+        value = super(HostVolumeConfiguration, self).get(item)
+        if isinstance(value, dict):
+            path = value.get(instance or 'default')
+        else:
+            path = value
+        if path and self._root and (path[0] != posixpath.sep):
+            return posixpath.join(self._root, path)
+        return path
+
+    def update(self, other=None, **kwargs):
+        if 'root' in other:
+            self._root = other.pop('root')
+        if 'root' in kwargs:
+            self._root = kwargs.pop('root')
+        super(HostVolumeConfiguration, self).update(other=other, **kwargs)

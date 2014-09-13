@@ -31,7 +31,7 @@ class DictMap(object):
 
     def get(self, item):
         """
-        Returns the value associated with the key `item`. Same as :func:`dict.get`.
+        Returns the value associated with the key `item`.
 
         :param item: Dictionary key.
         :type item: unicode

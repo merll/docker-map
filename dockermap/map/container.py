@@ -77,6 +77,7 @@ class ContainerMap(object):
     """
     def __init__(self, name, initial=None, check_integrity=True, **kwargs):
         self._name = name
+        self._repository = None
         self._host = HostVolumeConfiguration()
         self._volumes = DictMap()
         self._containers = defaultdict(ContainerConfiguration)
@@ -157,6 +158,19 @@ class ContainerMap(object):
             return '.'.join((self._name, container, instance))
         return '.'.join((self._name, container))
 
+    def iname(self, image):
+        """
+        Formats an image name for a container configuration. If the repository is already defined, it is not modified.
+        Otherwise the image name is prefixed with the default `repository`.
+
+        :param image: Image name.
+        :type image: unicode
+        :return: Repository-image name.
+        """
+        if '/' in image:
+            return image
+        return '/'.join((self._repository, image))
+
     def get(self, item):
         """
         Returns a container configuration from the map; if it does not yet exist, an initial config is created and
@@ -192,13 +206,20 @@ class ContainerMap(object):
         :param kwargs: Kwargs to update the map with
         """
         def _update(items):
-            for container, config in six.iteritems(items):
-                if container == 'volumes':
-                    self._volumes.update(config)
-                elif container == 'host':
-                    self._host.update(config)
+            for key, value in six.iteritems(items):
+                if key == 'volumes':
+                    self._volumes.update(value)
+                elif key == 'host':
+                    self._host.update(value)
+                elif key == 'host_root':
+                    self._host.root = value
+                elif key == 'repository':
+                    self._repository = value
+                elif key == 'containers':
+                    for container, config in six.iteritems(value):
+                        self._containers[container].update(config)
                 else:
-                    self._containers[container].update(config)
+                    self._containers[key].update(value)
 
         if isinstance(other, dict):
             _update(other)
@@ -211,7 +232,7 @@ class ContainerMap(object):
         * every container declared as `used` needs to have at least a shared volume or a host bind;
         * every host bind declared under `binds` needs to be shared from the host;
         * every volume alias used in `attached` and `binds` needs to be associated with a path in `volumes`;
-        * every container referred to in `links_to` needs to be defined.
+        * every container referred to in `links` needs to be defined.
 
         :param: Check for duplicate attached volumes.
         :type check_duplicates: bool
