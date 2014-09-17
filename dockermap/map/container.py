@@ -168,6 +168,8 @@ class ContainerMap(object):
         :return: Repository-image name.
         """
         if '/' in image:
+            if image.startswith('/'):
+                return image[1:]
             return image
         return '/'.join((self._repository, image))
 

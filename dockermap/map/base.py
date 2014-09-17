@@ -87,6 +87,8 @@ class DockerClientWrapper(docker.Client):
 
         :param tag: Tag of the new image to be built. Unlike in the superclass, this is obligatory.
         :type tag: unicode
+        :param add_latest_tag: In addition to the image `tag`, tag the image with `latest`.
+        :type add_latest_tag: bool
         :param kwargs: See :func:`docker.client.Client.build`.
         :return: New, generated image id or `None`.
         :rtype: unicode
