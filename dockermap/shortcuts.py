@@ -1,40 +1,61 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-_P = ' -p'
-_R = ' -R'
-_F = ' -f'
-_SYSTEM = ' --system'
-_NO_LOGIN = ' --no-create-home --disabled-login --disabled-password'
-_OUT_FILE = ' -o {0}'
-_CHDIR = ' -C {0}'
+import six
 
-_arg = lambda flag, is_set: flag if is_set else ''
-_arg_format = lambda flag, arg: flag.format(arg) if arg else ''
 
-rm = lambda path, recursive=False, force=False: 'rm{1}{2} {0}'.format(path, _arg(_R, recursive),  _arg(_F, force))
-chown = lambda user_group, path, recursive=True: 'chown{2} {0} {1}'.format(get_user_group(user_group), path, _arg(_R, recursive))
-chmod = lambda mode, path, recursive=True: 'chmod{2} {0} {1}'.format(mode, path, _arg(_R, recursive))
+_str_arg = lambda arg: six.text_type(arg).replace(' ', '\\ ')
 
-addgroup = lambda groupname, gid, system=False: 'addgroup{2} --gid {1} {0}'.format(groupname, gid, _arg(_SYSTEM, system))
-adduser = lambda username, uid, system=False, no_login=True: 'adduser{2}{3} --uid {1} --gid {1} {0}'.format(username, uid, _arg(_SYSTEM, system), _arg(_NO_LOGIN, no_login))
-assignuser = lambda username, groupnames: 'usermod -aG {1} {0}'.format(username, ','.join(groupnames))
 
-curl = lambda url, filename=None: 'curl{1} {0}'.format(url, _arg_format(_OUT_FILE, filename))
-wget = lambda url, filename=None: 'wget{1} {0}'.format(url, _arg_format(_OUT_FILE, filename))
-targz = lambda filename, source: 'tar -czf {0} {1}'.format(filename, source)
-untargz = lambda filename, target=None: 'tar{1} -xzf {0}'.format(filename, _arg_format(_CHDIR, target))
+def _gen_kwargs(kwargs):
+    for k, v in six.iteritems(kwargs):
+        if isinstance(v, tuple):
+            if v[0]:
+                yield ' '.join(map(_str_arg, v[1:]))
+        elif not isinstance(v, bool) and v is not None:
+            yield '{0} {1}'.format(k.replace('_', '-'), _str_arg(v))
+        elif v:
+            yield k.replace('_', '-')
+
+
+def _format_cmd(cmd, *args, **kwargs):
+    arg_str = ' '.join(map(_str_arg, args))
+    kwarg_str = ' '.join(_gen_kwargs(kwargs))
+    if kwarg_str:
+        return ' '.join((cmd, kwarg_str, arg_str))
+    return ' '.join((cmd, arg_str))
+
+
+_NO_LOGIN = '--no-create-home --disabled-login'
+_NO_PASSWORD = '--disabled-password'
+
+rm = lambda path, recursive=False, force=False: _format_cmd('rm', path, _R=bool(recursive), _f=bool(force))
+chown = lambda user_group, path, recursive=True: _format_cmd('chown', get_user_group(user_group), path,
+                                                             _R=bool(recursive))
+chmod = lambda mode, path, recursive=True: _format_cmd('chmod', mode, path, _R=bool(recursive))
+
+addgroup = lambda groupname, gid, system=False: _format_cmd('addgroup', groupname, __system=bool(system), __gid=gid)
+adduser = lambda username, uid, system=False, no_password=False, no_login=True, group=False, gecos=None: _format_cmd(
+    'adduser', username, __system=bool(system), __uid=uid, __group=bool(group), __gid=uid,
+    no_login=(no_login, _NO_LOGIN), __disabled_password=no_login or bool(no_password), __gecos=gecos)
+assignuser = lambda username, groupnames: _format_cmd('usermod', username, _aG=','.join(groupnames))
+
+curl = lambda url, filename=None: _format_cmd('curl', url, _o=filename)
+wget = lambda url, filename=None: _format_cmd('wget', url, _o=filename)
+targz = lambda filename, source: _format_cmd('tar', filename, source, _czf=True)
+untargz = lambda filename, target=None: _format_cmd('tar', filename, _xzf=True, _C=target)
 
 
 def get_user_group(user_group):
     """
-    Formats a user and group in the format 'user:group', as needed for 'chown'. If user_group is a tuple, this is used
-    for the fomatting. If a string or integer is given, it will be formatted as 'user:user'. Otherwise the input is
+    Formats a user and group in the format ``user:group``, as needed for `chown`. If user_group is a tuple, this is used
+    for the fomatting. If a string or integer is given, it will be formatted as ``user:user``. Otherwise the input is
     returned - this method does not perform any more checks.
 
-    :param user_group: User name, user id, user and group in format `user:group`, `user_id:group_id`, or tuple of (user, group).
+    :param user_group: User name, user id, user and group in format ``user:group``, ``user_id:group_id``, or tuple of
+      ``(user, group)``.
     :type user_group: unicode, int, or tuple
-    :return: Formatted string with in the format `user:group`.
+    :return: Formatted string with in the format ``user:group``.
     :rtype: unicode
     """
     if isinstance(user_group, tuple):
@@ -45,7 +66,7 @@ def get_user_group(user_group):
         return user_group
 
 
-def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, sudo=False):
+def addgroupuser(username, uid, groupnames=None, system=False, no_password=False, no_login=True, gecos=None, sudo=False):
     """
     Generates a unix command line for creating user and group with the same name, assigning the user to the group.
     Has the same effect as combining :func:`~addgroup`, :func:`~adduser`, and :func:`~assignuser`.
@@ -56,17 +77,21 @@ def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, su
     :type uid: int
     :param groupnames: Iterable with additional group names to assign the user to.
     :type groupnames: iterable
-    :param system: Create a system user and group. Default is `False`.
+    :param system: Create a system user and group. Default is ``False``.
     :type system: bool
-    :param no_login: Disallow login of this user and group, and skip creating the home directory. Default is `True`.
+    :param no_password: Do not set a password for the new user.
+    :type: no_password: bool
+    :param no_login: Disallow login of this user and group, and skip creating the home directory. Default is ``True``.
     :type no_login: bool
-    :param sudo: Prepend `sudo` to the command. Default is `False`. When using Fabric, use its `sudo` command instead.
+    :param gecos: Provide GECOS info and suppress prompt.
+    :type gecos: unicode
+    :param sudo: Prepend `sudo` to the command. Default is ``False``. When using Fabric, use its `sudo` command instead.
     :type sudo: bool
     :return: Unix shell command line.
     :rtype: unicode
     """
     group = addgroup(username, uid, system)
-    user = adduser(username, uid, system, no_login)
+    user = adduser(username, uid, system, no_password, no_login, False, gecos)
     prefix = 'sudo ' if sudo else ''
     if groupnames:
         usermod = assignuser(username, groupnames)
@@ -80,14 +105,15 @@ def mkdir(path, create_parent=True, check_if_exists=False):
 
     :param path: Directory path.
     :type path: unicode
-    :param create_parent: Create parent directories, if necessary. Default is `True`.
+    :param create_parent: Create parent directories, if necessary. Default is ``True``.
     :type create_parent: bool
-    :param check_if_exists: Prepend a check if the directory exists; in that case, the command is not run. Default is `False`.
+    :param check_if_exists: Prepend a check if the directory exists; in that case, the command is not run.
+      Default is ``False``.
     :type check_if_exists: bool
     :return: Unix shell command line.
     :rtype: unicode
     """
-    cmd = 'mkdir{1} {0}'.format(path, _arg(_P, create_parent))
+    cmd = _format_cmd('mkdir', path, _p=create_parent)
     if check_if_exists:
         return 'if [[ ! -d {0} ]]; then {1}; fi'.format(path, cmd)
     return cmd
@@ -98,14 +124,15 @@ def mkdir_chown(paths, user_group=None, permissions='ug=rwX,o=rX', create_parent
     Generates a unix command line for creating a directory and assigning permissions to it. Shortcut to a combination of
     :func:`~mkdir`, :func:`~chown`, and :func:`~chmod`.
 
-    Note that if `check_if_exists` has been set to `True`, and the directory is found, `mkdir` is not called, but
+    Note that if `check_if_exists` has been set to ``True``, and the directory is found, `mkdir` is not called, but
     `user_group` and `permissions` are still be applied.
 
     :param paths: Can be a single path string, or a list or tuple of path strings.
     :type paths: unicode or iterable
     :param: Optional owner of the directory. For notation, see :func:`~get_user_group`.
     :type user_group: unicode, int, or tuple
-    :param permissions: Optional permission mode, in any notation accepted by the unix `chmod` command. Default is `ug=rwX,o=rX`.
+    :param permissions: Optional permission mode, in any notation accepted by the unix `chmod` command.
+      Default is ``ug=rwX,o=rX``.
     :type permissions: unicode
     :param create_parent: Parent directories are created if not present (`-p` argument to `mkdir`).
     :type create_parent: bool
