@@ -26,7 +26,8 @@ def _format_cmd(cmd, *args, **kwargs):
     return ' '.join((cmd, arg_str))
 
 
-_NO_LOGIN = '--no-create-home --disabled-login'
+_NO_LOGIN = '--disabled-login'
+_NO_CREATE_HOME = '--no-create-home'
 _NO_PASSWORD = '--disabled-password'
 
 rm = lambda path, recursive=False, force=False: _format_cmd('rm', path, _R=bool(recursive), _f=bool(force))
@@ -37,7 +38,7 @@ chmod = lambda mode, path, recursive=True: _format_cmd('chmod', mode, path, _R=b
 addgroup = lambda groupname, gid, system=False: _format_cmd('addgroup', groupname, __system=bool(system), __gid=gid)
 adduser = lambda username, uid, system=False, no_password=False, no_login=True, group=False, gecos=None: _format_cmd(
     'adduser', username, __system=bool(system), __uid=uid, __group=bool(group), __gid=uid,
-    no_login=(no_login, _NO_LOGIN), __disabled_password=no_login or bool(no_password), __gecos=gecos)
+    no_login=(no_login, _NO_CREATE_HOME, _NO_LOGIN), __disabled_password=no_login or bool(no_password), __gecos=gecos)
 assignuser = lambda username, groupnames: _format_cmd('usermod', username, _aG=','.join(groupnames))
 
 curl = lambda url, filename=None: _format_cmd('curl', url, _o=filename)
