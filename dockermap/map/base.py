@@ -6,7 +6,7 @@ from docker.errors import APIError
 
 from .dep import SingleDependencyResolver
 from ..build.context import DockerContext
-from ..utils import parse_response
+from ..utils import is_latest_image, is_repo_image, parse_response
 
 
 class ContainerImageResolver(SingleDependencyResolver):
@@ -166,15 +166,20 @@ class DockerClientWrapper(docker.Client):
                 if e.response.status_code != 404:
                     raise e
 
-    def cleanup_images(self):
+    def cleanup_images(self, remove_old=False):
         """
         Finds all images that are neither used by any container nor another image, and removes them; does not remove
         repository-tagged images.
+
+        :param remove_old: Also removes images that have repository names, but no `latest` tag.
+        :type remove_old: bool
         """
         used_images = (container['Image'] for container in self.containers(all=True))
         image_dependencies = ((image['Id'], image['ParentId']) for image in self.images(all=True))
         resolver = ContainerImageResolver(used_images, image_dependencies)
-        unused_images = set(image['Id'] for image in self.images() if image['RepoTags'][0] == '<none>:<none>' and not resolver.get_dependencies(image['Id']))
+        tag_check = is_latest_image if remove_old else is_repo_image
+        unused_images = set(image['Id'] for image in self.images()
+                            if not tag_check(image) and not resolver.get_dependencies(image['Id']))
 
         for iid in unused_images:
             try:

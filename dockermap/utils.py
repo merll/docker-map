@@ -23,3 +23,11 @@ def parse_response(response):
     except ValueError:
         return None
     return obj
+
+
+def is_repo_image(image):
+    return image['RepoTags'][0] != '<none>:<none>'
+
+
+def is_latest_image(image):
+    return any(':latest' in tag for tag in image['RepoTags'])
