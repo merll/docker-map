@@ -36,7 +36,7 @@ chown = lambda user_group, path, recursive=True: _format_cmd('chown', get_user_g
 chmod = lambda mode, path, recursive=True: _format_cmd('chmod', mode, path, _R=bool(recursive))
 
 addgroup = lambda groupname, gid, system=False: _format_cmd('addgroup', groupname, __system=bool(system), __gid=gid)
-adduser = lambda username, uid, system=False, no_password=False, no_login=True, group=False, gecos=None: _format_cmd(
+adduser = lambda username, uid, system=False, no_login=True, no_password=False, group=False, gecos=None: _format_cmd(
     'adduser', username, __system=bool(system), __uid=uid, __group=bool(group), __gid=uid,
     no_login=(no_login, _NO_CREATE_HOME, _NO_LOGIN), __disabled_password=no_login or bool(no_password), __gecos=gecos)
 assignuser = lambda username, groupnames: _format_cmd('usermod', username, _aG=','.join(groupnames))
@@ -67,7 +67,7 @@ def get_user_group(user_group):
         return user_group
 
 
-def addgroupuser(username, uid, groupnames=None, system=False, no_password=False, no_login=True, gecos=None, sudo=False):
+def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no_password=False, gecos=None, sudo=False):
     """
     Generates a unix command line for creating user and group with the same name, assigning the user to the group.
     Has the same effect as combining :func:`~addgroup`, :func:`~adduser`, and :func:`~assignuser`.
@@ -80,10 +80,10 @@ def addgroupuser(username, uid, groupnames=None, system=False, no_password=False
     :type groupnames: iterable
     :param system: Create a system user and group. Default is ``False``.
     :type system: bool
-    :param no_password: Do not set a password for the new user.
-    :type: no_password: bool
     :param no_login: Disallow login of this user and group, and skip creating the home directory. Default is ``True``.
     :type no_login: bool
+    :param no_password: Do not set a password for the new user.
+    :type: no_password: bool
     :param gecos: Provide GECOS info and suppress prompt.
     :type gecos: unicode
     :param sudo: Prepend `sudo` to the command. Default is ``False``. When using Fabric, use its `sudo` command instead.
@@ -92,7 +92,7 @@ def addgroupuser(username, uid, groupnames=None, system=False, no_password=False
     :rtype: unicode
     """
     group = addgroup(username, uid, system)
-    user = adduser(username, uid, system, no_password, no_login, False, gecos)
+    user = adduser(username, uid, system, no_login, no_password, False, gecos)
     prefix = 'sudo ' if sudo else ''
     if groupnames:
         usermod = assignuser(username, groupnames)
