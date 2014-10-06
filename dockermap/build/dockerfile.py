@@ -144,7 +144,7 @@ class DockerFile(DockerStringBuffer):
     def prefix(self, prefix='#', *args):
         """
         Prefix one or multiple arguments with a Dockerfile command. The default is `#`, for comments. Multiple args will
-        be separated by a string.
+        be separated by a space.
 
         :param prefix: Dockerfile command to use, e.g. `ENV` or `RUN`.
         :type prefix: unicode

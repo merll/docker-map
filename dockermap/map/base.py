@@ -104,10 +104,41 @@ class DockerClientWrapper(docker.Client):
         return None
 
     def login(self, username, password=None, email=None, registry=None, reauth=False, **kwargs):
+        """
+        Login to a Docker registry server.
+
+        :param username: User name for login.
+        :type username: unicode
+        :param password: Login password; may be ``None`` if blank.
+        :type password: unicode
+        :param email: Optional; email address for login.
+        :type email: unicode
+        :param registry: Optional registry URL to log in to. Uses the Docker index by default.
+        :type registry: unicode
+        :param reauth: Re-authenticate, even if the login has been successful before.
+        :type reauth: bool
+        :param kwargs: Additional kwargs to :func:`docker.client.Client.login`.
+        :return: ``True`` if the login has succeeded, or if it has not been necessary as it succeeded before. ``False``
+          otherwise.
+        :rtype: bool
+        """
         response = super(DockerClientWrapper, self).login(username, password, email, registry, reauth=reauth, **kwargs)
         return response.get('Status') == 'Login Succeeded' or response.get('username') == username
 
     def pull(self, repository, tag=None, stream=False, **kwargs):
+        """
+        Pulls an image repository from the registry.
+
+        :param repository: Name of the repository.
+        :type repository: unicode
+        :param tag: Optional tag to pull; by default pulls all tags of the given repository.
+        :type tag: unicode
+        :param stream: Use the stream output format with additional status information.
+        :type stream: bool
+        :param kwargs: Additional kwargs for :func:`docker.client.Client.pull`.
+        :return: ``True`` if the image has been pulled successfully.
+        :rtype: bool
+        """
         response = super(DockerClientWrapper, self).pull(repository, tag=tag, stream=stream, **kwargs)
         if stream:
             result = self._docker_status_stream(response)
@@ -116,6 +147,17 @@ class DockerClientWrapper(docker.Client):
         return result and not result.get('error')
 
     def push(self, repository, stream=False, **kwargs):
+        """
+        Pushes an image repository to the registry.
+
+        :param repository: Name of the repository (can include a tag).
+        :type repository: unicode
+        :param stream: Use the stream output format with additional status information.
+        :type stream: bool
+        :param kwargs: Additional kwargs for :func:`docker.client.Client.push`.
+        :return: ``True`` if the image has been pushed successfully.
+        :rtype: bool
+        """
         response = super(DockerClientWrapper, self).push(repository, stream=stream, **kwargs)
         if stream:
             result = self._docker_status_stream(response)
@@ -168,8 +210,8 @@ class DockerClientWrapper(docker.Client):
 
     def cleanup_images(self, remove_old=False):
         """
-        Finds all images that are neither used by any container nor another image, and removes them; does not remove
-        repository-tagged images.
+        Finds all images that are neither used by any container nor another image, and removes them; by default does not
+        remove repository images.
 
         :param remove_old: Also removes images that have repository names, but no `latest` tag.
         :type remove_old: bool
