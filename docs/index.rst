@@ -30,6 +30,8 @@ Contents
    
    installation
    start
+   guide/dockerfiles
+   guide/context
 
 
 Status
