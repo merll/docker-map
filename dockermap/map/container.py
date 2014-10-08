@@ -129,6 +129,20 @@ class ContainerMap(object):
         return self._host
 
     @property
+    def repository(self):
+        """
+        Repository prefix for images. This is prepended to image names used by container configurations.
+
+        :return: Repository prefix.
+        :rtype: unicode
+        """
+        return self._repository
+
+    @repository.setter
+    def repository(self, value):
+        self._repository = value
+
+    @property
     def dependency_items(self):
         """
         Generates all containers' dependencies, i.e.. an iterator on tuples in the format
@@ -169,7 +183,7 @@ class ContainerMap(object):
         :return: Repository-image name.
         """
         if '/' in image:
-            if image.startswith('/'):
+            if image[0] == '/':
                 return image[1:]
             return image
         return '/'.join((self._repository, image))
