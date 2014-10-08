@@ -132,7 +132,7 @@ class ContainerMap(object):
     def dependency_items(self):
         """
         Generates all containers' dependencies, i.e.. an iterator on tuples in the format
-        `(container_name, used_containers`), whereas the used containers are a set, and can be empty.
+        ``(container_name, used_containers)``, whereas the used containers are a set, and can be empty.
 
         :return: Container dependencies.
         :rtype: iterator
@@ -160,8 +160,9 @@ class ContainerMap(object):
 
     def iname(self, image):
         """
-        Formats an image name for a container configuration. If the repository is already defined, it is not modified.
-        Otherwise the image name is prefixed with the default `repository`.
+        Formats an image name for a container configuration. If the repository prefix is already part of that name, it
+        is not modified.
+        Otherwise the image name is prefixed with the default :attr:`repository`.
 
         :param image: Image name.
         :type image: unicode

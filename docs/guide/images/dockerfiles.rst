@@ -32,25 +32,25 @@ you can use :func:`~dockermap.build.dockerfile.DockerFile.save`.
 
 
 Action commands
-===============
+---------------
 The following actions are performed on the string buffer immediately:
 
 Initial contents
-----------------
+^^^^^^^^^^^^^^^^
 Passing in a base image, a maintainer, or ``initial`` contents on instantiation. Plain Dockerfile commands can be used
 in ``initial``, as found in the `Dockerfile reference`_. The base image is prefixed with ``FROM``, whereas the
 maintainer is inserted with ``MAINTAINER``. None of the ``initial`` commands are processed any further, so they should
 be formatted properly and contain line breaks.
 
 Run commands
-------------
+^^^^^^^^^^^^
 In order to insert ``RUN`` commands for execution during the build process, use
 :func:`~dockermap.build.dockerfile.DockerFile.run` and
 :func:`~dockermap.build.dockerfile.DockerFile.run_all`. They are convenience methods for ``prefix('RUN', 'command')``
 and ``prefix_all('RUN', 'command 1', 'command 2', ...)``.
 
 Adding files
-------------
+^^^^^^^^^^^^
 Files can be added using :func:`~dockermap.build.dockerfile.DockerFile.add_file` and
 :func:`~dockermap.build.dockerfile.DockerFile.add_archive`. The former adds a single file or directory, whereas the
 latter adds the contents of an tar archive. By default, all files and directories will be inserted at the root of
@@ -86,40 +86,40 @@ For example, a file may also be added with the following arguments::
   Docker uses, this will not actually make the image smaller.
 
 Comments and blank lines
-------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^
 Comments can be inserted with :func:`~dockermap.build.dockerfile.DockerFile.comment`, which is only a convenience for
 ``prefix('#', 'comment')``. Passing ``None`` inserts an empty comment line. Blank lines are inserted with
 :func:`~dockermap.build.dockerfile.DockerFile.blank`. Note that these only have an effect if you actually store the
 Dockerfile somewhere.
 
 Miscellaneous Docker commands
------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Any Dockerfile command, or a series thereof, can be inserted with :func:`~dockermap.build.dockerfile.DockerFile.prefix`
 and :func:`~dockermap.build.dockerfile.DockerFile.prefix_all`.
 These insert strings prefixed with a Dockerfile command. Following convenience methods should be preferred where
 available.
 
 Direct write access
--------------------
+^^^^^^^^^^^^^^^^^^^
 Strings with Dockerfile contents may also be written directly using :func:`~dockermap.build.dockerfile.DockerFile.write`
 and :func:`~dockermap.build.dockerfile.DockerFile.writeline` (same, but appends a line break) and
 :func:`~dockermap.build.dockerfile.DockerFile.writelines` (for multiple). They are not further processed besides that.
 
 
 Configuration commands
-======================
+----------------------
 The following are set as properties to a Dockerfile. They are appended as soon as
 :func:`~dockermap.build.dockerfile.DockerFile.finalize` is called. Afterwards no more changes are allowed to the
 object. Typically it is not necessary to call :func:`~dockermap.build.dockerfile.DockerFile.finalize` manually.
 
 Volumes
--------
+^^^^^^^
 Setting :attr:`~dockermap.build.dockerfile.DockerFile.volumes` defines the list of volumes that a container in its
 default configuration will share. The list will be inserted prefixed with a ``VOLUME`` command, before any other of the
 following finalizing commands.
 
 Entry point and default command
--------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 :attr:`~dockermap.build.dockerfile.DockerFile.entrypoint` and
 :attr:`~dockermap.build.dockerfile.DockerFile.command` do the same as inserting ``ENTRYPOINT`` and ``CMD`` in the
 Dockerfile. They can be set either as a list/tuple of strings, or a single string separated with spaces. Depending on
@@ -133,14 +133,14 @@ commands in the Dockerfile. You can still use ``prefix('USER', 'username')`` if 
 build process.
 
 Exposed ports
--------------
+^^^^^^^^^^^^^
 :attr:`~dockermap.build.dockerfile.DockerFile.expose` can be set as a single string, integer, or as a list or tuple
 thereof. It will be written to the Dockerfile with the ``EXPOSE`` command; if applicable, multiple ports are separated
 with spaces.
 
 
 Building the Docker image
-=========================
+-------------------------
 For starting the build process, pass the :class:`~dockermap.build.dockerfile.DockerFile` to the Docker Remote API with
 the enhanced client function :func:`~dockermap.map.base.DockerClientWrapper.build_from_file`::
 

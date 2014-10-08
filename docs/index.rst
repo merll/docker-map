@@ -30,8 +30,10 @@ Contents
    
    installation
    start
-   guide/dockerfiles
-   guide/context
+
+   guide/images/dockerfiles
+   guide/images/context
+   guide/containers/landscapes
 
 
 Status
