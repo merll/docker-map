@@ -42,8 +42,8 @@ their dependencies.
 A simple example could be a web server an an application server, where the web server uses Unix sockets for
 communicating with the application server. The map could look like this::
 
-    container_map = ContainerMap({
-        nginx: { # Configure container creation and startup
+    container_map = ContainerMap('main', {
+        'nginx': { # Configure container creation and startup
             'image': 'nginx',
             'binds': {'nginx_config': 'ro'},
             'uses': 'uwsgi_socket',
@@ -61,11 +61,8 @@ communicating with the application server. The map could look like this::
             'attaches': ('uwsgi_log', 'app_log', 'uwsgi_socket'),
             'user': 2000,
             'permissions': 'u=rwX,g=rX,o=',
-            'start_options': {
-                'port_bindings': {8443: 8443},
-            },
         },
-        'volumes': { # Configure volume paths inside container
+        'volumes': { # Configure volume paths inside containers
             'nginx_config': '/etc/nginx',
             'nginx_log': '/var/log/nginx',
             'uwsgi_config': '/etc/uwsgi',
@@ -74,10 +71,10 @@ communicating with the application server. The map could look like this::
             'app_config': '/var/lib/app/config',
             'app_log': '/var/lib/app/log',
             'app_data': '/var/lib/app/data',
+        },
         'host': { # Configure volume paths on the Docker host
             'nginx_config': '/var/lib/site/config/nginx',
             'uwsgi_config': '/var/lib/site/config/uwsgi',
-            'app_config': '/var/lib/site/config/app',
             'app_config': '/var/lib/site/config/app',
             'app_data': '/var/lib/site/data/app',
         },

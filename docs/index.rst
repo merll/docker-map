@@ -33,7 +33,7 @@ Contents
 
    guide/images/dockerfiles
    guide/images/context
-   guide/containers/landscapes
+   guide/containers/maps
 
 
 Status
