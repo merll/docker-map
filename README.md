@@ -5,6 +5,7 @@ Utilities for building and managing Docker images and containers in Python.
 ---------------------------------------------------------------------------
 
 Project: https://github.com/merll/docker-map
+Docs: http://docker-map.readthedocs.org/en/latest/
 
 
 Overview
@@ -98,8 +99,3 @@ Running the container can be as easy as
 `client.start('container_name')`
 or can be enhanced with custom parameters such as
 `client.start('container_name', expose={80: 80})`.
-
-Todo
-====
-* More detailed introduction with examples.
-* Possibly add more Docker container configuration elements, e.g. command.
