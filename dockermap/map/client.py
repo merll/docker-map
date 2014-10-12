@@ -2,12 +2,23 @@
 from __future__ import unicode_literals
 
 import itertools
+import six
 
 from docker.errors import APIError
 
 from .. import DEFAULT_BASEIMAGE, DEFAULT_COREIMAGE
 from ..shortcuts import get_user_group
 from .container import ContainerDependencyResolver
+
+
+def _extract_user(user):
+    if user is None or user == '':
+        return None
+    if isinstance(user, tuple):
+        return user[0]
+    if isinstance(user, int):
+        return six.text_type(user)
+    return user.partition(':')[0]
 
 
 class MappingDockerClient(object):
@@ -130,10 +141,10 @@ class MappingDockerClient(object):
                 c_kwargs = config.create_options()
             else:
                 c_kwargs = config.create_options.copy()
-            c_user = user or c_kwargs.pop('user', config.user)
+            c_user = user or c_kwargs.pop('user', _extract_user(config.user))
             c_kwargs.update(kwargs)
         else:
-            c_user = user or config.user
+            c_user = user or _extract_user(config.user)
             c_kwargs = kwargs
 
         self._ensure_images(image)
