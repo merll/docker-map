@@ -33,6 +33,7 @@ Contents
 
    guide/images/dockerfiles
    guide/images/context
+   guide/containers/client
    guide/containers/maps
 
 

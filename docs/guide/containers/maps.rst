@@ -5,7 +5,7 @@ Managing containers
 Several practices have evolved around what should be part of a single image or separate. It is mainly a trade-off
 between simplicity and flexibility: On one hand, if one container instance encloses all necessary programs, it is easier
 to connect those, as they share one common file system and network. Beside security concerns, this can turn out to be
-impractical on the other hand. A single image has to be maintained and updated as a single image, which can become
+impractical on the other hand. A single image has to be maintained and updated in this form, which can become
 complex as well and takes more time to build. In larger system landscapes monolithic images also create redundancy of
 systems that could otherwise be shared easily, e.g. databases. Separate containers for different services are usually a
 better choice in more complex scenarios, but also hard to manage through command-line and startup-scripts alone.
@@ -17,7 +17,7 @@ and structuring user groups.
 
 Container landscapes with ContainerMap
 --------------------------------------
-The implementation of :class:`~dockermap.map.container.ContainerMap` aims to address both issues.
+The implementation of :class:`~dockermap.map.container.ContainerMap` aims to address both aforementioned issues.
 
 * It configures the creation and start of containers, including their dependencies.
 * Shared resources (e.g. file systems, unix domain sockets) can be moved to shared volumes; permissions can be adjusted
@@ -36,17 +36,22 @@ A :class:`~dockermap.map.container.ContainerMap` carries the following main elem
 * :attr:`~dockermap.map.container.ContainerMap.volumes`: Shared volume aliases to be used by the container configurations.
 * :attr:`~dockermap.map.container.ContainerMap.host`: Host volume paths, if they are mapped from the host's file system
 
-All of their contents can be accessed in a dictionary-like syntax, e.g.::
+Their contents can be accessed like regular attributes, e.g.::
 
     container_map.containers.app1.binds = 'volume1'
     container_map.volumes.volume1 = '/var/log/service'
     container_map.host.volume1 = '/var/log/app1'
 
-or::
+or in a dictionary-like syntax::
 
     container_map.containers['app1'].binds = 'volume1'
     container_map.volumes['volume1'] = '/var/log/service'
     container_map.host['volume1'] = '/var/log/app1'
+
+.. NOTE::
+   Elements of :attr:`~dockermap.map.container.ContainerMap.containers` do not have to be instantiated explicitly, but
+   are created upon their first access. For accessing only defined container configurations, see
+   :attr:`~dockermap.map.container.ContainerMap.get_existing`.
 
 Additionally there are the following attributes:
 
@@ -58,7 +63,7 @@ Additionally there are the following attributes:
 Volumes
 ^^^^^^^
 Typically Docker images rely on finding shared files (e.g. working data, log paths) in a specific directory.
-The :attr:`~dockermap.map.container.ContainerMap.volumes` of a container map assigns aliases to those paths. It is
+The :attr:`~dockermap.map.container.ContainerMap.volumes` of a container map assigns aliases to those elements. It is
 more or less just a simple dictionary of alias names and paths.
 
 Host
@@ -68,13 +73,13 @@ The :attr:`~dockermap.map.container.ContainerMap.host` is a single instance of
 :attr:`~dockermap.map.container.ContainerMap.volumes`, but it defines paths on the host-side. Every alias used here
 should also be defined container-side in :attr:`~dockermap.map.container.ContainerMap.volumes`.
 
-Beside that, a :attr:`~dockermap.map.config.HostVolumeConfiguration`
-one optional property: :attr:`~dockermap.map.config.HostVolumeConfiguration.root`. If the paths are relative paths
+Beside that, a :attr:`~dockermap.map.config.HostVolumeConfiguration` has
+the optional property :attr:`~dockermap.map.config.HostVolumeConfiguration.root`. If the paths are relative paths
 (i.e. they do not start with ``/``), they will be prefixed with the `root` at run-time.
 
 Usually paths are defined as normal strings. If you intend to launch multiple
 :attr:`~dockermap.map.config.ContainerConfiguration.instances` of the same container with
-different host-path assignments, you can however also define an entry as a dictionary::
+different host-path assignments, you can however also differentiate them as a dictionary::
 
     container_map.containers.app1.instances = 'instance1', 'instance2'
     ...
@@ -92,10 +97,10 @@ the following properties:
 Image
 """""
 The :attr:`~dockermap.map.config.ContainerConfiguration.image` simply sets the image to instantiate the container(s)
-from. If :attr:`~dockermap.map.config.ContainerConfiguration.repository` is set on the parent
-:class:`~dockermap.map.config.ContainerConfiguration`, it will be used as a prefix to the image name.
+from. If :attr:`~dockermap.map.container.ContainerMap.repository` is set on the parent
+:class:`~dockermap.map.container.ContainerMap`, it will be used as a prefix to the image name.
 
-For example, if you have a local registry under ``registry.example.com``, you likely do not want to name each of your
+For example, if you have a local registry under `registry.example.com`, you likely do not want to name each of your
 images separately as ``registry.example.com/image1``, ``registry.example.com/image2``, and so on. Instead, just set
 the :attr:`~dockermap.map.config.ContainerConfiguration.repository` to ``registry.example.com`` and use image names
 ``image1``, ``image2`` etc.
@@ -104,7 +109,9 @@ As an exception, any image with ``/`` in its name will not be prefixed. In order
 set :attr:`~dockermap.map.config.ContainerConfiguration.image` to ``/ubuntu``.
 
 If the image is not set at all, by default an image with the same name as the container will be attempted to use. Where
-applicable, it is prefixed with :attr:`~dockermap.map.config.ContainerConfiguration.repository`.
+applicable, it is prefixed with the :attr:`~dockermap.map.container.ContainerMap.repository`.
+
+.. _instances:
 
 Instances
 """""""""
@@ -117,7 +124,7 @@ Shared volumes
 """"""""""""""
 Volume paths can be set in :attr:`~dockermap.map.config.ContainerConfiguration.shares`, just like the
 ``VOLUME`` command in the Dockerfile or the ``-v`` argument to the command line client.
-You do not need to specify host-mapped volumes here - this is what
+You do not need to specify host-mapped volumes here -- this is what
 :attr:`~dockermap.map.config.ContainerConfiguration.binds` is for.
 
 Volumes shared with the host
@@ -128,8 +135,10 @@ container. The definition is usually a list or tuple of :attr:`~dockermap.map.co
 is a named tuple ``(volume, readonly)``, where the first element is the volume alias, and the second is a boolean
 value indicating a read-only access.
 
-For easier input, this can also be set as a simple two-element Python tuples, dictionaries with each a single key, or
-strings (which will default to write-access).
+For easier input, this can also be set as simple two-element Python tuples, dictionaries with each a single key;
+strings are also valid input, which will default to write-access.
+
+.. _shared-volumes-containers:
 
 Volumes shared with other containers
 """"""""""""""""""""""""""""""""""""
@@ -141,6 +150,8 @@ You can refer to other containers names on the map, or names listed in the
 container names, this container will have access to all of their shared volumes; when referencing attached volumes, only
 the attached volume will be accessible. Either way, this declares a dependency of one container on the other.
 
+.. _linked-containers:
+
 Linked containers
 """""""""""""""""
 Containers on the map can be linked together (similar to the ``--link`` argument on the command line) by assigning
@@ -150,22 +161,23 @@ gains access to the network of the referenced container. This also defines a dep
 Elements are set as :attr:`~dockermap.map.config.ContainerLink` named tuples, with elements ``(container, alias)``.
 However, it is also possible to insert plain two-element Python tuples, single-key dictionaries, and strings. If the
 alias is not set (e.g. because only a string is provided), the alias is identical to the container name, but without
-the name prefix of the ContainerMap.
+the name prefix of the `ContainerMap`.
+
+.. _attached-volumes:
 
 Selectively sharing volumes
 """""""""""""""""""""""""""
 There are multiple possibilities how a file system can be shared between containers:
 
-* Assigning all sharing containers the same host volume. This is the most practical approach for persistent working
-  data.
-* Sharing all volumes of one container with the other. It is the most pragmatic approach for temporary
+* Assigning all containers the same host volume. This is the most practical approach for persistent working data.
+* Sharing all volumes of one container with another. It is the most pragmatic approach for temporary
   files, e.g. pid or Unix sockets. However, this also implies access to all other shared volumes such as host paths.
 * In order to restrict sharing to the relevant volumes, an extra container can be created that is shared between
   all other containers. For example, a web application server communicating with its cache over Unix domain sockets
   needs access to the latter, but not the cache's data or configuration.
 
 Volumes for selective sharing with other containers can be generated using the
-:attr:`~dockermap.map.config.ContainerConfiguration.attaches` property. It refers to a path in
+:attr:`~dockermap.map.config.ContainerConfiguration.attaches` property. It refers to an alias in
 :attr:`~dockermap.map.container.ContainerMap.volumes` in order to define a path. At the same time, this becomes the
 name of the extra container, and other container configurations can refer to it in the
 :attr:`~dockermap.map.config.ContainerConfiguration.uses` property.
@@ -174,9 +186,11 @@ name of the extra container, and other container configurations can refer to it 
 `tianon/true`. They are also shared with the owning container. Since sharing data with other containers with
 non-superuser privileges usually requires permission adjustments, setting
 :attr:`~dockermap.map.config.ContainerConfiguration.user` starts one more temporary container (based on
-`busybox`) running a ``chown``. Furthermore this sets the user that the current container is started with.
-Similarly, :attr:`~dockermap.map.config.ContainerConfiguration.permissions` a temporary `busybox` container performs
+`busybox`) running a ``chown`` command. Furthermore this sets the user that the current container is started with.
+Similarly for :attr:`~dockermap.map.config.ContainerConfiguration.permissions`, a temporary `busybox` container performs
 a ``chmod`` command on the shared container.
+
+.. _additional-options:
 
 Additional options
 """"""""""""""""""
@@ -187,7 +201,7 @@ passed to the Docker Remote API functions in addition to the ones indirectly set
 * The user that a container is launched with, inherited from :attr:`~dockermap.map.config.ContainerConfiguration.user`,
   can be overridden by setting ``user`` in :attr:`~dockermap.map.config.ContainerConfiguration.create_options`.
 * Entries from ``volumes`` in :attr:`~dockermap.map.config.ContainerConfiguration.create_options` are
-  added to :attr:`~dockermap.map.config.ContainerConfiguration.shares` and resolved aliases from
+  added to elements of :attr:`~dockermap.map.config.ContainerConfiguration.shares` and resolved aliases from
   :attr:`~dockermap.map.config.ContainerConfiguration.binds`.
 * Mappings on ``volumes_from`` in :attr:`~dockermap.map.config.ContainerConfiguration.start_options` override entries
   with identical keys (paths) generated from :attr:`~dockermap.map.config.ContainerConfiguration.uses`;
@@ -197,14 +211,14 @@ passed to the Docker Remote API functions in addition to the ones indirectly set
   Non-conflicting names merge.
 
 Besides overriding the generated arguments, these options can also be used for addressing features not directly
-related to Docker-Map, e.g.::
+related to `Docker-Map`, e.g.::
 
     config = container_map.containers.app1
     config.create_options = {
         'mem_limit': '3g',  # Sets a memory limit.
     }
     config.start_options = {
-        'port_bindings': {8080: 80},  # Map the container port 8000 to host port 80.
+        'port_bindings': {8000: 80},  # Map the container port 8000 to host port 80.
         'restart_policy': {'MaximumRetryCount': 0, 'Name': 'always'},  # Unlimited restart attempts.
     }
 
@@ -240,18 +254,23 @@ at run-time, use::
 
 Creating and using container maps
 ---------------------------------
-A map and its can be initialized with or updated from a dictionary. Its keys and values should be structured
+A map can be initialized with or updated from a dictionary. Its keys and values should be structured
 in the same way as the properties of :class:`~dockermap.map.container.ContainerMap`. There are two exceptions:
 
 * Container names with their associated configuration can be, but do not have to be wrapped inside a ``containers``
   key. Any key that is not ``volumes``, ``host``, ``repository``, or ``host_root`` is considered a potential container
   name.
 * The host root path :attr:`~dockermap.map.config.HostVolumeConfiguration.root` can be set either with a ``host_root``
-  key on the highest level of the dictionary, or by a ``root`` key inside the ``host`` key.
+  key on the highest level of the dictionary, or by a ``root`` key inside the ``host`` dictionary.
 
 For initializing a container map upon instantiation, pass the dictionary as the second argument, after the map name.
 This also performs a brief integrity check, which can be deactivated by passing ``check_integrity=False`` and repeated
 any time later with :func:`~dockermap.map.container.ContainerMap.check_integrity`.
+
+A :class:`~dockermap.map.client.MappingDockerClient` instance finally applies the container map to a Docker client. Due
+to needed additional functionality in the process of creating and running containers, the latter must be an instance of
+:class:`~dockermap.map.base.DockerClientWrapper`. Details of these implementations are described in
+:ref:`container_client`.
 
 Example
 ^^^^^^^
@@ -303,7 +322,7 @@ sockets::
     })
 
 This example assumes you have two images, ``registry.example.com/nginx`` for the web server and
-``registry.example.com/app`` for the application server, including the app. Inside the ``nginx`` image, the working
+``registry.example.com/app`` for the application server (including the app). Inside the ``nginx`` image, the working
 user is assigned to the group id ``2000``. The app server is running with a user that has the id ``2000``.
 
 Creating a container with::
