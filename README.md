@@ -5,6 +5,7 @@ Utilities for building and managing Docker images and containers in Python.
 ---------------------------------------------------------------------------
 
 Project: https://github.com/merll/docker-map
+
 Docs: http://docker-map.readthedocs.org/en/latest/
 
 
@@ -78,6 +79,7 @@ Keeps the elements of a configured container. Its main elements are:
 `ContainerMap`
 --------------
 Contains three sets of elements:
+
 1. Container names, associated with a `ContainerConfiguration`.
 2. Volumes, mapping shared directory paths to alias names.
 3. Host shares, mapping host directory paths to alias names.

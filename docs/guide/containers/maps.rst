@@ -272,6 +272,7 @@ to needed additional functionality in the process of creating and running contai
 :class:`~dockermap.map.base.DockerClientWrapper`. Details of these implementations are described in
 :ref:`container_client`.
 
+.. _container_map_example:
 Example
 ^^^^^^^
 This is a brief example, given a web server that communicates with two app instances of the same image over unix domain
@@ -312,11 +313,11 @@ sockets::
             'web_config': 'config/nginx',
             'app_config': {
                 'instance1': 'config/app1',
-                'instance1': 'config/app2',
+                'instance2': 'config/app2',
             },
             'app_data': {
                 'instance1': 'data/app1',
-                'instance1': 'data/app2',
+                'instance2': 'data/app2',
             },
         },
     })

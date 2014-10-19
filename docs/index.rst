@@ -33,8 +33,10 @@ Contents
 
    guide/images/dockerfiles
    guide/images/context
+   guide/shortcuts
    guide/containers/client
    guide/containers/maps
+   guide/containers/yaml
 
 
 Status
