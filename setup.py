@@ -1,14 +1,16 @@
 from distutils.spawn import find_executable
 import os
-import pandoc
 from setuptools import setup, find_packages
 
 from dockermap import __version__
 
-pandoc.core.PANDOC_PATH = find_executable('pandoc')
-
 
 def include_readme():
+    try:
+        import pandoc
+    except ImportError:
+        return ''
+    pandoc.core.PANDOC_PATH = find_executable('pandoc')
     readme_file = os.path.join(os.path.dirname(__file__), 'README.md')
     doc = pandoc.Document()
     with open(readme_file, 'r') as rf:
@@ -21,6 +23,9 @@ setup(
     version=__version__,
     packages=find_packages(),
     install_requires=['six', 'docker-py>=0.5.0'],
+    extras_require = {
+        'yaml':  ['PyYAML'],
+    },
     license='MIT',
     author='Matthias Erll',
     author_email='matthias@erll.de',
