@@ -45,6 +45,15 @@ dockermap.map.dep module
     :show-inheritance:
 
 
+dockermap.map.dep module
+------------------------
+
+.. automodule:: dockermap.map.yaml
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
 Module contents
 ---------------
 

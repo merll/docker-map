@@ -273,6 +273,7 @@ to needed additional functionality in the process of creating and running contai
 :ref:`container_client`.
 
 .. _container_map_example:
+
 Example
 ^^^^^^^
 This is a brief example, given a web server that communicates with two app instances of the same image over unix domain

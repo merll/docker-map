@@ -12,11 +12,9 @@ YAML elements
 When used according to the full specification, YAML is a very feature-rich and powerful language. This is only
 a quick introduction to the syntactical elements of YAML, as relevant for container maps:
 
-* YAML implicitly transports one document per file. The standard also allows for placing multiple YAML documents in
-  one file, although Docker-Map does not make use of that (yet).
-* Document elements can be structured in a hierarchy, similar to other markup languages. Just Like in Python, the
+* YAML elements can be structured in a hierarchy, similar to other markup languages. Just Like in Python, the
   hierarchy level is defined by outline indentation.
-* Every line without any prefix is usually written as a key-value pair ``key: value``, and read as items of an
+* Every line without any prefix is a key-value pair ``key: value``, and read as items of an
   associative array (a dictionary in Python). An indented key indicates a nested structure.
 * Lines prefixed with a dash ``-`` followed by a space represent items of a list.
 * Most data types are implicit. For example, you do not need to quote strings, unless they consist of only numbers and
@@ -33,7 +31,7 @@ also has detailed examples. There is also a `type list`_, which decribes most im
 Example
 ^^^^^^^
 
-The container_map_example_ map can be more easily written as:
+The :ref:`container_map_example` map can be more easily written as:
 
 .. code-block:: yaml
 
@@ -78,22 +76,31 @@ The container_map_example_ map can be more easily written as:
 
 Importing YAML maps
 -------------------
-The easiest way to generate a :class:`~dockermap.map.container.ContainerMap` from a YAML file is to use
+The easiest way to generate a :class:`~dockermap.map.container.ContainerMap` from a YAML file is
 :func:`~dockermap.map.yaml.load_map_file`::
 
     from dockermap.map import yaml
     map = yaml.load_map_file('/path/to/example_map.yaml')
 
 
-By default the map will be named according to the file name; this can be overwritten, e.g.::
+By default the map will be named according to a ``name`` element on the root level of the map; this can be overwritten,
+e.g.::
 
     map = yaml.load_map_file('/path/to/example_map.yaml', 'apps')
 
-
-Additionally the initial integrity check can be skipped by passing ``check_integrity=False``.
+The initial integrity check can be skipped by passing ``check_integrity=False``.
 
 If your YAML structure is not a file, but a stream, you can use :func:`~dockermap.map.yaml.load_map`. It takes a buffer
 as first argument; additional arguments are identical to ``load_map_file``.
+
+There are in total three ways to assign a name to a map, in the following order of priority:
+
+1. The name passed as a keyword argument in :func:`~dockermap.map.yaml.load_map_file` or
+   :func:`~dockermap.map.yaml.load_map`.
+2. The base file name without extension from :func:`~dockermap.map.yaml.load_map_file`, if an empty string is passed
+   as the ``name`` argument.
+3. An extra ``name`` element on the root level of the map.
+
 
 User and environment variables
 ------------------------------
