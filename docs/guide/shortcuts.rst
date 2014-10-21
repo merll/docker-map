@@ -1,7 +1,7 @@
 .. _shortcuts:
 
-Utilitities for image building
-==============================
+Shortcuts for Dockerfiles
+=========================
 
 A couple of common commands in a `Dockerfile` require writing a lot of repetitive code. In combination with variables
 from Python code, additional adaptions (e.g. escaping of strings, reformatting of certain parameters) has to be made.
