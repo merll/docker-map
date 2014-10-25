@@ -23,15 +23,16 @@ def _extract_user(user):
 
 class MappingDockerClient(object):
     """
-    Reflects a :class:`.volumes.ContainerMap` instance on a Docker client (:class:`.client.DockerClientWrapper`).
+    Reflects a :class:`~dockermap.map.container.ContainerMap` instance on a Docker client
+    (:class:`~dockermap.map.base.DockerClientWrapper`).
     This means that the usual actions of creating containers, starting containers, and stopping containers consider
     dependent containers and volume assignments.
 
-    Image names and container names are cached. In order to force a refresh, use :func:`refresh_names`.
+    Image names and container names are cached. In order to force a refresh, use :meth:`refresh_names`.
 
-    :param container_map: :class:`.container.ContainerMap` instance.
+    :param container_map: :class:`~dockermap.map.container.ContainerMap` instance.
     :type container_map: dockermap.map.container.ContainerMap
-    :param docker_client: :class:`.base.DockerClientWrapper` instance.
+    :param docker_client: :class:`~dockermap.map.base.DockerClientWrapper` instance.
     :type docker_client: dockermap.map.base.DockerClientWrapper
     """
     def __init__(self, container_map=None, docker_client=None):

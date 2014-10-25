@@ -89,7 +89,7 @@ class DockerClientWrapper(docker.Client):
         :type tag: unicode
         :param add_latest_tag: In addition to the image `tag`, tag the image with `latest`.
         :type add_latest_tag: bool
-        :param kwargs: See :func:`docker.client.Client.build`.
+        :param kwargs: See :meth:`docker.client.Client.build`.
         :return: New, generated image id or `None`.
         :rtype: unicode
         """
@@ -117,7 +117,7 @@ class DockerClientWrapper(docker.Client):
         :type registry: unicode
         :param reauth: Re-authenticate, even if the login has been successful before.
         :type reauth: bool
-        :param kwargs: Additional kwargs to :func:`docker.client.Client.login`.
+        :param kwargs: Additional kwargs to :meth:`docker.client.Client.login`.
         :return: ``True`` if the login has succeeded, or if it has not been necessary as it succeeded before. ``False``
           otherwise.
         :rtype: bool
@@ -135,7 +135,7 @@ class DockerClientWrapper(docker.Client):
         :type tag: unicode
         :param stream: Use the stream output format with additional status information.
         :type stream: bool
-        :param kwargs: Additional kwargs for :func:`docker.client.Client.pull`.
+        :param kwargs: Additional kwargs for :meth:`docker.client.Client.pull`.
         :return: ``True`` if the image has been pulled successfully.
         :rtype: bool
         """
@@ -154,7 +154,7 @@ class DockerClientWrapper(docker.Client):
         :type repository: unicode
         :param stream: Use the stream output format with additional status information.
         :type stream: bool
-        :param kwargs: Additional kwargs for :func:`docker.client.Client.push`.
+        :param kwargs: Additional kwargs for :meth:`docker.client.Client.push`.
         :return: ``True`` if the image has been pushed successfully.
         :rtype: bool
         """
@@ -173,7 +173,7 @@ class DockerClientWrapper(docker.Client):
         :type ctx: dockermap.build.context.DockerContext
         :param tag: New image tag.
         :type tag: unicode
-        :param kwargs: See :func:`docker.client.Client.build`.
+        :param kwargs: See :meth:`docker.client.Client.build`.
         :return: New, generated image id or `None`.
         :rtype: unicode
         """
@@ -181,15 +181,15 @@ class DockerClientWrapper(docker.Client):
 
     def build_from_file(self, dockerfile, tag, **kwargs):
         """
-        Builds a docker image from the given :class:`~.context.DockerFile`. Use this as a shortcut to
-        :func:`~build_from_context`, if no extra data is added to the context.
+        Builds a docker image from the given :class:`~dockermap.build.dockerfile.DockerFile`. Use this as a shortcut to
+        :meth:`build_from_context`, if no extra data is added to the context.
 
-        :param dockerfile: An instance of :class:`~.dockerfile.DockerFile`.
+        :param dockerfile: An instance of :class:`~dockermap.build.dockerfile.DockerFile`.
         :type dockerfile: dockermap.build.dockerfile.DockerFile
         :param tag: New image tag.
         :type tag: unicode
-        :param kwargs: See :func:`docker.client.Client.build`.
-        :return: New, generated image id or `None`.
+        :param kwargs: See :meth:`docker.client.Client.build`.
+        :return: New, generated image id or ``None``.
         :rtype: unicode
         """
         with DockerContext(dockerfile, finalize=True) as ctx:
@@ -253,8 +253,8 @@ class DockerClientWrapper(docker.Client):
 
     def push_container_logs(self, container):
         """
-        Reads the current container logs and passes them to :func:`~push_log`. Removes a trailing empty line and prefixes
-        each log line with the container name.
+        Reads the current container logs and passes them to :meth:`~push_log`. Removes a trailing empty line and
+        prefixes each log line with the container name.
 
         :param container: Container name or id.
         :type container: unicode
@@ -289,7 +289,7 @@ class DockerClientWrapper(docker.Client):
     def copy_resource(self, container, resource, local_filename):
         """
         *Experimental:* Copies a resource from a Docker container to a local tar file. For details, see
-        :func:`docker.client.Client.copy`.
+        :meth:`docker.client.Client.copy`.
 
         :param container: Container name or id.
         :type container: unicode
@@ -306,7 +306,7 @@ class DockerClientWrapper(docker.Client):
     def save_image(self, image, local_filename):
         """
         *Experimental:* Copies an image from Docker to a local tar file. For details, see
-        :func:`docker.client.Client.get_image`.
+        :meth:`docker.client.Client.get_image`.
 
         :param image: Image name or id.
         :type image: unicode

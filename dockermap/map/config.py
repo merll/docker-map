@@ -223,7 +223,7 @@ class ContainerConfiguration(object):
     @property
     def create_options(self):
         """
-        Additional keyword args for :func:`docker.client.Client.create_container`.
+        Additional keyword args for :meth:`docker.client.Client.create_container`.
 
         :return: Kwargs for creating the container.
         :rtype: dict
@@ -237,7 +237,7 @@ class ContainerConfiguration(object):
     @property
     def start_options(self):
         """
-        Additional keyword args for :func:`docker.client.Client.start`.
+        Additional keyword args for :meth:`docker.client.Client.start`.
 
         :return: Kwargs for starting the container.
         :rtype: dict

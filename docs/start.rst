@@ -16,7 +16,7 @@ For deriving a new image from an existing `ubuntu` base image, you can use the f
 
 Docker image with files
 -----------------------
-For adding files during the build process, use the :func:`~dockermap.build.dockerfile.DockerFile.add_file` function.
+For adding files during the build process, use the :meth:`~dockermap.build.dockerfile.DockerFile.add_file` function.
 It inserts the `ADD` command into the Dockerfile, but also makes sure that file is part of the context tarball::
 
     client = DockerClientWrapper('unix://var/run/docker.sock')

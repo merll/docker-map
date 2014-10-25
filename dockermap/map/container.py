@@ -191,7 +191,7 @@ class ContainerMap(object):
     def get(self, item):
         """
         Returns a container configuration from the map; if it does not yet exist, an initial config is created and
-        returned (to avoid this, use :func:`get_existing` instead). `item` can be any valid Docker container name.
+        returned (to avoid this, use :meth:`get_existing` instead). `item` can be any valid Docker container name.
 
         :param item: Container name.
         :type item: unicode
@@ -202,7 +202,7 @@ class ContainerMap(object):
 
     def get_existing(self, item):
         """
-        Same as :func:`get`, except for that non-existing container configurations will not be created; `None` is
+        Same as :meth:`get`, except for that non-existing container configurations will not be created; ``None`` is
         returned instead in this case.
 
         :param item: Container name.

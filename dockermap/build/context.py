@@ -45,17 +45,18 @@ class DockerContext(DockerTempFile):
 
         :param name: File or directory path.
         :type name: unicode
-        :param args: Additional args for :func:`tarfile.TarFile.add`.
-        :param kwargs: Additional kwargs for :func:`tarfile.TarFile.add`.
+        :param args: Additional args for :meth:`tarfile.TarFile.add`.
+        :param kwargs: Additional kwargs for :meth:`tarfile.TarFile.add`.
         """
         self.tarfile.add(name, *args, **kwargs)
 
     def addfile(self, *args, **kwargs):
         """
-        Add a file to the tarball using a `tarinfo` object. For details, see :func:`tarfile.TarFile.addfile`.
+        Add a file to the tarball using a :class:`~tarfile.TarInfo` object. For details, see
+        :meth:`tarfile.TarFile.addfile`.
 
-        :param args: Args to :func:`tarfile.TarFile.addfile`.
-        :param kwargs: Kwargs to :func:`tarfile.TarFile.addfile`
+        :param args: Args to :meth:`tarfile.TarFile.addfile`.
+        :param kwargs: Kwargs to :meth:`tarfile.TarFile.addfile`
         """
         self.tarfile.addfile(*args, **kwargs)
 
@@ -94,11 +95,11 @@ class DockerContext(DockerTempFile):
 
     def gettarinfo(self, *args, **kwargs):
         """
-        Returns a `tarinfo` object. See :func:`tarfile.TarFile.gettarinfo`.
+        Returns a :class:`~tarfile.TarInfo` object. See :meth:`tarfile.TarFile.gettarinfo`.
 
-        :param args: Args to :func:`tarfile.TarFile.gettarinfo`.
-        :param kwargs: Kwargs to :func:`tarfile.TarFile.gettarinfo`.
-        :return: :class:`tarfile.TarInfo` object.
+        :param args: Args to :meth:`tarfile.TarFile.gettarinfo`.
+        :param kwargs: Kwargs to :meth:`tarfile.TarFile.gettarinfo`.
+        :return: :class:`~tarfile.TarInfo` object.
         :rtype: tarfile.TarInfo
         """
         return self.tarfile.gettarinfo(*args, **kwargs)
@@ -124,7 +125,7 @@ class DockerContext(DockerTempFile):
     @property
     def stream_encoding(self):
         """
-        Returns the stream encoding, as used when calling :func:`docker.client.Client.build`.
+        Returns the stream encoding, as used when calling :meth:`docker.client.Client.build`.
 
         :return: Stream encoding.
         :rtype: unicode

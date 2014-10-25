@@ -265,7 +265,7 @@ in the same way as the properties of :class:`~dockermap.map.container.ContainerM
 
 For initializing a container map upon instantiation, pass the dictionary as the second argument, after the map name.
 This also performs a brief integrity check, which can be deactivated by passing ``check_integrity=False`` and repeated
-any time later with :func:`~dockermap.map.container.ContainerMap.check_integrity`.
+any time later with :meth:`~dockermap.map.container.ContainerMap.check_integrity`.
 
 A :class:`~dockermap.map.client.MappingDockerClient` instance finally applies the container map to a Docker client. Due
 to needed additional functionality in the process of creating and running containers, the latter must be an instance of

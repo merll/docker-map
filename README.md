@@ -1,4 +1,4 @@
-docker-map
+Docker-Map
 ==========
 
 Utilities for building and managing Docker images and containers in Python.
@@ -6,7 +6,7 @@ Utilities for building and managing Docker images and containers in Python.
 
 Project: https://github.com/merll/docker-map
 
-Docs: http://docker-map.readthedocs.org/en/latest/
+Docs: https://docker-map.readthedocs.org/en/latest/
 
 
 Overview
