@@ -115,7 +115,7 @@ applicable, it is prefixed with the :attr:`~dockermap.map.container.ContainerMap
 
 Instances
 """""""""
-If you plan to launch containers from the same image, and with an identical configuration, except for paths on the host
+If you plan to launch containers from the same image with an identical configuration, except for paths on the host
 system that are mapped to shared folders, these containers can be named as
 :attr:`~dockermap.map.config.ContainerConfiguration.instances`. The instance name is appended to the default container
 name on instantiation. If this property is not set, there is only one default instance.
@@ -198,7 +198,8 @@ The properties :attr:`~dockermap.map.config.ContainerConfiguration.create_option
 :attr:`~dockermap.map.config.ContainerConfiguration.start_options` are dictionaries of keyword arguments. They are
 passed to the Docker Remote API functions in addition to the ones indirectly set by the aforementioned properties.
 
-* The user that a container is launched with, inherited from :attr:`~dockermap.map.config.ContainerConfiguration.user`,
+* The user that a container is launched with, inherited from the
+  :attr:`~dockermap.map.config.ContainerConfiguration.user` configuration,
   can be overridden by setting ``user`` in :attr:`~dockermap.map.config.ContainerConfiguration.create_options`.
 * Entries from ``volumes`` in :attr:`~dockermap.map.config.ContainerConfiguration.create_options` are
   added to elements of :attr:`~dockermap.map.config.ContainerConfiguration.shares` and resolved aliases from
@@ -209,6 +210,18 @@ passed to the Docker Remote API functions in addition to the ones indirectly set
 * Similarly, ``links`` keys set in :attr:`~dockermap.map.config.ContainerConfiguration.start_options` can override
   container links derived from :attr:`~dockermap.map.config.ContainerConfiguration.links` with the same name.
   Non-conflicting names merge.
+
+Start and create options can also be set via keyword arguments of
+:meth:`~dockermap.map.client.MappingDockerClient.create` and :meth:`~dockermap.map.client.MappingDockerClient.start`,
+in summary the order of precedence is the following:
+
+#. Keyword arguments to the :meth:`~dockermap.map.client.MappingDockerClient.create` and
+   :meth:`~dockermap.map.client.MappingDockerClient.start`;
+#. :attr:`~dockermap.map.config.ContainerConfiguration.create_options` and
+   :attr:`~dockermap.map.config.ContainerConfiguration.start_options`;
+#. and finally the aforementioned attributes from the :class:`~dockermap.map.config.ContainerConfiguration`;
+
+whereas single-value properties (e.g. user) are overwritten and dictionaries merge (i.e. override matching keys).
 
 Besides overriding the generated arguments, these options can also be used for addressing features not directly
 related to `Docker-Map`, e.g.::
@@ -355,3 +368,6 @@ Furthermore, on calling::
    the volume of ``example_map.app_server_socket``.
 #. ``example_map.web_server`` is started, and shares the volume of ``example_map.app_server_socket`` with the app
    server instances.
+
+It is also
+For only starting one instance of ``app_server`` manually

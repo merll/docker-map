@@ -11,10 +11,10 @@ applied to any other command line setting, e.g. ``run`` calls in `Fabric`.
 
 Users and groups
 ----------------
-Since Docker does not use the host systems names, you either have to rely on only user ids, or create users and groups
-within the image. The former may not always be sufficient. Therefore, it is more pratical to include commands such
-as ``RUN adduser username ...``. Additionally, when sharing volumes between images, it is most practical if user and
-group ids are consistent between the containers that are accessing them.
+Since Docker does not use the host system's names, you either have to rely on only user ids, or create users and groups
+within the image. The former may not always be sufficient. Therefore, it is more practical to include commands such
+as ``RUN adduser username ...``. Additionally, when sharing volumes between images, user and group ids should be
+consistent between the containers that are accessing them.
 
 The utility :func:`~dockermap.shortcuts.adduser` generates a `adduser` command with the arguments ``username`` and
 ``uid`` -- other keyword arguments are optional. The optional default values assume that typically, you need a user for
@@ -59,8 +59,8 @@ code creates that group and assigns the web server user to it::
 
 .. tip::
    The user and group names, as well as their ids, are only written here as literals for illustration purposes. The
-   main intention of the :class:`~dockermap.build.dockerfile.DockerFile` implementation is that you do *not* hardcode
-   these things, but instead refer to variables.
+   main intention of the :class:`~dockermap.build.dockerfile.DockerFile` implementation is that you do not hard-code
+   these settings, but instead refer to variables.
 
 .. note::
    `adduser` and `addgroup` are specific to Debian-based Linux distributions. Therefore, they will be replaced with

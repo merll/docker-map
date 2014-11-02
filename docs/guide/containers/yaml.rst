@@ -4,25 +4,25 @@ Container configurations in YAML
 ================================
 
 YAML (YAML Ain’t Markup Language) files are often easier to write than Python dictionaries, and provide a good
-possibility to separate code from configuration. Container maps can be maintained in and loaded from YAML files. As the
-contents are imported as a dictionary, the inner structure is identical to the Python dictionary representation.
+possibility to separate code from configuration. Container maps can be maintained in and loaded from YAML files. The
+contents are represented as a Python dictionary, and therefore, the configuration structure is identical.
 
 YAML elements
 -------------
 When used according to the full specification, YAML is a very feature-rich and powerful language. This is only
-a quick introduction to the syntactical elements of YAML, as relevant for container maps:
+a quick introduction to the syntactical elements of YAML, as far as relevant for container maps:
 
-* YAML elements can be structured in a hierarchy, similar to other markup languages. Just Like in Python, the
+* YAML elements can be structured in a hierarchy, similar to other markup languages. Just like in Python, the
   hierarchy level is defined by outline indentation.
 * Every line without any prefix is a key-value pair ``key: value``, and read as items of an
   associative array (a dictionary in Python). An indented key indicates a nested structure.
 * Lines prefixed with a dash ``-`` followed by a space represent items of a list.
 * Most data types are implicit. For example, you do not need to quote strings, unless they consist of only numbers and
-  a dot and therefore could be read as integer or float. In doubt (e.g. for version numbers), you should quote them
+  a dot and therefore could be read as integer or float. When in doubt (e.g. for version numbers), you should quote them
   or prefix with the tag ``!!str``.
 * Strings are trimmed (unless within quotes); in a dictionary for example, it does not matter how much space there is
   between the key and the value.
-* Lists and dictionaries can also be written in inline-syle, similar to JSON syntax: Curly brackets represent a
+* Lists and dictionaries can also be written in inline-syle in JSON syntax: Curly brackets represent a
   associative array (dictionary), square brackets a list.
 
 For a more comprehensive reference, the Wikipedia_ article provides a good overview. The `YAML specification`_
@@ -43,7 +43,7 @@ The :ref:`container_map_example` map can be more easily written as:
      uses: app_server_socket
      attaches: web_log
      start_options:
-     port_bindings: {80: 80, 443: 443}
+       port_bindings: {80: 80, 443: 443}
    app_server:
      image: app
      instances:
@@ -93,7 +93,7 @@ The initial integrity check can be skipped by passing ``check_integrity=False``.
 If your YAML structure is not a file, but a stream, you can use :func:`~dockermap.map.yaml.load_map`. It takes a buffer
 as first argument; additional arguments are identical to ``load_map_file``.
 
-There are in total three ways to assign a name to a map, in the following order of priority:
+There are in total three ways to assign a name to a map during the import, in the following order of priority:
 
 1. The name passed as a keyword argument in :func:`~dockermap.map.yaml.load_map_file` or
    :func:`~dockermap.map.yaml.load_map`.
@@ -113,8 +113,8 @@ aforementioned example's ``host_root`` entry also could also be defined as:
    host_root: !path $SITE_ROOT
 
 
-Nested elements are also expanded on their first level of sub-elements, when the tag is applied to a list or
-associative array:
+When the tag is applied to a list or associative array, nested elements are also expanded on their first level of
+sub-elements:
 
 .. code-block:: yaml
 

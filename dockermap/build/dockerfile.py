@@ -41,12 +41,13 @@ def prepare_path(path, replace_space, replace_sep, expandvars, expanduser):
 
 def format_command(cmd, shell=False):
     """
-    Converts a command line to the notation as used in a Dockerfile `CMD` and `ENTRYPOINT` command. In shell notation,
-    this returns a simple string, whereas by default it returns a JSON-list format with the command and arguments.
+    Converts a command line to the notation as used in a Dockerfile ``CMD`` and ``ENTRYPOINT`` command. In shell
+    notation, this returns a simple string, whereas by default it returns a JSON-list format with the command and
+    arguments.
 
     :param cmd: Command line as a string or tuple.
     :type cmd: unicode, string, or tuple
-    :param shell: Use the notation so that Docker runs the command in a shell. Default is `False`.
+    :param shell: Use the notation so that Docker runs the command in a shell. Default is ``False``.
     :type shell: bool
     :return: The command string.
     :rtype: unicode
@@ -79,7 +80,7 @@ def format_command(cmd, shell=False):
 
 def format_expose(expose):
     """
-    Converts a port number or multiple port numbers, as used in the Dockerfile `EXPOSE` command, to a tuple.
+    Converts a port number or multiple port numbers, as used in the Dockerfile ``EXPOSE`` command, to a tuple.
 
     :param: Port numbers, can be as integer, string, or a list/tuple of those.
     :type expose: int, unicode, list, or tuple
@@ -96,19 +97,19 @@ def format_expose(expose):
 class DockerFile(DockerStringBuffer):
     """
     Class for constructing Dockerfiles; can be saved or used in a :class:`DockerContext`. For :class:`DockerContext`, it
-    keeps track of `ADD` operations, so that all files can easily be added to the context tarball.
+    keeps track of ``ADD`` operations, so that all files can easily be added to the context tarball.
 
     :param name: Descriptive name to print in the Dockerfile, for documentation purposes only.
     :type name: unicode
     :param version: Version number to print in the Dockerfile comments, for documentation purposes only.
     :type version: unicode
-    :param baseimage: Base image to use for the new image. Set this to `None` if you want to explicitly write out the
-     `FROM` Dockerfile command.
+    :param baseimage: Base image to use for the new image. Set this to ``None`` if you want to explicitly write out the
+     ``FROM`` Dockerfile command.
     :type baseimage: unicode
-    :param maintainer: Optional maintainer, to be used for the `MAINTAINER` Dockerfile command.
+    :param maintainer: Optional maintainer, to be used for the ``MAINTAINER`` Dockerfile command.
     :type maintainer: unicode
-    :param initial: Optional initial Dockerfile contents. Should only include header comments, `FROM`, or `MAINTAINER`,
-     if those are not set in aforementioned parameters.
+    :param initial: Optional initial Dockerfile contents. Should only include header comments, ``FROM``, or
+     ``MAINTAINER``, if those are not set in aforementioned parameters.
     :type initial: unicode
     """
     baseimage = DEFAULT_BASEIMAGE
@@ -143,10 +144,10 @@ class DockerFile(DockerStringBuffer):
 
     def prefix(self, prefix='#', *args):
         """
-        Prefix one or multiple arguments with a Dockerfile command. The default is `#`, for comments. Multiple args will
+        Prefix one or multiple arguments with a Dockerfile command. The default is ``#``, for comments. Multiple args will
         be separated by a space.
 
-        :param prefix: Dockerfile command to use, e.g. `ENV` or `RUN`.
+        :param prefix: Dockerfile command to use, e.g. ``ENV`` or ``RUN``.
         :type prefix: unicode
         :param args: Arguments to be prefixed.
         """
@@ -156,7 +157,7 @@ class DockerFile(DockerStringBuffer):
         """
         Same as :func:`~prefix`, for multiple lines.
 
-        :param prefix: Dockerfile command to use, e.g. `ENV` or `RUN`.
+        :param prefix: Dockerfile command to use, e.g. ``ENV`` or ``RUN``.
         :type prefix: unicode
         :param lines: Lines with arguments to be prefixed.
         :type lines: iterable
@@ -179,16 +180,17 @@ class DockerFile(DockerStringBuffer):
 
     def run_all(self, *lines):
         """
-        Insert a series of commands in a Dockerfile, all prefixed with `RUN`.
+        Insert a series of commands in a Dockerfile, all prefixed with ``RUN``.
 
         :param lines: Command lines to be inserted.
         :type: iterable
         """
         self.prefix_all('RUN', *lines)
 
-    def add_file(self, src_path, dst_path=None, ctx_path=None, replace_space=True, expandvars=False, expanduser=False, remove_final=False):
+    def add_file(self, src_path, dst_path=None, ctx_path=None, replace_space=True, expandvars=False, expanduser=False,
+                 remove_final=False):
         """
-        Adds a file to the Docker build. An `ADD` command is inserted, and the path is stored for later packaging of
+        Adds a file to the Docker build. An ``ADD`` command is inserted, and the path is stored for later packaging of
         the context tarball.
 
         :param src_path: Path to the file or directory.
@@ -198,11 +200,11 @@ class DockerFile(DockerStringBuffer):
         :param ctx_path: Path inside the context tarball. Can be set in order to avoid name clashes. By default
          identical to the destination path.
         :type ctx_path: unicode
-        :param replace_space: Mask spaces in path names with a backslash. Default is `True`.
+        :param replace_space: Mask spaces in path names with a backslash. Default is ``True``.
         :type replace_space: bool
-        :param expandvars: Expand local environment variables. Default is `False`.
+        :param expandvars: Expand local environment variables. Default is ``False``.
         :type expandvars: bool
-        :param expanduser: Expand local user variables. Default is `False`.
+        :param expanduser: Expand local user variables. Default is ``False``.
         :type expanduser: bool
         :param remove_final: Remove the file after the build operation has completed. Can be useful e.g. for source code
          archives, which are no longer needed after building the binaries. Note that this will delete recursively, so
@@ -254,7 +256,7 @@ class DockerFile(DockerStringBuffer):
 
     def add_volume(self, path):
         """
-        Add a shared volume (i.e. with the `VOLUME` command). Not actually written until finalized.
+        Add a shared volume (i.e. with the ``VOLUME`` command). Not actually written until finalized.
 
         :param path: Path to the shared volume.
         """
@@ -320,7 +322,7 @@ class DockerFile(DockerStringBuffer):
     @volumes.setter
     def volumes(self, value):
         """
-        Sets the list of shared volumes to be set in the Dockerfile `VOLUMES` command. Not written before finalization.
+        Sets the list of shared volumes to be set in the Dockerfile ``VOLUME`` command. Not written before finalization.
 
         :param value: List of shared volumes
         :type value: list
@@ -341,7 +343,7 @@ class DockerFile(DockerStringBuffer):
     @entrypoint.setter
     def entrypoint(self, value):
         """
-        Sets the entry point for the Dockerfile `ENTRYPOINT` command. Not written before finalization.
+        Sets the entry point for the Dockerfile ``ENTRYPOINT`` command. Not written before finalization.
 
         :param value: Entry point.
         :type value: unicode, list, or tuple
@@ -362,7 +364,7 @@ class DockerFile(DockerStringBuffer):
     @command.setter
     def command(self, value):
         """
-        Sets the default command for the Dockerfile `CMD` command. Not written before finalization.
+        Sets the default command for the Dockerfile ``CMD`` command. Not written before finalization.
 
         :param value: Command.
         :type value: unicode, list, or tuple
@@ -375,7 +377,7 @@ class DockerFile(DockerStringBuffer):
         """
         Returns if entry point and command should be formatted as a shell, or as an exec command upon finalization.
 
-        :return: `True`, if Docker should use a shell, `False` if exec is used.
+        :return: ``True``, if Docker should use a shell, ``False`` if exec is used.
         :rtype: bool
         """
         return self._command_shell
@@ -385,7 +387,7 @@ class DockerFile(DockerStringBuffer):
         """
         Sets if entry point and command should be formatted as a shell, or as an exec command upon finalization.
 
-        :param value: Set to `True`, if Docker should use a shell, use `False` if exec is to be used.
+        :param value: Set to ``True``, if Docker should use a shell, use ``False`` if exec is to be used.
         :type value: bool
         """
         self.check_not_finalized()
@@ -405,8 +407,8 @@ class DockerFile(DockerStringBuffer):
     def command_user(self, value):
         """
         Sets the default user that should be used for the default entry point and command. Upon finalization, this will
-        insert a `USER` command right before `ENTRYPONT` or `COMMAND` if applicable. For applying this to `RUN`
-        commands, insert the `USER` command manually.
+        insert a ``USER`` command right before ``ENTRYPONT`` or ``COMMAND`` if applicable. For applying this to ``RUN``
+        commands, insert the ``USER`` command manually.
 
         :param value: User name or id. Must be valid in the docker image.
         :type value: unicode
@@ -417,7 +419,7 @@ class DockerFile(DockerStringBuffer):
     @property
     def expose(self):
         """
-        Returns the ports to be inserted with the `EXPOSE` command in the Dockerfile.
+        Returns the ports to be inserted with the ``EXPOSE`` command in the Dockerfile.
 
         :return: Ports.
         :rtype: unicode, int, tuple, or list
@@ -427,7 +429,7 @@ class DockerFile(DockerStringBuffer):
     @expose.setter
     def expose(self, value):
         """
-        Sets the ports to be inserted with the `EXPOSE` command in the Dockerfile. Not written before finalization.
+        Sets the ports to be inserted with the ``EXPOSE`` command in the Dockerfile. Not written before finalization.
 
         :param value: Ports.
         :return: unicode, int, tuple, or list
@@ -438,11 +440,11 @@ class DockerFile(DockerStringBuffer):
     def finalize(self):
         """
         Finalizes the Dockerfile. Before the buffer is practically marked as read-only, the following Dockerfile
-        commands are written: `RUN rm -R` on each files marked for automatic removal; `VOLUME` for shared volumes;
-        `USER` as the default user for following commands; `ENTRYPOINT` and `CMD`, each formatted as a shell or exec
-        command according to :attr:`command_shell`; and `EXPOSE` for exposed ports.
+        commands are written: `RUN rm -R` on each files marked for automatic removal; ``VOLUME`` for shared volumes;
+        `USER` as the default user for following commands; ``ENTRYPOINT`` and ``CMD``, each formatted as a shell or exec
+        command according to :attr:`command_shell`; and ``EXPOSE`` for exposed ports.
 
-        An attempt to finalize an already-finalized instance will have no effect.
+        An attempt to finalize an already-finalized instance has no effect.
         """
         if self._finalized:
             return

@@ -1,6 +1,5 @@
 .. _getting_started:
 
-===============
 Getting started
 ===============
 Simple Dockerfile
@@ -81,18 +80,18 @@ communicating with the application server. The map could look like this::
     })
 
 
-*Notes*:
+.. note::
 
-* By default an instantiation of such a map performs a brief integrity check, whether all aliases as used in container
-  configurations have been defined in `host` and `volumes` assignments.
-* `Attached` volumes are Docker containers based on a minimal launchable image, that are created for the sole
-  purpose of sharing a volume. In this example, the `nginx` container will have access to `uwsgi_socket`, but none
-  of the other shared volumes.
-* The aforementioned `permissions` in the `uwsgi` container assume that the working user in the `nginx` container is
-  part of a group with the id `2000`. If this is not the case, you have to open up `permissions`, e.g. to
-  ``u=rwX,g=rX,o=rX``.
-* Although it is out of scope of this introduction, the recommended method for configuring container maps is YAML files,
-  since it is syntactically simpler than Python code.
+   * By default an instantiation of such a map performs a brief integrity check, whether all aliases as used in
+     container configurations have been defined in `host` and `volumes` assignments.
+   * `Attached` volumes are Docker containers based on a minimal launchable image, that are created for the sole
+     purpose of sharing a volume. In this example, the `nginx` container will have access to `uwsgi_socket`, but none
+     of the other shared volumes.
+   * The aforementioned `permissions` in the `uwsgi` container assume that the working user in the `nginx` container is
+     part of a group with the id `2000`. If this is not the case, you have to open up `permissions`, e.g. to
+     ``u=rwX,g=rX,o=rX``.
+   * Although it is out of scope of this introduction, the recommended method for configuring container maps is
+     the :ref:`import of YAML files <container_yaml>`. It is syntactically simpler than Python code.
 
 This map can be used with a :class:`~dockermap.map.client.MappingDockerClient`::
 

@@ -2,21 +2,21 @@
 
 Enhanced client functionality
 =============================
-The library comes with an enhanced client for some added functionality. `Docker-Map` is relying on that for managing
-container creation and startup. One part of the client is, :class:`~dockermap.map.base.DockerClientWrapper`, a wrapper
+The library comes with an enhanced client for some added functionality. Docker-Map is relying on that for managing
+container creation and startup. One part of the client is :class:`~dockermap.map.base.DockerClientWrapper`, a wrapper
 around `docker-py`'s client; another is the application of :class:`~dockermap.map.container.ContainerMap` instances to
 this client, which is handled by :class:`~dockermap.map.client.MappingDockerClient`.
 
-Wrapped functions
------------------
+Wrapped functionality
+---------------------
 In a few methods, the original arguments and behavior of `docker-py` has been modified in
 :class:`~dockermap.map.base.DockerClientWrapper`:
 
 Building images
 ^^^^^^^^^^^^^^^
-On the build function :meth:`~dockermap.map.base.DockerClientWrapper.build`, it is mandatory to give the new image a
-name. Optionally ``add_latest_tag`` can be set to ``True`` for tagging the image additionally with `latest`. Whereas
-`docker-py` returns a stream, the wrapped function sends that stream to a log
+On the build method :meth:`~dockermap.map.base.DockerClientWrapper.build`, it is mandatory to give the new image a
+name (short example in :ref:`build_image_run`). Optionally ``add_latest_tag`` can be set to ``True`` for tagging the
+image additionally with `latest`. Whereas `docker-py` returns a stream, the wrapped method sends that stream to a log
 (see :ref:`client-logging`) and returns the new image id, if the build has been
 successful. Unsuccessful builds return ``None``.
 
@@ -28,8 +28,8 @@ has been successful, or ``False`` otherwise. Registry :meth:`~dockermap.map.base
 :meth:`~dockermap.map.base.DockerClientWrapper.push_log`; they return ``True`` or ``False`` depending on whether the
 operation succeeded.
 
-Added functions
----------------
+Added functionality
+-------------------
 The following methods are not part of the original `docker-py` implementation:
 
 .. _client-logging:
@@ -65,7 +65,9 @@ Use this with care outside of the development environment.
 
 For removing images without names and tags (i.e. that show up as `none`), use
 :meth:`~dockermap.map.base.DockerClientWrapper.cleanup_images`. Optionally, setting ``remove_old`` to ``True``
-additionally removes images that do have names and tags, but not one with `latest`.
+additionally removes images that do have names and tags, but not one with `latest`::
+
+    client.cleanup_images(remove_old=True)
 
 All current container names are available through :meth:`~dockermap.map.base.DockerClientWrapper.get_container_names`,
 for checking if they exist. Similarly :meth:`~dockermap.map.base.DockerClientWrapper.get_image_tags` returns all
@@ -82,6 +84,9 @@ However, this has turned out to be very slow and may not be practical.
 
 Applying container maps
 -----------------------
+This section provides some background information of the client functionality. The configuration and an example is
+further described in :ref:`container_maps`.
+
 Instances of :class:`~dockermap.map.client.MappingDockerClient` are usually created with a map and a client.
 The former is an instance of :class:`~dockermap.map.container.ContainerMap`, the latter is
 a :class:`~dockermap.map.base.DockerClientWrapper` object. Both initializing arguments are however optional and may be
@@ -90,41 +95,39 @@ changed any time later using the properties :attr:`~dockermap.map.client.Mapping
 
     map_client = MappingDockerClient(container_map, DockerClientWrapper('unix://var/run/docker.sock'))
 
-
-This section only provides an overview of the client functionality. The configuration and an example is further
-described in :ref:`container_maps`.
-
 :class:`~dockermap.map.client.MappingDockerClient` contains most functions used within a container lifecycle, but
 additionally resolves dependencies from the map and applies the resulting parameters to the creation and start.
 Calling :meth:`~dockermap.map.client.MappingDockerClient.create`
-first resolves all dependency containers to be created prior to the current one. In order to see what defines
-a dependency, see :ref:`shared-volumes-containers` and :ref:`linked-containers`. First, `attached` volumes
-are created (see :ref:`attached-volumes`) of the dependency containers.  Then the
-client creates dependency containers and the requested container. This
-functionality can be overridden by setting ``autocreate_dependencies`` and ``autocreate_attached`` to ``False``.
-Similarly, :meth:`~dockermap.map.client.MappingDockerClient.start` first launches
-dependency containers' `attached` volumes, then dependencies themselves, and finally the requested container; the
-behavior can also be changed with ``autostart_dependencies``.
+resolves all dependency containers to be created prior to the current one. First, `attached` volumes are created (see
+:ref:`attached-volumes`) of the dependency containers. Then the client creates dependency containers and the requested
+container. This functionality can be overridden by setting ``autocreate_dependencies`` and ``autocreate_attached`` to
+``False``.
 
-Additional keyword arguments to the ``start`` and ``create`` functions of the client are passed through; they
-complement -- and with matching keys override -- existing
-:attr:`~dockermap.map.config.ContainerConfiguration.create_options` and
-:attr:`~dockermap.map.config.ContainerConfiguration.start_options`. The order of precedence is further detailed in
-:ref:`additional-options`.
+Similarly, :meth:`~dockermap.map.client.MappingDockerClient.start` first launches dependency containers' `attached`
+volumes, then dependencies themselves, and finally the requested container; the behavior can also be changed with
+``autostart_dependencies``.
 
-Both :meth:`~dockermap.map.client.MappingDockerClient.create` and
-:meth:`~dockermap.map.client.MappingDockerClient.start` in their current implementation will always re-use existing
-containers with the same name. This may be changed to a more sophisticated evaluation in future implementations, as
-partial re-creation of dependency containers with shared volumes may lead to the
-:meth:`~dockermap.map.client.MappingDockerClient.start` function referring to wrong container instances.
+In order to see what defines a dependency, see :ref:`shared-volumes-containers` and :ref:`linked-containers`.
+
+Additional keyword arguments to the ``start`` and ``create`` methods of the client are passed through; the order of
+precedence towards the :class:`~dockermap.map.config.ContainerConfiguration` is further detailed in
+:ref:`additional-options`. Example::
+
+    map_client.start('web_server', restart_policy={'MaximumRetryCount': 0, 'Name': 'always'})
+
+.. note:: Both :meth:`~dockermap.map.client.MappingDockerClient.create` and
+          :meth:`~dockermap.map.client.MappingDockerClient.start` in their current implementation will always re-use
+          existing containers with the same name. This may be changed to a more sophisticated evaluation in future
+          implementations, as partial re-creation of dependency containers with shared volumes may lead to the
+          :meth:`~dockermap.map.client.MappingDockerClient.start` method referring to wrong container instances.
 
 :meth:`~dockermap.map.client.MappingDockerClient.stop` stops a container and its dependencies, i.e. containers
 that have been started thereafter. The dependency resolution is once again optional and may be deactivated by setting
-``autostop_dependent`` to ``False``. Removing containers with :meth:`~dockermap.map.client.MappingDockerClient.remove`
-does not resolve dependencies, but only removes the specified container. Like in the general client, it only works on
-stopped containers.
+``autostop_dependent=False``. Removing containers with :meth:`~dockermap.map.client.MappingDockerClient.remove`
+does not resolve dependencies, but only removes the specified container. Like in the `docker-py` and command line
+client, it only works on stopped containers.
 
-The function :meth:`~dockermap.map.client.MappingDockerClient.wait`, in addition to the original `wait` implementation,
+The method :meth:`~dockermap.map.client.MappingDockerClient.wait`, in addition to the original `wait` implementation,
 only provides additional (and optional) logging, and prefixes the given container name with the name of the map.
 :meth:`~dockermap.map.client.MappingDockerClient.wait_and_remove` removes the container after is has finished running.
 
