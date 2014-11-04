@@ -112,9 +112,6 @@ class DockerFile(DockerStringBuffer):
      ``MAINTAINER``, if those are not set in aforementioned parameters.
     :type initial: unicode
     """
-    baseimage = DEFAULT_BASEIMAGE
-    maintainer = None
-
     def __init__(self, baseimage=DEFAULT_BASEIMAGE, maintainer=None, initial=None):
         super(DockerFile, self).__init__()
         self._files = []
@@ -128,13 +125,10 @@ class DockerFile(DockerStringBuffer):
         self._expose = None
 
         if baseimage:
-            self.baseimage = baseimage
-        self.prefix('FROM', self.baseimage)
+            self.prefix('FROM', baseimage)
         self.blank()
         if maintainer:
-            self.maintainer = maintainer
-        if self.maintainer:
-            self.prefix('MAINTAINER', self.maintainer)
+            self.prefix('MAINTAINER', maintainer)
             self.blank()
 
         if isinstance(initial, (tuple, list)):
