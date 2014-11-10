@@ -1,12 +1,22 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import logging
+
 from docker import client as docker
 from docker.errors import APIError
 
 from .dep import SingleDependencyResolver
 from ..build.context import DockerContext
 from ..utils import is_latest_image, is_repo_image, parse_response
+
+
+logger = logging.getLogger(__name__)
+CONTAINER_LOG = logging.INFO + 2
+STREAM_LOG = logging.INFO + 1
+STREAM_PROGRESS = logging.INFO - 1
+LOG_PROGRESS_FORMAT = "{0} {1} {2}"
+LOG_CONTAINER_FORMAT = "[{0}] {1}"
 
 
 class ContainerImageResolver(SingleDependencyResolver):
@@ -51,7 +61,7 @@ class DockerClientWrapper(docker.Client):
             output = parse_response(e)
             log_str = output['stream'][:-1] if output and 'stream' in output else None
             if log_str:
-                self.push_log(log_str)
+                self.push_log(log_str, STREAM_LOG)
         return log_str  # Last line written to stdout
 
     def _docker_status_stream(self, response):
@@ -61,24 +71,29 @@ class DockerClientWrapper(docker.Client):
             if output:
                 result.update(output)
                 if 'status' in output:
-                    id = output.get('id')
+                    oid = output.get('id')
                     progress = output.get('progress', '')
-                    if id:
-                        self.push_log("{0} {1} {2}".format(output['status'], id, progress))
+                    if oid:
+                        self.push_progress(output['status'], oid, progress)
                     else:
-                        self.push_log(output['status'])
+                        self.push_log(output['status'], STREAM_LOG)
                 elif 'error' in output:
-                    self.push_log(output['error'])
+                    self.push_log(output['error'], logging.ERROR)
         return result
 
-    def push_log(self, info):
+    def push_progress(self, status, object_id, progress):
+        print(LOG_PROGRESS_FORMAT.format(status, object_id, progress))
+
+    def push_log(self, info, level=logging.INFO):
         """
         Writes logs. To be fully implemented by subclasses.
 
         :param info: Log message content.
         :type info: unicode
+        :param level: Logging level; default is :data:`~logging.INFO`.
+        :type level: int
         """
-        print(info)
+        logger.log(level, info)
 
     def build(self, tag, add_latest_tag=False, **kwargs):
         """
@@ -195,26 +210,44 @@ class DockerClientWrapper(docker.Client):
         with DockerContext(dockerfile, finalize=True) as ctx:
             return self.build_from_context(ctx, tag, **kwargs)
 
-    def cleanup_containers(self):
+    def cleanup_containers(self, include_initial=False, exclude=None, raise_on_error=False):
         """
-        Finds all stopped containers and removes them; does not remove containers that have never been started.
+        Finds all stopped containers and removes them; by default does not remove containers that have never been
+        started.
+
+        :param include_initial: Consider containers that have never been started.
+        :type include_initial: bool
+        :param exclude: Container names to exclude from the cleanup process.
+        :type exclude: iterable
+        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :type raise_on_error: bool
         """
-        stopped_containers = [(container['Id'], container['Names'][0][1:]) for container in self.containers(all=True)
-                              if container['Status'].startswith('Exited')]
-        for cid, c_name in stopped_containers:
+        def _stopped_containers():
+            exclude_names = set(exclude or ())
+            for container in self.containers(all=True):
+                c_name = container['Names'][0][1:]
+                c_status = container['Status']
+                if ((include_initial and c_status == '') or c_status.startswith('Exited')) and c_name not in exclude_names:
+                    yield container['Id'], c_name
+
+        for cid, cn in _stopped_containers():
             try:
                 self.remove_container(cid)
             except APIError as e:
                 if e.response.status_code != 404:
-                    raise e
+                    self.push_log("Could not remove container '{0}': {1}".format(cn, e.explanation), logging.ERROR)
+                    if raise_on_error:
+                        raise e
 
-    def cleanup_images(self, remove_old=False):
+    def cleanup_images(self, remove_old=False, raise_on_error=False):
         """
         Finds all images that are neither used by any container nor another image, and removes them; by default does not
         remove repository images.
 
         :param remove_old: Also removes images that have repository names, but no `latest` tag.
         :type remove_old: bool
+        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :type raise_on_error: bool
         """
         used_images = (container['Image'] for container in self.containers(all=True))
         image_dependencies = ((image['Id'], image['ParentId']) for image in self.images(all=True))
@@ -228,7 +261,9 @@ class DockerClientWrapper(docker.Client):
                 self.remove_image(iid)
             except APIError as e:
                 if e.response.status_code != 404:
-                    raise e
+                    self.push_log("Could not remove image '{0}': {1}".format(iid, e.explanation), logging.ERROR)
+                    if raise_on_error:
+                        raise e
 
     def get_container_names(self):
         """
@@ -264,7 +299,7 @@ class DockerClientWrapper(docker.Client):
         if log_lines and not log_lines[-1]:
             log_lines.pop()
         for line in log_lines:
-            self.push_log('[{0}] {1}'.format(container, line))
+            self.push_log(LOG_CONTAINER_FORMAT.format(line), CONTAINER_LOG)
 
     def remove_all_containers(self):
         """
@@ -273,12 +308,12 @@ class DockerClientWrapper(docker.Client):
         containers = [(container['Names'][0][1:], container['Status'].startswith('Exited'))
                       for container in self.containers(all=True)]
         for c_name, stopped in containers:
-            try:
-                if not stopped:
+            if not stopped:
+                try:
                     self.stop(c_name)
-            except APIError as e:
-                if e.response.status_code != 404:
-                    raise e
+                except APIError as e:
+                    if e.response.status_code != 404:
+                        raise e
         for c_name, stopped in containers:
             try:
                 self.remove_container(c_name)

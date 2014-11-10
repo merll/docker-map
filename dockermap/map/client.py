@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import itertools
+import logging
 import six
 
 from docker.errors import APIError
@@ -201,7 +202,7 @@ class MappingDockerClient(object):
             _update_kwargs(ic_kwargs, {'binds': dict(_get_host_binds(i))}, c_options, kwargs)
             self._client.start(c_name, **ic_kwargs)
 
-    def _stop_instance_containers(self, container, instances=None, **kwargs):
+    def _stop_instance_containers(self, container, instances=None, raise_on_error=False, **kwargs):
         c_instances = instances or self._get(container).instances or [None]
         for i in c_instances:
             c_name = self._cname(container, i)
@@ -210,9 +211,11 @@ class MappingDockerClient(object):
                     self._client.stop(c_name, **kwargs)
                 except APIError as e:
                     if e.response.status_code != 404:
-                        self._client.push_log("Failed to stop container '{0}': {1}".format(c_name, e.explanation))
+                        self._client.push_log("Failed to stop container '{0}': {1}".format(c_name, e.explanation), logging.ERROR)
+                        if raise_on_error:
+                            raise e
 
-    def _remove_instance_containers(self, container, instances=None, **kwargs):
+    def _remove_instance_containers(self, container, instances=None, raise_on_error=False, **kwargs):
         c_instances = instances or self._get(container).instances or [None]
         for i in c_instances:
             c_name = self._cname(container, i)
@@ -220,7 +223,9 @@ class MappingDockerClient(object):
                 try:
                     self._client.remove_container(c_name, **kwargs)
                 except APIError as e:
-                    self._client.push_log("Failed to remove container '{0}': ".format(c_name, e.explanation))
+                    self._client.push_log("Failed to remove container '{0}': ".format(c_name, e.explanation), logging.ERROR)
+                    if raise_on_error:
+                        raise e
 
     def _container_dependencies(self, container):
         return reversed(ContainerDependencyResolver(self._map).get_dependencies(container))
@@ -299,7 +304,7 @@ class MappingDockerClient(object):
 
         self._start_instance_containers(container, instances, **kwargs)
 
-    def stop(self, container, instances=None, stop_dependent=True, **kwargs):
+    def stop(self, container, instances=None, stop_dependent=True, raise_on_error=False, **kwargs):
         """
         Stops instances for a container configuration.
 
@@ -310,15 +315,17 @@ class MappingDockerClient(object):
         :type instances: iterable
         :param stop_dependent: Resolve and stop dependent containers.
         :type stop_dependent: bool
+        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :type raise_on_error: bool
         :param kwargs: Additional kwargs for stopping the container and its dependents.
         """
         if stop_dependent:
             for dependent_container in self._container_dependents(container):
-                self._stop_instance_containers(dependent_container, **kwargs)
+                self._stop_instance_containers(dependent_container, raise_on_error, **kwargs)
 
-        self._stop_instance_containers(container, instances, **kwargs)
+        self._stop_instance_containers(container, instances, raise_on_error, **kwargs)
 
-    def remove(self, container, instances=None, remove_dependent=True, **kwargs):
+    def remove(self, container, instances=None, remove_dependent=True, raise_on_error=False, **kwargs):
         """
         Remove instances from a container configuration.
 
@@ -329,13 +336,15 @@ class MappingDockerClient(object):
         :type instances: iterable
         :param remove_dependent: Resolve and remove dependent containers.
         :type remove_dependent: bool
+        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :type raise_on_error: bool
         :param kwargs: Additional kwargs for removing the container and its dependents.
         """
         if remove_dependent:
             for dependent_container in self._container_dependents(container):
-                self._remove_instance_containers(dependent_container, **kwargs)
+                self._remove_instance_containers(dependent_container, raise_on_error, **kwargs)
 
-        self._remove_instance_containers(container, instances, **kwargs)
+        self._remove_instance_containers(container, instances, raise_on_error, **kwargs)
 
     def wait(self, container, instance=None, log=True):
         """
@@ -373,6 +382,26 @@ class MappingDockerClient(object):
         """
         self._check_refresh_images(True)
         self._check_refresh_containers(True)
+
+    def list_persistent_containers(self):
+        """
+        Lists the names of all persistent containers on this map. Attached containers are always considered persistent.
+
+        :return: List of container names.
+        :rtype: list
+        """
+        def _container_names():
+            for container, config in self._map:
+                for ac in config.attaches:
+                    yield self._cname(ac)
+                if config.persistent:
+                    if config.instances:
+                        for ci in config.instances:
+                            yield self._cname(container, ci)
+                    else:
+                        yield self._cname(container)
+
+        return list(_container_names())
 
     @property
     def client(self):

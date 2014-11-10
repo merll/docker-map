@@ -75,6 +75,7 @@ class ContainerConfiguration(object):
         self._attaches = []
         self._user = None
         self._permissions = None
+        self._persistent = False
         self._create_kwargs = None
         self._start_kwargs = None
         self.update(kwargs)
@@ -219,6 +220,20 @@ class ContainerConfiguration(object):
     @permissions.setter
     def permissions(self, value):
         self._permissions = value
+
+    @property
+    def persistent(self):
+        """
+        Whether the container should be removed during cleanup processes, when exited. Set to ``True`` to keep it.
+
+        :return: Persistent flag.
+        :rtype: bool
+        """
+        return self._persistent
+
+    @persistent.setter
+    def persistent(self, value):
+        self._persistent = bool(value)
 
     @property
     def create_options(self):
