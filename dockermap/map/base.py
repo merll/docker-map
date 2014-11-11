@@ -82,7 +82,7 @@ class DockerClientWrapper(docker.Client):
         return result
 
     def push_progress(self, status, object_id, progress):
-        print(LOG_PROGRESS_FORMAT.format(status, object_id, progress))
+        pass
 
     def push_log(self, info, level=logging.INFO):
         """
@@ -299,7 +299,7 @@ class DockerClientWrapper(docker.Client):
         if log_lines and not log_lines[-1]:
             log_lines.pop()
         for line in log_lines:
-            self.push_log(LOG_CONTAINER_FORMAT.format(line), CONTAINER_LOG)
+            self.push_log(LOG_CONTAINER_FORMAT.format(container, line), CONTAINER_LOG)
 
     def remove_all_containers(self):
         """
