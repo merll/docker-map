@@ -221,7 +221,7 @@ class MappingDockerClient(object):
             c_name = self._cname(container, i)
             if c_name in self._get_container_names():
                 try:
-                    self._client.remove_container(c_name, **kwargs)
+                    self._remove_container(c_name, **kwargs)
                 except APIError as e:
                     self._client.push_log("Failed to remove container '{0}': ".format(c_name, e.explanation), logging.ERROR)
                     if raise_on_error:
