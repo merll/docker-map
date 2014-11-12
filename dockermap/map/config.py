@@ -3,10 +3,13 @@ from __future__ import unicode_literals
 
 import posixpath
 from collections import namedtuple
+import operator
 import six
 
 from . import DictMap
 
+
+LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches'
 
 HostShare = namedtuple('HostShare', ('volume', 'readonly'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
@@ -23,7 +26,9 @@ def _get_list(value):
 
 
 def _get_listed_tuples(value, element_type, conversion_func):
-    if isinstance(value, element_type):
+    if value is None:
+        return []
+    elif isinstance(value, element_type):
         return [value]
     elif isinstance(value, six.string_types):
         return [conversion_func(value)]
@@ -57,6 +62,10 @@ def _get_container_link(value):
             return ContainerLink(*value)
         raise ValueError("Invalid element length; only tuples and lists of length 2 can be converted to a ContainerLink tuple.")
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value)))
+
+
+_get_host_shares = lambda value: _get_listed_tuples(value, HostShare, _get_host_share)
+_get_container_links = lambda value: _get_listed_tuples(value, ContainerLink, _get_container_link)
 
 
 class ContainerConfiguration(object):
@@ -143,7 +152,7 @@ class ContainerConfiguration(object):
 
     @binds.setter
     def binds(self, value):
-        self._binds = _get_listed_tuples(value, HostShare, _get_host_share)
+        self._binds = _get_host_shares(value)
 
     @property
     def uses(self):
@@ -173,7 +182,7 @@ class ContainerConfiguration(object):
 
     @links.setter
     def links(self, value):
-        self._links_to = _get_listed_tuples(value, ContainerLink, _get_container_link)
+        self._links_to = _get_container_links(value)
 
     @property
     def attaches(self):
@@ -266,7 +275,7 @@ class ContainerConfiguration(object):
     def update(self, values):
         """
         Updates the container configuration with the contents of the given dictionary, if keys are valid attributes for
-        this class.
+        this class. Existing attributes are replaced with the new values.
 
         :param values: Dictionary to update this container configuration with.
         :type values: dict
@@ -274,6 +283,42 @@ class ContainerConfiguration(object):
         for key, value in six.iteritems(values):
             if hasattr(self, key):
                 self.__setattr__(key, value)
+
+    def merge(self, values):
+        """
+        Merges list-based attributes (instances, shares, uses, attaches, volumes, and binds) into one list including
+        unique elements from both lists. Ignores all other attributes.
+
+        :param values: Values to update the ContainerConfiguration with.
+        :type values: ContainerConfiguration or dict
+        """
+        def _merge_list(attr, update_list):
+            current = self.__getattribute__(attr)
+            current.extend(set(update_list) - set(current))
+
+        def _merge_first(current, update_list):
+            new_keys = set(map(operator.itemgetter(0), update_list)) - set(map(operator.itemgetter(0), current))
+            current.extend(filter(lambda u: u[0] in new_keys, update_list))
+
+        if isinstance(values, dict):
+            for key in LIST_ATTRIBUTES:
+                value = values.get(key)
+                if value:
+                    _merge_list(key, value)
+
+            _merge_first(self._binds, _get_host_shares(values.get('binds')))
+            _merge_first(self._links_to, _get_container_links(values.get('links')))
+        elif isinstance(values, ContainerConfiguration):
+            for key in LIST_ATTRIBUTES:
+                value = values.__getattribute__(key)
+                if value:
+                    _merge_list(key, value)
+
+            _merge_first(self._binds, values._binds)
+            _merge_first(self._links_to, values._links_to)
+
+        else:
+            raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values)))
 
 
 class HostVolumeConfiguration(DictMap):
@@ -316,8 +361,26 @@ class HostVolumeConfiguration(DictMap):
         return path
 
     def update(self, other=None, **kwargs):
-        if 'root' in other:
-            self._root = other.pop('root')
+        if other:
+            if isinstance(other, HostVolumeConfiguration):
+                self._root = other._root
+            elif isinstance(other, dict):
+                if 'root' in other:
+                    other = other.copy()
+                    self._root = other.pop('root')
+            else:
+                raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(other)))
         if 'root' in kwargs:
             self._root = kwargs.pop('root')
         super(HostVolumeConfiguration, self).update(other=other, **kwargs)
+
+    def merge(self, items):
+        if isinstance(items, HostVolumeConfiguration):
+            self._map.update(items._map)
+        elif isinstance(items, dict):
+            if 'root' in items:
+                items = items.copy()
+                items.pop('root')
+            self._map.update(items)
+        else:
+            raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(items)))

@@ -88,6 +88,68 @@ class ContainerMap(object):
     def __iter__(self):
         return six.iteritems(self._containers)
 
+    def _update_from_dict(self, items):
+        """
+        :type items: dict
+        """
+        for key, value in six.iteritems(items):
+            if key == 'volumes':
+                self._volumes.update(value)
+            elif key == 'host':
+                self._host.update(value)
+            elif key == 'host_root':
+                self._host.root = value
+            elif key == 'repository':
+                self._repository = value
+            elif key == 'containers':
+                for container, config in six.iteritems(value):
+                    self._containers[container].update(config)
+            else:
+                self._containers[key].update(value)
+
+    def _merge_from_dict(self, items):
+        """
+        :type items: dict
+        """
+        for key, value in six.iteritems(items):
+            if key == 'volumes':
+                self._volumes.update(value)
+            elif key == 'host':
+                self._host.merge(value)
+            elif key == 'containers':
+                for container, config in six.iteritems(value):
+                    if container in self._containers:
+                        self._containers[container].merge(config)
+                    else:
+                        self._containers[container].update(config)
+            else:
+                if key in self._containers:
+                    self._containers[key].merge(value)
+                else:
+                    self._containers[key].update(value)
+
+    def _update_from_obj(self, items):
+        """
+        :type items: ContainerMap
+        """
+        self._volumes.update(items._volumes)
+        self._host.update(items._host)
+        self._repository = items._repository
+        for container, config in items:
+            self._containers[container].update(config)
+
+    def _merge_from_obj(self, items):
+        """
+        :type items: ContainerMap
+        """
+        self._volumes.update(items._volumes)
+        self._host.merge(items._host)
+        for container, config in items:
+            if container in self._containers:
+                self._containers[container].merge(config)
+            else:
+                self._containers[container] = config
+
     @property
     def name(self):
         """
@@ -214,33 +276,37 @@ class ContainerMap(object):
 
     def update(self, other=None, **kwargs):
         """
-        Updates the container map with a dictionary. The keys need to be container names, the values should be a
-        dictionary structure of :class:`dockermap.map.config.ContainerConfiguration` properties. `host` and `volumes`
-        can also be included.
+        Updates the container map with a dictionary or another instance. In case of a dictionary, the keys need to be
+        container names, the values should be a dictionary structure of
+        :class:`dockermap.map.config.ContainerConfiguration` properties. ``host``, ``host_root``, and ``volumes`` can
+        also be included.
 
-        :item other: Dictionary to update the map with.
-        :type other: dict
+        :item other: Dictionary or ContainerMap to update the map with.
+        :type other: ContainerMap or dict
         :param kwargs: Kwargs to update the map with
         """
-        def _update(items):
-            for key, value in six.iteritems(items):
-                if key == 'volumes':
-                    self._volumes.update(value)
-                elif key == 'host':
-                    self._host.update(value)
-                elif key == 'host_root':
-                    self._host.root = value
-                elif key == 'repository':
-                    self._repository = value
-                elif key == 'containers':
-                    for container, config in six.iteritems(value):
-                        self._containers[container].update(config)
-                else:
-                    self._containers[key].update(value)
+        if other:
+            if isinstance(other, ContainerMap):
+                self._update_from_obj(other)
+            elif isinstance(other, dict):
+                self._update_from_dict(other)
+            else:
+                raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(other)))
+        self._update_from_dict(kwargs)
 
-        if isinstance(other, dict):
-            _update(other)
-        _update(kwargs)
+    def merge(self, c_map):
+        """
+        Merges a container map and its items into the current one.
+
+        :param c_map: Merging dictionary or ContainerMap
+        :type c_map: ContainerMap or dict
+        """
+        if isinstance(c_map, ContainerMap):
+            self._merge_from_obj(c_map)
+        elif isinstance(c_map, dict):
+            self._merge_from_dict(c_map)
+        else:
+            raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(c_map)))
 
     def check_integrity(self, check_duplicates=True):
         """

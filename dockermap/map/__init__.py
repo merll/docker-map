@@ -44,7 +44,10 @@ class DictMap(object):
         """
         Updates the underlying dictionary. Same as :func:`dict.update`.
 
-        :type other: dict
+        :type other: dict or DictMap
         :param kwargs: dict
         """
-        self._map.update(other, **kwargs)
+        if isinstance(other, DictMap):
+            self._map.update(other._map, **kwargs)
+        else:
+            self._map.update(other, **kwargs)
