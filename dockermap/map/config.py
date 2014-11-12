@@ -9,6 +9,8 @@ import six
 from . import DictMap
 
 
+SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent'
+DICT_ATTRIBUTES = 'create_options', 'start_options'
 LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches'
 
 HostShare = namedtuple('HostShare', ('volume', 'readonly'))
@@ -284,41 +286,59 @@ class ContainerConfiguration(object):
             if hasattr(self, key):
                 self.__setattr__(key, value)
 
-    def merge(self, values):
+    def merge(self, values, lists_only=False):
         """
         Merges list-based attributes (instances, shares, uses, attaches, volumes, and binds) into one list including
-        unique elements from both lists. Ignores all other attributes.
+        unique elements from both lists. When ``lists_only`` is set to ``False``, updates dictionaries and overwrites
+        single-value attributes.
 
         :param values: Values to update the ContainerConfiguration with.
         :type values: ContainerConfiguration or dict
+        :param lists_only: Ignore single-value attributes and update dictionary options.
+        :type lists_only: bool
         """
-        def _merge_list(attr, update_list):
-            current = self.__getattribute__(attr)
-            current.extend(set(update_list) - set(current))
-
         def _merge_first(current, update_list):
             new_keys = set(map(operator.itemgetter(0), update_list)) - set(map(operator.itemgetter(0), current))
             current.extend(filter(lambda u: u[0] in new_keys, update_list))
 
+        def _update_attr(attr, update_func):
+            update = get_func(attr)
+            if update:
+                update_func(attr, update)
+
+        def _merge_list(attr, update_list):
+            current = self.__getattribute__(attr)
+            current.extend(set(update_list) - set(current))
+
+        _update_single = lambda attr, new_val: self.__setattr__(attr, new_val)
+
+        def _update_dict(attr, new_val):
+            current_dict = self.__getattribute__(attr)
+            if current_dict:
+                current_dict.update(new_val)
+            else:
+                self.__setattr__(attr, new_val)
+
         if isinstance(values, dict):
-            for key in LIST_ATTRIBUTES:
-                value = values.get(key)
-                if value:
-                    _merge_list(key, value)
-
-            _merge_first(self._binds, _get_host_shares(values.get('binds')))
-            _merge_first(self._links_to, _get_container_links(values.get('links')))
+            get_func = values.get
+            update_binds = _get_host_shares(values.get('binds'))
+            update_links = _get_container_links(values.get('links'))
         elif isinstance(values, ContainerConfiguration):
-            for key in LIST_ATTRIBUTES:
-                value = values.__getattribute__(key)
-                if value:
-                    _merge_list(key, value)
-
-            _merge_first(self._binds, values._binds)
-            _merge_first(self._links_to, values._links_to)
-
+            get_func = values.__getattribute__
+            update_binds = values._binds
+            update_links = values._links_to
         else:
             raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values)))
+
+        for key in LIST_ATTRIBUTES:
+            _update_attr(key, _merge_list)
+        _merge_first(self._binds, update_binds)
+        _merge_first(self._links_to, update_links)
+        if not lists_only:
+            for key in SINGLE_ATTRIBUTES:
+                _update_attr(key, _update_single)
+            for key in DICT_ATTRIBUTES:
+                _update_attr(key, _update_dict)
 
 
 class HostVolumeConfiguration(DictMap):
@@ -374,13 +394,17 @@ class HostVolumeConfiguration(DictMap):
             self._root = kwargs.pop('root')
         super(HostVolumeConfiguration, self).update(other=other, **kwargs)
 
-    def merge(self, items):
+    def merge(self, items, overwrite=False):
         if isinstance(items, HostVolumeConfiguration):
             self._map.update(items._map)
+            if items._root and overwrite:
+                self._root = items._root
         elif isinstance(items, dict):
             if 'root' in items:
                 items = items.copy()
-                items.pop('root')
+                root = items.pop('root')
+                if overwrite:
+                    self._root = root
             self._map.update(items)
         else:
             raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(items)))

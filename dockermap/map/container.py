@@ -107,24 +107,31 @@ class ContainerMap(object):
             else:
                 self._containers[key].update(value)
 
-    def _merge_from_dict(self, items):
+    def _merge_from_dict(self, items, lists_only):
         """
         :type items: dict
+        :type lists_only: bool
         """
         for key, value in six.iteritems(items):
             if key == 'volumes':
                 self._volumes.update(value)
             elif key == 'host':
                 self._host.merge(value)
+            elif key == 'host_root':
+                if not lists_only:
+                    self._host.root = value
+            elif key == 'repository':
+                if not lists_only:
+                    self._repository = value
             elif key == 'containers':
                 for container, config in six.iteritems(value):
                     if container in self._containers:
-                        self._containers[container].merge(config)
+                        self._containers[container].merge(config, lists_only)
                     else:
                         self._containers[container].update(config)
             else:
                 if key in self._containers:
-                    self._containers[key].merge(value)
+                    self._containers[key].merge(value, lists_only)
                 else:
                     self._containers[key].update(value)
 
@@ -138,15 +145,18 @@ class ContainerMap(object):
         for container, config in items:
             self._containers[container].update(config)
 
-    def _merge_from_obj(self, items):
+    def _merge_from_obj(self, items, lists_only):
         """
         :type items: ContainerMap
+        :type lists_only: bool
         """
         self._volumes.update(items._volumes)
         self._host.merge(items._host)
+        if not lists_only:
+            self._repository = items._repository
         for container, config in items:
             if container in self._containers:
-                self._containers[container].merge(config)
+                self._containers[container].merge(config, lists_only)
             else:
                 self._containers[container] = config
 
@@ -294,17 +304,19 @@ class ContainerMap(object):
                 raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(other)))
         self._update_from_dict(kwargs)
 
-    def merge(self, c_map):
+    def merge(self, c_map, lists_only=False):
         """
         Merges a container map and its items into the current one.
 
         :param c_map: Merging dictionary or ContainerMap
         :type c_map: ContainerMap or dict
+        :param lists_only: Restrict merge to list-based fields of container configurations. In the default  ``True``
+         setting, overwrites existing single-values and updates dictionary attributes.
         """
         if isinstance(c_map, ContainerMap):
-            self._merge_from_obj(c_map)
+            self._merge_from_obj(c_map, lists_only)
         elif isinstance(c_map, dict):
-            self._merge_from_dict(c_map)
+            self._merge_from_dict(c_map, lists_only)
         else:
             raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(c_map)))
 
