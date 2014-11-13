@@ -162,6 +162,7 @@ class MappingDockerClient(object):
 
     def _get_instance_containers(self, container, instances=None, **kwargs):
         config = self._get(container)
+        c_basename = kwargs.pop('name', container)
         c_instances = instances or config.instances or [None]
         image = self._iname(config.image or container)
         c_kwargs = {
@@ -173,7 +174,7 @@ class MappingDockerClient(object):
 
         self._ensure_images(image)
         for i in c_instances:
-            c_name = self._cname(container, i)
+            c_name = self._cname(c_basename, i)
             if c_name not in self._get_container_names():
                 self._create_named_container(image, c_name, **c_kwargs)
             else:
@@ -189,6 +190,7 @@ class MappingDockerClient(object):
                     yield share, bind
 
         config = self._get(container)
+        c_basename = kwargs.pop('name', container)
         c_instances = instances or config.instances or [None]
         c_kwargs = {
             'volumes_from': list(map(self._cname, itertools.chain(config.uses, config.attaches))),
@@ -197,15 +199,16 @@ class MappingDockerClient(object):
         c_options = _init_options(config.start_options)
 
         for i in c_instances:
-            c_name = self._cname(container, i)
+            c_name = self._cname(c_basename, i)
             ic_kwargs = c_kwargs.copy()
             _update_kwargs(ic_kwargs, {'binds': dict(_get_host_binds(i))}, c_options, kwargs)
             self._client.start(c_name, **ic_kwargs)
 
     def _stop_instance_containers(self, container, instances=None, raise_on_error=False, **kwargs):
+        c_basename = kwargs.pop('name', container)
         c_instances = instances or self._get(container).instances or [None]
         for i in c_instances:
-            c_name = self._cname(container, i)
+            c_name = self._cname(c_basename, i)
             if c_name in self._get_container_names():
                 try:
                     self._client.stop(c_name, **kwargs)
@@ -216,9 +219,10 @@ class MappingDockerClient(object):
                             raise e
 
     def _remove_instance_containers(self, container, instances=None, raise_on_error=False, **kwargs):
+        c_basename = kwargs.pop('name', container)
         c_instances = instances or self._get(container).instances or [None]
         for i in c_instances:
-            c_name = self._cname(container, i)
+            c_name = self._cname(c_basename, i)
             if c_name in self._get_container_names():
                 try:
                     self._remove_container(c_name, **kwargs)
@@ -319,11 +323,12 @@ class MappingDockerClient(object):
         :type raise_on_error: bool
         :param kwargs: Additional kwargs for stopping the container and its dependents.
         """
+        basename = kwargs.pop('name', container)
         if stop_dependent:
             for dependent_container in self._container_dependents(container):
                 self._stop_instance_containers(dependent_container, raise_on_error, **kwargs)
 
-        self._stop_instance_containers(container, instances, raise_on_error, **kwargs)
+        self._stop_instance_containers(container, instances, raise_on_error, name=basename, **kwargs)
 
     def remove(self, container, instances=None, remove_dependent=True, raise_on_error=False, **kwargs):
         """
@@ -340,13 +345,14 @@ class MappingDockerClient(object):
         :type raise_on_error: bool
         :param kwargs: Additional kwargs for removing the container and its dependents.
         """
+        basename = kwargs.pop('name', container)
         if remove_dependent:
             for dependent_container in self._container_dependents(container):
                 self._remove_instance_containers(dependent_container, raise_on_error, **kwargs)
 
-        self._remove_instance_containers(container, instances, raise_on_error, **kwargs)
+        self._remove_instance_containers(container, instances, raise_on_error, name=basename, **kwargs)
 
-    def wait(self, container, instance=None, log=True):
+    def wait(self, container, instance=None, log=True, **kwargs):
         """
         Wait for a container.
 
@@ -356,13 +362,15 @@ class MappingDockerClient(object):
         :type instance: unicode
         :param log: Log the container output before removing it.
         :type log: bool
+        :param kwargs: Additional kwargs. Currently only ``name`` is used.
         """
-        c_name = self._cname(container, instance)
+        basename = kwargs.pop('name', container)
+        c_name = self._cname(basename, instance)
         self._client.wait(c_name)
         if log:
             self._client.push_container_logs(c_name)
 
-    def wait_and_remove(self, container, instance=None, log=True):
+    def wait_and_remove(self, container, instance=None, log=True, **kwargs):
         """
         Wait for, and then remove a container.
 
@@ -373,8 +381,9 @@ class MappingDockerClient(object):
         :param log: Log the container output before removing it.
         :type log: bool
         """
-        self.wait(container, instance, log)
-        self.remove(container, [instance])
+        basename = kwargs.pop('name', container)
+        self.wait(container, instance, log, name=basename)
+        self.remove(container, [instance], name=basename)
 
     def refresh_names(self):
         """
