@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import itertools
 import logging
+import re
 import six
 
 from docker.errors import APIError
@@ -10,6 +11,10 @@ from docker.errors import APIError
 from .. import DEFAULT_BASEIMAGE, DEFAULT_COREIMAGE
 from ..shortcuts import get_user_group
 from .container import ContainerDependencyResolver
+
+
+EXITED_REGEX = 'Exited \((\d+)\)'
+exited_pattern = re.compile(EXITED_REGEX)
 
 
 def _extract_user(user):
@@ -67,7 +72,7 @@ class MappingDockerClient(object):
     def __init__(self, container_map=None, docker_client=None):
         self._map = container_map
         self._client = docker_client
-        self._container_names = None
+        self._container_status = None
         self._image_tags = None
 
     def _get(self, container):
@@ -83,8 +88,25 @@ class MappingDockerClient(object):
         return self._map.iname(image)
 
     def _check_refresh_containers(self, force=False):
-        if force or self._container_names is None:
-            self._container_names = self._client.get_container_names()
+        def _extract_status(all_containers):
+            for container in all_containers:
+                status = container['Status']
+                if status == '':
+                    cs = False
+                elif status.startswith('Up'):
+                    cs = True
+                else:
+                    exit_match = exited_pattern.match(status)
+                    if exit_match:
+                        cs = int(exit_match.group(1))
+                    else:
+                        cs = None
+                for name in container['Names']:
+                    yield name[1:], cs
+
+        if force or self._container_status is None:
+            containers = self._client.containers(all=True)
+            self._container_status = dict(_extract_status(containers))
 
     def _check_refresh_images(self, force=False):
         if force or self._image_tags is None:
@@ -92,7 +114,11 @@ class MappingDockerClient(object):
 
     def _get_container_names(self):
         self._check_refresh_containers()
-        return self._container_names
+        return self._container_status.keys()
+
+    def _get_running_containers(self):
+        self._check_refresh_containers()
+        return set(name for name, status in six.iteritems(self._container_status) if status is True)
 
     def _get_image_tags(self):
         self._check_refresh_images()
@@ -116,12 +142,20 @@ class MappingDockerClient(object):
 
     def _create_named_container(self, image, name, **kwargs):
         container = self._client.create_container(image, name, **kwargs)
-        self._container_names.add(name)
+        self._container_status[name] = False
         return container
 
     def _remove_container(self, name, **kwargs):
-        self._container_names.remove(name)
+        self._container_status.pop(name, None)
         self._client.remove_container(name, **kwargs)
+
+    def _start_container(self, name, **kwargs):
+        self._client.start_(name, **kwargs)
+        self._container_status[name] = True
+
+    def _stop_container(self, name, **kwargs):
+        self._container_status[name] = False
+        self._client.stop(name, **kwargs)
 
     def _run_and_dispose(self, coreimage, entrypoint, command, user, volumes_from):
         tmp_container = self._client.create_container(coreimage, entrypoint=entrypoint, command=command, user=user)['Id']
@@ -173,9 +207,10 @@ class MappingDockerClient(object):
         _update_kwargs(c_kwargs, _init_options(config.create_options), kwargs)
 
         self._ensure_images(image)
+        existing_names = self._get_container_names()
         for i in c_instances:
             c_name = self._cname(c_basename, i)
-            if c_name not in self._get_container_names():
+            if c_name not in existing_names:
                 self._create_named_container(image, c_name, **c_kwargs)
             else:
                 self._client.push_log("Container '{0}' exists.".format(c_name))
@@ -197,19 +232,24 @@ class MappingDockerClient(object):
             'links': dict((self._cname(name), alias) for name, alias in config.links),
         }
         c_options = _init_options(config.start_options)
+        running_names = self._get_running_containers()
 
         for i in c_instances:
             c_name = self._cname(c_basename, i)
-            ic_kwargs = c_kwargs.copy()
-            _update_kwargs(ic_kwargs, {'binds': dict(_get_host_binds(i))}, c_options, kwargs)
-            self._client.start(c_name, **ic_kwargs)
+            if c_name not in running_names:
+                ic_kwargs = c_kwargs.copy()
+                _update_kwargs(ic_kwargs, {'binds': dict(_get_host_binds(i))}, c_options, kwargs)
+                self._client.start(c_name, **ic_kwargs)
+            else:
+                self._client.push_log("Container '{0}' is already started.".format(c_name))
 
     def _stop_instance_containers(self, container, instances=None, raise_on_error=False, **kwargs):
         c_basename = kwargs.pop('name', container)
         c_instances = instances or self._get(container).instances or [None]
+        running_containers = self._get_running_containers()
         for i in c_instances:
             c_name = self._cname(c_basename, i)
-            if c_name in self._get_container_names():
+            if c_name in running_containers:
                 try:
                     self._client.stop(c_name, **kwargs)
                 except APIError as e:
@@ -221,9 +261,10 @@ class MappingDockerClient(object):
     def _remove_instance_containers(self, container, instances=None, raise_on_error=False, **kwargs):
         c_basename = kwargs.pop('name', container)
         c_instances = instances or self._get(container).instances or [None]
+        existing_containers = self._get_container_names()
         for i in c_instances:
             c_name = self._cname(c_basename, i)
-            if c_name in self._get_container_names():
+            if c_name in existing_containers:
                 try:
                     self._remove_container(c_name, **kwargs)
                 except APIError as e:
@@ -425,7 +466,7 @@ class MappingDockerClient(object):
     @client.setter
     def client(self, value):
         self._client = value
-        self._container_names = None
+        self._container_status = None
         self._image_tags = None
 
     @property
