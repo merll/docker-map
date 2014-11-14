@@ -82,6 +82,16 @@ class DockerClientWrapper(docker.Client):
         return result
 
     def push_progress(self, status, object_id, progress):
+        """
+        Handles streamed progress information.
+
+        :param status: Status text.
+        :type status: unicode
+        :param object_id: Object that the progress is reported on.
+        :type object_id: unicode
+        :param progress: Progress bar.
+        :type progress: unicode
+        """
         pass
 
     def push_log(self, info, level=logging.INFO):
@@ -305,18 +315,18 @@ class DockerClientWrapper(docker.Client):
         """
         First stops (if necessary) and them removes all containers present on the Docker instance.
         """
-        containers = [(container['Names'][0][1:], container['Status'].startswith('Exited'))
+        containers = [(container['Id'], container['Status'].startswith('Exited'))
                       for container in self.containers(all=True)]
-        for c_name, stopped in containers:
+        for c_id, stopped in containers:
             if not stopped:
                 try:
-                    self.stop(c_name)
+                    self.stop(c_id)
                 except APIError as e:
                     if e.response.status_code != 404:
                         raise e
-        for c_name, stopped in containers:
+        for c_id, __ in containers:
             try:
-                self.remove_container(c_name)
+                self.remove_container(c_id)
             except APIError as e:
                 if e.response.status_code != 404:
                     raise e
