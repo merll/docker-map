@@ -289,7 +289,7 @@ class DockerClientWrapper(docker.Client):
         """
         Fetches image labels (repository / tags) from Docker.
 
-        :return: A dictionary, with image id as the key and all associated tags as values.
+        :return: A dictionary, with image name and tags as the key and the image id as value.
         :rtype: dict
         """
         current_images = self.images()
