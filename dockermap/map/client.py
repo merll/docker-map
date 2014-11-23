@@ -10,8 +10,7 @@ from docker.errors import APIError
 from ..shortcuts import get_user_group
 from .container import ContainerMap
 from .policy import (ACTION_CREATE, ACTIONS_CREATE, ACTIONS_START, ACTIONS_RESTART, ACTIONS_PREPARE, ACTIONS_STOP,
-                     ACTIONS_REMOVE, ACTION_START, ACTION_STOP, ACTION_REMOVE, ACTION_RESTART)
-from .policy.simple import SimplePolicy
+                     ACTIONS_REMOVE, ACTION_START, ACTION_STOP, ACTION_REMOVE, ACTION_RESTART, SimplePolicy)
 
 
 EXITED_REGEX = 'Exited \((\d+)\)'
@@ -50,13 +49,13 @@ class MappingDockerClient(object):
 
     Image names and container names are cached. In order to force a refresh, use :meth:`refresh_names`.
 
-    :param policy_class: Policy class for generating container actions.
-    :type policy_class: class
     :param container_maps: :class:`~dockermap.map.container.ContainerMap` instance.
     :type container_maps: dockermap.map.container.ContainerMap or
       list[(dockermap.map.container.ContainerMap, dockermap.map.base.DockerClientWrapper)]
     :param docker_client: :class:`~dockermap.map.base.DockerClientWrapper` instance.
     :type docker_client: dockermap.map.base.DockerClientWrapper
+    :param policy_class: Policy class for generating container actions.
+    :type policy_class: class
     """
     def __init__(self, container_maps=None, docker_client=None, policy_class=SimplePolicy):
         if isinstance(container_maps, ContainerMap):
