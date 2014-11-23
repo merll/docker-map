@@ -1,58 +1,43 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import itertools
+from collections import namedtuple
 import logging
 import re
-import six
 
 from docker.errors import APIError
 
-from .. import DEFAULT_BASEIMAGE, DEFAULT_COREIMAGE
 from ..shortcuts import get_user_group
-from .container import ContainerDependencyResolver
+from . import policy
+from .container import ContainerMap
+from .policy.simple import SimplePolicy
 
 
 EXITED_REGEX = 'Exited \((\d+)\)'
 exited_pattern = re.compile(EXITED_REGEX)
 
-
-def _extract_user(user):
-    if not user and user != 0 and user != '0':
-        return None
-    if isinstance(user, tuple):
-        return user[0]
-    if isinstance(user, int):
-        return six.text_type(user)
-    return user.partition(':')[0]
+MapClient = namedtuple('MapClient', ('container_map', 'client'))
 
 
-def _update_kwargs(kwargs, *updates):
-    for update in updates:
-        for key, u_item in six.iteritems(update):
-            if not u_item:
-                continue
-            kw_item = kwargs.get(key)
-            if isinstance(u_item, (tuple, list)):
-                if kw_item:
-                    kw_item.extend(u_item)
-                else:
-                    kwargs[key] = u_item[:]
-            elif isinstance(u_item, dict):
-                if kw_item:
-                    kw_item.update(u_item)
-                else:
-                    kwargs[key] = u_item.copy()
-            else:
-                kwargs[key] = u_item
+def _run_and_dispose(client, image, entrypoint, command, user, volumes_from):
+    tmp_container = client.create_container(image, entrypoint=entrypoint, command=command, user=user)['Id']
+    try:
+        client.start(tmp_container, volumes_from=volumes_from)
+        client.wait(tmp_container)
+        client.push_container_logs(tmp_container)
+    finally:
+        client.remove_container(tmp_container)
 
 
-def _init_options(options):
-    if options:
-        if callable(options):
-            return options()
-        return options
-    return {}
+def _adjust_permissions(client, image, container_name, path, user, permissions):
+    if not user and not permissions:
+        return
+    if user:
+        client.push_log("Adjusting user for container '{0}' to '{1}'.".format(container_name, user))
+        _run_and_dispose(client, image, None, ['chown', '-R', get_user_group(user), path], 'root', [container_name])
+    if permissions:
+        client.push_log("Adjusting permissions for container '{0}' to '{1}'.".format(container_name, permissions))
+        _run_and_dispose(client, image, None, ['chmod', '-R', permissions, path], 'root', [container_name])
 
 
 class MappingDockerClient(object):
@@ -64,241 +49,143 @@ class MappingDockerClient(object):
 
     Image names and container names are cached. In order to force a refresh, use :meth:`refresh_names`.
 
-    :param container_map: :class:`~dockermap.map.container.ContainerMap` instance.
-    :type container_map: dockermap.map.container.ContainerMap
+    :param policy_class: Policy class for generating container actions.
+    :type policy_class: class
+    :param container_maps: :class:`~dockermap.map.container.ContainerMap` instance.
+    :type container_maps: dockermap.map.container.ContainerMap or
+      list[(dockermap.map.container.ContainerMap, dockermap.map.base.DockerClientWrapper)]
     :param docker_client: :class:`~dockermap.map.base.DockerClientWrapper` instance.
     :type docker_client: dockermap.map.base.DockerClientWrapper
     """
-    def __init__(self, container_map=None, docker_client=None):
-        self._map = container_map
-        self._client = docker_client
-        self._container_status = None
-        self._image_tags = None
+    def __init__(self, container_maps=None, docker_client=None, policy_class=SimplePolicy):
+        if isinstance(container_maps, ContainerMap):
+            self._default_map = container_maps.name
+            self._maps = {container_maps.name: MapClient(container_maps, docker_client)}
+        elif isinstance(container_maps, (list, tuple)):
+            self._default_map = None
+            self._maps = dict((c_map.name, MapClient(c_map, client)) for c_map, client in container_maps)
+        else:
+            raise ValueError("Unexpected type of container_maps argument: {0}".format(type(container_maps)))
+        self._image_tags = {}
+        self._policy_class = policy_class
+        self._policy = None
 
-    def _get(self, container):
-        config = self._map.get_existing(container)
-        if not config:
-            raise ValueError("No configurations found for container '{0}'.".format(container))
-        return config
-
-    def _cname(self, container, instance=None):
-        return self._map.cname(container, instance)
-
-    def _iname(self, image):
-        return self._map.iname(image)
-
-    def _check_refresh_containers(self, force=False):
-        def _extract_status(all_containers):
-            for container in all_containers:
-                status = container['Status']
-                if status == '':
-                    cs = False
-                elif status.startswith('Up'):
-                    cs = True
-                else:
-                    exit_match = exited_pattern.match(status)
-                    if exit_match:
-                        cs = int(exit_match.group(1))
+    def _get_status(self):
+        def _extract_status():
+            for c_map, client in self._maps.values():
+                map_containers = client.containers(all=True)
+                for container in map_containers:
+                    c_status = container['Status']
+                    if c_status == '':
+                        cs = False
+                    elif c_status.startswith('Up'):
+                        cs = True
                     else:
-                        cs = None
-                for name in container['Names']:
-                    yield name[1:], cs
+                        exit_match = exited_pattern.match(c_status)
+                        if exit_match:
+                            cs = int(exit_match.group(1))
+                        else:
+                            cs = None
+                    for name in container['Names']:
+                        yield name[1:], cs
 
-        if force or self._container_status is None:
-            containers = self._client.containers(all=True)
-            self._container_status = dict(_extract_status(containers))
+        return dict(_extract_status())
 
-    def _check_refresh_images(self, force=False):
-        if force or self._image_tags is None:
-            self._image_tags = self._client.get_image_tags()
+    def _get_image_tags(self, map_name, force=False):
+        tags = self._image_tags.get(map_name) if not force else None
+        if tags is None:
+            client = self._get_client(map_name)
+            tags = client.get_image_tags()
+            self._image_tags[map_name] = tags
+        return tags
 
-    def _get_container_names(self):
-        self._check_refresh_containers()
-        return self._container_status.keys()
+    def _get_client(self, map_name):
+        """
+        :type map_name: unicode
+        :rtype: dockermap.map.base.DockerClientWrapper
+        """
+        c_map = self._maps.get(map_name)
+        if not c_map:
+            raise ValueError("No map found with name '{0}'.".format(map_name))
+        return c_map[1]
 
-    def _get_running_containers(self):
-        self._check_refresh_containers()
-        return set(name for name, status in six.iteritems(self._container_status) if status is True)
-
-    def _get_image_tags(self):
-        self._check_refresh_images()
-        return self._image_tags
-
-    def _ensure_images(self, *images):
+    def _ensure_images(self, map_name, *images):
         def _check_image(image_name):
             image_name, __, tag = image_name.partition(':')
             if tag:
                 full_name = image_name
             else:
                 full_name = ':'.join((image_name, 'latest'))
-            if full_name not in self._get_image_tags():
-                self._client.import_image(image=image_name, tag=tag or 'latest')
+            if full_name not in map_images:
+                map_client.import_image(image=image_name, tag=tag or 'latest')
                 return True
             return False
 
+        map_client = self._get_client(map_name)
+        map_images = self._get_image_tags(map_name)
         new_images = [_check_image(image) for image in images]
         if any(new_images):
-            self._check_refresh_images(True)
+            self._get_image_tags(map_name, True)
 
-    def _create_named_container(self, image, name, **kwargs):
-        container = self._client.create_container(image, name, **kwargs)
-        self._container_status[name] = False
-        return container
+    def get_policy(self):
+        """
 
-    def _remove_container(self, name, **kwargs):
-        self._container_status.pop(name, None)
-        self._client.remove_container(name, **kwargs)
+        :return:
+        :rtype: dockermap.map.policy.BasePolicy
+        """
+        if not self._policy:
+            self._policy = self._policy_class(mc.container_map for mc in self._maps.values())
+        self._policy.status = self._get_status()
+        return self._policy
 
-    def _start_container(self, name, **kwargs):
-        self._client.start_(name, **kwargs)
-        self._container_status[name] = True
+    def run_action_list(self, actions, apply_kwargs=None, raise_on_error=False):
+        """
 
-    def _stop_container(self, name, **kwargs):
-        self._container_status[name] = False
-        self._client.stop(name, **kwargs)
-
-    def _run_and_dispose(self, coreimage, entrypoint, command, user, volumes_from):
-        tmp_container = self._client.create_container(coreimage, entrypoint=entrypoint, command=command, user=user)['Id']
-        try:
-            self._client.start(tmp_container, volumes_from=volumes_from)
-            self._client.wait(tmp_container)
-            self._client.push_container_logs(tmp_container)
-        finally:
-            self._client.remove_container(tmp_container)
-
-    def _adjust_permissions(self, coreimage, container_name, path, user, permissions):
-        if not user and not permissions:
-            return
-        if user:
-            self._client.push_log("Adjusting user for container '{0}' to '{1}'.".format(container_name, user))
-            self._run_and_dispose(coreimage, None, ['chown', '-R', get_user_group(user), path], 'root', [container_name])
-        if permissions:
-            self._client.push_log("Adjusting permissions for container '{0}' to '{1}'.".format(container_name, permissions))
-            self._run_and_dispose(coreimage, None, ['chmod', '-R', permissions, path], 'root', [container_name])
-
-    def _get_or_create_volume(self, baseimage, coreimage, alias, user, permissions):
-        c_name = self._cname(alias)
-        if c_name not in self._get_container_names():
-            path = self._get_volume_path(alias)
-            self._create_named_container(baseimage, c_name, volumes=[path], user=user)
-            self._client.start(c_name)
-            self._client.wait(c_name)
-            self._adjust_permissions(coreimage, c_name, path, user, permissions)
-        else:
-            self._client.push_log("Container '{0}' exists.".format(c_name))
-        return alias, c_name
-
-    def _get_volume_path(self, alias):
-        path = self._map.volumes.get(alias)
-        if not path:
-            raise ValueError("No path found for volume '{0}'.".format(alias))
-        return path
-
-    def _get_instance_containers(self, container, instances=None, **kwargs):
-        config = self._get(container)
-        c_basename = kwargs.pop('name', container)
-        c_instances = instances or config.instances or [None]
-        image = self._iname(config.image or container)
-        c_kwargs = {
-            'volumes': list(itertools.chain(config.shares,
-                                            (self._get_volume_path(b.volume) for b in config.binds))),
-            'user': _extract_user(config.user),
-        }
-        _update_kwargs(c_kwargs, _init_options(config.create_options), kwargs)
-
-        self._ensure_images(image)
-        existing_names = self._get_container_names()
-        for i in c_instances:
-            c_name = self._cname(c_basename, i)
-            if c_name not in existing_names:
-                self._create_named_container(image, c_name, **c_kwargs)
+        :param actions:
+        :type actions: list[dockermap.map.policy.ContainerAction]
+        :param apply_kwargs:
+        :type apply_kwargs: dict
+        """
+        for action, map_name, container, kwargs in actions:
+            client = self._get_client(map_name)
+            c_kwargs = apply_kwargs.get(action)
+            if c_kwargs:
+                a_kwargs = kwargs.copy() if kwargs else {}
+                a_kwargs.update(c_kwargs)
             else:
-                self._client.push_log("Container '{0}' exists.".format(c_name))
-            yield container, c_name
-
-    def _start_instance_containers(self, container, instances=None, **kwargs):
-        def _get_host_binds(instance):
-            for alias, readonly in config.binds:
-                share = self._map.host.get(alias, instance)
-                if share:
-                    bind = {'bind': self._get_volume_path(alias), 'ro': readonly}
-                    yield share, bind
-
-        config = self._get(container)
-        c_basename = kwargs.pop('name', container)
-        c_instances = instances or config.instances or [None]
-        c_kwargs = {
-            'volumes_from': list(map(self._cname, itertools.chain(config.uses, config.attaches))),
-            'links': dict((self._cname(name), alias) for name, alias in config.links),
-        }
-        c_options = _init_options(config.start_options)
-        running_names = self._get_running_containers()
-
-        for i in c_instances:
-            c_name = self._cname(c_basename, i)
-            if c_name not in running_names:
-                ic_kwargs = c_kwargs.copy()
-                _update_kwargs(ic_kwargs, {'binds': dict(_get_host_binds(i))}, c_options, kwargs)
-                self._client.start(c_name, **ic_kwargs)
-            else:
-                self._client.push_log("Container '{0}' is already started.".format(c_name))
-
-    def _stop_instance_containers(self, container, instances=None, raise_on_error=False, **kwargs):
-        c_basename = kwargs.pop('name', container)
-        c_instances = instances or self._get(container).instances or [None]
-        running_containers = self._get_running_containers()
-        for i in c_instances:
-            c_name = self._cname(c_basename, i)
-            if c_name in running_containers:
+                a_kwargs = kwargs or {}
+            if action in policy.ACTIONS_CREATE:
+                image = a_kwargs.pop('image')
+                self._ensure_images(map_name, image)
+                yield client.create_container(image, container, **a_kwargs)
+            elif action in policy.ACTIONS_START:
+                client.start(container, **a_kwargs)
+            elif action in policy.ACTIONS_PREPARE:
+                image = a_kwargs.pop('image')
+                client.wait(container)
+                _adjust_permissions(client, image, container, **a_kwargs)
+            elif action in policy.ACTIONS_STOP:
                 try:
-                    self._client.stop(c_name, **kwargs)
+                    client.stop(container, **a_kwargs)
                 except APIError as e:
                     if e.response.status_code != 404:
-                        self._client.push_log("Failed to stop container '{0}': {1}".format(c_name, e.explanation), logging.ERROR)
+                        client.push_log("Failed to stop container '{0}': {1}".format(container, e.explanation),
+                                        logging.ERROR)
                         if raise_on_error:
                             raise e
-
-    def _remove_instance_containers(self, container, instances=None, raise_on_error=False, **kwargs):
-        c_basename = kwargs.pop('name', container)
-        c_instances = instances or self._get(container).instances or [None]
-        existing_containers = self._get_container_names()
-        for i in c_instances:
-            c_name = self._cname(c_basename, i)
-            if c_name in existing_containers:
+            elif action in policy.ACTIONS_REMOVE:
                 try:
-                    self._remove_container(c_name, **kwargs)
+                    client.remove_container(container, **a_kwargs)
                 except APIError as e:
-                    self._client.push_log("Failed to remove container '{0}': ".format(c_name, e.explanation), logging.ERROR)
-                    if raise_on_error:
-                        raise e
+                    if e.response.status_code != 404:
+                        client.push_log("Failed to remove container '{0}': {1}".format(container, e.explanation),
+                                        logging.ERROR)
+                        if raise_on_error:
+                            raise e
+            else:
+                raise ValueError("Unrecognized action {0}.".format(action))
 
-    def _container_dependencies(self, container):
-        return reversed(ContainerDependencyResolver(self._map).get_dependencies(container))
-
-    def _container_dependents(self, container):
-        resolver = ContainerDependencyResolver()
-        resolver.update_backward(self._map)
-        return reversed(resolver.get_dependencies(container))
-
-    def create_attached_volumes(self, container, baseimage=DEFAULT_BASEIMAGE, coreimage=DEFAULT_COREIMAGE):
-        """
-        Creates attached volumes for a container configuration; that means that a minimal container image will
-        be created for the purpose of sharing the volumes as set in the `attaches` property. Multiple instances share
-        the same attached container.
-
-        :param container: Container name.
-        :param baseimage: Base image to use for sharing the volume. Default is :const:`DEFAULT_BASEIMAGE`.
-        :param coreimage: Image with coreutils to initialize the containers. Default is :const:`DEFAULT_COREIMAGE`.
-        :return: A dictionary with container aliases, mapping them to names of the instantiated Docker container.
-        :rtype: dict
-        """
-        config = self._get(container)
-        self._ensure_images(baseimage, coreimage)
-        return dict(self._get_or_create_volume(baseimage, coreimage, a, config.user, config.permissions)
-                    for a in config.attaches)
-
-    def create(self, container, instances=None, create_dependencies=True, create_attached=True,
-               attached_baseimage=DEFAULT_BASEIMAGE, **kwargs):
+    def create(self, container, instances=None, map_name=None, **kwargs):
         """
         Creates container instances for a container configuration.
 
@@ -307,29 +194,21 @@ class MappingDockerClient(object):
         :param instances: Instance name to create. If not specified, will create all instances as specified in the
          configuration (or just one default instance).
         :type instances: tuple or list
-        :param create_dependencies: Resolve and create dependency containers.
-        :type create_dependencies: bool
-        :param create_attached: Create attached volumes (also applies to all dependencies, if applicable).
-        :type create_attached: bool
-        :param attached_baseimage: Base image for creating attached volumes.
-        :type attached_baseimage: unicode
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :type policy: dockermap.map.policy.BasePolicy
         :param kwargs: Additional kwargs for creating the container. `volumes` and `environment` enhance the generated
          arguments; `user` overrides the user from the container configuration.
         :return: List of tuples with container aliases and names of container instances. Does not include attached
          containers.
         """
-        def _create_containers(c_name, c_instances=None, c_kwargs={}):
-            if create_attached:
-                self.create_attached_volumes(c_name, attached_baseimage)
-            return tuple(self._get_instance_containers(c_name, c_instances, **c_kwargs))
+        apply_kwargs = {
+            policy.ACTION_CREATE: kwargs,
+        }
+        create_actions = self.get_policy().create_actions(map_name or self._default_map, container, instances)
+        return list(self.run_action_list(create_actions, apply_kwargs, raise_on_error=False))
 
-        if create_dependencies:
-            created_containers = list(map(_create_containers, self._container_dependencies(container)))
-            created_containers.append(_create_containers(container, instances, kwargs))
-            return list(itertools.chain.from_iterable(created_containers))
-        return _create_containers(container, instances, kwargs)
-
-    def start(self, container, instances=None, start_dependencies=True, **kwargs):
+    def start(self, container, instances=None, map_name=None, **kwargs):
         """
         Starts instances for a container configuration.
 
@@ -337,19 +216,19 @@ class MappingDockerClient(object):
         :type container: unicode
         :param instances: Instance names to start. If not specified, will start all instances as specified in the
          configuration (or just one default instance).
+        :param map_name: Container map name.
+        :type map_name: unicode
         :type instances: iterable
-        :param start_dependencies: Resolve and start dependency containers.
-        :type start_dependencies: bool
         :param kwargs: Additional kwargs for starting the container. `binds` and `volumes_from` will enhance the
          generated arguments.
         """
-        if start_dependencies:
-            for dependent_container in self._container_dependencies(container):
-                self._start_instance_containers(dependent_container)
+        apply_kwargs = {
+            policy.ACTION_START: kwargs,
+        }
+        start_actions = self.get_policy().start_actions(map_name or self._default_map, container, instances)
+        return list(self.run_action_list(start_actions, apply_kwargs, raise_on_error=False))
 
-        self._start_instance_containers(container, instances, **kwargs)
-
-    def stop(self, container, instances=None, stop_dependent=True, raise_on_error=False, **kwargs):
+    def stop(self, container, instances=None, map_name=None, raise_on_error=False, **kwargs):
         """
         Stops instances for a container configuration.
 
@@ -358,20 +237,19 @@ class MappingDockerClient(object):
         :param instances: Instance names to stop. If not specified, will stop all instances as specified in the
          configuration (or just one default instance).
         :type instances: iterable
-        :param stop_dependent: Resolve and stop dependent containers.
-        :type stop_dependent: bool
+        :param map_name: Container map name.
+        :type map_name: unicode
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
         :param kwargs: Additional kwargs for stopping the container and its dependents.
         """
-        basename = kwargs.pop('name', container)
-        if stop_dependent:
-            for dependent_container in self._container_dependents(container):
-                self._stop_instance_containers(dependent_container, raise_on_error, **kwargs)
+        apply_kwargs = {
+            policy.ACTION_STOP: kwargs,
+        }
+        stop_actions = self.get_policy().stop_actions(map_name or self._default_map, container, instances)
+        return list(self.run_action_list(stop_actions, apply_kwargs, raise_on_error=raise_on_error))
 
-        self._stop_instance_containers(container, instances, raise_on_error, name=basename, **kwargs)
-
-    def remove(self, container, instances=None, remove_dependent=True, raise_on_error=False, **kwargs):
+    def remove(self, container, instances=None, map_name=None, raise_on_error=False, **kwargs):
         """
         Remove instances from a container configuration.
 
@@ -380,20 +258,19 @@ class MappingDockerClient(object):
         :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
          configuration (or just one default instance).
         :type instances: iterable
-        :param remove_dependent: Resolve and remove dependent containers.
-        :type remove_dependent: bool
+        :param map_name: Container map name.
+        :type map_name: unicode
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
         :param kwargs: Additional kwargs for removing the container and its dependents.
         """
-        basename = kwargs.pop('name', container)
-        if remove_dependent:
-            for dependent_container in self._container_dependents(container):
-                self._remove_instance_containers(dependent_container, raise_on_error, **kwargs)
+        apply_kwargs = {
+            policy.ACTION_REMOVE: kwargs,
+        }
+        remove_actions = self.get_policy().remove_actions(map_name or self._default_map, container, instances)
+        return list(self.run_action_list(remove_actions, apply_kwargs, raise_on_error=raise_on_error))
 
-        self._remove_instance_containers(container, instances, raise_on_error, name=basename, **kwargs)
-
-    def wait(self, container, instance=None, log=True, **kwargs):
+    def wait(self, container, instance=None, map_name=None, log=True):
         """
         Wait for a container.
 
@@ -401,84 +278,82 @@ class MappingDockerClient(object):
         :type container: unicode
         :param instance: Instance name to remove. If not specified, removes the default instance.
         :type instance: unicode
-        :param log: Log the container output before removing it.
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param log: Log the container output after waiting.
         :type log: bool
-        :param kwargs: Additional kwargs. Currently only ``name`` is used.
         """
-        basename = kwargs.pop('name', container)
-        c_name = self._cname(basename, instance)
-        self._client.wait(c_name)
+        client = self._get_client(map_name)
+        c_name = self._policy_class.cname(map_name or self._default_map, container, instance)
+        client.wait(c_name)
         if log:
-            self._client.push_container_logs(c_name)
+            client.push_container_logs(c_name)
 
-    def wait_and_remove(self, container, instance=None, log=True, **kwargs):
+    def wait_and_remove(self, container, instance=None, map_name=None, log=True, **kwargs):
         """
-        Wait for, and then remove a container.
+        Wait for, and then remove a container. Does not resolve dependencies.
 
         :param container: Container name.
         :type container: unicode
         :param instance: Instance name to remove. If not specified, removes the default instance.
         :type instance: unicode
+        :param map_name: Container map name.
+        :type map_name: unicode
         :param log: Log the container output before removing it.
         :type log: bool
+        :param kwargs: Additional kwargs for removing the container.
         """
-        basename = kwargs.pop('name', container)
-        self.wait(container, instance, log, name=basename)
-        self.remove(container, [instance], name=basename)
+        client = self._get_client(map_name)
+        c_name = self._policy_class.cname(map_name or self._default_map, container, instance)
+        self.wait(container, instance=instance, map_name=map_name, log=log)
+        client.remove_container(c_name, **kwargs)
 
     def refresh_names(self):
         """
-        Refresh the container name cache.
+        Invalidates the image name cache.
         """
-        self._check_refresh_images(True)
-        self._check_refresh_containers(True)
+        self._image_tags = {}
 
-    def list_persistent_containers(self):
+    def list_persistent_containers(self, map_name=None):
         """
-        Lists the names of all persistent containers on this map. Attached containers are always considered persistent.
+        Lists the names of all persistent containers on the specified map or all maps. Attached containers are always
+        considered persistent.
 
+        :param map_name: Container map name.
+        :type map_name: unicode
         :return: List of container names.
         :rtype: list
         """
         def _container_names():
-            for container, config in self._map:
-                for ac in config.attaches:
-                    yield self._cname(ac)
-                if config.persistent:
-                    if config.instances:
-                        for ci in config.instances:
-                            yield self._cname(container, ci)
-                    else:
-                        yield self._cname(container)
+            for c_map, __ in maps:
+                for container, config in c_map:
+                    for ac in config.attaches:
+                        yield cname_func(c_map.name, ac)
+                    if config.persistent:
+                        if config.instances:
+                            for ci in config.instances:
+                                yield cname_func(c_map.name, container, ci)
+                        else:
+                            yield cname_func(c_map.name, container)
 
+        cname_func = self._policy_class.cname
+        maps = (self._maps[map_name], ) if map_name else self._maps.values()
         return list(_container_names())
 
     @property
-    def client(self):
-        """
-        Docker client.
-
-        :return: :class:`.base.DockerClientWrapper` instance.
-        :rtype: dockermap.map.base.DockerClientWrapper
-        """
-        return self._client
-
-    @client.setter
-    def client(self, value):
-        self._client = value
-        self._container_status = None
-        self._image_tags = None
-
-    @property
-    def map(self):
+    def maps(self):
         """
         Container map.
 
         :return: :class:`.container.ContainerMap` instance.
-        :rtype: dockermap.map.container.ContainerMap
+        :rtype: dict(unicode, dockermap.map.container.ContainerMap)
         """
-        return self._map
+        return self._maps
 
-    @map.setter
-    def map(self, value):
-        self._map = value
+    @property
+    def default_map(self):
+        return self._default_map
+
+    @default_map.setter
+    def default_map(self, value):
+        self._default_map = value
