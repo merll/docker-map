@@ -185,9 +185,9 @@ class MultiDependencyResolver(BaseDependencyResolver):
         :param items: Iterable or dictionary in the format `(dependent_item, dependencies)`.
         :type items: iterable
         """
-        for item, parents in _dependency_dict(items):
+        for item, parents in six.iteritems(_dependency_dict(items)):
             dep = self._deps[item]
-            self._deps[item] = Dependency(dep.parent.union(parents), None)
+            self._deps[item] = Dependency(dep.parent.union(parents.parent), None)
 
     def update_backward(self, items):
         """
@@ -197,7 +197,11 @@ class MultiDependencyResolver(BaseDependencyResolver):
         :param items: Iterable or dictionary in the format `(item, dependent_items)`.
         :type items: iterable
         """
-        for parent, sub_items in items:
+        if isinstance(items, dict):
+            iterator = six.iteritems(items)
+        else:
+            iterator = items
+        for parent, sub_items in iterator:
             for si in sub_items:
                 dep = self._deps[si]
                 dep.parent.add(parent)
