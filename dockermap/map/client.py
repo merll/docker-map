@@ -8,8 +8,9 @@ import re
 from docker.errors import APIError
 
 from ..shortcuts import get_user_group
-from . import policy
 from .container import ContainerMap
+from .policy import (ACTION_CREATE, ACTIONS_CREATE, ACTIONS_START, ACTIONS_RESTART, ACTIONS_PREPARE, ACTIONS_STOP,
+                     ACTIONS_REMOVE, ACTION_START, ACTION_STOP, ACTION_REMOVE, ACTION_RESTART)
 from .policy.simple import SimplePolicy
 
 
@@ -154,17 +155,19 @@ class MappingDockerClient(object):
                 a_kwargs.update(c_kwargs)
             else:
                 a_kwargs = kwargs or {}
-            if action in policy.ACTIONS_CREATE:
+            if action in ACTIONS_CREATE:
                 image = a_kwargs.pop('image')
                 self._ensure_images(map_name, image)
                 yield client.create_container(image, container, **a_kwargs)
-            elif action in policy.ACTIONS_START:
+            elif action in ACTIONS_START:
                 client.start(container, **a_kwargs)
-            elif action in policy.ACTIONS_PREPARE:
+            elif action in ACTIONS_PREPARE:
                 image = a_kwargs.pop('image')
                 client.wait(container)
                 _adjust_permissions(client, image, container, **a_kwargs)
-            elif action in policy.ACTIONS_STOP:
+            elif action in ACTIONS_RESTART:
+                client.restart(container, **a_kwargs)
+            elif action in ACTIONS_STOP:
                 try:
                     client.stop(container, **a_kwargs)
                 except APIError as e:
@@ -173,7 +176,7 @@ class MappingDockerClient(object):
                                         logging.ERROR)
                         if raise_on_error:
                             raise e
-            elif action in policy.ACTIONS_REMOVE:
+            elif action in ACTIONS_REMOVE:
                 try:
                     client.remove_container(container, **a_kwargs)
                 except APIError as e:
@@ -203,10 +206,10 @@ class MappingDockerClient(object):
          containers.
         """
         apply_kwargs = {
-            policy.ACTION_CREATE: kwargs,
+            ACTION_CREATE: kwargs,
         }
         create_actions = self.get_policy().create_actions(map_name or self._default_map, container, instances)
-        return list(self.run_action_list(create_actions, apply_kwargs, raise_on_error=False))
+        return list(self.run_action_list(create_actions, apply_kwargs))
 
     def start(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -223,10 +226,31 @@ class MappingDockerClient(object):
          generated arguments.
         """
         apply_kwargs = {
-            policy.ACTION_START: kwargs,
+            ACTION_START: kwargs,
         }
         start_actions = self.get_policy().start_actions(map_name or self._default_map, container, instances)
-        return list(self.run_action_list(start_actions, apply_kwargs, raise_on_error=False))
+        return list(self.run_action_list(start_actions, apply_kwargs))
+
+    def restart(self, container, instances=None, map_name=None, **kwargs):
+        """
+        Restarts instances for a container configuration.
+
+        :param container: Container name.
+        :type container: unicode
+        :param instances: Instance names to stop. If not specified, will restart all instances as specified in the
+         configuration (or just one default instance).
+        :type instances: iterable
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :type raise_on_error: bool
+        :param kwargs: Additional kwargs for restarting the container.
+        """
+        apply_kwargs = {
+            ACTION_RESTART: kwargs,
+        }
+        restart_actions = self.get_policy().restart_actions(map_name or self._default_map, container, instances)
+        return list(self.run_action_list(restart_actions, apply_kwargs))
 
     def stop(self, container, instances=None, map_name=None, raise_on_error=False, **kwargs):
         """
@@ -244,7 +268,7 @@ class MappingDockerClient(object):
         :param kwargs: Additional kwargs for stopping the container and its dependents.
         """
         apply_kwargs = {
-            policy.ACTION_STOP: kwargs,
+            ACTION_STOP: kwargs,
         }
         stop_actions = self.get_policy().stop_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(stop_actions, apply_kwargs, raise_on_error=raise_on_error))
@@ -265,10 +289,27 @@ class MappingDockerClient(object):
         :param kwargs: Additional kwargs for removing the container and its dependents.
         """
         apply_kwargs = {
-            policy.ACTION_REMOVE: kwargs,
+            ACTION_REMOVE: kwargs,
         }
         remove_actions = self.get_policy().remove_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(remove_actions, apply_kwargs, raise_on_error=raise_on_error))
+
+    def update(self, container, instances=None, map_name=None, raise_on_error=False):
+        """
+        Updates instances from a container configuration.
+
+        :param container: Container name.
+        :type container: unicode
+        :param instances: Instance names to remove. If not specified, will update all instances as specified in the
+         configuration (or just one default instance).
+        :type instances: iterable
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :type raise_on_error: bool
+        """
+        update_actions = self.get_policy().update_actions(map_name or self._default_map, container, instances)
+        return list(self.run_action_list(update_actions, raise_on_error=raise_on_error))
 
     def wait(self, container, instance=None, map_name=None, log=True):
         """

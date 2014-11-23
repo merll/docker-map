@@ -95,6 +95,10 @@ class BasePolicy(object):
         return c_kwargs
 
     @classmethod
+    def get_restart_kwargs(cls, container_map, config, instance, kwargs=None):
+        return {}
+
+    @classmethod
     def get_stop_kwargs(cls, container_map, config, instance, kwargs=None):
         return {}
 
@@ -129,6 +133,12 @@ class BasePolicy(object):
 
     def shutdown_actions(self, map_name, container, instances=None, **kwargs):
         raise NotImplementedError("This policy does not support the shutdown command.")
+
+    def restart_actions(self, map_name, container, instances=None, **kwargs):
+        raise NotImplementedError("This policy does not support the restart command.")
+
+    def update_actions(self, map_name, container, instances=None, **kwargs):
+        raise NotImplementedError("This policy does not support the update command.")
 
     @property
     def container_maps(self):

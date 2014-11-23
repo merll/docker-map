@@ -7,7 +7,7 @@ from . import (ContainerAction, ACTION_CREATE_DEPENDENCY_ATTACHED, ACTION_CREATE
                ACTION_CREATE, ACTION_START_DEPENDENCY_ATTACHED, ACTION_PREPARE_DEPENDENCY_ATTACHED,
                ACTION_START_DEPENDENCY, ACTION_START_ATTACHED, ACTION_PREPARE_ATTACHED, ACTION_START,
                ACTION_STOP_DEPENDENT, ACTION_STOP, ACTION_REMOVE_DEPENDENT, ACTION_REMOVE_DEPENDENT_ATTACHED,
-               ACTION_REMOVE, ACTION_REMOVE_ATTACHED)
+               ACTION_REMOVE, ACTION_REMOVE_ATTACHED, ACTION_RESTART)
 from .base import BasePolicy
 from .utils import get_existing_containers, get_config, get_running_containers
 
@@ -78,6 +78,19 @@ class SimpleStartMixin(object):
             if ci_name not in running_containers:
                 c_kwargs = self.get_start_kwargs(c_map, c_config, instance, kwargs)
                 yield ContainerAction(ACTION_START, map_name, ci_name, c_kwargs)
+
+
+class SimpleRestartMixin(object):
+    def restart(self, map_name, container, instances=None, **kwargs):
+        c_map = self._maps[map_name]
+        running_containers = get_running_containers(self._status)
+        c_config = get_config(c_map, container)
+        c_instances = instances or c_config.instances or [None]
+        for instance in c_instances:
+            ci_name = self.cname(map_name, container, instance)
+            if ci_name in running_containers:
+                c_kwargs = self.get_restart_kwargs(c_map, c_config, instance, kwargs)
+                yield ContainerAction(ACTION_RESTART, map_name, ci_name, c_kwargs)
 
 
 class SimpleStopMixin(object):
@@ -155,5 +168,5 @@ class SimpleShutdownMixin(SimpleStopMixin, SimpleRemoveMixin):
                                self.remove_actions(map_name, container, instances))
 
 
-class SimplePolicy(SimpleStartupMixin, SimpleShutdownMixin, BasePolicy):
+class SimplePolicy(SimpleStartupMixin, SimpleShutdownMixin, SimpleRestartMixin, BasePolicy):
     pass
