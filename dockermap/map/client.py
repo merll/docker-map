@@ -5,12 +5,13 @@ from collections import namedtuple
 import logging
 import re
 
+import six
 from docker.errors import APIError
 
 from ..shortcuts import get_user_group
 from .container import ContainerMap
-from .policy import (ACTION_CREATE, ACTIONS_CREATE, ACTIONS_START, ACTIONS_RESTART, ACTIONS_PREPARE, ACTIONS_STOP,
-                     ACTIONS_REMOVE, ACTION_START, ACTION_STOP, ACTION_REMOVE, ACTION_RESTART, SimplePolicy)
+from .policy import (ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_PREPARE, ACTION_STOP, ACTION_REMOVE,
+                     ResumePolicy)
 
 
 EXITED_REGEX = 'Exited \((\d+)\)'
@@ -57,7 +58,7 @@ class MappingDockerClient(object):
     :param policy_class: Policy class for generating container actions.
     :type policy_class: class
     """
-    def __init__(self, container_maps=None, docker_client=None, policy_class=SimplePolicy):
+    def __init__(self, container_maps=None, docker_client=None, policy_class=ResumePolicy):
         if isinstance(container_maps, ContainerMap):
             self._default_map = container_maps.name
             self._maps = {container_maps.name: MapClient(container_maps, docker_client)}
@@ -91,6 +92,10 @@ class MappingDockerClient(object):
 
         return dict(_extract_status())
 
+    def _inspect_container(self, map_name, container):
+        client = self._get_client(map_name)
+        return client.inspect_container(container)
+
     def _get_image_tags(self, map_name, force=False):
         tags = self._image_tags.get(map_name) if not force else None
         if tags is None:
@@ -122,7 +127,7 @@ class MappingDockerClient(object):
             return False
 
         map_client = self._get_client(map_name)
-        map_images = self._get_image_tags(map_name)
+        map_images = set(self._get_image_tags(map_name).keys())
         new_images = [_check_image(image) for image in images]
         if any(new_images):
             self._get_image_tags(map_name, True)
@@ -134,7 +139,13 @@ class MappingDockerClient(object):
         :rtype: dockermap.map.policy.BasePolicy
         """
         if not self._policy:
-            self._policy = self._policy_class(mc.container_map for mc in self._maps.values())
+            map_dict = dict((name, mc[0]) for name, mc in six.iteritems(self._maps))
+            persistent_list = self.list_persistent_containers()
+            status_dict = dict((name, lambda container_name: self._inspect_container(name, container_name))
+                               for name in self._maps.keys())
+            image_dict = dict((name, lambda image_name: self._get_image_tags(name))
+                              for name in self._maps.keys())
+            self._policy = self._policy_class(map_dict, persistent_list, status_dict, image_dict)
         self._policy.status = self._get_status()
         return self._policy
 
@@ -146,27 +157,28 @@ class MappingDockerClient(object):
         :param apply_kwargs:
         :type apply_kwargs: dict
         """
-        for action, map_name, container, kwargs in actions:
+        run_kwargs = apply_kwargs or {}
+        for action, flags, map_name, container, kwargs in actions:
             client = self._get_client(map_name)
-            c_kwargs = apply_kwargs.get(action)
+            c_kwargs = run_kwargs.get(action)
             if c_kwargs:
                 a_kwargs = kwargs.copy() if kwargs else {}
                 a_kwargs.update(c_kwargs)
             else:
                 a_kwargs = kwargs or {}
-            if action in ACTIONS_CREATE:
+            if action == ACTION_CREATE:
                 image = a_kwargs.pop('image')
                 self._ensure_images(map_name, image)
                 yield client.create_container(image, container, **a_kwargs)
-            elif action in ACTIONS_START:
+            elif action == ACTION_START:
                 client.start(container, **a_kwargs)
-            elif action in ACTIONS_PREPARE:
+            elif action == ACTION_PREPARE:
                 image = a_kwargs.pop('image')
                 client.wait(container)
                 _adjust_permissions(client, image, container, **a_kwargs)
-            elif action in ACTIONS_RESTART:
+            elif action == ACTION_RESTART:
                 client.restart(container, **a_kwargs)
-            elif action in ACTIONS_STOP:
+            elif action == ACTION_STOP:
                 try:
                     client.stop(container, **a_kwargs)
                 except APIError as e:
@@ -175,7 +187,7 @@ class MappingDockerClient(object):
                                         logging.ERROR)
                         if raise_on_error:
                             raise e
-            elif action in ACTIONS_REMOVE:
+            elif action == ACTION_REMOVE:
                 try:
                     client.remove_container(container, **a_kwargs)
                 except APIError as e:
@@ -293,6 +305,14 @@ class MappingDockerClient(object):
         remove_actions = self.get_policy().remove_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(remove_actions, apply_kwargs, raise_on_error=raise_on_error))
 
+    def startup(self, container, instances=None, map_name=None, raise_on_error=False):
+        startup_actions = self.get_policy().startup_actions(map_name or self._default_map, container, instances)
+        return list(self.run_action_list(startup_actions, raise_on_error=raise_on_error))
+
+    def shutdown(self, container, instances=None, map_name=None, raise_on_error=False):
+        shutdown_actions = self.get_policy().shutdown_actions(map_name or self._default_map, container, instances)
+        return list(self.run_action_list(shutdown_actions, raise_on_error=raise_on_error))
+
     def update(self, container, instances=None, map_name=None, raise_on_error=False):
         """
         Updates instances from a container configuration.
@@ -323,8 +343,9 @@ class MappingDockerClient(object):
         :param log: Log the container output after waiting.
         :type log: bool
         """
-        client = self._get_client(map_name)
-        c_name = self._policy_class.cname(map_name or self._default_map, container, instance)
+        c_map_name = map_name or self._default_map
+        client = self._get_client(c_map_name)
+        c_name = self._policy_class.cname(c_map_name, container, instance)
         client.wait(c_name)
         if log:
             client.push_container_logs(c_name)
@@ -343,9 +364,10 @@ class MappingDockerClient(object):
         :type log: bool
         :param kwargs: Additional kwargs for removing the container.
         """
-        client = self._get_client(map_name)
-        c_name = self._policy_class.cname(map_name or self._default_map, container, instance)
-        self.wait(container, instance=instance, map_name=map_name, log=log)
+        c_map_name = map_name or self._default_map
+        client = self._get_client(c_map_name)
+        c_name = self._policy_class.cname(c_map_name, container, instance)
+        self.wait(container, instance=instance, map_name=c_map_name, log=log)
         client.remove_container(c_name, **kwargs)
 
     def refresh_names(self):
@@ -397,3 +419,12 @@ class MappingDockerClient(object):
     @default_map.setter
     def default_map(self, value):
         self._default_map = value
+
+    @property
+    def policy_class(self):
+        return self._policy_class
+
+    @policy_class.setter
+    def policy_class(self, value):
+        self._policy = None
+        self._policy_class = value

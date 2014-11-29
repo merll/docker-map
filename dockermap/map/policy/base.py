@@ -5,8 +5,9 @@ from abc import ABCMeta, abstractmethod
 import itertools
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
+from . import ACTION_DEPENDENCY_FLAG
 from .dep import ContainerDependencyResolver
-from .utils import extract_user, get_host_binds, get_volume_path, init_options, update_kwargs
+from .utils import extract_user, get_host_binds, get_volume_path, init_options, update_kwargs, get_config
 
 
 class BasePolicy(object):
@@ -19,11 +20,11 @@ class BasePolicy(object):
     core_image = DEFAULT_COREIMAGE
     base_image = DEFAULT_BASEIMAGE
 
-    def __init__(self, container_maps):
-        if isinstance(container_maps, dict):
-            self._maps = container_maps
-        else:
-            self._maps = dict((c_map.name, c_map) for c_map in container_maps)
+    def __init__(self, container_maps, persistent_names, status_detail, images):
+        self._maps = container_maps
+        self._persistent_names = set(persistent_names)
+        self._status_detail = status_detail
+        self._images = images
         self._status = {}
         self._f_resolver = ContainerDependencyResolver()
         for m in self._maps.values():
@@ -106,6 +107,12 @@ class BasePolicy(object):
     def get_remove_kwargs(cls, container_map, config, kwargs=None):
         return {}
 
+    def get_container_status(self, map_name, container):
+        return self._status_detail[map_name](container)
+
+    def get_image_id(self, map_name, image_name):
+        return self._images[map_name](image_name)
+
     def get_dependencies(self, map_name, container):
         return reversed(self._f_resolver.get_container_dependencies(map_name, container))
 
@@ -151,3 +158,19 @@ class BasePolicy(object):
     @status.setter
     def status(self, value):
         self._status = value
+
+
+class BaseActionMixin(object):
+    def get_base_actions(self, action_generator, map_name, container, instances=None, **kwargs):
+        def _dep_actions(d_map_name, d_container, d_instance):
+            d_map = self._maps[d_map_name]
+            d_config = get_config(d_map, d_container)
+            d_instances = [d_instance] if d_instance else d_config.instances or [None]
+            return action_generator(map_name, d_map, d_container, d_config, d_instances, ACTION_DEPENDENCY_FLAG)
+
+        dependencies = self.get_dependencies(map_name, container)
+        dep_actions = itertools.chain.from_iterable(_dep_actions(*d) for d in dependencies)
+        c_map = self._maps[map_name]
+        c_config = get_config(c_map, container)
+        c_instances = instances or c_config.instances or [None]
+        return itertools.chain(dep_actions, action_generator(map_name, c_map, container, c_config, c_instances, **kwargs))
