@@ -59,12 +59,17 @@ class MappingDockerClient(object):
     :type policy_class: class
     """
     def __init__(self, container_maps=None, docker_client=None, policy_class=ResumePolicy):
+        def _map_client(item):
+            if isinstance(item, (list, tuple)):
+                return item[0].name, MapClient(item[0], item[1])
+            return item.name, MapClient(item, docker_client)
+
         if isinstance(container_maps, ContainerMap):
             self._default_map = container_maps.name
             self._maps = {container_maps.name: MapClient(container_maps, docker_client)}
         elif isinstance(container_maps, (list, tuple)):
             self._default_map = None
-            self._maps = dict((c_map.name, MapClient(c_map, client)) for c_map, client in container_maps)
+            self._maps = dict(map(_map_client, container_maps))
         else:
             raise ValueError("Unexpected type of container_maps argument: {0}".format(type(container_maps)))
         self._image_tags = {}
@@ -160,7 +165,7 @@ class MappingDockerClient(object):
         run_kwargs = apply_kwargs or {}
         for action, flags, map_name, container, kwargs in actions:
             client = self._get_client(map_name)
-            c_kwargs = run_kwargs.get(action)
+            c_kwargs = run_kwargs.get((action, flags))
             if c_kwargs:
                 a_kwargs = kwargs.copy() if kwargs else {}
                 a_kwargs.update(c_kwargs)
@@ -217,7 +222,7 @@ class MappingDockerClient(object):
          containers.
         """
         apply_kwargs = {
-            ACTION_CREATE: kwargs,
+            (ACTION_CREATE, 0): kwargs,
         }
         create_actions = self.get_policy().create_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(create_actions, apply_kwargs))
@@ -237,7 +242,7 @@ class MappingDockerClient(object):
          generated arguments.
         """
         apply_kwargs = {
-            ACTION_START: kwargs,
+            (ACTION_START, 0): kwargs,
         }
         start_actions = self.get_policy().start_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(start_actions, apply_kwargs))
@@ -258,7 +263,7 @@ class MappingDockerClient(object):
         :param kwargs: Additional kwargs for restarting the container.
         """
         apply_kwargs = {
-            ACTION_RESTART: kwargs,
+            (ACTION_RESTART, 0): kwargs,
         }
         restart_actions = self.get_policy().restart_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(restart_actions, apply_kwargs))
@@ -279,7 +284,7 @@ class MappingDockerClient(object):
         :param kwargs: Additional kwargs for stopping the container and its dependents.
         """
         apply_kwargs = {
-            ACTION_STOP: kwargs,
+            (ACTION_STOP, 0): kwargs,
         }
         stop_actions = self.get_policy().stop_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(stop_actions, apply_kwargs, raise_on_error=raise_on_error))
@@ -300,7 +305,7 @@ class MappingDockerClient(object):
         :param kwargs: Additional kwargs for removing the container and its dependents.
         """
         apply_kwargs = {
-            ACTION_REMOVE: kwargs,
+            (ACTION_REMOVE, 0): kwargs,
         }
         remove_actions = self.get_policy().remove_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(remove_actions, apply_kwargs, raise_on_error=raise_on_error))
@@ -374,7 +379,7 @@ class MappingDockerClient(object):
         """
         Invalidates the image name cache.
         """
-        self._image_tags = {}
+        self._policy = None
 
     def list_persistent_containers(self, map_name=None):
         """
@@ -418,6 +423,8 @@ class MappingDockerClient(object):
 
     @default_map.setter
     def default_map(self, value):
+        if value in self._maps:
+            raise ValueError("Default name must match an available map name.")
         self._default_map = value
 
     @property
