@@ -44,18 +44,24 @@ def _adjust_permissions(client, image, container_name, path, user, permissions):
 class MappingDockerClient(object):
     """
     Reflects a :class:`~dockermap.map.container.ContainerMap` instance on a Docker client
-    (:class:`~dockermap.map.base.DockerClientWrapper`).
-    This means that the usual actions of creating containers, starting containers, and stopping containers consider
-    dependent containers and volume assignments.
+    (:class:`~dockermap.map.base.DockerClientWrapper`). The ``policy_class`` determines if and how dependencies
+    are being considered during creation, starting, stopping, and removal of containers.
 
-    Image names and container names are cached. In order to force a refresh, use :meth:`refresh_names`.
+    If only one container map is provided, it will be the default map for all operations. If multiple container maps
+    are used, the list can contain instances of clients to be used. In that case, the ``docker_client`` argument is
+    ignored.
 
-    :param container_maps: :class:`~dockermap.map.container.ContainerMap` instance.
+    Image names, container status, and dependencies are cached. In order to force a refresh, use :meth:`refresh_names`.
+    It is also cleared on every change of ``policy_class``.
+
+    :param container_maps: :class:`~dockermap.map.container.ContainerMap` instance or a tuple or list of such instances
+      along with an associated instance.
     :type container_maps: dockermap.map.container.ContainerMap or
       list[(dockermap.map.container.ContainerMap, dockermap.map.base.DockerClientWrapper)]
-    :param docker_client: :class:`~dockermap.map.base.DockerClientWrapper` instance.
+    :param docker_client: Default :class:`~dockermap.map.base.DockerClientWrapper` instance.
     :type docker_client: dockermap.map.base.DockerClientWrapper
-    :param policy_class: Policy class for generating container actions.
+    :param policy_class: Policy class based on :class:`~dockermap.map.policy.base.BasePolicy` for generating container
+      actions.
     :type policy_class: class
     """
     def __init__(self, container_maps=None, docker_client=None, policy_class=ResumePolicy):
@@ -77,6 +83,9 @@ class MappingDockerClient(object):
         self._policy = None
 
     def _get_status(self):
+        """
+        :rtype: dict
+        """
         def _extract_status():
             for c_map, client in self._maps.values():
                 map_containers = client.containers(all=True)
@@ -98,10 +107,20 @@ class MappingDockerClient(object):
         return dict(_extract_status())
 
     def _inspect_container(self, map_name, container):
+        """
+        :type map_name: unicode
+        :type container: unicode
+        :rtype: dict
+        """
         client = self._get_client(map_name)
         return client.inspect_container(container)
 
     def _get_image_tags(self, map_name, force=False):
+        """
+        :type map_name: unicode
+        :type force: bool
+        :return: dict
+        """
         tags = self._image_tags.get(map_name) if not force else None
         if tags is None:
             client = self._get_client(map_name)
@@ -120,6 +139,11 @@ class MappingDockerClient(object):
         return c_map[1]
 
     def _ensure_images(self, map_name, *images):
+        """
+        :type map_name: unicode
+        :type images: unicode
+        :rtype: dict
+        """
         def _check_image(image_name):
             image_name, __, tag = image_name.partition(':')
             if tag:
@@ -139,8 +163,17 @@ class MappingDockerClient(object):
 
     def get_policy(self):
         """
+        Returns an instance of :attr:`~policy_class`. When instantiating, the following items are collected:
 
-        :return:
+        * A dictionary of container maps.
+        * A list of container names marked as persistent.
+        * A dictionary of image tags and ids.
+        * A dictionary of functions to evaluate a detailed container status at runtime.
+
+        A dictionary of the basic container status is refreshed on each call. In order to force a refresh on other
+        items, use :meth:`~refresh_names`.
+
+        :return: An instance of the current policy class.
         :rtype: dockermap.map.policy.BasePolicy
         """
         if not self._policy:
@@ -156,11 +189,18 @@ class MappingDockerClient(object):
 
     def run_action_list(self, actions, apply_kwargs=None, raise_on_error=False):
         """
+        Performs the actions on Docker containers defined by the given list.
 
-        :param actions:
+        :param actions: An iterable of ContainerAction tuples. It can also be a generator.
         :type actions: list[dockermap.map.policy.ContainerAction]
-        :param apply_kwargs:
+        :param apply_kwargs: Optional dictionary of actions to apply certain keyword arguments to.
         :type apply_kwargs: dict
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
+          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
+          ``True``. Please note that 404 errors (on non-existing containers) are always ignored on stop and removal.
+        :type raise_on_error: bool
+        :return: Iterable of created containers.
+        :rtype: generator
         """
         run_kwargs = apply_kwargs or {}
         for action, flags, map_name, container, kwargs in actions:
@@ -213,13 +253,12 @@ class MappingDockerClient(object):
         :param instances: Instance name to create. If not specified, will create all instances as specified in the
          configuration (or just one default instance).
         :type instances: tuple or list
-        :param map_name: Container map name.
+        :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
-        :type policy: dockermap.map.policy.BasePolicy
-        :param kwargs: Additional kwargs for creating the container. `volumes` and `environment` enhance the generated
-         arguments; `user` overrides the user from the container configuration.
-        :return: List of tuples with container aliases and names of container instances. Does not include attached
-         containers.
+        :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
+          the main container creation.
+        :return: List of created containers.
+        :rtype: list[dict]
         """
         apply_kwargs = {
             (ACTION_CREATE, 0): kwargs,
@@ -235,11 +274,13 @@ class MappingDockerClient(object):
         :type container: unicode
         :param instances: Instance names to start. If not specified, will start all instances as specified in the
          configuration (or just one default instance).
-        :param map_name: Container map name.
+        :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
         :type instances: iterable
-        :param kwargs: Additional kwargs for starting the container. `binds` and `volumes_from` will enhance the
-         generated arguments.
+        :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
+          the main container start.
+        :return: List of created containers.
+        :rtype: list[dict]
         """
         apply_kwargs = {
             (ACTION_START, 0): kwargs,
@@ -256,11 +297,12 @@ class MappingDockerClient(object):
         :param instances: Instance names to stop. If not specified, will restart all instances as specified in the
          configuration (or just one default instance).
         :type instances: iterable
-        :param map_name: Container map name.
+        :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
-        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
-        :type raise_on_error: bool
-        :param kwargs: Additional kwargs for restarting the container.
+        :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
+          the main container restart.
+        :return: List of created containers.
+        :rtype: list[dict]
         """
         apply_kwargs = {
             (ACTION_RESTART, 0): kwargs,
@@ -277,11 +319,16 @@ class MappingDockerClient(object):
         :param instances: Instance names to stop. If not specified, will stop all instances as specified in the
          configuration (or just one default instance).
         :type instances: iterable
-        :param map_name: Container map name.
+        :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
-        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
+          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
+          ``True``. Please note that 404 errors (on non-existing containers) are always ignored on stop and removal.
         :type raise_on_error: bool
-        :param kwargs: Additional kwargs for stopping the container and its dependents.
+        :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
+          the main container stop.
+        :return: List of created containers.
+        :rtype: list[dict]
         """
         apply_kwargs = {
             (ACTION_STOP, 0): kwargs,
@@ -298,11 +345,16 @@ class MappingDockerClient(object):
         :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
          configuration (or just one default instance).
         :type instances: iterable
-        :param map_name: Container map name.
+        :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
-        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
+          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
+          ``True``. Please note that 404 errors (on non-existing containers) are always ignored on stop and removal.
         :type raise_on_error: bool
-        :param kwargs: Additional kwargs for removing the container and its dependents.
+        :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
+          the main container removal.
+        :return: List of created containers.
+        :rtype: list[dict]
         """
         apply_kwargs = {
             (ACTION_REMOVE, 0): kwargs,
@@ -311,25 +363,63 @@ class MappingDockerClient(object):
         return list(self.run_action_list(remove_actions, apply_kwargs, raise_on_error=raise_on_error))
 
     def startup(self, container, instances=None, map_name=None, raise_on_error=False):
+        """
+        Start up container instances from a container configuration. Typically this means creating and starting
+        containers and their dependencies. Note that not all policy classes necessarily implement this method.
+
+        :param container: Container name.
+        :type container: unicode
+        :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
+         configuration (or just one default instance).
+        :type instances: iterable
+        :param map_name: Container map name. Optional - if not provided the default map is used.
+        :type map_name: unicode
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
+          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
+          ``True``. Please note that 404 errors (on non-existing containers) are always ignored on stop and removal.
+        :type raise_on_error: bool
+        :return:
+        """
         startup_actions = self.get_policy().startup_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(startup_actions, raise_on_error=raise_on_error))
 
     def shutdown(self, container, instances=None, map_name=None, raise_on_error=False):
+        """
+        Shut down container instances from a container configuration. Typically this means stopping and removing
+        containers. Note that not all policy classes necessarily implement this method.
+
+        :param container: Container name.
+        :type container: unicode
+        :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
+         configuration (or just one default instance).
+        :type instances: iterable
+        :param map_name: Container map name. Optional - if not provided the default map is used.
+        :type map_name: unicode
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
+          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
+          ``True``. Please note that 404 errors (on non-existing containers) are always ignored on stop and removal.
+        :type raise_on_error: bool
+        :return:
+        """
         shutdown_actions = self.get_policy().shutdown_actions(map_name or self._default_map, container, instances)
         return list(self.run_action_list(shutdown_actions, raise_on_error=raise_on_error))
 
     def update(self, container, instances=None, map_name=None, raise_on_error=False):
         """
-        Updates instances from a container configuration.
+        Updates instances from a container configuration. Typically this means restarting or recreating containers based
+        on detected changes in the configuration or environment.  Note that not all policy classes necessarily implement
+        this method.
 
         :param container: Container name.
         :type container: unicode
-        :param instances: Instance names to remove. If not specified, will update all instances as specified in the
+        :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
          configuration (or just one default instance).
         :type instances: iterable
-        :param map_name: Container map name.
+        :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
-        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
+          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
+          ``True``. Please note that 404 errors (on non-existing containers) are always ignored on stop and removal.
         :type raise_on_error: bool
         """
         update_actions = self.get_policy().update_actions(map_name or self._default_map, container, instances)
@@ -343,7 +433,7 @@ class MappingDockerClient(object):
         :type container: unicode
         :param instance: Instance name to remove. If not specified, removes the default instance.
         :type instance: unicode
-        :param map_name: Container map name.
+        :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
         :param log: Log the container output after waiting.
         :type log: bool
@@ -363,7 +453,7 @@ class MappingDockerClient(object):
         :type container: unicode
         :param instance: Instance name to remove. If not specified, removes the default instance.
         :type instance: unicode
-        :param map_name: Container map name.
+        :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
         :param log: Log the container output before removing it.
         :type log: bool
@@ -377,7 +467,7 @@ class MappingDockerClient(object):
 
     def refresh_names(self):
         """
-        Invalidates the image name cache.
+        Invalidates the policy name and status cache.
         """
         self._policy = None
 
@@ -386,10 +476,10 @@ class MappingDockerClient(object):
         Lists the names of all persistent containers on the specified map or all maps. Attached containers are always
         considered persistent.
 
-        :param map_name: Container map name.
+        :param map_name: Container map name. Optional, only returns persistent containers from the specified map.
         :type map_name: unicode
         :return: List of container names.
-        :rtype: list
+        :rtype: list[unicode]
         """
         def _container_names():
             for c_map, __ in maps:
@@ -410,15 +500,21 @@ class MappingDockerClient(object):
     @property
     def maps(self):
         """
-        Container map.
+        Container maps.
 
-        :return: :class:`.container.ContainerMap` instance.
-        :rtype: dict(unicode, dockermap.map.container.ContainerMap)
+        :return: A dictionary with container map names as keys, and container map and client as values.
+        :rtype: dict[unicode, MapClient]
         """
         return self._maps
 
     @property
     def default_map(self):
+        """
+        The default map to use for any actions, if not otherwise specified.
+
+        :return: Container map name.
+        :rtype: unicode
+        """
         return self._default_map
 
     @default_map.setter
@@ -429,6 +525,12 @@ class MappingDockerClient(object):
 
     @property
     def policy_class(self):
+        """
+        The policy class, that transforms commands into actions on containers, considering potential dependencies.
+
+        :return: Subclass of :class:`~dockermap.map.policy.base.BasePolicy`.
+        :rtype: class
+        """
         return self._policy_class
 
     @policy_class.setter
