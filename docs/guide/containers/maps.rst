@@ -210,6 +210,8 @@ passed to the Docker Remote API functions in addition to the ones indirectly set
 * Similarly, ``links`` keys set in :attr:`~dockermap.map.config.ContainerConfiguration.start_options` can override
   container links derived from :attr:`~dockermap.map.config.ContainerConfiguration.links` with the same name.
   Non-conflicting names merge.
+* Containers marked with ``persistent`` set to ``True`` are treated like attached volumes: They are only started once
+  and not removed during cleanup processes.
 
 Start and create options can also be set via keyword arguments of
 :meth:`~dockermap.map.client.MappingDockerClient.create` and :meth:`~dockermap.map.client.MappingDockerClient.start`,
@@ -289,6 +291,10 @@ to needed additional functionality in the process of creating and running contai
 
 Example
 ^^^^^^^
+.. NOTE::
+   The following example assumes that actions on containers are determined using the default policy class
+   :class:`~dockermap.map.policy.resume.ResumePolicy`.
+
 This is a brief example, given a web server that communicates with two app instances of the same image over unix domain
 sockets::
 
@@ -368,6 +374,3 @@ Furthermore, on calling::
    the volume of ``example_map.app_server_socket``.
 #. ``example_map.web_server`` is started, and shares the volume of ``example_map.app_server_socket`` with the app
    server instances.
-
-It is also
-For only starting one instance of ``app_server`` manually

@@ -8,7 +8,7 @@ Docker-Map enhances docker-py_, the Docker Remote API client library for Python.
 building Docker images, create containers, connect dependent resources, and run them in development as well as
 production environments.
 
-For connections through SSH tunnels and additional deployment utilities, see Docker-Fabric_.
+For connections through SSH tunnels, command-line tools, and additional deployment utilities, see Docker-Fabric_.
 
 The project is hosted on GitHub_.
 
@@ -37,6 +37,8 @@ Contents
    guide/containers/client
    guide/containers/maps
    guide/containers/yaml
+
+   changes
 
 
 Status

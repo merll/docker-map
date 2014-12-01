@@ -36,14 +36,11 @@ The following methods are not part of the original `docker-py` implementation:
 
 Logging
 ^^^^^^^
-Feedback from the service is processed with :meth:`~dockermap.map.base.DockerClientWrapper.push_log`. The
-implementation writes to `stdout`, but this may easily be changed in a subclass. Logs for a running container can be
-shown with :meth:`~dockermap.map.base.DockerClientWrapper.push_container_logs`. Each message is prefixed with the
-container name.
-
-.. NOTE::
-   This implementation structure is likely to be changed in the future, in order to provide better support for different
-   logging needs (e.g. using the default logger or showing progress bars).
+Feedback from the service is processed with :meth:`~dockermap.map.base.DockerClientWrapper.push_log`. The default
+implementation uses the standard logging system. Progress streams are sent using
+:meth:`~dockermap.map.base.DockerClientWrapper.push_progress`, which by default is not implemented. Logs for a running
+container can be shown with :meth:`~dockermap.map.base.DockerClientWrapper.push_container_logs`. Each message is
+prefixed with the container name.
 
 Building from DockerFile and DockerContext
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -90,22 +87,36 @@ further described in :ref:`container_maps`.
 Instances of :class:`~dockermap.map.client.MappingDockerClient` are usually created with a map and a client.
 The former is an instance of :class:`~dockermap.map.container.ContainerMap`, the latter is
 a :class:`~dockermap.map.base.DockerClientWrapper` object. Both initializing arguments are however optional and may be
-changed any time later using the properties :attr:`~dockermap.map.client.MappingDockerClient.map` and
-:attr:`~dockermap.map.client.MappingDockerClient.client`::
+changed any time later using the properties :attr:`~dockermap.map.client.MappingDockerClient.maps`::
 
     map_client = MappingDockerClient(container_map, DockerClientWrapper('unix://var/run/docker.sock'))
 
-:class:`~dockermap.map.client.MappingDockerClient` contains most functions used within a container lifecycle, but
-additionally resolves dependencies from the map and applies the resulting parameters to the creation and start.
-Calling :meth:`~dockermap.map.client.MappingDockerClient.create`
-resolves all dependency containers to be created prior to the current one. First, `attached` volumes are created (see
-:ref:`attached-volumes`) of the dependency containers. Then the client creates dependency containers and the requested
-container. This functionality can be overridden by setting ``autocreate_dependencies`` and ``autocreate_attached`` to
-``False``.
+Since version 0.2.0, also multiple maps and clients are supported by passing a tuple or list of them, along with their
+associated client as arguments::
 
-Similarly, :meth:`~dockermap.map.client.MappingDockerClient.start` first launches dependency containers' `attached`
-volumes, then dependencies themselves, and finally the requested container; the behavior can also be changed with
-``autostart_dependencies``.
+    map_client = MappingDockerClient((container_map1, DockerClientWrapper('host1'),
+                                     (container_map2, DockerClientWrapper('host2'), ...)
+
+:class:`~dockermap.map.client.MappingDockerClient` uses a policy class, that transforms the container configurations
+and their current state into actions on the client, along with keyword arguments accepted by `docker-py`.
+The default, :class:`~dockermap.map.policy.resume.ResumePolicy` supports the following methods.
+
+* :meth:`~dockermap.map.client.MappingDockerClient.create` resolves all dependency containers to be created prior to
+  the current one. First, `attached` volumes are created (see :ref:`attached-volumes`) of the dependency containers.
+  Then the client creates dependency containers and the requested container. Existing containers are not re-created.
+* Similarly, :meth:`~dockermap.map.client.MappingDockerClient.start` first launches dependency containers' `attached`
+  volumes, then dependencies themselves, and finally the requested container. Running, `persistent`, and `attached`,
+  containers are not restarted if they have exited.
+* :meth:`~dockermap.map.client.MappingDockerClient.restart` only restarts the selected container.
+* :meth:`~dockermap.map.client.MappingDockerClient.stop` stops the current container and containers that depend on it.
+* :meth:`~dockermap.map.client.MappingDockerClient.remove` removes containers and their dependents, but does not
+  remove attached volumes.
+* :meth:`~dockermap.map.client.MappingDockerClient.startup`, along the dependency path,
+  * removes containers with unrecoverable errors (currently code ``-127``, but may be extended as needed);
+  * creates missing containers; if an attached volume is missing, the parent container is restarted;
+  * and starts non-running containers (like `start`).
+* :meth:`~dockermap.map.client.MappingDockerClient.shutdown` simply combines
+  :meth:`~dockermap.map.client.MappingDockerClient.stop` and :meth:`~dockermap.map.client.MappingDockerClient.remove`.
 
 In order to see what defines a dependency, see :ref:`shared-volumes-containers` and :ref:`linked-containers`.
 
@@ -115,32 +126,21 @@ precedence towards the :class:`~dockermap.map.config.ContainerConfiguration` is 
 
     map_client.start('web_server', restart_policy={'MaximumRetryCount': 0, 'Name': 'always'})
 
-.. note:: Both :meth:`~dockermap.map.client.MappingDockerClient.create` and
-          :meth:`~dockermap.map.client.MappingDockerClient.start` in their current implementation will always re-use
-          existing containers with the same name. This may be changed to a more sophisticated evaluation in future
-          implementations, as partial re-creation of dependency containers with shared volumes may lead to the
-          :meth:`~dockermap.map.client.MappingDockerClient.start` method referring to wrong container instances.
+For limiting effects to particular :ref:`instances` of a container configuration, all these methods accept an
+``instances`` argument, where one or multiple instance names can be specified. By implementing a custom subclass of
+:class:`~dockermap.map.client.policy.base.BasePolicy`, the aforementioned behavior can be further adjusted to
+individual needs.
 
-:meth:`~dockermap.map.client.MappingDockerClient.stop` stops a container and its dependencies, i.e. containers
-that have been started thereafter. The dependency resolution is once again optional and may be deactivated by setting
-``autostop_dependent=False``. Removing containers with :meth:`~dockermap.map.client.MappingDockerClient.remove`
-does not resolve dependencies, but only removes the specified container. Like in the `docker-py` and command line
-client, it only works on stopped containers.
+Note that :class:`~dockermap.map.client.MappingDockerClient` caches names of existing containers and images for
+speeding up operations. The cache is flushed automatically when the
+:attr:`~dockermap.map.base.MappingDockerClient.policy_class` property is set. However, when changes (e.g. creating or
+removing containers) are made directly, the name cache should be reset with
+:meth:`~dockermap.map.client.MappingDockerClient.refresh_names`.
 
+
+Additional methods
+------------------
 The method :meth:`~dockermap.map.client.MappingDockerClient.wait`, in addition to the original `wait` implementation,
 only provides additional (and optional) logging, and prefixes the given container name with the name of the map.
 :meth:`~dockermap.map.client.MappingDockerClient.wait_and_remove` removes the container after is has finished running.
-
-For limiting effects to particular :ref:`instances` of a container configuration,
-:meth:`~dockermap.map.client.MappingDockerClient.create`,
-:meth:`~dockermap.map.client.MappingDockerClient.start`,
-:meth:`~dockermap.map.client.MappingDockerClient.stop`, and
-:meth:`~dockermap.map.client.MappingDockerClient.remove`, accept an ``instances`` argument, where one or multiple
-instance names can be specified. Similarly, :meth:`~dockermap.map.client.MappingDockerClient.wait`
-and :meth:`~dockermap.map.client.MappingDockerClient.wait_and_remove` allow for
-specifying a single ``instance`` name.
-
-Note that :class:`~dockermap.map.client.MappingDockerClient` caches names of existing containers and images for
-speeding up operations. The cache is flushed automatically when the :attr:`~dockermap.map.base.client` property
-is set. However, when changes (e.g. creating or removing containers) are made directly, the name cache should be
-reset with :meth:`~dockermap.map.client.MappingDockerClient.refresh_names`.
+Both methods allow for specifying a single ``instance`` name.

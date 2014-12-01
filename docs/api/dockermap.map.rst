@@ -1,6 +1,13 @@
 dockermap.map package
 =====================
 
+Subpackages
+-----------
+
+.. toctree::
+
+    dockermap.map.policy
+
 Submodules
 ----------
 
