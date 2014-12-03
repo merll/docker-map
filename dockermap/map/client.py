@@ -181,7 +181,7 @@ class MappingDockerClient(object):
             persistent_list = self.list_persistent_containers()
             status_dict = dict((name, lambda container_name: self._inspect_container(name, container_name))
                                for name in self._maps.keys())
-            image_dict = dict((name, lambda image_name: self._get_image_tags(name))
+            image_dict = dict((name, lambda image_name: self._get_image_tags(name).get(image_name))
                               for name in self._maps.keys())
             self._policy = self._policy_class(map_dict, persistent_list, status_dict, image_dict)
         self._policy.status = self._get_status()
