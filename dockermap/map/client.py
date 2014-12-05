@@ -11,7 +11,7 @@ from docker.errors import APIError
 from ..shortcuts import get_user_group
 from .container import ContainerMap
 from .policy import (ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_PREPARE, ACTION_STOP, ACTION_REMOVE,
-                     ResumePolicy)
+                     ResumeUpdatePolicy)
 
 
 EXITED_REGEX = 'Exited \((\d+)\)'
@@ -64,7 +64,7 @@ class MappingDockerClient(object):
       actions.
     :type policy_class: class
     """
-    def __init__(self, container_maps=None, docker_client=None, policy_class=ResumePolicy):
+    def __init__(self, container_maps=None, docker_client=None, policy_class=ResumeUpdatePolicy):
         def _map_client(item):
             if isinstance(item, (list, tuple)):
                 return item[0].name, MapClient(item[0], item[1])

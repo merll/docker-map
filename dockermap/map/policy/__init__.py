@@ -5,4 +5,4 @@ from .actions import (ACTION_CREATE, ACTION_START, ACTION_PREPARE, ACTION_RESTAR
                       ACTION_ATTACHED_FLAG, ACTION_DEPENDENCY_FLAG, ContainerAction)
 
 from .simple import SimplePolicy
-from .resume import ResumePolicy
+from .resume import ResumeUpdatePolicy

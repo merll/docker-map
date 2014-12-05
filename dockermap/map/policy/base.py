@@ -14,6 +14,12 @@ class BasePolicy(object):
     """
     :param container_maps: Container maps.
     :type container_maps: dict[unicode, dockermap.map.container.ContainerMap]
+    :param persistent_names: Names of persistent containers.
+    :type persistent_names: list[unicode]
+    :param status_detail: Dictionary of functions with argument container name.
+    :type status_detail: dict
+    :param images: Dictionary of functions with argument image name
+    :type images: dict
     """
     __metaclass__ = ABCMeta
 
@@ -159,18 +165,54 @@ class BasePolicy(object):
     def status(self, value):
         self._status = value
 
+    @property
+    def persistent_names(self):
+        return self._persistent_names
 
-class BaseActionMixin(object):
-    def get_base_actions(self, action_generator, map_name, container, instances=None, **kwargs):
-        def _dep_actions(d_map_name, d_container, d_instance):
-            d_map = self._maps[d_map_name]
-            d_config = get_config(d_map, d_container)
-            d_instances = [d_instance] if d_instance else d_config.instances or [None]
-            return action_generator(map_name, d_map, d_container, d_config, d_instances, ACTION_DEPENDENCY_FLAG)
+    @property
+    def status_detail(self):
+        return self._status_detail
 
-        dependencies = self.get_dependencies(map_name, container)
-        dep_actions = itertools.chain.from_iterable(_dep_actions(*d) for d in dependencies)
-        c_map = self._maps[map_name]
-        c_config = get_config(c_map, container)
-        c_instances = instances or c_config.instances or [None]
-        return itertools.chain(dep_actions, action_generator(map_name, c_map, container, c_config, c_instances, **kwargs))
+    @property
+    def images(self):
+        return self._images
+
+
+class AbstractActionGenerator(object):
+    """
+    :type policy: BasePolicy
+    """
+    __metaclass__ = ABCMeta
+
+    def __init__(self, policy):
+        self._policy = policy
+
+    @abstractmethod
+    def get_dependency_path(self, map_name, container_name):
+        pass
+
+    @abstractmethod
+    def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
+        pass
+
+    def get_actions(self, map_name, container, instances=None, **kwargs):
+        def _gen_actions(c_map_name, c_container, c_instance, c_flags=0, **c_kwargs):
+            c_map = self._policy.container_maps[c_map_name]
+            c_config = get_config(c_map, c_container)
+            c_instances = [c_instance] if c_instance else c_config.instances or [None]
+            return self.generate_item_actions(map_name, c_map, c_container, c_config, c_instances, c_flags, **c_kwargs)
+
+        dependency_path = self.get_dependency_path(map_name, container)
+        dep_actions = itertools.chain.from_iterable(_gen_actions(*d, c_flags=ACTION_DEPENDENCY_FLAG)
+                                                    for d in dependency_path)
+        return itertools.chain(dep_actions, _gen_actions(map_name, container, instances, c_flags=0, **kwargs))
+
+
+class ForwardActionGeneratorMixin(object):
+    def get_dependency_path(self, map_name, container_name):
+        return self._policy.get_dependencies(map_name, container_name)
+
+
+class ReverseActionGeneratorMixin(object):
+    def get_dependency_path(self, map_name, container_name):
+        return self._policy.get_dependents(map_name, container_name)
