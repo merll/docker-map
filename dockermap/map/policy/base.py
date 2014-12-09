@@ -184,7 +184,7 @@ class AbstractActionGenerator(object):
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, policy):
+    def __init__(self, policy=None):
         self._policy = policy
 
     @abstractmethod
@@ -206,6 +206,14 @@ class AbstractActionGenerator(object):
         dep_actions = itertools.chain.from_iterable(_gen_actions(*d, c_flags=ACTION_DEPENDENCY_FLAG)
                                                     for d in dependency_path)
         return itertools.chain(dep_actions, _gen_actions(map_name, container, instances, c_flags=0, **kwargs))
+
+    @property
+    def policy(self):
+        return self._policy
+
+    @policy.setter
+    def policy(self, value):
+        self._policy = value
 
 
 class ForwardActionGeneratorMixin(object):
