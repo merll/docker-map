@@ -213,8 +213,9 @@ class MappingDockerClient(object):
                 a_kwargs = kwargs or {}
             if action == ACTION_CREATE:
                 image = a_kwargs.pop('image')
+                name = a_kwargs.pop('name', container)
                 self._ensure_images(map_name, image)
-                yield client.create_container(image, container, **a_kwargs)
+                yield client.create_container(image, name=name, **a_kwargs)
             elif action == ACTION_START:
                 client.start(container, **a_kwargs)
             elif action == ACTION_PREPARE:
