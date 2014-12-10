@@ -6,7 +6,6 @@ import itertools
 from . import (ACTION_DEPENDENCY_FLAG, ACTION_ATTACHED_FLAG, ACTION_CREATE, ACTION_START, ACTION_PREPARE,
                ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ContainerAction)
 from .base import BasePolicy, ForwardActionGeneratorMixin, AbstractActionGenerator, ReverseActionGeneratorMixin
-from .utils import get_config
 
 
 class SimpleCreateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator):
@@ -52,7 +51,7 @@ class SimpleStartMixin(object):
 class SimpleRestartMixin(object):
     def restart_actions(self, map_name, container, instances=None, **kwargs):
         c_map = self._maps[map_name]
-        c_config = get_config(c_map, container)
+        c_config = c_map.get_existing(container)
         c_instances = instances or c_config.instances or [None]
         for instance in c_instances:
             ci_name = self.cname(map_name, container, instance)

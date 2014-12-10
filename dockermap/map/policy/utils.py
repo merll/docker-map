@@ -41,31 +41,15 @@ def init_options(options):
         if callable(options):
             return options()
         return options
-    return {}
-
-
-def get_config(container_map, config_name):
-    return container_map.get_existing(config_name)
-
-
-def get_volume_path(container_map, alias):
-    path = container_map.volumes.get(alias)
-    if not path:
-        raise ValueError("No path found for volume '{0}'.".format(alias))
-    return path
+    return dict()
 
 
 def get_host_binds(container_map, config, instance):
-    for alias, readonly in config.binds:
-        share = container_map.host.get(alias, instance)
-        if share:
-            bind = {'bind': get_volume_path(container_map, alias), 'ro': readonly}
-            yield share, bind
+    def _gen_binds():
+        for alias, readonly in config.binds:
+            share = container_map.host.get(alias, instance)
+            if share:
+                bind = dict(bind=container_map.volumes[alias], ro=readonly)
+                yield share, bind
 
-
-def get_existing_containers(container_status):
-    return container_status.keys()
-
-
-def get_running_containers(container_status):
-    return set(container for container, status in six.iteritems(container_status) if status is True)
+    return dict(_gen_binds())

@@ -7,7 +7,7 @@ import itertools
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from . import ACTION_DEPENDENCY_FLAG
 from .dep import ContainerDependencyResolver
-from .utils import extract_user, get_host_binds, get_volume_path, init_options, update_kwargs, get_config
+from .utils import extract_user, get_host_binds, init_options, update_kwargs
 
 
 class BasePolicy(object):
@@ -61,7 +61,7 @@ class BasePolicy(object):
         c_kwargs = dict(
             image=cls.iname(container_map, config.image or default_image),
             volumes=list(itertools.chain(config.shares,
-                                         (get_volume_path(container_map, b.volume) for b in config.binds))),
+                                         (container_map.volumes[b.volume] for b in config.binds))),
             user=extract_user(config.user),
         )
         update_kwargs(c_kwargs, init_options(config.create_options), kwargs)
@@ -69,7 +69,7 @@ class BasePolicy(object):
 
     @classmethod
     def get_attached_create_kwargs(cls, container_map, config, alias, kwargs=None):
-        path = get_volume_path(container_map, alias)
+        path = container_map.volumes[alias]
         c_kwargs = dict(
             image=cls.base_image,
             volumes=[path],
@@ -80,7 +80,7 @@ class BasePolicy(object):
 
     @classmethod
     def get_attached_prepare_kwargs(cls, container_map, config, alias, kwargs=None):
-        path = get_volume_path(container_map, alias)
+        path = container_map.volumes[alias]
         c_kwargs = dict(
             image=cls.core_image,
             path=path,
@@ -96,7 +96,7 @@ class BasePolicy(object):
         c_kwargs = dict(
             volumes_from=list(cls.cname(map_name, u_name) for u_name in itertools.chain(config.uses, config.attaches)),
             links=dict((cls.cname(map_name, l_name), alias) for l_name, alias in config.links),
-            binds=dict(get_host_binds(container_map, config, instance))
+            binds=get_host_binds(container_map, config, instance),
         )
         update_kwargs(c_kwargs, init_options(config.start_options), kwargs)
         return c_kwargs
@@ -198,7 +198,7 @@ class AbstractActionGenerator(object):
     def get_actions(self, map_name, container, instances=None, **kwargs):
         def _gen_actions(c_map_name, c_container, c_instance, c_flags=0, **c_kwargs):
             c_map = self._policy.container_maps[c_map_name]
-            c_config = get_config(c_map, c_container)
+            c_config = c_map.get_existing(c_container)
             c_instances = [c_instance] if c_instance else c_config.instances or [None]
             return self.generate_item_actions(map_name, c_map, c_container, c_config, c_instances, c_flags, **c_kwargs)
 
