@@ -24,6 +24,19 @@ class SimpleCreateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator
 
 class SimpleCreateMixin(object):
     def create_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates actions for creating any configured container that does not already exist, including all of its
+        dependencies.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
+          created.
+        :type instances: list[unicode]
+        :param kwargs: Additional keyword args for the create action.
+        """
         return SimpleCreateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
@@ -45,11 +58,35 @@ class SimpleStartGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator)
 
 class SimpleStartMixin(object):
     def start_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates actions for starting any configured container that is not running, including all of its dependencies.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
+          started.
+        :type instances: list[unicode]
+        :param kwargs: Additional keyword args for the start action.
+        """
         return SimpleStartGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
 class SimpleRestartMixin(object):
     def restart_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates actions for restarting a configured container. Does not consider dependencies.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
+          restarted.
+        :type instances: list[unicode]
+        :param kwargs: Additional keyword args for the restart action.
+        """
         c_map = self._maps[map_name]
         c_config = c_map.get_existing(container)
         c_instances = instances or c_config.instances or [None]
@@ -78,6 +115,20 @@ class SimpleStopMixin(object):
     stop_dependent = True
 
     def stop_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates actions for stopping any configured container that is running, including all of its
+        dependents. Stopping dependent containers can be prevented by setting ``stop_dependent`` to ``False`` in
+        subclasses.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
+          stopped.
+        :type instances: list[unicode]
+        :param kwargs: Additional keyword args for the stop action.
+        """
         return SimpleStopGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
@@ -108,17 +159,65 @@ class SimpleRemoveMixin(object):
     remove_attached = False
 
     def remove_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates actions for removing any configured container that exists, including all of its
+        dependents. Removing dependent containers can be prevented by setting ``remove_dependent`` to ``False`` in
+        subclasses. Containers with the :attr:`~dockermap.map.config.ContainerConfiguration.persistent` property are
+        also removed, but attached containers are not.
+        This behavior can be changed by setting ``remove_persistent`` and ``remove_attached`` in subclasses.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
+          removed.
+        :type instances: list[unicode]
+        :param kwargs: Additional keyword args for the remove action.
+        """
         return SimpleRemoveGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
 class SimpleStartupMixin(object):
     def startup_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates actions for creating any configured container that does not already exist, and start any non-running
+        containers. This also applies to all of its dependencies.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
+          created and started.
+        :type instances: list[unicode]
+        :param kwargs: Has no effect in this implementation.
+        """
         return itertools.chain(self.create_actions(map_name, container, instances),
                                self.start_actions(map_name, container, instances))
 
 
 class SimpleShutdownMixin(object):
     def shutdown_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates actions for stopping any configured container that is running, and removing any container that exists.
+        This also applies to all of its dependent container configurations.
+
+        Stopping dependent containers can be prevented by setting ``stop_dependent`` to ``False`` in
+        subclasses. Removing dependent containers can be prevented by setting ``remove_dependent`` to ``False`` in
+        subclasses. Containers with the :attr:`~dockermap.map.config.ContainerConfiguration.persistent` property are also
+        removed, but attached containers are not. This behavior can be changed by setting ``remove_persistent`` and
+        ``remove_attached`` in subclasses.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
+          stopped and removed.
+        :type instances: list[unicode]
+        :param kwargs: Has no effect in this implementation.
+        """
         return itertools.chain(self.stop_actions(map_name, container, instances),
                                self.remove_actions(map_name, container, instances))
 

@@ -60,6 +60,25 @@ class ResumeStartupMixin(object):
     remove_status = (-127, )
 
     def startup_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates actions for restoring the running state of a configured container, including all of its dependencies.
+        In detail, this means that:
+
+        * Attached containers, if missing, are created and started. The same applies if the container exists but
+          has failed to start (currently status -127).
+        * Other containers are stopped, removed, and re-created if any of their attached containers has been
+          (re-)created, or if they have an exit status indicating that they cannot be restarted (-127).
+          Non-existing containers are created and started.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
+          updated.
+        :type instances: list[unicode]
+        :param kwargs: Has no effect in this implementation.
+        """
         return ResumeStartupGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 

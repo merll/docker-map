@@ -69,4 +69,26 @@ class ContainerUpdateMixin(object):
     remove_status = (-127, )
 
     def update_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates actions for updating a configured container, including all of its dependencies. Updating in this case
+        means that:
+
+        * An attached container is removed and re-created if its image id does not correspond with the current base
+          image, or the status indicates that the container cannot be restarted (-127 in this implementation).
+        * Any other container is re-created if any of its attached volumes' paths does not match (i.e. they are not
+          actually sharing the same virtual file system), the container cannot be restarted, or if the image id does
+          not correspond with the configured image (e.g. because the image has been updated).
+
+        Only prior existing containers are removed and re-created. Any created container is also started by its
+        configuration.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
+          updated.
+        :type instances: list[unicode]
+        :param kwargs: Has no effect in this implementation.
+        """
         return ContainerUpdateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)

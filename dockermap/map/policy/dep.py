@@ -6,11 +6,11 @@ from ..dep import MultiDependencyResolver
 
 class ContainerDependencyResolver(MultiDependencyResolver):
     """
-    Resolves dependencies between :class:`dockermap.map.config.ContainerConfiguration` instances, based on shared and
+    Resolves dependencies between :class:`~dockermap.map.config.ContainerConfiguration` instances, based on shared and
     used volumes.
 
-    :param container_map: Optional :class:`ContainerMap` instance for initialization.
-    :type container_map: ContainerMap
+    :param container_map: Optional :class:`~dockermap.map.container.ContainerMap` instance for initialization.
+    :type container_map: dockermap.map.container.ContainerMap
     """
     def __init__(self, container_map=None):
         items = container_map.dependency_items if container_map else None
@@ -43,18 +43,20 @@ class ContainerDependencyResolver(MultiDependencyResolver):
 
     def update(self, container_map):
         """
-        Overrides the `update` function of the superclass to use a :class:`ContainerMap` instance.
+        Overrides the `update` function of the superclass to use a :class:`~dockermap.map.container.ContainerMap`
+        instance.
 
         :param container_map: :class:`ContainerMap` instance
-        :type container_map: ContainerMap
+        :type container_map: dockermap.map.container.ContainerMap
         """
         super(ContainerDependencyResolver, self).update(container_map.dependency_items)
 
     def update_backward(self, container_map):
         """
-        Overrides the `update_backward` function of the superclass to use a :class:`ContainerMap` instance.
+        Overrides the `update_backward` function of the superclass to use a
+        :class:`~dockermap.map.container.ContainerMap` instance.
 
-        :param container_map: :class:`ContainerMap` instance
-        :type container_map: ContainerMap
+        :param container_map: :class:`~dockermap.map.container.ContainerMap` instance
+        :type container_map: dockermap.map.container.ContainerMap
         """
         super(ContainerDependencyResolver, self).update_backward(container_map.dependency_items)
