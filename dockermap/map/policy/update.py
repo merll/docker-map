@@ -40,7 +40,9 @@ class ContainerUpdateGenerator(ForwardActionGeneratorMixin, AbstractActionGenera
                     yield ContainerAction(ACTION_PREPARE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, ap_kwargs)
                     current_attached_paths[a] = None
                 else:
-                    current_attached_paths[a] = a_detail['Volumes'].get(a_paths[a])
+                    volumes = a_detail.get('Volumes')
+                    mapped_path = a_paths[a]
+                    current_attached_paths[mapped_path] = volumes.get(mapped_path) if volumes else None
         image_name = self.iname_tag(c_map, c_config.image or container_name)
         image_id = self._policy.images[map_name](image_name)
         for ci in instances:
@@ -50,7 +52,8 @@ class ContainerUpdateGenerator(ForwardActionGeneratorMixin, AbstractActionGenera
                 ci_status = self._policy.status[ci_name]
                 ci_detail = self._policy.status_detail[map_name](ci_name)
                 ci_image = ci_detail['Image']
-                path_mismatch = any(current_attached_paths.get(a) != ci_detail['Volumes'].get(a_path)
+                ci_volumes = ci_detail.get('Volumes') or dict()
+                path_mismatch = any(current_attached_paths.get(a_path) != ci_volumes.get(a_path)
                                     for a, a_path in six.iteritems(a_paths))
                 ci_remove = ci_status in self.remove_status or ci_image != image_id or path_mismatch
                 if ci_remove:
