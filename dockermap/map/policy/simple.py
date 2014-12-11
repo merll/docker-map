@@ -45,7 +45,7 @@ class SimpleStartGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator)
         for a in c_config.attaches:
             a_name = self._policy.cname(map_name, a)
             a_status = self._policy.status.get(a_name)
-            if a_status != 0 or a_status is False:
+            if a_status != 0:
                 yield ContainerAction(ACTION_START, ACTION_ATTACHED_FLAG | flags, map_name, a_name, None)
                 ca_kwargs = self._policy.get_attached_prepare_kwargs(c_map, c_config, a)
                 yield ContainerAction(ACTION_PREPARE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, ca_kwargs)
