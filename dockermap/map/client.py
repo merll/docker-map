@@ -93,7 +93,7 @@ class MappingDockerClient(object):
                     c_status = container['Status']
                     if c_status == '':
                         cs = False
-                    elif c_status.startswith('Up'):
+                    elif c_status.startswith('Up') or c_status.startswith('Restarting'):
                         cs = True
                     else:
                         exit_match = exited_pattern.match(c_status)
