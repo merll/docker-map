@@ -22,7 +22,7 @@ class ContainerUpdateGenerator(ForwardActionGeneratorMixin, AbstractActionGenera
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         current_attached_paths = dict()
-        a_paths = dict((alias, utils.get_volume_path(c_map, alias)) for alias in c_config.attaches)
+        a_paths = dict((alias, c_map.volumes[alias]) for alias in c_config.attaches)
         for a in c_config.attaches:
             a_name = self._policy.cname(map_name, a)
             a_exists = a_name in self._policy.status
