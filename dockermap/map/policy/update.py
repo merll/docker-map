@@ -6,7 +6,6 @@ import six
 from .base import ForwardActionGeneratorMixin, AbstractActionGenerator
 from . import (ContainerAction, ACTION_REMOVE, ACTION_ATTACHED_FLAG, ACTION_CREATE, ACTION_START, ACTION_PREPARE,
                ACTION_STOP)
-from . import utils
 
 
 class ContainerUpdateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator):
@@ -23,18 +22,22 @@ class ContainerUpdateGenerator(ForwardActionGeneratorMixin, AbstractActionGenera
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         current_attached_paths = dict()
         a_paths = dict((alias, c_map.volumes[alias]) for alias in c_config.attaches)
+        existing_containers = self._policy.container_names[map_name]
         for a in c_config.attaches:
             a_name = self._policy.cname(map_name, a)
-            a_exists = a_name in self._policy.status
+            a_exists = a_name in existing_containers
             if a_exists:
-                a_detail = self._policy.status_detail[map_name](a_name)
-                a_status = self._policy.status[a_name]
+                a_detail = self._policy.container_detail[map_name](a_name)
+                a_status = a_detail['State']
                 a_image = a_detail['Image']
-                a_remove = a_status in self.remove_status or a_image != self.base_image_ids[map_name]
+                a_remove = (not a_status['Running'] and a_status['ExitCode'] in self.remove_status) or \
+                    a_image != self.base_image_ids[map_name]
                 if a_remove:
                     yield ContainerAction(ACTION_REMOVE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, None)
+                    existing_containers.remove(a_name)
                     ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, a)
                     yield ContainerAction(ACTION_CREATE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, ac_kwargs)
+                    existing_containers.add(a_name)
                     yield ContainerAction(ACTION_START, ACTION_ATTACHED_FLAG | flags, map_name, a_name, None)
                     ap_kwargs = self._policy.get_attached_prepare_kwargs(c_map, c_config, a)
                     yield ContainerAction(ACTION_PREPARE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, ap_kwargs)
@@ -47,23 +50,26 @@ class ContainerUpdateGenerator(ForwardActionGeneratorMixin, AbstractActionGenera
         image_id = self._policy.images[map_name](image_name)
         for ci in instances:
             ci_name = self._policy.cname(map_name, container_name, ci)
-            ci_exists = ci_name in self._policy.status
+            ci_exists = ci_name in existing_containers
             if ci_exists:
-                ci_status = self._policy.status[ci_name]
-                ci_detail = self._policy.status_detail[map_name](ci_name)
+                ci_detail = self._policy.container_detail[map_name](ci_name)
+                ci_status = ci_detail['State']
                 ci_image = ci_detail['Image']
                 ci_volumes = ci_detail.get('Volumes') or dict()
                 path_mismatch = any(current_attached_paths.get(a_path) != ci_volumes.get(a_path)
                                     for a, a_path in six.iteritems(a_paths))
-                ci_remove = ci_status in self.remove_status or ci_image != image_id or path_mismatch
+                ci_remove = (not ci_status['Running'] and ci_status['ExitCode'] in self.remove_status) or \
+                    ci_image != image_id or path_mismatch
                 if ci_remove:
-                    if ci_status is True:
+                    if ci_status['Running']:
                         ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, ci)
                         yield ContainerAction(ACTION_STOP, flags, map_name, ci_name, ip_kwargs)
                     ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config)
                     yield ContainerAction(ACTION_REMOVE, flags, map_name, ci_name, ir_kwargs)
+                    existing_containers.remove(ci_name)
                     ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, container_name)
                     yield ContainerAction(ACTION_CREATE, flags, map_name, ci_name, ic_kwargs)
+                    existing_containers.add(ci_name)
                     is_kwargs = self._policy.get_start_kwargs(c_map, c_config, ci)
                     yield ContainerAction(ACTION_START, flags, map_name, ci_name, is_kwargs)
 

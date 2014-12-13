@@ -82,29 +82,14 @@ class MappingDockerClient(object):
         self._policy_class = policy_class
         self._policy = None
 
-    def _get_status(self):
-        """
-        :rtype: dict
-        """
-        def _extract_status():
+    def _current_names(self):
+        def _iter_maps():
             for c_map, client in self._maps.values():
+                map_name = c_map.name
                 map_containers = client.containers(all=True)
-                for container in map_containers:
-                    c_status = container['Status']
-                    if c_status == '':
-                        cs = False
-                    elif c_status.startswith('Up') or c_status.startswith('Restarting'):
-                        cs = True
-                    else:
-                        exit_match = exited_pattern.match(c_status)
-                        if exit_match:
-                            cs = int(exit_match.group(1))
-                        else:
-                            cs = None
-                    for name in container['Names']:
-                        yield name[1:], cs
+                yield map_name, set(name[1:] for container in map_containers for name in container['Names'])
 
-        return dict(_extract_status())
+        return dict(_iter_maps())
 
     def _inspect_container(self, map_name, container):
         """
@@ -178,13 +163,12 @@ class MappingDockerClient(object):
         """
         if not self._policy:
             map_dict = dict((name, mc[0]) for name, mc in six.iteritems(self._maps))
-            persistent_list = self.list_persistent_containers()
             status_dict = dict((name, lambda container_name: self._inspect_container(name, container_name))
                                for name in self._maps.keys())
             image_dict = dict((name, lambda image_name: self._get_image_tags(name).get(image_name))
                               for name in self._maps.keys())
-            self._policy = self._policy_class(map_dict, persistent_list, status_dict, image_dict)
-        self._policy.status = self._get_status()
+            self._policy = self._policy_class(map_dict, status_dict, image_dict)
+        self._policy.container_names = self._current_names()
         return self._policy
 
     def run_action_list(self, actions, apply_kwargs=None, raise_on_error=False):

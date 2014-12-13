@@ -31,12 +31,11 @@ class BasePolicy(object):
     core_image = DEFAULT_COREIMAGE
     base_image = DEFAULT_BASEIMAGE
 
-    def __init__(self, container_maps, persistent_names, status_detail, images):
+    def __init__(self, container_maps, container_detail, images):
         self._maps = container_maps
-        self._persistent_names = set(persistent_names)
-        self._status_detail = status_detail
+        self._container_detail = container_detail
         self._images = images
-        self._status = {}
+        self._container_names = dict()
         self._f_resolver = ContainerDependencyResolver()
         for m in self._maps.values():
             self._f_resolver.update(m)
@@ -271,7 +270,7 @@ class BasePolicy(object):
         :return: Container information.
         :rtype: dict
         """
-        return self._status_detail[map_name](container)
+        return self._container_detail[map_name](container)
 
     def get_image_id(self, map_name, image_name):
         """
@@ -464,38 +463,28 @@ class BasePolicy(object):
         return self._maps
 
     @property
-    def status(self):
+    def container_names(self):
         """
-        Container status to base actions on.
+        Names of existing containers on each map.
 
-        :return: Dictionary of container states.
-        :rtype: dict[unicode, int]
+        :return: Dictionary of container names.
+        :rtype: dict[unicode, set(unicode)]
         """
-        return self._status
+        return self._container_names
 
-    @status.setter
-    def status(self, value):
-        self._status = value
+    @container_names.setter
+    def container_names(self, value):
+        self._container_names = value
 
     @property
-    def persistent_names(self):
+    def container_detail(self):
         """
-        Names of persistent containers of the container configurations.
+        Inspect function on containers.
 
-        :return: Set of container names.
-        :rtype: set[unicode]
-        """
-        return self._persistent_names
-
-    @property
-    def status_detail(self):
-        """
-        Status detail functions on containers.
-
-        :return: Dictionary of functions to retrieve container status details.
+        :return: Dictionary of functions to retrieve container inspection details.
         :rtype: dict[unicode, function]
         """
-        return self._status_detail
+        return self._container_detail
 
     @property
     def images(self):

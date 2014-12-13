@@ -4,6 +4,9 @@ from __future__ import unicode_literals
 import six
 
 
+INITIAL_START_TIME = '0001-01-01T00:00:00Z'
+
+
 def extract_user(user):
     """
     Extract the user for running a container from the following possible input formats:
