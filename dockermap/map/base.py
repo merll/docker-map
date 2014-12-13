@@ -25,15 +25,15 @@ class ContainerImageResolver(SingleDependencyResolver):
     image and each image depends on one or zero images. The purpose is only to find *if* images are used - not by what -
     in order to perform a clean-up.
 
-    :param container_images: Iterable with image ids, which are used by containers.
-    :type container_images: iterable
+    :param container_images: Set of image ids currently used by containers.
+    :type container_images: set[unicode]
     :param images: Iterable or dictionary of images in the format `(image, parent_image)`.
     :type images: iterable
     """
 
     def __init__(self, container_images=None, images=None):
         super(ContainerImageResolver, self).__init__(images)
-        self._container_images = set(container_images)
+        self._container_images = container_images
 
     def merge_dependency(self, item, resolve_parent, parent):
         """
@@ -47,7 +47,7 @@ class ContainerImageResolver(SingleDependencyResolver):
         :return: `True` if any dependency has been found, `False` otherwise.
         :type: bool
         """
-        return item[:12] in self._container_images or super(ContainerImageResolver, self).merge_dependency(item, resolve_parent, parent)
+        return item in self._container_images or super(ContainerImageResolver, self).merge_dependency(item, resolve_parent, parent)
 
 
 class DockerClientWrapper(docker.Client):
@@ -259,7 +259,8 @@ class DockerClientWrapper(docker.Client):
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
         """
-        used_images = (container['Image'] for container in self.containers(all=True))
+        used_images = set(self.inspect_container(container['Id'])['Image']
+                          for container in self.containers(all=True))
         image_dependencies = ((image['Id'], image['ParentId']) for image in self.images(all=True))
         resolver = ContainerImageResolver(used_images, image_dependencies)
         tag_check = is_latest_image if remove_old else is_repo_image
