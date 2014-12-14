@@ -348,12 +348,12 @@ class HostVolumeConfiguration(DictMap):
     :param volume_root: Optional root directory for host volumes.
     :type volume_root: unicode
     """
-    def __init__(self, volume_root=None):
+    def __init__(self, volume_root=None, *args, **kwargs):
         self._root = volume_root
-        super(HostVolumeConfiguration, self).__init__()
+        super(HostVolumeConfiguration, self).__init__(*args, **kwargs)
 
     def __repr__(self):
-        return '{0} shares: {1}'.format(self.__class__.__name__, self._map)
+        return '{0} shares: {1}'.format(self.__class__.__name__, self)
 
     @property
     def root(self):
@@ -392,11 +392,11 @@ class HostVolumeConfiguration(DictMap):
                 raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(other)))
         if 'root' in kwargs:
             self._root = kwargs.pop('root')
-        super(HostVolumeConfiguration, self).update(other=other, **kwargs)
+        super(HostVolumeConfiguration, self).update(other, **kwargs)
 
     def merge(self, items, overwrite=False):
         if isinstance(items, HostVolumeConfiguration):
-            self._map.update(items._map)
+            self.update(items)
             if items._root and overwrite:
                 self._root = items._root
         elif isinstance(items, dict):
@@ -405,6 +405,6 @@ class HostVolumeConfiguration(DictMap):
                 root = items.pop('root')
                 if overwrite:
                     self._root = root
-            self._map.update(items)
+            self.update(items)
         else:
-            raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(items)))
+            raise ValueError("Expected HostVolumeConfiguration or dictionary; found '{0}'".format(type(items)))
