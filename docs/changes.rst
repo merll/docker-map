@@ -6,6 +6,7 @@ Change History
 0.2.0
 -----
 * Moved container handling logic to policy classes.
+* Added ``startup``, ``shutdown``, and ``update`` actions, referring to variable policy implementations.
 * Added ``persistent`` flag to container configurations to differentiate during cleanup processes.
 * Added methods for merging container maps and configurations.
 * More flexible logging.

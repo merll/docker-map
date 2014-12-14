@@ -235,7 +235,8 @@ class ContainerConfiguration(object):
     @property
     def persistent(self):
         """
-        Whether the container should be removed during cleanup processes, when exited. Set to ``True`` to keep it.
+        Set this to ``True`` for containers that are only started to share a volume, but exist immediately.
+        Such containers are restarted and not removed during cleanup.
 
         :return: Persistent flag.
         :rtype: bool

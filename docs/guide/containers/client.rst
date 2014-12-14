@@ -99,7 +99,7 @@ associated client as arguments::
 
 :class:`~dockermap.map.client.MappingDockerClient` uses a policy class, that transforms the container configurations
 and their current state into actions on the client, along with keyword arguments accepted by `docker-py`.
-The default, :class:`~dockermap.map.policy.resume.ResumePolicy` supports the following methods.
+The default, :class:`~dockermap.map.policy.resume.ResumeUpdatePolicy` supports the following methods.
 
 * :meth:`~dockermap.map.client.MappingDockerClient.create` resolves all dependency containers to be created prior to
   the current one. First, `attached` volumes are created (see :ref:`attached-volumes`) of the dependency containers.
@@ -112,11 +112,20 @@ The default, :class:`~dockermap.map.policy.resume.ResumePolicy` supports the fol
 * :meth:`~dockermap.map.client.MappingDockerClient.remove` removes containers and their dependents, but does not
   remove attached volumes.
 * :meth:`~dockermap.map.client.MappingDockerClient.startup`, along the dependency path,
+
   * removes containers with unrecoverable errors (currently code ``-127``, but may be extended as needed);
   * creates missing containers; if an attached volume is missing, the parent container is restarted;
   * and starts non-running containers (like `start`).
 * :meth:`~dockermap.map.client.MappingDockerClient.shutdown` simply combines
   :meth:`~dockermap.map.client.MappingDockerClient.stop` and :meth:`~dockermap.map.client.MappingDockerClient.remove`.
+* :meth:`~dockermap.map.client.MappingDockerClient.update` checks along the dependency path for outdated containers or
+  container connections. In more detail, containers are removed, re-created, and restarted if any of the following
+  applies:
+
+  * The virtual filesystem path of attached containers and shared volumes between containers is compared to dependent
+    containers' path. The latter is updated in case of a mismatch.
+  * The image id from existing container is compared to the current id of the image as specified in the container
+    configuration. If it does not match, the container is re-created based on the new image.
 
 In order to see what defines a dependency, see :ref:`shared-volumes-containers` and :ref:`linked-containers`.
 

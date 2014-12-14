@@ -19,10 +19,8 @@ class BasePolicy(object):
 
     :param container_maps: Container maps.
     :type container_maps: dict[unicode, dockermap.map.container.ContainerMap]
-    :param persistent_names: Names of persistent containers.
-    :type persistent_names: list[unicode]
-    :param status_detail: Dictionary of functions with argument container name.
-    :type status_detail: dict
+    :param container_detail: Dictionary of functions with argument container name.
+    :type container_detail: dict
     :param images: Dictionary of functions with argument image name.
     :type images: dict
     """
@@ -534,7 +532,7 @@ class AbstractActionGenerator(object):
         :param container_name: Container configuration name.
         :param c_config: Container configuration object.
         :param instances: Instance names as a list. Can be ``[None]``
-        :param flags: Flags for the current container, as defined in :module:`dockermap.map.policy.actions`.
+        :param flags: Flags for the current container, as defined in :mod:`~dockermap.map.policy.actions`.
         :param args: Additional positional arguments.
         :param kwargs: Additional keyword arguments.
         :return: An iterable of container actions. Can be a generator.

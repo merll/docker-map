@@ -17,7 +17,8 @@ environments.
 
 The library builds on functionality of the Docker Remote API client for Python,
 `docker-py`. Based on it, available deployment tools can be enhanced
-(see docker-fabric) or custom orchestration can be implemented.
+(see [docker-fabric](https://github.com/merll/docker-fabric)) or custom orchestration
+can be implemented.
 
 
 Building images
@@ -101,3 +102,6 @@ Running the container can be as easy as
 `client.start('container_name')`
 or can be enhanced with custom parameters such as
 `client.start('container_name', expose={80: 80})`.
+
+If all configuration is stored on the map, creation and start are combined in
+`client.startup('container_name')`.
