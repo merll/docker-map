@@ -64,6 +64,31 @@ class BasePolicy(object):
         return '.'.join((map_name, container))
 
     @classmethod
+    def resolve_cname(cls, container_name, includes_map=True):
+        """
+        The reverse function of :meth:`cname` for resolving a container name into map name, container configuration,
+        and instance name. The instance name may be ``None`` if not present. In case the map name is not present
+        in the container name, ``includes_map`` should be set to ``False`` for only resolving configuration name and map
+        name.
+
+        :param container_name: Container name.
+        :type container_name: unicode
+        :param includes_map: Whether the name includes a map name (e.g. for running containers) or not (e.g. for
+         references within the same map).
+        :return: Tuple of container map name (optional), container configuration name, and instance.
+        :rtype: tuple[unicode]
+        """
+        if includes_map:
+            map_name, __, ci_name = container_name.partition('.')
+            if not ci_name:
+                raise ValueError("Invalid container name: {0}".format(container_name))
+            c_name, __, i_name = ci_name.partition('.')
+            return map_name, c_name, i_name or None
+
+        c_name, __, i_name = container_name.partition('.')
+        return c_name, i_name or None
+
+    @classmethod
     def iname(cls, container_map, image):
         """
         Generates the full image name that should be used when creating a new container.
