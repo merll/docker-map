@@ -122,10 +122,14 @@ The default, :class:`~dockermap.map.policy.resume.ResumeUpdatePolicy` supports t
   container connections. In more detail, containers are removed, re-created, and restarted if any of the following
   applies:
 
-  * The virtual filesystem path of attached containers and shared volumes between containers is compared to dependent
-    containers' path. The latter is updated in case of a mismatch.
   * The image id from existing container is compared to the current id of the image as specified in the container
     configuration. If it does not match, the container is re-created based on the new image.
+  * Linked containers, as declared on the map, are compared to the current container's runtime configuration. If any
+    container is missing or the linked alias mismatches, the dependent container is re-created and restarted.
+  * The virtual filesystem path of attached containers and other shared volumes is compared to dependent
+    containers' paths. In case of a mismatch, the latter is updated.
+
+  For ensuring the integrity, all missing containers are created and started along the dependency path.
 
 In order to see what defines a dependency, see :ref:`shared-volumes-containers` and :ref:`linked-containers`.
 
