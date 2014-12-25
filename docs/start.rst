@@ -96,8 +96,7 @@ communicating with the application server. The map could look like this::
 This map can be used with a :class:`~dockermap.map.client.MappingDockerClient`::
 
     map_client = MappingDockerClient(container_map, DockerClientWrapper('unix://var/run/docker.sock'))
-    map_client.create('nginx')
-    map_client.start('nginx')
+    map_client.startup('nginx')
 
 
 This performs the following tasks:
@@ -107,3 +106,17 @@ This performs the following tasks:
 * Create containers for sharing attached volumes, and assign configured user (`chown`) and access permissions
   (`chmod`).
 * Create and start containers `uwsgi` and `nginx` in that order, passing the necessary parameters to `docker-py`.
+
+If images become updated on the Docker host, running containers can easily use the newer versions::
+
+    map_client.update('nginx')
+
+Along the aforementioned dependency path, every container is stopped, removed, re-created and restarted as necessary if
+
+* the image id does not match the current tag specification, e.g. since a new image version has been pulled,
+* the container is stopped and its exit status indicates that it cannot be restarted,
+* a linked container is missing, or
+* the virtual filesystems refer to the same path inside the container, but on the host they do not match (e.g. due to
+  container updates along the dependency path).
+
+Non-running containers are simply started during this process.

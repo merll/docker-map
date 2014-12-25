@@ -4,8 +4,13 @@ Enhanced client functionality
 =============================
 The library comes with an enhanced client for some added functionality. Docker-Map is relying on that for managing
 container creation and startup. One part of the client is :class:`~dockermap.map.base.DockerClientWrapper`, a wrapper
-around `docker-py`'s client; another is the application of :class:`~dockermap.map.container.ContainerMap` instances to
-this client, which is handled by :class:`~dockermap.map.client.MappingDockerClient`.
+around `docker-py`'s client; another is the application of container maps in form of
+:class:`~dockermap.map.container.ContainerMap` instances to this client, which is handled by
+:class:`~dockermap.map.client.MappingDockerClient`.
+
+Since version 0.2.0 it is possible to use :class:`~dockermap.map.client.MappingDockerClient` without
+:class:`~dockermap.map.base.DockerClientWrapper`. The following paragraphs describe the added wrapper functionality. If
+you are not interested in that, you can skip to :ref:`applying_maps`.
 
 Wrapped functionality
 ---------------------
@@ -79,6 +84,8 @@ as a tarball) are available directly, but they return a stream. Implementations 
 However, this has turned out to be very slow and may not be practical.
 
 
+.. _applying_maps:
+
 Applying container maps
 -----------------------
 This section provides some background information of the client functionality. The configuration and an example is
@@ -91,11 +98,20 @@ changed any time later using the properties :attr:`~dockermap.map.client.Mapping
 
     map_client = MappingDockerClient(container_map, DockerClientWrapper('unix://var/run/docker.sock'))
 
-Since version 0.2.0, also multiple maps and clients are supported by passing a tuple or list of them, along with their
-associated client as arguments::
+Since version 0.2.0, also multiple maps and clients are supported. If exactly one map is provided, it is considered the
+default map. That one is always used when not specified otherwise is a command (e.g. ``create``). Similarly, there can
+be a default client, which is used whenever a container map does not explicitly state a different set of clients.
+More clients can be passed as a dictionary, e.g.::
 
-    map_client = MappingDockerClient((container_map1, DockerClientWrapper('host1'),
-                                     (container_map2, DockerClientWrapper('host2'), ...)
+    map_client = MappingDockerClient([container_map1, container_map2, ...],     # Container maps as list or tuple
+                                     DockerClientWrapper('default_host'),       # Default client, optional
+                                     {'client1': DockerClientWrapper('host1'),  # Further clients
+                                      'client2': DockerClientWrapper('host2'),
+                                      ...})
+
+These clients are then used according to the :ref:`map_clients` configuration on a container map.
+The default client can be referenced with the name ``__default__``. As this is implied on a container map, it
+is however not necessary there.
 
 :class:`~dockermap.map.client.MappingDockerClient` uses a policy class, that transforms the container configurations
 and their current state into actions on the client, along with keyword arguments accepted by `docker-py`.

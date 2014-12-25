@@ -6,9 +6,11 @@ Change History
 0.2.0
 -----
 * Moved container handling logic to policy classes.
+* Better support for multiple maps and multiple clients.
 * Added ``startup``, ``shutdown``, and ``update`` actions, referring to variable policy implementations.
 * Added ``persistent`` flag to container configurations to differentiate during cleanup processes.
 * Added methods for merging container maps and configurations.
+* It is no longer required to use the wrapped client ``DockerClientWrapper``.
 * More flexible logging.
 
 0.1.4

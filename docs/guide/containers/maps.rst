@@ -89,6 +89,18 @@ different host-path assignments, you can however also differentiate them as a di
     }
 
 
+.. _map_clients:
+
+Clients
+^^^^^^^
+Since version 0.2.0, a map can describe a container structure on a specific set of clients. For example, it is possible
+to run three application servers on a set of hosts, which are reverse-proxied by a single web server. This scenario
+would be described using the following configuration::
+
+    apps_container_map.clients = 'apps1', 'apps2', 'apps3'
+    web_container_map.clients = 'web1'
+
+
 Container configuration
 ^^^^^^^^^^^^^^^^^^^^^^^
 Container configurations are defined within :class:`~dockermap.map.config.ContainerConfiguration` objects. They have
@@ -282,9 +294,9 @@ For initializing a container map upon instantiation, pass the dictionary as the 
 This also performs a brief integrity check, which can be deactivated by passing ``check_integrity=False`` and repeated
 any time later with :meth:`~dockermap.map.container.ContainerMap.check_integrity`.
 
-A :class:`~dockermap.map.client.MappingDockerClient` instance finally applies the container map to a Docker client. Due
-to needed additional functionality in the process of creating and running containers, the latter must be an instance of
-:class:`~dockermap.map.base.DockerClientWrapper`. Details of these implementations are described in
+A :class:`~dockermap.map.client.MappingDockerClient` instance finally applies the container map to a Docker client. This
+can be a an instance of the Docker Remove API client. For added logging and additional functionality, using an instance
+of :class:`~dockermap.map.base.DockerClientWrapper` is recommended. Details of these implementations are described in
 :ref:`container_client`.
 
 .. _container_map_example:

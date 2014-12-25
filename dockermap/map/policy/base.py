@@ -625,7 +625,7 @@ class AbstractActionGenerator(object):
         :param c_map: Container map instance.
         :type c_map: dockermap.map.container.ContainerMap
         :param container_name: Container configuration name.
-        :type unicode
+        :type container_name: unicode
         :param c_config: Container configuration object.
         :type c_config: dockermap.map.config.ContainerConfiguration
         :param instances: Instance names as a list. Can be ``[None]``
