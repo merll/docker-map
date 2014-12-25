@@ -124,7 +124,7 @@ class DockerClientWrapper(docker.Client):
             image_id = last_log[19:]  # Remove prefix
             repo, __, i_tag = tag.partition(':')
             if i_tag and i_tag != 'latest':
-                self.tag(image_id, repo, 'latest')
+                self.tag(image_id, repo, 'latest', force=True)
             return image_id
         return None
 
