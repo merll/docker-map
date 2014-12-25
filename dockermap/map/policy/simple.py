@@ -1,29 +1,31 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import itertools
-
-from . import (ACTION_DEPENDENCY_FLAG, ACTION_ATTACHED_FLAG, ACTION_CREATE, ACTION_START, ACTION_PREPARE,
-               ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ContainerAction)
-from .base import BasePolicy, ForwardActionGeneratorMixin, AbstractActionGenerator, ReverseActionGeneratorMixin
-from .utils import INITIAL_START_TIME
+from . import ACTION_DEPENDENCY_FLAG
+from .base import (BasePolicy, AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator,
+                   ReverseActionGeneratorMixin)
+from .utils import is_initial
 
 
 class SimpleCreateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator):
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
-        existing_containers = self._policy.container_names[map_name]
-        for a in c_config.attaches:
-            a_name = self._policy.cname(map_name, a)
-            if a_name not in existing_containers:
-                a_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, a)
-                yield ContainerAction(ACTION_CREATE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, a_kwargs)
-                existing_containers.add(a_name)
-        for ci in instances:
-            ci_name = self._policy.cname(map_name, container_name, ci)
-            if ci_name not in existing_containers:
-                c_kwargs = self._policy.get_create_kwargs(c_map, c_config, container_name, kwargs)
-                yield ContainerAction(ACTION_CREATE, flags, map_name, ci_name, c_kwargs)
-                existing_containers.add(ci_name)
+        for client_name, client in self._policy.get_clients(c_map):
+            existing_containers = self._policy.container_names[client_name]
+            images = self._policy.images[client_name]
+            for a in c_config.attaches:
+                a_name = self._policy.cname(map_name, a)
+                if a_name not in existing_containers:
+                    a_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, a_name, a)
+                    images.ensure_image(a_kwargs['image'])
+                    client.create_container(**a_kwargs)
+                    existing_containers.add(a_name)
+            for ci in instances:
+                ci_name = self._policy.cname(map_name, container_name, ci)
+                if ci_name not in existing_containers:
+                    c_kwargs = self._policy.get_create_kwargs(c_map, c_config, ci_name, container_name, kwargs=kwargs)
+                    images.ensure_image(c_kwargs['image'])
+                    client.create_container(**c_kwargs)
+                    existing_containers.add(ci_name)
 
 
 class SimpleCreateMixin(object):
@@ -41,24 +43,26 @@ class SimpleCreateMixin(object):
         :type instances: list[unicode]
         :param kwargs: Additional keyword args for the create action.
         """
-        return SimpleCreateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        SimpleCreateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
-class SimpleStartGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator):
+class SimpleStartGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
-        for a in c_config.attaches:
-            a_name = self._policy.cname(map_name, a)
-            a_status = self._policy.container_detail[map_name](a_name)['State']
-            if a_status['ExitCode'] != 0 or a_status['StartedAt'] == INITIAL_START_TIME:
-                yield ContainerAction(ACTION_START, ACTION_ATTACHED_FLAG | flags, map_name, a_name, None)
-                ca_kwargs = self._policy.get_attached_prepare_kwargs(c_map, c_config, a)
-                yield ContainerAction(ACTION_PREPARE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, ca_kwargs)
-        for instance in instances:
-            ci_name = self._policy.cname(map_name, container_name, instance)
-            ci_status = self._policy.container_detail[map_name](ci_name)['State']
-            if not ci_status['Running']:
-                c_kwargs = self._policy.get_start_kwargs(c_map, c_config, instance, kwargs)
-                yield ContainerAction(ACTION_START, flags, map_name, ci_name, c_kwargs)
+        for client_name, client in self._policy.get_clients(c_map):
+            images = self._policy.images[client_name]
+            for a in c_config.attaches:
+                a_name = self._policy.cname(map_name, a)
+                a_status = client.inspect_container(a_name)['State']
+                if a_status['ExitCode'] != 0 or is_initial(a_status):
+                    a_kwargs = self._policy.get_attached_start_kwargs(c_map, c_config, a_name, a)
+                    client.start(**a_kwargs)
+                    self.prepare_container(images, client, c_map, c_config, a, a_name)
+            for instance in instances:
+                ci_name = self._policy.cname(map_name, container_name, instance)
+                ci_status = client.inspect_container(ci_name)['State']
+                if not ci_status['Running']:
+                    c_kwargs = self._policy.get_start_kwargs(c_map, c_config, ci_name, instance, kwargs=kwargs)
+                    client.start(**c_kwargs)
 
 
 class SimpleStartMixin(object):
@@ -75,7 +79,7 @@ class SimpleStartMixin(object):
         :type instances: list[unicode]
         :param kwargs: Additional keyword args for the start action.
         """
-        return SimpleStartGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        SimpleStartGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
 class SimpleRestartMixin(object):
@@ -95,13 +99,14 @@ class SimpleRestartMixin(object):
         c_map = self._maps[map_name]
         c_config = c_map.get_existing(container)
         c_instances = instances or c_config.instances or [None]
-        existing_containers = self._policy.container_names[map_name]
-        for instance in c_instances:
-            ci_name = self.cname(map_name, container, instance)
-            ci_status = self._policy.container_detail[map_name](ci_name)['State'] if ci_name in existing_containers else None
-            if ci_status and ci_status['Running']:
-                c_kwargs = self.get_restart_kwargs(c_map, c_config, instance, kwargs)
-                yield ContainerAction(ACTION_RESTART, 0, map_name, ci_name, c_kwargs)
+        for client_name, client in self._policy.get_clients(c_map):
+            existing_containers = self._policy.container_names[client_name]
+            for instance in c_instances:
+                ci_name = self.cname(map_name, container, instance)
+                ci_status = client.inspect_container(ci_name)['State'] if ci_name in existing_containers else None
+                if ci_status and ci_status['Running']:
+                    c_kwargs = self._policy.get_restart_kwargs(c_map, c_config, ci_name, instance, kwargs=kwargs)
+                    client.restart(**c_kwargs)
 
 
 class SimpleStopGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):
@@ -111,13 +116,14 @@ class SimpleStopGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         if self._stop_dependent or not flags & ACTION_DEPENDENCY_FLAG:
-            existing_containers = self._policy.container_names[map_name]
-            for instance in instances:
-                ci_name = self._policy.cname(map_name, container_name, instance)
-                ci_status = self._policy.container_detail[map_name](ci_name)['State'] if ci_name in existing_containers else None
-                if ci_status and ci_status['Running']:
-                    c_kwargs = self._policy.get_stop_kwargs(c_map, c_config, instance, kwargs)
-                    yield ContainerAction(ACTION_STOP, flags, map_name, ci_name, c_kwargs)
+            for client_name, client in self._policy.get_clients(c_map):
+                existing_containers = self._policy.container_names[client_name]
+                for instance in instances:
+                    ci_name = self._policy.cname(map_name, container_name, instance)
+                    ci_status = client.inspect_container(ci_name)['State'] if ci_name in existing_containers else None
+                    if ci_status and ci_status['Running']:
+                        c_kwargs = self._policy.get_stop_kwargs(c_map, c_config, ci_name, instance, kwargs=kwargs)
+                        client.stop(**c_kwargs)
 
 
 class SimpleStopMixin(object):
@@ -138,7 +144,7 @@ class SimpleStopMixin(object):
         :type instances: list[unicode]
         :param kwargs: Additional keyword args for the stop action.
         """
-        return SimpleStopGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        SimpleStopGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
 class SimpleRemoveGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):
@@ -150,19 +156,21 @@ class SimpleRemoveGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         if (self._remove_dependent or not flags & ACTION_DEPENDENCY_FLAG) and (self._remove_persistent or not c_config.persistent):
-            existing_containers = self._policy.container_names[map_name]
-            for instance in instances:
-                ci_name = self._policy.cname(map_name, container_name, instance)
-                if ci_name in existing_containers:
-                    yield ContainerAction(ACTION_REMOVE, flags, map_name, ci_name, kwargs)
-                    existing_containers.remove(ci_name)
-            if self._remove_attached:
-                for a in c_config.attaches:
-                    a_name = self._policy.cname(map_name, a)
-                    if a_name in existing_containers:
-                        a_kwargs = self._policy.get_remove_kwargs(c_map, c_config, kwargs)
-                        yield ContainerAction(ACTION_REMOVE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, a_kwargs)
-                        existing_containers.remove(a_name)
+            for client_name, client in self._policy.get_clients(c_map):
+                existing_containers = self._policy.container_names[client_name]
+                for instance in instances:
+                    ci_name = self._policy.cname(map_name, container_name, instance)
+                    if ci_name in existing_containers:
+                        c_kwargs = self._policy.get_remove_kwargs(map_name, c_config, ci_name, kwargs=kwargs)
+                        client.remove_container(**c_kwargs)
+                        existing_containers.remove(ci_name)
+                if self._remove_attached:
+                    for a in c_config.attaches:
+                        a_name = self._policy.cname(map_name, a)
+                        if a_name in existing_containers:
+                            a_kwargs = self._policy.get_remove_kwargs(c_map, c_config, a_name, kwargs=kwargs)
+                            client.remove_container(**a_kwargs)
+                            existing_containers.remove(a_name)
 
 
 class SimpleRemoveMixin(object):
@@ -187,7 +195,7 @@ class SimpleRemoveMixin(object):
         :type instances: list[unicode]
         :param kwargs: Additional keyword args for the remove action.
         """
-        return SimpleRemoveGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        SimpleRemoveGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
 class SimpleStartupMixin(object):
@@ -205,8 +213,8 @@ class SimpleStartupMixin(object):
         :type instances: list[unicode]
         :param kwargs: Has no effect in this implementation.
         """
-        return itertools.chain(self.create_actions(map_name, container, instances),
-                               self.start_actions(map_name, container, instances))
+        self.create_actions(map_name, container, instances)
+        self.start_actions(map_name, container, instances)
 
 
 class SimpleShutdownMixin(object):
@@ -230,8 +238,8 @@ class SimpleShutdownMixin(object):
         :type instances: list[unicode]
         :param kwargs: Has no effect in this implementation.
         """
-        return itertools.chain(self.stop_actions(map_name, container, instances),
-                               self.remove_actions(map_name, container, instances))
+        self.stop_actions(map_name, container, instances)
+        self.remove_actions(map_name, container, instances)
 
 
 class SimplePolicy(SimpleCreateMixin, SimpleStartMixin, SimpleRestartMixin, SimpleStopMixin, SimpleRemoveMixin,

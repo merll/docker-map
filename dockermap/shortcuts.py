@@ -4,22 +4,22 @@ from __future__ import unicode_literals
 import six
 
 
-_str_arg = lambda arg: six.text_type(arg).replace(' ', '\\ ')
+str_arg = lambda arg: six.text_type(arg).replace(' ', '\\ ')
 
 
 def _gen_kwargs(kwargs):
     for k, v in six.iteritems(kwargs):
         if isinstance(v, tuple):
             if v[0]:
-                yield ' '.join(map(_str_arg, v[1:]))
+                yield ' '.join(map(str_arg, v[1:]))
         elif not isinstance(v, bool) and v is not None:
-            yield '{0} {1}'.format(k.replace('_', '-'), _str_arg(v))
+            yield '{0} {1}'.format(k.replace('_', '-'), str_arg(v))
         elif v:
             yield k.replace('_', '-')
 
 
 def _format_cmd(cmd, *args, **kwargs):
-    arg_str = ' '.join(map(_str_arg, args))
+    arg_str = ' '.join(map(str_arg, args))
     kwarg_str = ' '.join(_gen_kwargs(kwargs))
     if kwarg_str:
         return ' '.join((cmd, kwarg_str, arg_str))

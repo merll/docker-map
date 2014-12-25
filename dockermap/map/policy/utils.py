@@ -107,3 +107,15 @@ def get_host_binds(container_map, config, instance):
                 yield share, bind
 
     return dict(_gen_binds())
+
+
+def is_initial(container_state):
+    """
+    Checks if a container with the given status information has ever been started.
+
+    :param container_state: Container status dictionary.
+    :type container_state: dict
+    :return: ``True`` if the container has never been started before, ``False`` otherwise.
+    :rtype: bool
+    """
+    return container_state['StartedAt'] == INITIAL_START_TIME

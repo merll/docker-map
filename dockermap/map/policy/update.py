@@ -3,17 +3,15 @@ from __future__ import unicode_literals
 
 import six
 
-from .base import ForwardActionGeneratorMixin, AbstractActionGenerator
-from . import (ContainerAction, ACTION_REMOVE, ACTION_ATTACHED_FLAG, ACTION_CREATE, ACTION_START, ACTION_PREPARE,
-               ACTION_STOP)
+from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
 
 
-class ContainerUpdateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator):
+class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
     def __init__(self, policy, *args, **kwargs):
         super(ContainerUpdateGenerator, self).__init__(policy, *args, **kwargs)
         self.remove_status = policy.remove_status
-        self.base_image_ids = dict((map_name, self._policy.images[map_name](self.iname_tag(map_, self._policy.base_image)))
-                                   for map_name, map_ in six.iteritems(self._policy.container_maps))
+        self.base_image_ids = dict((client_name, policy.images[client_name].ensure_image(
+            self.iname_tag(policy.base_image))) for client_name, __ in six.iteritems(policy.clients))
         self.path_vfs = dict()
 
     def _check_links(self, map_name, c_config, instance_links):
@@ -60,70 +58,75 @@ class ContainerUpdateGenerator(ForwardActionGeneratorMixin, AbstractActionGenera
 
         return _check_config_paths(c_config, instance_name)
 
-    def iname_tag(self, container_map, image):
+    def iname_tag(self, image, container_map=None):
         i_name = ':'.join((image, 'latest')) if ':' not in image else image
-        return self._policy.iname(container_map, i_name)
+        if container_map:
+            return self._policy.iname(container_map, i_name)
+        return i_name
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         a_paths = dict((alias, c_map.volumes[alias]) for alias in c_config.attaches)
-        existing_containers = self._policy.container_names[map_name]
-        for a in c_config.attaches:
-            a_name = self._policy.cname(map_name, a)
-            a_exists = a_name in existing_containers
-            if a_exists:
-                a_detail = self._policy.container_detail[map_name](a_name)
-                a_status = a_detail['State']
-                a_image = a_detail['Image']
-                a_remove = (not a_status['Running'] and a_status['ExitCode'] in self.remove_status) or \
-                    a_image != self.base_image_ids[map_name]
-                if a_remove:
-                    yield ContainerAction(ACTION_REMOVE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, None)
-                    existing_containers.remove(a_name)
-            else:
-                a_remove = False
-                a_detail = None
-            if a_remove or not a_exists:
-                ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, a)
-                yield ContainerAction(ACTION_CREATE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, ac_kwargs)
-                existing_containers.add(a_name)
-                yield ContainerAction(ACTION_START, ACTION_ATTACHED_FLAG | flags, map_name, a_name, None)
-                ap_kwargs = self._policy.get_attached_prepare_kwargs(c_map, c_config, a)
-                yield ContainerAction(ACTION_PREPARE, ACTION_ATTACHED_FLAG | flags, map_name, a_name, ap_kwargs)
-            else:
-                volumes = a_detail.get('Volumes')
-                if volumes:
-                    mapped_path = a_paths[a]
-                    self.path_vfs[a, None, mapped_path] = volumes.get(mapped_path)
-        image_name = self.iname_tag(c_map, c_config.image or container_name)
-        image_id = self._policy.images[map_name](image_name)
-        for ci in instances:
-            ci_name = self._policy.cname(map_name, container_name, ci)
-            ci_exists = ci_name in existing_containers
-            if ci_exists:
-                ci_detail = self._policy.container_detail[map_name](ci_name)
-                ci_status = ci_detail['State']
-                ci_image = ci_detail['Image']
-                ci_volumes = ci_detail.get('Volumes') or dict()
-                ci_links = ci_detail['HostConfig']['Links'] or []
-                ci_remove = (not ci_status['Running'] and ci_status['ExitCode'] in self.remove_status) or \
-                    ci_image != image_id or \
-                    not self._check_volumes(c_map, c_config, container_name, ci, ci_volumes) or \
-                    not self._check_links(map_name, c_config, ci_links)
-                if ci_remove:
-                    if ci_status['Running']:
-                        ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, ci)
-                        yield ContainerAction(ACTION_STOP, flags, map_name, ci_name, ip_kwargs)
-                    ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config)
-                    yield ContainerAction(ACTION_REMOVE, flags, map_name, ci_name, ir_kwargs)
-                    existing_containers.remove(ci_name)
-            else:
-                ci_remove = False
-            if ci_remove or not ci_exists:
-                ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, container_name)
-                yield ContainerAction(ACTION_CREATE, flags, map_name, ci_name, ic_kwargs)
-                existing_containers.add(ci_name)
-                is_kwargs = self._policy.get_start_kwargs(c_map, c_config, ci)
-                yield ContainerAction(ACTION_START, flags, map_name, ci_name, is_kwargs)
+        for client_name, client in self._policy.get_clients(c_map):
+            images = self._policy.images[client_name]
+            existing_containers = self._policy.container_names[client_name]
+            for a in c_config.attaches:
+                a_name = self._policy.cname(map_name, a)
+                a_exists = a_name in existing_containers
+                if a_exists:
+                    a_detail = client.inspect_container(a_name)
+                    a_status = a_detail['State']
+                    a_image = a_detail['Image']
+                    a_remove = (not a_status['Running'] and a_status['ExitCode'] in self.remove_status) or \
+                        a_image != self.base_image_ids[client_name]
+                    if a_remove:
+                        ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, a_name)
+                        client.remove(**ar_kwargs)
+                        existing_containers.remove(a_name)
+                else:
+                    a_remove = False
+                    a_detail = None
+                if a_remove or not a_exists:
+                    ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, a_name, a)
+                    client.create_container(**ac_kwargs)
+                    existing_containers.add(a_name)
+                    as_kwargs = self._policy.get_attached_start_kwargs(c_map, c_config, a_name, a)
+                    client.start(**as_kwargs)
+                    self.prepare_container(images, client, c_map, c_config, a, a_name)
+                else:
+                    volumes = a_detail.get('Volumes')
+                    if volumes:
+                        mapped_path = a_paths[a]
+                        self.path_vfs[a, None, mapped_path] = volumes.get(mapped_path)
+            image_name = self.iname_tag(c_config.image or container_name, container_map=c_map)
+            image_id = self._policy.images[client_name].ensure_image(image_name)
+            for ci in instances:
+                ci_name = self._policy.cname(map_name, container_name, ci)
+                ci_exists = ci_name in existing_containers
+                if ci_exists:
+                    ci_detail = client.inspect_container(ci_name)
+                    ci_status = ci_detail['State']
+                    ci_image = ci_detail['Image']
+                    ci_volumes = ci_detail.get('Volumes') or dict()
+                    ci_links = ci_detail['HostConfig']['Links'] or []
+                    ci_remove = (not ci_status['Running'] and ci_status['ExitCode'] in self.remove_status) or \
+                        ci_image != image_id or \
+                        not self._check_volumes(c_map, c_config, container_name, ci, ci_volumes) or \
+                        not self._check_links(map_name, c_config, ci_links)
+                    if ci_remove:
+                        if ci_status['Running']:
+                            ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, ci_name, ci)
+                            client.stop(**ip_kwargs)
+                        ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config, ci_name)
+                        client.remove_container(**ir_kwargs)
+                        existing_containers.remove(ci_name)
+                else:
+                    ci_remove = False
+                if ci_remove or not ci_exists:
+                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, ci_name, container_name)
+                    client.create_container(**ic_kwargs)
+                    existing_containers.add(ci_name)
+                    is_kwargs = self._policy.get_start_kwargs(c_map, c_config, ci_name, ci)
+                    client.start(**is_kwargs)
 
 
 class ContainerUpdateMixin(object):
@@ -152,4 +155,4 @@ class ContainerUpdateMixin(object):
         :type instances: list[unicode]
         :param kwargs: Has no effect in this implementation.
         """
-        return ContainerUpdateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        ContainerUpdateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)

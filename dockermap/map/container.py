@@ -28,6 +28,7 @@ class ContainerMap(object):
         self._host = HostVolumeConfiguration()
         self._volumes = DictMap()
         self._containers = defaultdict(ContainerConfiguration)
+        self._clients = set()
         self.update(initial, **kwargs)
         if (initial or kwargs) and check_integrity:
             self.check_integrity()
@@ -48,6 +49,8 @@ class ContainerMap(object):
                 self._host.root = value
             elif key == 'repository':
                 self._repository = value
+            elif key == 'clients':
+                self._clients = set(value)
             elif key == 'containers':
                 for container, config in six.iteritems(value):
                     self._containers[container].update(config)
@@ -70,6 +73,8 @@ class ContainerMap(object):
             elif key == 'repository':
                 if not lists_only:
                     self._repository = value
+            elif key == 'clients':
+                self._clients.update(value)
             elif key == 'containers':
                 for container, config in six.iteritems(value):
                     if container in self._containers:
@@ -89,6 +94,7 @@ class ContainerMap(object):
         self._volumes.update(items._volumes)
         self._host.update(items._host)
         self._repository = items._repository
+        self._clients.update(items._clients)
         for container, config in items:
             self._containers[container].update(config)
 
@@ -99,6 +105,7 @@ class ContainerMap(object):
         """
         self._volumes.update(items._volumes)
         self._host.merge(items._host)
+        self._clients.update(items._clients)
         if not lists_only:
             self._repository = items._repository
         for container, config in items:
@@ -116,6 +123,16 @@ class ContainerMap(object):
         :rtype: unicode
         """
         return self._name
+
+    @property
+    def clients(self):
+        """
+        Alias names of clients associated with this container map.
+
+        :return: Client names.
+        :rtype: set(unicode)
+        """
+        return self._clients
 
     @property
     def containers(self):

@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import logging
 
-from docker import client as docker
+import docker
 from docker.errors import APIError
 
 from .dep import SingleDependencyResolver
@@ -311,6 +311,48 @@ class DockerClientWrapper(docker.Client):
             log_lines.pop()
         for line in log_lines:
             self.push_log(LOG_CONTAINER_FORMAT.format(container, line), CONTAINER_LOG)
+
+    def remove_container(self, container, raise_on_error=False, **kwargs):
+        """
+        Removes a container. For convenience optionally ignores 404 errors.
+
+        :param container: Container name.
+        :type container: unicode
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
+          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
+          ``True``. Please note that 404 errors (on non-existing containers) are always ignored.
+        :type raise_on_error: bool
+        :param kwargs: Additional keyword args for :meth:`docker.client.Client.remove_container`.
+        """
+        try:
+            super(DockerClientWrapper, self).remove_container(container, **kwargs)
+        except APIError as e:
+            if e.response.status_code != 404:
+                self.push_log("Failed to stop container '{0}': {1}".format(container, e.explanation),
+                              logging.ERROR)
+                if raise_on_error:
+                    raise e
+
+    def stop(self, container, raise_on_error=False, **kwargs):
+        """
+        Removes a container. For convenience optionally ignores 404 errors.
+
+        :param container: Container name.
+        :type container: unicode
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
+          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
+          ``True``. Please note that 404 errors (on non-existing containers) are always ignored.
+        :type raise_on_error: bool
+        :param kwargs: Additional keyword args for :meth:`docker.client.Client.stop`.
+        """
+        try:
+            super(DockerClientWrapper, self).stop(container, **kwargs)
+        except APIError as e:
+            if e.response.status_code != 404:
+                self.push_log("Failed to remove container '{0}': {1}".format(container, e.explanation),
+                              logging.ERROR)
+                if raise_on_error:
+                    raise e
 
     def remove_all_containers(self):
         """
