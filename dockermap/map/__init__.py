@@ -12,5 +12,11 @@ class DictMap(dict):
     def __getattr__(self, item):
         return self[item]
 
+    def __setattr__(self, key, value):
+        if hasattr(self, key):
+            super(DictMap, self).__setattr__(key, value)
+        else:
+            self[key] = value
+
     def __iter__(self):
         return six.iteritems(self)
