@@ -208,36 +208,6 @@ class ContainerMap(object):
                 yield (self._name, c_name, c_instance), dep_set
             yield (self._name, c_name, None), dep_set
 
-    def cname(self, container, instance=None):
-        """
-        Formats the instantiated container's name. For containers with several instances, the format is
-        `map_name.container_name.instance_name`; for others, it is just `map_name.container_name`.
-
-        :param container: Container name.
-        :param instance: Optional instance name.
-        :return: Docker container name.
-        :rtype: unicode
-        """
-        if instance:
-            return '.'.join((self._name, container, instance))
-        return '.'.join((self._name, container))
-
-    def iname(self, image):
-        """
-        Formats an image name for a container configuration. If the repository prefix is already part of that name, it
-        is not modified.
-        Otherwise the image name is prefixed with the default :attr:`repository`.
-
-        :param image: Image name.
-        :type image: unicode
-        :return: Repository-image name.
-        """
-        if '/' in image:
-            if image[0] == '/':
-                return image[1:]
-            return image
-        return '/'.join((self._repository, image))
-
     def get(self, item):
         """
         Returns a container configuration from the map; if it does not yet exist, an initial config is created and

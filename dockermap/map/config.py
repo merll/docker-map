@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import posixpath
 from collections import namedtuple
 import operator
+import posixpath
 import six
+
+from docker.client import DEFAULT_DOCKER_API_VERSION, DEFAULT_TIMEOUT_SECONDS
 
 from . import DictMap
 
@@ -15,6 +17,7 @@ LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches'
 
 HostShare = namedtuple('HostShare', ('volume', 'readonly'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
+PortBinding = namedtuple('PortBinding', ('port', 'interface'))
 
 
 def _get_list(value):
@@ -66,8 +69,21 @@ def _get_container_link(value):
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value)))
 
 
+def _get_port_binding(value):
+    if isinstance(value, six.string_types):
+        return PortBinding(value, None)
+    elif isinstance(value, (int, long)):
+        return PortBinding(value, six.text_type(value))
+    elif isinstance(value, (list, tuple)):
+        if len(value) == 2:
+            return PortBinding(value[0], six.text_type(value[1]))
+        raise ValueError("Invalid element length; only tuples and lists of length 2 can be converted to a PortBinding tuple.")
+    raise ValueError("Invalid type; expected a list, tuple, int or string type, found {0}.".format(type(value)))
+
+
 _get_host_shares = lambda value: _get_listed_tuples(value, HostShare, _get_host_share)
 _get_container_links = lambda value: _get_listed_tuples(value, ContainerLink, _get_container_link)
+_get_port_bindings = lambda value: _get_listed_tuples(value, PortBinding, _get_port_binding)
 
 
 class ContainerConfiguration(object):
@@ -84,6 +100,7 @@ class ContainerConfiguration(object):
         self._uses = []
         self._links_to = []
         self._attaches = []
+        self._publishes = []
         self._user = None
         self._permissions = None
         self._persistent = False
@@ -201,6 +218,22 @@ class ContainerConfiguration(object):
     @attaches.setter
     def attaches(self, value):
         self._attaches = _get_list(value)
+
+    @property
+    def publishes(self):
+        """
+        Ports and (virtual) interface name that a network service is published on. If the interface is not set, the
+        port will be published to all interfaces (as this is the Docker default). Otherwise the relevant IP address
+        to expose the service on will be looked up at run-time.
+
+        :return: List of port bindings.
+        :rtype: list[PortBinding]
+        """
+        return self._publishes
+
+    @publishes.setter
+    def publishes(self, value):
+        self._publishes = _get_port_bindings(value)
 
     @property
     def user(self):
@@ -409,3 +442,68 @@ class HostVolumeConfiguration(DictMap):
             self.update(items)
         else:
             raise ValueError("Expected HostVolumeConfiguration or dictionary; found '{0}'".format(type(items)))
+
+
+class ClientConfiguration(DictMap):
+    """
+    Utility class for storing values that are specific to a particular Docker client.
+
+    :param base_url: URL of the Docker Remote API.
+    :type base_url: unicode
+    :param version: Docker Remote API version.
+    :type version: unicode
+    :param timeout: Request timeout.
+    :type timeout: int
+    :param args: Further initializing dictionary with values.
+    :param kwargs: Further initializing keyword arguments.
+    """
+    init_kwargs = 'base_url', 'version', 'timeout', 'tls'
+
+    def __init__(self, base_url=None, version=DEFAULT_DOCKER_API_VERSION, timeout=DEFAULT_TIMEOUT_SECONDS,
+                 *args, **kwargs):
+        self.base_url = base_url
+        self.version = version
+        self.timeout = timeout
+        self._interfaces = DictMap()
+        super(ClientConfiguration, self).__init__(*args, **kwargs)
+
+    @classmethod
+    def from_client(cls, client):
+        """
+        Constructs a configuration object. To be used when the client existed prior to the configuration object.
+
+        :param client:
+        :type client: docker.client.Client
+        :return:
+        """
+        return cls(base_url=client.base_url, version=client._version, timeout=client._timeout)
+
+    def get_init_kwargs(self):
+        """
+        Generates keyword arguments for creating a new Docker client instance.
+
+        :return: Keyword arguments as defined through this configuration.
+        :rtype: dict
+        """
+        def _if_set():
+            for k in self.init_kwargs:
+                v = self.get(k)
+                if v:
+                    yield k, v
+
+        return dict(_if_set())
+
+    @property
+    def interfaces(self):
+        """
+        Dictionary of network interface settings as specific for the client. Note that the interface name is virtual,
+        i.e. only used for assigning addresses.
+
+        :return: Network interface configuration.
+        :rtype: DictMap
+        """
+        return self._interfaces
+
+    @interfaces.setter
+    def interfaces(self, value):
+        self._interfaces = DictMap(value)

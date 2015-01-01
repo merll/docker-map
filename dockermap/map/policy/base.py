@@ -23,7 +23,7 @@ class BasePolicy(object):
     :param container_maps: Container maps.
     :type container_maps: dict[unicode, dockermap.map.container.ContainerMap]
     :param clients: Dictionary of clients.
-    :type clients: dict[unicode, docker.client.Client]
+    :type clients: dict[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]
     """
     __metaclass__ = ABCMeta
 
@@ -131,16 +131,19 @@ class BasePolicy(object):
         return image
 
     @classmethod
-    def get_create_kwargs(cls, container_map, config, container, default_image, kwargs=None):
+    def get_create_kwargs(cls, container_map, container_config, client_config, container_name, default_image,
+                          kwargs=None):
         """
         Generates keyword arguments for the Docker client to create a container.
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
-        :param config: Container configuration object.
-        :type config: dockermap.map.container.ContainerConfiguration
-        :param container: Container name.
-        :type container: unicode
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container_name: Container name.
+        :type container_name: unicode
         :param default_image: Image name to use in case the container configuration does not specify.
         :type default_image: unicode
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
@@ -149,26 +152,29 @@ class BasePolicy(object):
         :rtype: dict
         """
         c_kwargs = dict(
-            name=container,
-            image=cls.iname(container_map, config.image or default_image),
-            volumes=list(itertools.chain(config.shares,
-                                         (container_map.volumes[b.volume] for b in config.binds))),
-            user=extract_user(config.user),
+            name=container_name,
+            image=cls.iname(container_map, container_config.image or default_image),
+            volumes=list(itertools.chain(container_config.shares,
+                                         (container_map.volumes[b.volume] for b in container_config.binds))),
+            user=extract_user(container_config.user),
         )
-        update_kwargs(c_kwargs, init_options(config.create_options), kwargs)
+        update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
         return c_kwargs
 
     @classmethod
-    def get_attached_create_kwargs(cls, container_map, config, container, alias, kwargs=None):
+    def get_attached_create_kwargs(cls, container_map, container_config, client_config, container_name, alias,
+                                   kwargs=None):
         """
         Generates keyword arguments for the Docker client to create an attached container.
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
-        :param config: Container configuration object.
-        :type config: dockermap.map.container.ContainerConfiguration
-        :param container: Container name.
-        :type container: unicode
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container_name: Container name.
+        :type container_name: unicode
         :param alias: Alias name of the container volume.
         :type alias: unicode
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
@@ -178,24 +184,26 @@ class BasePolicy(object):
         """
         path = container_map.volumes[alias]
         c_kwargs = dict(
-            name=container,
+            name=container_name,
             image=cls.base_image,
             volumes=[path],
-            user=config.user,
+            user=container_config.user,
         )
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
     @classmethod
-    def get_start_kwargs(cls, container_map, config, container, instance, kwargs=None):
+    def get_start_kwargs(cls, container_map, container_config, client_config, container, instance, kwargs=None):
         """
         Generates keyword arguments for the Docker client to start a container.
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
-        :param config: Container configuration object.
-        :type config: dockermap.map.container.ContainerConfiguration
-        :param container: Container name.
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container: Container name or id.
         :type container: unicode
         :param instance: Instance name.
         :type instance: unicode
@@ -207,24 +215,27 @@ class BasePolicy(object):
         map_name = container_map.name
         c_kwargs = dict(
             container=container,
-            links=dict((cls.cname(map_name, l_name), alias) for l_name, alias in config.links),
-            binds=get_host_binds(container_map, config, instance),
+            links=dict((cls.cname(map_name, l_name), alias) for l_name, alias in container_config.links),
+            binds=get_host_binds(container_map, container_config, instance),
             volumes_from=list(cls.cname(map_name, u_name)
-                              for u_name in itertools.chain(config.uses, config.attaches)),
+                              for u_name in itertools.chain(container_config.uses, container_config.attaches)),
         )
-        update_kwargs(c_kwargs, init_options(config.start_options), kwargs)
+        update_kwargs(c_kwargs, init_options(container_config.start_options), kwargs)
         return c_kwargs
 
     @classmethod
-    def get_attached_preparation_create_kwargs(cls, container_map, config, alias, volume_container, kwargs=None):
+    def get_attached_preparation_create_kwargs(cls, container_map, container_config, client_config, alias,
+                                               volume_container, kwargs=None):
         """
         Generates keyword arguments for the Docker client to prepare an attached container (i.e. adjust user and
         permissions).
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
-        :param config: Container configuration object.
-        :type config: dockermap.map.container.ContainerConfiguration
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
         :param alias: Alias name of the container volume.
         :type alias: unicode
         :param volume_container: Name of the container that shares the volume.
@@ -235,11 +246,11 @@ class BasePolicy(object):
         :rtype: dict
         """
         def _get_cmd():
-            user = config.user
+            user = container_config.user
             if user:
                 yield ' '.join(('chown -R', get_user_group(user), str_arg(path)))
-            permissions = config.permissions
-            if config.permissions:
+            permissions = container_config.permissions
+            if container_config.permissions:
                 yield ' '.join(('chmod -R', permissions, str_arg(path)))
 
         path = container_map.volumes[alias]
@@ -252,14 +263,16 @@ class BasePolicy(object):
         return c_kwargs
 
     @classmethod
-    def get_attached_start_kwargs(cls, container_map, config, container, alias, kwargs=None):
+    def get_attached_start_kwargs(cls, container_map, container_config, client_config, container, alias, kwargs=None):
         """
         Generates keyword arguments for the Docker client to start an attached container.
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
-        :param config: Container configuration object.
-        :type config: dockermap.map.container.ContainerConfiguration
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
         :param container: Container name or id.
         :type container: unicode
         :param alias: Alias name of the container volume.
@@ -274,17 +287,19 @@ class BasePolicy(object):
         return c_kwargs
 
     @classmethod
-    def get_attached_preparation_start_kwargs(cls, container_map, config, container, alias, volume_container,
-                                              kwargs=None):
+    def get_attached_preparation_start_kwargs(cls, container_map, container_config, client_config, container, alias,
+                                              volume_container, kwargs=None):
         """
         Generates keyword arguments for the Docker client to prepare an attached container (i.e. adjust user and
         permissions).
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
-        :param config: Container configuration object.
-        :type config: dockermap.map.container.ContainerConfiguration
-        :param container: Container name.
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container: Container name or id.
         :type container: unicode
         :param alias: Alias name of the container volume.
         :type alias: unicode
@@ -303,15 +318,17 @@ class BasePolicy(object):
         return c_kwargs
 
     @classmethod
-    def get_restart_kwargs(cls, container_map, config, container, instance, kwargs=None):
+    def get_restart_kwargs(cls, container_map, container_config, client_config, container, instance, kwargs=None):
         """
         Generates keyword arguments for the Docker client to restart a container.
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
-        :param config: Container configuration object.
-        :type config: dockermap.map.container.ContainerConfiguration
-        :param container: Container name.
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container: Container name or id.
         :type container: unicode
         :param instance: Instance name.
         :type instance: unicode
@@ -325,15 +342,17 @@ class BasePolicy(object):
         return c_kwargs
 
     @classmethod
-    def get_stop_kwargs(cls, container_map, config, container, instance, kwargs=None):
+    def get_stop_kwargs(cls, container_map, container_config, client_config, container, instance, kwargs=None):
         """
         Generates keyword arguments for the Docker client to stop a container.
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
-        :param config: Container configuration object.
-        :type config: dockermap.map.container.ContainerConfiguration
-        :param container: Container name.
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container: Container name or id.
         :type container: unicode
         :param instance: Instance name.
         :type instance: unicode
@@ -342,20 +361,25 @@ class BasePolicy(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(container=container)
+        c_kwargs = dict(
+            container=container,
+            timeout=client_config.get('stop_timeout', 10)
+        )
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
     @classmethod
-    def get_remove_kwargs(cls, container_map, config, container, kwargs=None):
+    def get_remove_kwargs(cls, container_map, container_config, client_config, container, kwargs=None):
         """
         Generates keyword arguments for the Docker client to remove a container.
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
-        :param config: Container configuration object.
-        :type config: dockermap.map.container.ContainerConfiguration
-        :param container: Container name.
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container: Container name or id.
         :type container: unicode
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
@@ -374,7 +398,7 @@ class BasePolicy(object):
         :param c_map: Container map instance.
         :type c_map: dockermap.map.container.ContainerMap
         :return: Docker client objects.
-        :rtype: tuple[tuple[unicode, docker.client.Client]]
+        :rtype: tuple[tuple[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]]
         """
         if c_map.clients:
             return tuple((c, self._clients[c]) for c in six.iteritems(c_map.clients))
@@ -560,10 +584,10 @@ class BasePolicy(object):
     @property
     def clients(self):
         """
-        Docker client objects.
+        Docker client objects and configurations.
 
         :return: Dictionary of Docker client objects.
-        :rtype: dict[unicode, docker.client.Client]
+        :rtype: dict[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]
         """
         return self._clients
 
@@ -679,7 +703,8 @@ class AttachedPreparationMixin(object):
     """
     Utility mixin for preparing attached containers with file system owners and permissions.
     """
-    def prepare_container(self, images, client, c_map, c_config, alias, volume_container):
+    def prepare_container(self, images, client, container_map, container_config, client_config, alias,
+                          volume_container):
         """
         Runs a temporary container for preparing an attached volume for a container configuration.
 
@@ -687,25 +712,29 @@ class AttachedPreparationMixin(object):
         :type images: dockermap.map.policy.cache.CachedImageSet
         :param client: Client object.
         :type client: docker.client.Client
-        :param c_map: Container map instance.
-        :type c_map: dockermap.map.container.ContainerMap
-        :param c_config: Container configuration object.
-        :type c_config: dockermap.map.config.ContainerConfiguration
+        :param container_map: Container map instance.
+        :type container_map: dockermap.map.container.ContainerMap
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.config.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
         :param alias: The alias name of the attached volume in the configuration.
         :type alias: unicode
-        :param volume_container: The full name of the container sharing the volume.
+        :param volume_container: The full name or id of the container sharing the volume.
         :type volume_container: unicode
         """
-        client.wait(volume_container)
-        apc_kwargs = self._policy.get_attached_preparation_create_kwargs(c_map, c_config, alias, volume_container)
+        client.wait(volume_container, timeout=client_config.get('wait_timeout'))
+        apc_kwargs = self._policy.get_attached_preparation_create_kwargs(container_map, container_config, client_config,
+                                                                         alias, volume_container)
         images.ensure_image(apc_kwargs['image'])
         temp_container = client.create_container(**apc_kwargs)
         temp_id = temp_container['Id']
         try:
-            aps_kwargs = self._policy.get_attached_preparation_start_kwargs(c_map, c_config, temp_id, alias,
+            aps_kwargs = self._policy.get_attached_preparation_start_kwargs(container_map, container_config,
+                                                                            client_config, temp_id, alias,
                                                                             volume_container)
             client.start(**aps_kwargs)
-            client.wait(temp_id)
+            client.wait(temp_id, timeout=client_config.get('wait_timeout'))
         finally:
             client.remove_container(temp_id)
 

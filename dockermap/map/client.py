@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import six
+
+import docker
+
+from .base import DockerClientWrapper
+from .config import ClientConfiguration
 from .container import ContainerMap
 from .policy import ResumeUpdatePolicy
 
@@ -25,11 +31,23 @@ class MappingDockerClient(object):
       list[dockermap.map.container.ContainerMap]
     :param docker_client: Default :class:`~docker.client.Client` instance.
     :type docker_client: docker.client.Client
+    :param clients: Dictionary of client objects, client configurations, or both
+    :type clients: dict[unicode, docker.client.Client] or dict[unicode, dockermap.map.config.ClientConfiguration]
+      or dict[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]
     :param policy_class: Policy class based on :class:`~dockermap.map.policy.base.BasePolicy` for generating container
       actions.
     :type policy_class: class
     """
     def __init__(self, container_maps=None, docker_client=None, clients=None, policy_class=ResumeUpdatePolicy):
+        def _client_config(obj):
+            if isinstance(obj, docker.Client):
+                return obj, ClientConfiguration.from_client(obj)
+            elif isinstance(obj, ClientConfiguration):
+                return DockerClientWrapper.from_config(obj), obj
+            elif isinstance(obj, tuple) and isinstance(obj[0], docker.Client) and isinstance(obj[1], ClientConfiguration):
+                return obj
+            raise ValueError("Unexpected type of clients item: {0}".format(type(obj)))
+
         if isinstance(container_maps, ContainerMap):
             self._default_map = container_maps.name
             self._maps = {container_maps.name: container_maps}
@@ -38,10 +56,11 @@ class MappingDockerClient(object):
             self._maps = dict((c_map.name, c_map) for c_map in container_maps)
         else:
             raise ValueError("Unexpected type of container_maps argument: {0}".format(type(container_maps)))
-        self._clients = clients.copy() if clients else dict()
+        self._clients = dict((client_name, _client_config(client_obj))
+                             for client_name, client_obj in six.iteritems(clients)) if clients else dict()
         if docker_client:
             default_name = policy_class.get_default_client_name()
-            self._clients[default_name] = docker_client
+            self._clients[default_name] = _client_config(docker_client)
         self._policy_class = policy_class
         self._policy = None
 

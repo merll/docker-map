@@ -15,9 +15,10 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         recreate_attached = False
-        for client_name, client in self._policy.get_clients(c_map):
+        for client_name, (client, client_config) in self._policy.get_clients(c_map):
             existing_containers = self._policy.container_names[client_name]
             images = self._policy.images[client_name]
+            client_config = self._policy.client_config[client_name]
             for a in c_config.attaches:
                 a_name = self._policy.cname(map_name, a)
                 a_exists = a_name in existing_containers
@@ -25,21 +26,21 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
                 a_running = a_status and a_status['Running']
                 a_remove = a_exists and not a_running and a_status['ExitCode'] in self._remove_status
                 if a_remove:
-                    ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, a_name)
+                    ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_config, a_name)
                     client.remove_container(**ar_kwargs)
                     existing_containers.remove(a_name)
                 a_create = not a_exists or a_remove
                 if a_create:
-                    ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, a_name, a)
+                    ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_config, a_name, a)
                     images.ensure_image(ac_kwargs['image'])
                     client.create_container(**ac_kwargs)
                     existing_containers.add(a_name)
                     recreate_attached = True
                 a_start = a_create or is_initial(a_status)
                 if a_start:
-                    as_kwargs = self._policy.get_attached_start_kwargs(c_map, c_config, a_name, a)
+                    as_kwargs = self._policy.get_attached_start_kwargs(c_map, c_config, client_config, a_name, a)
                     client.start(**as_kwargs)
-                    self.prepare_container(images, client, c_map, c_config, a, a_name)
+                    self.prepare_container(images, client, c_map, c_config, client_config, a, a_name)
             for ci in instances:
                 ci_name = self._policy.cname(map_name, container_name, ci)
                 ci_exists = ci_name in existing_containers
@@ -47,23 +48,23 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
                 ci_running = ci_status and ci_status['Running']
                 ci_remove = ci_exists and not ci_running and ci_status['ExitCode'] in self._remove_status
                 if ci_remove:
-                    ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config, ci_name)
+                    ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_config, ci_name)
                     client.remove_container(**ir_kwargs)
                     existing_containers.remove(ci_name)
                 ci_create = not ci_exists or ci_remove
                 if ci_create:
-                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, ci_name, container_name)
+                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_config, ci_name, container_name)
                     images.ensure_image(ic_kwargs['image'])
                     client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
                 ci_stop = recreate_attached and ci_running
                 if ci_stop:
-                    ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, ci_name, ci)
+                    ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_config, ci_name, ci)
                     client.stop(**ip_kwargs)
                 needs_start = ci_create or is_initial(ci_status) if c_config.persistent else not ci_running
                 ci_start = ci_create or ci_stop or needs_start
                 if ci_start:
-                    is_kwargs = self._policy.get_start_kwargs(c_map, c_config, ci_name, ci)
+                    is_kwargs = self._policy.get_start_kwargs(c_map, c_config, client_config, ci_name, ci)
                     client.start(**is_kwargs)
 
 
