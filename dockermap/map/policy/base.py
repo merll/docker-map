@@ -3,14 +3,13 @@ from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
 import itertools
-import six
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from ...shortcuts import get_user_group, str_arg
 from . import ACTION_DEPENDENCY_FLAG
 from .dep import ContainerDependencyResolver
 from .cache import ContainerCache, ImageCache
-from .utils import extract_user, get_host_binds, init_options, update_kwargs
+from .utils import extract_user, get_host_binds, get_port_bindings, init_options, update_kwargs
 
 
 class BasePolicy(object):
@@ -157,6 +156,7 @@ class BasePolicy(object):
             volumes=list(itertools.chain(container_config.shares,
                                          (container_map.volumes[b.volume] for b in container_config.binds))),
             user=extract_user(container_config.user),
+            ports=[port_binding.exposed_port for port_binding in container_config.publishes],
         )
         update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
         return c_kwargs
@@ -219,6 +219,7 @@ class BasePolicy(object):
             binds=get_host_binds(container_map, container_config, instance),
             volumes_from=list(cls.cname(map_name, u_name)
                               for u_name in itertools.chain(container_config.uses, container_config.attaches)),
+            port_bindings=get_port_bindings(container_config, client_config),
         )
         update_kwargs(c_kwargs, init_options(container_config.start_options), kwargs)
         return c_kwargs
@@ -401,7 +402,7 @@ class BasePolicy(object):
         :rtype: tuple[tuple[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]]
         """
         if c_map.clients:
-            return tuple((c, self._clients[c]) for c in six.iteritems(c_map.clients))
+            return tuple((c, self._clients[c]) for c in c_map.clients)
         default_name = self.get_default_client_name()
         return (default_name, self._clients[default_name]),
 
@@ -677,7 +678,7 @@ class AbstractActionGenerator(object):
             c_map = self._policy.container_maps[c_map_name]
             c_config = c_map.get_existing(c_container)
             c_instances = [c_instance] if c_instance else c_config.instances or [None]
-            return self.generate_item_actions(map_name, c_map, c_container, c_config, c_instances, c_flags, **c_kwargs)
+            self.generate_item_actions(map_name, c_map, c_container, c_config, c_instances, c_flags, **c_kwargs)
 
         dependency_path = self.get_dependency_path(map_name, container)
         for d in dependency_path:

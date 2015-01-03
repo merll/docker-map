@@ -17,7 +17,7 @@ LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches'
 
 HostShare = namedtuple('HostShare', ('volume', 'readonly'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
-PortBinding = namedtuple('PortBinding', ('port', 'interface'))
+PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface'))
 
 
 def _get_list(value):
@@ -70,14 +70,22 @@ def _get_container_link(value):
 
 
 def _get_port_binding(value):
-    if isinstance(value, six.string_types):
-        return PortBinding(value, None)
-    elif isinstance(value, (int, long)):
-        return PortBinding(value, six.text_type(value))
-    elif isinstance(value, (list, tuple)):
+    sub_types = six.string_types + (int, long)
+    if isinstance(value, sub_types):  # Port only
+        return PortBinding(int(value), None, None)
+    elif isinstance(value, (list, tuple)):  # Exposed port, host port, and possibly interface
         if len(value) == 2:
-            return PortBinding(value[0], six.text_type(value[1]))
-        raise ValueError("Invalid element length; only tuples and lists of length 2 can be converted to a PortBinding tuple.")
+            ex_port, host_bind = value
+            if isinstance(host_bind, sub_types):  # Port, host port
+                return PortBinding(int(ex_port), int(host_bind), None)
+            elif isinstance(host_bind, (list, tuple)) and len(host_bind) == 2:  # Port, (host port, interface)
+                host_port, interface = host_bind
+                return PortBinding(int(ex_port), int(host_port), interface)
+            raise ValueError("Invalid sub-element type or length. Needs to be a port number or a tuple / list: (port, interface).")
+        elif len(value) == 3:
+            ex_port, host_port, interface = value
+            return PortBinding(int(ex_port), int(host_port), interface)
+        raise ValueError("Invalid element length; only tuples and lists of length 2 or 3 can be converted to a PortBinding tuple.")
     raise ValueError("Invalid type; expected a list, tuple, int or string type, found {0}.".format(type(value)))
 
 
@@ -225,6 +233,17 @@ class ContainerConfiguration(object):
         Ports and (virtual) interface name that a network service is published on. If the interface is not set, the
         port will be published to all interfaces (as this is the Docker default). Otherwise the relevant IP address
         to expose the service on will be looked up at run-time.
+
+        The following formats are considered as valid input and will be converted to a list of ``PortBinding`` tuples:
+
+        * Dictionary with container exposed ports as keys, and either host port and interface, or only the host port as
+          values.
+        * A list or tuple with elements
+
+          * tuple or list: container exposed port, host port - for mapping all host addresses;
+          * tuple or list: container exposed port, (host port, host interface) as nested tuple or list;
+          * tuple or list: container exposed port, host port, host interface;
+          * container exposed port only - will not be published, but is available to linked containers.
 
         :return: List of port bindings.
         :rtype: list[PortBinding]
@@ -492,6 +511,13 @@ class ClientConfiguration(DictMap):
                     yield k, v
 
         return dict(_if_set())
+
+    def update(self, other=None, **kwargs):
+        if 'interfaces' in other:
+            self._interfaces = DictMap(other.pop('interfaces'))
+        if 'interfaces' in kwargs:
+            self._interfaces = DictMap(kwargs.pop('interfaces'))
+        super(ClientConfiguration, self).update(other, **kwargs)
 
     @property
     def interfaces(self):

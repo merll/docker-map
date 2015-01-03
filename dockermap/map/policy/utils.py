@@ -109,6 +109,29 @@ def get_host_binds(container_map, config, instance):
     return dict(_gen_binds())
 
 
+def get_port_bindings(container_config, client_config):
+    """
+    Generates the input dictionary for the ``port_bindings`` argument.
+
+    :param container_config: Container configuration.
+    :type container_config: dockermap.map.config.ContainerConfiguration
+    :param client_config: Client configuration.
+    :type client_config: dockermap.map.config.ClientConfiguration
+    :return: Dictionary of ports with mapped port, and if applicable, with bind address
+    :rtype: dict
+    """
+    def _get_port_bind(port_binding):
+        exposed_port, bind_port, interface = port_binding
+        if interface:
+            bind_addr = client_config.get(interface)
+            if not bind_addr:
+                raise ValueError("Address for interface {0} not found in client configuration.".format(interface))
+            return exposed_port, (bind_port, bind_addr)
+        return exposed_port, bind_port
+
+    return dict(map(_get_port_bind, container_config.publishes))
+
+
 def is_initial(container_state):
     """
     Checks if a container with the given status information has ever been started.

@@ -18,7 +18,6 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
         for client_name, (client, client_config) in self._policy.get_clients(c_map):
             existing_containers = self._policy.container_names[client_name]
             images = self._policy.images[client_name]
-            client_config = self._policy.client_config[client_name]
             for a in c_config.attaches:
                 a_name = self._policy.cname(map_name, a)
                 a_exists = a_name in existing_containers
