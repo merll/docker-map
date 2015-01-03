@@ -143,7 +143,7 @@ class ContainerConfiguration(object):
         containers will be created for each instance in the format `map_name.container_name.instance`.
 
         :return: Instance names.
-        :rtype: list
+        :rtype: list[unicode]
         """
         return self._instances
 
@@ -157,7 +157,7 @@ class ContainerConfiguration(object):
         Shared volumes for a container.
 
         :return: Shared volumes.
-        :rtype: list
+        :rtype: list[unicode]
         """
         return self._shares
 
@@ -173,7 +173,7 @@ class ContainerConfiguration(object):
         `(volume_alias: unicode, readonly: bool)`.
 
         :return: Host volumes.
-        :rtype: list
+        :rtype: list[HostShare]
         """
         return self._binds
 
@@ -188,7 +188,7 @@ class ContainerConfiguration(object):
         names if all volumes are to be used of that container.
 
         :return: Used volumes.
-        :rtype: list
+        :rtype: list[unicode]
         """
         return self._uses
 
@@ -203,7 +203,7 @@ class ContainerConfiguration(object):
         container's name, and the alias name the alias to use for this container instance.
 
         :return: Containers to be linked to when the container is started.
-        :rtype: list
+        :rtype: list[ContainerLink]
         """
         return self._links_to
 
@@ -219,7 +219,7 @@ class ContainerConfiguration(object):
         available to other containers.
 
         :return: Attached containers.
-        :rtype: list
+        :rtype: list[unicode]
         """
         return self._attaches
 
