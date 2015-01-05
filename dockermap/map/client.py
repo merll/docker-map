@@ -38,12 +38,15 @@ class MappingDockerClient(object):
       actions.
     :type policy_class: class
     """
+    configuration_class = ClientConfiguration
+    client_class = DockerClientWrapper
+
     def __init__(self, container_maps=None, docker_client=None, clients=None, policy_class=ResumeUpdatePolicy):
         def _client_config(obj):
             if isinstance(obj, docker.Client):
-                return obj, ClientConfiguration.from_client(obj)
+                return obj, self.configuration_class.from_client(obj)
             elif isinstance(obj, ClientConfiguration):
-                return DockerClientWrapper.from_config(obj), obj
+                return self.client_class.from_config(obj), obj
             elif isinstance(obj, tuple) and isinstance(obj[0], docker.Client) and isinstance(obj[1], ClientConfiguration):
                 return obj
             raise ValueError("Unexpected type of clients item: {0}".format(type(obj)))

@@ -4,6 +4,8 @@ from __future__ import unicode_literals, absolute_import
 import os
 import six
 import yaml
+
+from .config import ClientConfiguration
 from .container import ContainerMap
 from ..utils import expand_path
 
@@ -73,6 +75,24 @@ def load_map(stream, name=None, check_integrity=True):
     raise ValueError("Valid map could not be decoded.")
 
 
+def load_clients(stream, configuration_class=ClientConfiguration):
+    """
+    Loads client configurations from a YAML document stream.
+
+    :param stream: YAML stream.
+    :type stream: file
+    :param configuration_class: Class of the configuration object to create.
+    :type configuration_class: class
+    :return: A dictionary of client configuration objects.
+    :rtype: dict[unicode, dockermap.map.config.ClientConfiguration]
+    """
+    client_dict = yaml.safe_load(stream)
+    if isinstance(client_dict, dict):
+        return dict((client_name, configuration_class(**client_config))
+                    for client_name, client_config in six.iteritems(client_dict))
+    raise ValueError("Valid configuration could not be decoded.")
+
+
 def load_map_file(filename, name=None, check_integrity=True):
     """
     Loads a ContainerMap configuration from a YAML file.
@@ -94,3 +114,18 @@ def load_map_file(filename, name=None, check_integrity=True):
         map_name = name
     with open(filename, 'r') as f:
         return load_map(f, name=map_name, check_integrity=check_integrity)
+
+
+def load_clients_file(filename, configuration_class=ClientConfiguration):
+    """
+    Loads client configurations from a YAML file.
+
+    :param filename: YAML file name.
+    :type filename: unicode
+    :param configuration_class: Class of the configuration object to create.
+    :type configuration_class: class
+    :return: A dictionary of client configuration objects.
+    :rtype: dict[unicode, dockermap.map.config.ClientConfiguration]
+    """
+    with open(filename, 'r') as f:
+        return load_clients(f, configuration_class=configuration_class)
