@@ -454,7 +454,10 @@ class ClientConfiguration(DictMap):
         self.base_url = base_url
         self.version = version
         self.timeout = timeout
-        self._interfaces = DictMap()
+        if 'interfaces' in kwargs:
+            self._interfaces = DictMap(kwargs.pop('interfaces'))
+        else:
+            self._interfaces = DictMap()
         super(ClientConfiguration, self).__init__(*args, **kwargs)
 
     @classmethod
