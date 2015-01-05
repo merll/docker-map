@@ -13,7 +13,7 @@ from . import DictMap
 
 SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent'
 DICT_ATTRIBUTES = 'create_options', 'start_options'
-LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches'
+LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches', 'links', 'publishes'
 
 HostShare = namedtuple('HostShare', ('volume', 'readonly'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
@@ -72,19 +72,19 @@ def _get_container_link(value):
 def _get_port_binding(value):
     sub_types = six.string_types + (int, long)
     if isinstance(value, sub_types):  # Port only
-        return PortBinding(int(value), None, None)
+        return PortBinding(value, None, None)
     elif isinstance(value, (list, tuple)):  # Exposed port, host port, and possibly interface
         if len(value) == 2:
             ex_port, host_bind = value
             if isinstance(host_bind, sub_types):  # Port, host port
-                return PortBinding(int(ex_port), int(host_bind), None)
+                return PortBinding(ex_port, host_bind, None)
             elif isinstance(host_bind, (list, tuple)) and len(host_bind) == 2:  # Port, (host port, interface)
                 host_port, interface = host_bind
-                return PortBinding(int(ex_port), int(host_port), interface)
+                return PortBinding(ex_port, host_port, interface)
             raise ValueError("Invalid sub-element type or length. Needs to be a port number or a tuple / list: (port, interface).")
         elif len(value) == 3:
             ex_port, host_port, interface = value
-            return PortBinding(int(ex_port), int(host_port), interface)
+            return PortBinding(ex_port, host_port, interface)
         raise ValueError("Invalid element length; only tuples and lists of length 2 or 3 can be converted to a PortBinding tuple.")
     raise ValueError("Invalid type; expected a list, tuple, int or string type, found {0}.".format(type(value)))
 

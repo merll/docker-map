@@ -123,10 +123,10 @@ def get_port_bindings(container_config, client_config):
     def _get_port_bind(port_binding):
         exposed_port, bind_port, interface = port_binding
         if interface:
-            bind_addr = client_config.get(interface)
+            bind_addr = client_config.interfaces.get(interface)
             if not bind_addr:
-                raise ValueError("Address for interface {0} not found in client configuration.".format(interface))
-            return exposed_port, (bind_port, bind_addr)
+                raise ValueError("Address for interface '{0}' not found in client configuration.".format(interface))
+            return exposed_port, (bind_addr, bind_port)
         return exposed_port, bind_port
 
     return dict(map(_get_port_bind, container_config.publishes))
