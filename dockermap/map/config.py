@@ -433,35 +433,6 @@ class HostVolumeConfiguration(DictMap):
             return posixpath.join(self._root, path)
         return path
 
-    def update(self, other=None, **kwargs):
-        if other:
-            if isinstance(other, HostVolumeConfiguration):
-                self._root = other._root
-            elif isinstance(other, dict):
-                if 'root' in other:
-                    other = other.copy()
-                    self._root = other.pop('root')
-            else:
-                raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(other)))
-        if 'root' in kwargs:
-            self._root = kwargs.pop('root')
-        super(HostVolumeConfiguration, self).update(other, **kwargs)
-
-    def merge(self, items, overwrite=False):
-        if isinstance(items, HostVolumeConfiguration):
-            self.update(items)
-            if items._root and overwrite:
-                self._root = items._root
-        elif isinstance(items, dict):
-            if 'root' in items:
-                items = items.copy()
-                root = items.pop('root')
-                if overwrite:
-                    self._root = root
-            self.update(items)
-        else:
-            raise ValueError("Expected HostVolumeConfiguration or dictionary; found '{0}'".format(type(items)))
-
 
 class ClientConfiguration(DictMap):
     """
@@ -511,13 +482,6 @@ class ClientConfiguration(DictMap):
                     yield k, v
 
         return dict(_if_set())
-
-    def update(self, other=None, **kwargs):
-        if 'interfaces' in other:
-            self._interfaces = DictMap(other.pop('interfaces'))
-        if 'interfaces' in kwargs:
-            self._interfaces = DictMap(kwargs.pop('interfaces'))
-        super(ClientConfiguration, self).update(other, **kwargs)
 
     @property
     def interfaces(self):

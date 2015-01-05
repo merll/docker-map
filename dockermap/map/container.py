@@ -66,7 +66,7 @@ class ContainerMap(object):
             if key == 'volumes':
                 self._volumes.update(value)
             elif key == 'host':
-                self._host.merge(value)
+                self._host.update(value)
             elif key == 'host_root':
                 if not lists_only:
                     self._host.root = value
@@ -104,7 +104,7 @@ class ContainerMap(object):
         :type lists_only: bool
         """
         self._volumes.update(items._volumes)
-        self._host.merge(items._host)
+        self._host.update(items._host)
         self._clients.update(items._clients)
         if not lists_only:
             self._repository = items._repository
