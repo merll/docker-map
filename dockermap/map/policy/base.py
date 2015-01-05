@@ -598,7 +598,7 @@ class BasePolicy(object):
         Names of existing containers on each map.
 
         :return: Dictionary of container names.
-        :rtype: dict[unicode, set(unicode)]
+        :rtype: dict[unicode, dockermap.map.policy.cache.CachedContainerNames]
         """
         return self._container_names
 
@@ -608,7 +608,7 @@ class BasePolicy(object):
         Image information functions.
 
         :return: Dictionary of image names per client.
-        :rtype: dict[unicode, ImageCache]
+        :rtype: dict[unicode, dockermap.map.policy.cache.CachedImages]
         """
         return self._images
 
