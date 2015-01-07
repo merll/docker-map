@@ -267,6 +267,16 @@ class MappingDockerClient(object):
         return self._maps
 
     @property
+    def clients(self):
+        """
+        Clients and their configuration objects.
+
+        :return Dictionary of client names, with their client instance and a configuration object as values.
+        :rtype: dict[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]
+        """
+        return self._clients
+
+    @property
     def default_map(self):
         """
         The default map to use for any actions, if not otherwise specified.

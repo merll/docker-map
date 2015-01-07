@@ -112,6 +112,7 @@ class ContainerConfiguration(object):
         self._user = None
         self._permissions = None
         self._persistent = False
+        self._clients = None
         self._create_kwargs = None
         self._start_kwargs = None
         self.update(kwargs)
@@ -298,6 +299,21 @@ class ContainerConfiguration(object):
     @persistent.setter
     def persistent(self, value):
         self._persistent = bool(value)
+
+    @property
+    def clients(self):
+        """
+        Set this to client names that you would like to limit container instantiation to. This overrides clients
+        specified globally for a map.
+
+        :return: Container configuration clients.
+        :rtype: list[unicode]
+        """
+        return self._clients
+
+    @clients.setter
+    def clients(self, value):
+        self._clients = list(value)
 
     @property
     def create_options(self):

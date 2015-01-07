@@ -66,7 +66,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         a_paths = dict((alias, c_map.volumes[alias]) for alias in c_config.attaches)
-        for client_name, (client, client_config) in self._policy.get_clients(c_map):
+        for client_name, (client, client_config) in self._policy.get_clients(c_config, c_map):
             images = self._policy.images[client_name]
             existing_containers = self._policy.container_names[client_name]
             for a in c_config.attaches:

@@ -15,7 +15,7 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         recreate_attached = False
-        for client_name, (client, client_config) in self._policy.get_clients(c_map):
+        for client_name, (client, client_config) in self._policy.get_clients(c_config, c_map):
             existing_containers = self._policy.container_names[client_name]
             images = self._policy.images[client_name]
             for a in c_config.attaches:

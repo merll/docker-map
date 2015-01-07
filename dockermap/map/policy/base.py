@@ -391,16 +391,21 @@ class BasePolicy(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_clients(self, c_map):
+    def get_clients(self, c_config, c_map):
         """
-        Returns the Docker client objects for a given map. If there are no clients specified on that map, the
-        default client is returned.
+        Returns the Docker client objects for a given container configuration or map. If there are no clients specified
+        for the configuration, the list defaults to the one globally specified for the given map. If that is not defined
+        either, the default client is returned.
 
+        :param c_config: Container configuration object.
+        :type c_config: dockermap.map.config.ContainerConfiguration
         :param c_map: Container map instance.
         :type c_map: dockermap.map.container.ContainerMap
         :return: Docker client objects.
         :rtype: tuple[tuple[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]]
         """
+        if c_config.clients:
+            return tuple((c, self._clients[c]) for c in c_config.clients)
         if c_map.clients:
             return tuple((c, self._clients[c]) for c in c_map.clients)
         default_name = self.get_default_client_name()

@@ -28,7 +28,7 @@ class ContainerMap(object):
         self._host = HostVolumeConfiguration()
         self._volumes = DictMap()
         self._containers = defaultdict(ContainerConfiguration)
-        self._clients = set()
+        self._clients = list()
         self.update(initial, **kwargs)
         if (initial or kwargs) and check_integrity:
             self.check_integrity()
@@ -50,7 +50,7 @@ class ContainerMap(object):
             elif key == 'repository':
                 self._repository = value
             elif key == 'clients':
-                self._clients = set(value)
+                self._clients = list(value)
             elif key == 'containers':
                 for container, config in six.iteritems(value):
                     self._containers[container].update(config)
@@ -74,7 +74,7 @@ class ContainerMap(object):
                 if not lists_only:
                     self._repository = value
             elif key == 'clients':
-                self._clients.update(value)
+                self._clients.extend(set(value) - set(self._clients))
             elif key == 'containers':
                 for container, config in six.iteritems(value):
                     if container in self._containers:
@@ -130,9 +130,13 @@ class ContainerMap(object):
         Alias names of clients associated with this container map.
 
         :return: Client names.
-        :rtype: set(unicode)
+        :rtype: list[unicode]
         """
         return self._clients
+
+    @clients.setter
+    def clients(self, value):
+        self._clients = list(value)
 
     @property
     def containers(self):
