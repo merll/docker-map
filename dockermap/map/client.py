@@ -224,6 +224,27 @@ class MappingDockerClient(object):
         """
         return self.get_policy().update_actions(map_name or self._default_map, container, instances)
 
+    def call(self, action_name, container, instances=None, map_name=None, **kwargs):
+        """
+        Generic function for running container actions based on a policy.
+
+        :param container: Container name.
+        :type container: unicode
+        :param instances: Instance names to remove. If not specified, runs on all instances as specified in the
+         configuration (or just one default instance).
+        :type instances: iterable
+        :param map_name: Container map name. Optional - if not provided the default map is used.
+        :type map_name: unicode
+        :param kwargs: Additional kwargs for the policy method.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
+        """
+        method_name = '_'.join((action_name, 'actions'))
+        action_method = getattr(self.get_policy(), method_name)
+        if callable(action_method):
+            return action_method(map_name or self._default_map, container, instances=instances, **kwargs)
+        raise ValueError("The selected policy does not provide a method '{0}' for generating actions.".format(method_name))
+
     def refresh_names(self):
         """
         Invalidates the policy name and status cache.
