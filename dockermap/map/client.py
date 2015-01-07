@@ -282,8 +282,8 @@ class MappingDockerClient(object):
         """
         Container maps.
 
-        :return: A dictionary with container map names as keys, and container map and client as values.
-        :rtype: dict[unicode, MapClient]
+        :return: A dictionary with container map names as keys, and the container maps values.
+        :rtype: dict[unicode, dockermap.map.container.ContainerMap]
         """
         return self._maps
 

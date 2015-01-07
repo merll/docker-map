@@ -144,7 +144,7 @@ class ContainerMap(object):
         Container configurations of the map.
 
         :return: Container configurations.
-        :rtype: dict
+        :rtype: dict[unicode, dockermap.map.config.ContainerConfiguration]
         """
         return self._containers
 
