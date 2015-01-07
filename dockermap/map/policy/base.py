@@ -673,17 +673,19 @@ class AbstractActionGenerator(object):
         :param instances: Instance names.
         :type instances: list or tuple
         :param kwargs: Additional keyword arguments to pass to the main container action.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
         def _gen_actions(c_map_name, c_container, c_instance, c_flags=0, **c_kwargs):
             c_map = self._policy.container_maps[c_map_name]
             c_config = c_map.get_existing(c_container)
             c_instances = [c_instance] if c_instance else c_config.instances or [None]
-            self.generate_item_actions(map_name, c_map, c_container, c_config, c_instances, c_flags, **c_kwargs)
+            return self.generate_item_actions(map_name, c_map, c_container, c_config, c_instances, c_flags, **c_kwargs)
 
         dependency_path = self.get_dependency_path(map_name, container)
         for d in dependency_path:
             _gen_actions(*d, c_flags=ACTION_DEPENDENCY_FLAG)
-        _gen_actions(map_name, container, instances, c_flags=0, **kwargs)
+        return list(_gen_actions(map_name, container, instances, c_flags=0, **kwargs) or ())
 
     @property
     def policy(self):

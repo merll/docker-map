@@ -54,7 +54,7 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
                 if ci_create:
                     ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_config, ci_name, container_name)
                     images.ensure_image(ic_kwargs['image'])
-                    client.create_container(**ic_kwargs)
+                    yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
                 ci_stop = recreate_attached and ci_running
                 if ci_stop:
@@ -89,8 +89,10 @@ class ResumeStartupMixin(object):
           updated.
         :type instances: list[unicode]
         :param kwargs: Has no effect in this implementation.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        ResumeStartupGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        return ResumeStartupGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
 class ResumeUpdatePolicy(SimpleCreateMixin, SimpleStartMixin, SimpleRestartMixin, SimpleStopMixin, SimpleRemoveMixin,

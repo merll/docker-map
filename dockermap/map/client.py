@@ -91,8 +91,10 @@ class MappingDockerClient(object):
         :type map_name: unicode
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container creation.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        self.get_policy().create_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.get_policy().create_actions(map_name or self._default_map, container, instances, **kwargs)
 
     def start(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -107,8 +109,10 @@ class MappingDockerClient(object):
         :type instances: iterable
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container start.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        self.get_policy().start_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.get_policy().start_actions(map_name or self._default_map, container, instances, **kwargs)
 
     def restart(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -123,8 +127,10 @@ class MappingDockerClient(object):
         :type map_name: unicode
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container restart.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        self.get_policy().restart_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.get_policy().restart_actions(map_name or self._default_map, container, instances, **kwargs)
 
     def stop(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -143,8 +149,10 @@ class MappingDockerClient(object):
         :type raise_on_error: bool
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container stop.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        self.get_policy().stop_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.get_policy().stop_actions(map_name or self._default_map, container, instances, **kwargs)
 
     def remove(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -159,8 +167,10 @@ class MappingDockerClient(object):
         :type map_name: unicode
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container removal.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        self.get_policy().remove_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.get_policy().remove_actions(map_name or self._default_map, container, instances, **kwargs)
 
     def startup(self, container, instances=None, map_name=None):
         """
@@ -174,8 +184,10 @@ class MappingDockerClient(object):
         :type instances: iterable
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        self.get_policy().startup_actions(map_name or self._default_map, container, instances)
+        return self.get_policy().startup_actions(map_name or self._default_map, container, instances)
 
     def shutdown(self, container, instances=None, map_name=None):
         """
@@ -189,8 +201,10 @@ class MappingDockerClient(object):
         :type instances: iterable
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        self.get_policy().shutdown_actions(map_name or self._default_map, container, instances)
+        return self.get_policy().shutdown_actions(map_name or self._default_map, container, instances)
 
     def update(self, container, instances=None, map_name=None):
         """
@@ -205,8 +219,10 @@ class MappingDockerClient(object):
         :type instances: iterable
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        self.get_policy().update_actions(map_name or self._default_map, container, instances)
+        return self.get_policy().update_actions(map_name or self._default_map, container, instances)
 
     def refresh_names(self):
         """

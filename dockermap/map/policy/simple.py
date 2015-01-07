@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import itertools
+
 from . import ACTION_DEPENDENCY_FLAG
 from .base import (BasePolicy, AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator,
                    ReverseActionGeneratorMixin)
@@ -25,7 +27,7 @@ class SimpleCreateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator
                     c_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_config, ci_name, container_name,
                                                               kwargs=kwargs)
                     images.ensure_image(c_kwargs['image'])
-                    client.create_container(**c_kwargs)
+                    yield client_name, client.create_container(**c_kwargs)
                     existing_containers.add(ci_name)
 
 
@@ -43,8 +45,10 @@ class SimpleCreateMixin(object):
           created.
         :type instances: list[unicode]
         :param kwargs: Additional keyword args for the create action.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        SimpleCreateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        return SimpleCreateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
 class SimpleStartGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
@@ -218,9 +222,11 @@ class SimpleStartupMixin(object):
           created and started.
         :type instances: list[unicode]
         :param kwargs: Has no effect in this implementation.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        self.create_actions(map_name, container, instances)
-        self.start_actions(map_name, container, instances)
+        return itertools.chain(self.create_actions(map_name, container, instances) or (),
+                               self.start_actions(map_name, container, instances) or ())
 
 
 class SimpleShutdownMixin(object):

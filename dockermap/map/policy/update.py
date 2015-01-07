@@ -123,7 +123,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     ci_remove = False
                 if ci_remove or not ci_exists:
                     ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_config, ci_name, container_name)
-                    client.create_container(**ic_kwargs)
+                    yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
                     is_kwargs = self._policy.get_start_kwargs(c_map, c_config, client_config, ci_name, ci)
                     client.start(**is_kwargs)
@@ -154,5 +154,7 @@ class ContainerUpdateMixin(object):
           updated.
         :type instances: list[unicode]
         :param kwargs: Has no effect in this implementation.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode, dict)]
         """
-        ContainerUpdateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        return ContainerUpdateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
