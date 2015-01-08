@@ -94,7 +94,7 @@ class ContainerMap(object):
         self._volumes.update(items._volumes)
         self._host.update(items._host)
         self._repository = items._repository
-        self._clients.update(items._clients)
+        self._clients = items._clients
         for container, config in items:
             self._containers[container].update(config)
 
@@ -105,7 +105,7 @@ class ContainerMap(object):
         """
         self._volumes.update(items._volumes)
         self._host.update(items._host)
-        self._clients.update(items._clients)
+        self._clients.extend(set(items._clients) - set(self._clients))
         if not lists_only:
             self._repository = items._repository
         for container, config in items:

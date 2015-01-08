@@ -13,7 +13,7 @@ from . import DictMap
 
 SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent'
 DICT_ATTRIBUTES = 'create_options', 'start_options'
-LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches', 'links', 'publishes'
+LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches', 'clients'
 
 HostShare = namedtuple('HostShare', ('volume', 'readonly'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
@@ -45,7 +45,9 @@ def _get_listed_tuples(value, element_type, conversion_func):
 
 
 def _get_host_share(value):
-    if isinstance(value, six.string_types):
+    if isinstance(value, HostShare):
+        return value
+    elif isinstance(value, six.string_types):
         return HostShare(value, False)
     elif isinstance(value, (list, tuple)):
         if len(value) == 2:
@@ -60,7 +62,9 @@ def _get_host_share(value):
 
 
 def _get_container_link(value):
-    if isinstance(value, six.string_types):
+    if isinstance(value, ContainerLink):
+        return value
+    elif isinstance(value, six.string_types):
         return ContainerLink(value, value)
     elif isinstance(value, (list, tuple)):
         if len(value) == 2:
@@ -71,7 +75,9 @@ def _get_container_link(value):
 
 def _get_port_binding(value):
     sub_types = six.string_types + (int, long)
-    if isinstance(value, sub_types):  # Port only
+    if isinstance(value, PortBinding):
+        return value
+    elif isinstance(value, sub_types):  # Port only
         return PortBinding(value, None, None)
     elif isinstance(value, (list, tuple)):  # Exposed port, host port, and possibly interface
         if len(value) == 2:
@@ -366,7 +372,15 @@ class ContainerConfiguration(object):
         :param lists_only: Ignore single-value attributes and update dictionary options.
         :type lists_only: bool
         """
+        def _get_converted_list(dict_key, func):
+            v = values.get(dict_key)
+            if v:
+                return func(v)
+            return None
+
         def _merge_first(current, update_list):
+            if not update_list:
+                return
             new_keys = set(map(operator.itemgetter(0), update_list)) - set(map(operator.itemgetter(0), current))
             current.extend(filter(lambda u: u[0] in new_keys, update_list))
 
@@ -390,12 +404,14 @@ class ContainerConfiguration(object):
 
         if isinstance(values, dict):
             get_func = values.get
-            update_binds = _get_host_shares(values.get('binds'))
-            update_links = _get_container_links(values.get('links'))
+            update_binds = _get_converted_list('binds', _get_host_shares)
+            update_links = _get_converted_list('links', _get_container_links)
+            update_ports = _get_converted_list('publishes', _get_port_bindings)
         elif isinstance(values, ContainerConfiguration):
             get_func = values.__getattribute__
             update_binds = values._binds
             update_links = values._links_to
+            update_ports = values._publishes
         else:
             raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values)))
 
@@ -403,6 +419,7 @@ class ContainerConfiguration(object):
             _update_attr(key, _merge_list)
         _merge_first(self._binds, update_binds)
         _merge_first(self._links_to, update_links)
+        _merge_first(self._publishes, update_ports)
         if not lists_only:
             for key in SINGLE_ATTRIBUTES:
                 _update_attr(key, _update_single)
