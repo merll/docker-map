@@ -689,7 +689,7 @@ class AbstractActionGenerator(object):
 
         dependency_path = self.get_dependency_path(map_name, container)
         for d in dependency_path:
-            _gen_actions(*d, c_flags=ACTION_DEPENDENCY_FLAG)
+            list(_gen_actions(*d, c_flags=ACTION_DEPENDENCY_FLAG) or ())
         return list(_gen_actions(map_name, container, instances, c_flags=0, **kwargs) or ())
 
     @property
