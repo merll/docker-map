@@ -120,16 +120,18 @@ def get_port_bindings(container_config, client_config):
     :return: Dictionary of ports with mapped port, and if applicable, with bind address
     :rtype: dict
     """
-    def _get_port_bind(port_binding):
-        exposed_port, bind_port, interface = port_binding
-        if interface:
-            bind_addr = client_config.interfaces.get(interface)
-            if not bind_addr:
-                raise ValueError("Address for interface '{0}' not found in client configuration.".format(interface))
-            return exposed_port, (bind_addr, bind_port)
-        return exposed_port, bind_port
+    def _gen_port_binds():
+        for port_binding in container_config.publishes:
+            exposed_port, bind_port, interface = port_binding
+            if interface:
+                bind_addr = client_config.interfaces.get(interface)
+                if not bind_addr:
+                    raise ValueError("Address for interface '{0}' not found in client configuration.".format(interface))
+                yield exposed_port, (bind_addr, bind_port)
+            elif bind_port:
+                yield exposed_port, bind_port
 
-    return dict(map(_get_port_bind, container_config.publishes))
+    return dict(_gen_port_binds())
 
 
 def is_initial(container_state):
