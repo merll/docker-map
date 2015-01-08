@@ -80,7 +80,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                         a_image != self.base_image_ids[client_name]
                     if a_remove:
                         ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_config, a_name)
-                        client.remove(**ar_kwargs)
+                        client.remove_container(**ar_kwargs)
                         existing_containers.remove(a_name)
                 else:
                     a_remove = False
