@@ -9,6 +9,7 @@ import six
 from docker.client import DEFAULT_DOCKER_API_VERSION, DEFAULT_TIMEOUT_SECONDS
 
 from . import DictMap
+from .base import DockerClientWrapper
 
 
 SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent'
@@ -469,7 +470,8 @@ class HostVolumeConfiguration(DictMap):
 
 class ClientConfiguration(DictMap):
     """
-    Utility class for storing values that are specific to a particular Docker client.
+    Configuration class for storing values that are specific to a particular Docker client, and generating client
+    instances.
 
     :param base_url: URL of the Docker Remote API.
     :type base_url: unicode
@@ -481,6 +483,7 @@ class ClientConfiguration(DictMap):
     :param kwargs: Further initializing keyword arguments.
     """
     init_kwargs = 'base_url', 'version', 'timeout', 'tls'
+    client_constructor = DockerClientWrapper
 
     def __init__(self, base_url=None, version=DEFAULT_DOCKER_API_VERSION, timeout=DEFAULT_TIMEOUT_SECONDS,
                  *args, **kwargs):
@@ -491,18 +494,19 @@ class ClientConfiguration(DictMap):
             self._interfaces = DictMap(kwargs.pop('interfaces'))
         else:
             self._interfaces = DictMap()
+        self._client = kwargs.pop('client', None)
         super(ClientConfiguration, self).__init__(*args, **kwargs)
 
     @classmethod
     def from_client(cls, client):
         """
-        Constructs a configuration object. To be used when the client existed prior to the configuration object.
+        Constructs a configuration object from an existing client instance.
 
-        :param client:
+        :param client: Client object to derive the configuration from.
         :type client: docker.client.Client
-        :return:
+        :return: ClientConfiguration
         """
-        return cls(base_url=client.base_url, version=client._version, timeout=client._timeout)
+        return cls(base_url=client.base_url, version=client._version, timeout=client._timeout, client=client)
 
     def get_init_kwargs(self):
         """
@@ -519,6 +523,20 @@ class ClientConfiguration(DictMap):
 
         return dict(_if_set())
 
+    def get_client(self):
+        """
+        Retrieves or creates a client instance from this configuration object. If instantiated from this configuration,
+        the resulting object is also cached in the property ``client``.
+
+        :return: Client object instance.
+        :rtype: docker.client.Client
+        """
+        client = self._client
+        if not client:
+            client = self.client_constructor(**self.get_init_kwargs())
+            self._client = client
+        return client
+
     @property
     def interfaces(self):
         """
@@ -533,3 +551,17 @@ class ClientConfiguration(DictMap):
     @interfaces.setter
     def interfaces(self, value):
         self._interfaces = DictMap(value)
+
+    @property
+    def client(self):
+        """
+        Assigned Client instance.
+
+        :return: Client object.
+        :rtype: docker.client.Client
+        """
+        return self._client
+
+    @client.setter
+    def client(self, value):
+        self._client = value

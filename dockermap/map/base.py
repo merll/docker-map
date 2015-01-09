@@ -54,18 +54,6 @@ class DockerClientWrapper(docker.Client):
     """
     Adds a few utility functions to the Docker API client.
     """
-    @classmethod
-    def from_config(cls, client_config):
-        """
-        Alternative constructor for creating an instance from a configuration object.
-
-        :param client_config: Client configuration object.
-        :type client_config: dockermap.map.config.ClientConfiguration
-        :return: New object instance.
-        :rtype: DockerClientWrapper
-        """
-        return cls(**client_config.get_init_kwargs())
-
     def _docker_log_stream(self, response):
         log_str = None
         for e in response:

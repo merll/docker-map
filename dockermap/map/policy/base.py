@@ -22,7 +22,7 @@ class BasePolicy(object):
     :param container_maps: Container maps.
     :type container_maps: dict[unicode, dockermap.map.container.ContainerMap]
     :param clients: Dictionary of clients.
-    :type clients: dict[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]
+    :type clients: dict[unicode, dockermap.map.config.ClientConfiguration]
     """
     __metaclass__ = ABCMeta
 
@@ -405,12 +405,16 @@ class BasePolicy(object):
         :return: Docker client objects.
         :rtype: tuple[tuple[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]]
         """
+        def _get_client(client_name):
+            client_config = self._clients[client_name]
+            return client_name, (client_config.get_client(), client_config)
+
         if c_config.clients:
-            return tuple((c, self._clients[c]) for c in c_config.clients)
+            return tuple(map(_get_client, c_config.clients))
         if c_map.clients:
-            return tuple((c, self._clients[c]) for c in c_map.clients)
+            return tuple(map(_get_client, c_map.clients))
         default_name = self.get_default_client_name()
-        return (default_name, self._clients[default_name]),
+        return _get_client(default_name),
 
     def get_dependencies(self, map_name, container):
         """
@@ -594,7 +598,7 @@ class BasePolicy(object):
         Docker client objects and configurations.
 
         :return: Dictionary of Docker client objects.
-        :rtype: dict[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]
+        :rtype: dict[unicode, dockermap.map.config.ClientConfiguration]
         """
         return self._clients
 

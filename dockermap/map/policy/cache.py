@@ -74,7 +74,7 @@ class DockerHostItemCache(dict):
     their existence does not have to be checked separately for every action.
 
     :param clients: Dictionary of clients with alias and client object.
-    :type clients: dict[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]
+    :type clients: dict[unicode, dockermap.map.config.ClientConfiguration]
     """
     item_class = None
 
@@ -106,7 +106,7 @@ class DockerHostItemCache(dict):
         :return: Items in the cache.
         :rtype: item_class
         """
-        client = self._clients[item][0]
+        client = self._clients[item].get_client()
         val = self.item_class(client)
         self[item] = val
         return val

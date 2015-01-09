@@ -29,41 +29,43 @@ class MappingDockerClient(object):
       along with an associated instance.
     :type container_maps: dockermap.map.container.ContainerMap or
       list[dockermap.map.container.ContainerMap]
-    :param docker_client: Default :class:`~docker.client.Client` instance.
-    :type docker_client: docker.client.Client
-    :param clients: Dictionary of client objects, client configurations, or both
-    :type clients: dict[unicode, docker.client.Client] or dict[unicode, dockermap.map.config.ClientConfiguration]
-      or dict[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]
+    :param docker_client: Default :class:`~docker.client.Client` instance or configuration.
+    :type docker_client: dockermap.map.config.ClientConfiguration or docker.client.Client
+    :param clients: Dictionary of client configurations
+    :type clients: dict[unicode, dockermap.map.config.ClientConfiguration]
     :param policy_class: Policy class based on :class:`~dockermap.map.policy.base.BasePolicy` for generating container
       actions.
     :type policy_class: class
     """
     configuration_class = ClientConfiguration
-    client_class = DockerClientWrapper
 
     def __init__(self, container_maps=None, docker_client=None, clients=None, policy_class=ResumeUpdatePolicy):
-        def _client_config(obj):
-            if isinstance(obj, docker.Client):
-                return obj, self.configuration_class.from_client(obj)
-            elif isinstance(obj, ClientConfiguration):
-                return self.client_class.from_config(obj), obj
-            elif isinstance(obj, tuple) and isinstance(obj[0], docker.Client) and isinstance(obj[1], ClientConfiguration):
-                return obj
-            raise ValueError("Unexpected type of clients item: {0}".format(type(obj)))
-
-        if isinstance(container_maps, ContainerMap):
-            self._default_map = container_maps.name
-            self._maps = {container_maps.name: container_maps}
-        elif isinstance(container_maps, (list, tuple)):
-            self._default_map = None
-            self._maps = dict((c_map.name, c_map) for c_map in container_maps)
-        else:
-            raise ValueError("Unexpected type of container_maps argument: {0}".format(type(container_maps)))
-        self._clients = dict((client_name, _client_config(client_obj))
-                             for client_name, client_obj in six.iteritems(clients)) if clients else dict()
+        if container_maps:
+            if isinstance(container_maps, ContainerMap):
+                self._default_map = container_maps.name
+                self._maps = dict(((container_maps.name, container_maps),))
+            elif isinstance(container_maps, (list, tuple)):
+                self._default_map = None
+                self._maps = dict((c_map.name, c_map) for c_map in container_maps)
+            elif isinstance(container_maps, dict):
+                self._default_map = None
+                self._maps = container_maps
+            else:
+                raise ValueError("Unexpected type of 'container_maps' argument: {0}".format(type(container_maps)))
+        if clients:
+            if isinstance(clients, (list, tuple)):
+                self._clients = dict(clients)
+            else:
+                self._clients = clients
         if docker_client:
+            if isinstance(docker_client, docker.Client):
+                default_client = self.configuration_class.from_client(docker_client)
+            elif isinstance(docker_client, ClientConfiguration):
+                default_client = docker_client
+            else:
+                raise ValueError("Unexpected type of 'docker_client' argument: {0}".format(type(docker_client)))
             default_name = policy_class.get_default_client_name()
-            self._clients[default_name] = _client_config(docker_client)
+            self._clients[default_name] = default_client
         self._policy_class = policy_class
         self._policy = None
 
@@ -293,7 +295,7 @@ class MappingDockerClient(object):
         Clients and their configuration objects.
 
         :return Dictionary of client names, with their client instance and a configuration object as values.
-        :rtype: dict[unicode, (docker.client.Client, dockermap.map.config.ClientConfiguration)]
+        :rtype: dict[unicode, dockermap.map.config.ClientConfiguration]
         """
         return self._clients
 
