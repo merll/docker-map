@@ -115,7 +115,7 @@ class ContainerConfiguration(object):
         self._uses = []
         self._links_to = []
         self._attaches = []
-        self._publishes = []
+        self._exposes = []
         self._user = None
         self._permissions = None
         self._persistent = False
@@ -236,11 +236,9 @@ class ContainerConfiguration(object):
         self._attaches = _get_list(value)
 
     @property
-    def publishes(self):
+    def exposes(self):
         """
-        Ports and (virtual) interface name that a network service is published on. If the interface is not set, the
-        port will be published to all interfaces (as this is the Docker default). Otherwise the relevant IP address
-        to expose the service on will be looked up at run-time.
+        Ports and (virtual) interface name that a network service is exposed on.
 
         The following formats are considered as valid input and will be converted to a list of ``PortBinding`` tuples:
 
@@ -253,14 +251,17 @@ class ContainerConfiguration(object):
           * tuple or list: container exposed port, host port, host interface;
           * container exposed port only - will not be published, but is available to linked containers.
 
+        If the host port, but no interface is set, the port will be published to all interfaces (as this is the Docker
+        default). Otherwise the relevant IP address to expose the service on will be looked up at run-time.
+
         :return: List of port bindings.
         :rtype: list[PortBinding]
         """
-        return self._publishes
+        return self._exposes
 
-    @publishes.setter
-    def publishes(self, value):
-        self._publishes = _get_port_bindings(value)
+    @exposes.setter
+    def exposes(self, value):
+        self._exposes = _get_port_bindings(value)
 
     @property
     def user(self):
@@ -412,7 +413,7 @@ class ContainerConfiguration(object):
             get_func = values.__getattribute__
             update_binds = values._binds
             update_links = values._links_to
-            update_ports = values._publishes
+            update_ports = values._exposes
         else:
             raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values)))
 
@@ -420,7 +421,7 @@ class ContainerConfiguration(object):
             _update_attr(key, _merge_list)
         _merge_first(self._binds, update_binds)
         _merge_first(self._links_to, update_links)
-        _merge_first(self._publishes, update_ports)
+        _merge_first(self._exposes, update_ports)
         if not lists_only:
             for key in SINGLE_ATTRIBUTES:
                 _update_attr(key, _update_single)

@@ -121,7 +121,7 @@ def get_port_bindings(container_config, client_config):
     :rtype: dict
     """
     def _gen_port_binds():
-        for port_binding in container_config.publishes:
+        for port_binding in container_config.exposes:
             exposed_port, bind_port, interface = port_binding
             if interface:
                 bind_addr = client_config.interfaces.get(interface)

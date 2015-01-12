@@ -157,7 +157,7 @@ class BasePolicy(object):
                                          (container_map.volumes[b.volume] for b in container_config.binds))),
             user=extract_user(container_config.user),
             ports=[port_binding.exposed_port
-                   for port_binding in container_config.publishes if port_binding.exposed_port],
+                   for port_binding in container_config.exposes if port_binding.exposed_port],
         )
         update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
         return c_kwargs
