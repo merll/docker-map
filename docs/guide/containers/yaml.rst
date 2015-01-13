@@ -42,8 +42,9 @@ The :ref:`container_map_example` map can be more easily written as:
      binds: {web_config: ro}
      uses: app_server_socket
      attaches: web_log
-     start_options:
-       port_bindings: {80: 80, 443: 443}
+     exposes:
+       80: 80
+       443: 443
    app_server:
      image: app
      instances:
@@ -74,6 +75,29 @@ The :ref:`container_map_example` map can be more easily written as:
        instance2: data/app2
 
 
+A configuration of clients, such as briefly described in :ref:`map_clients`, would be written in the following format:
+
+.. code-block:: yaml
+
+   apps1:
+     base_url: apps1_host
+     interfaces:
+       private: 10.x.x.11
+   apps2:
+     base_url: apps2_host
+     interfaces:
+       private: 10.x.x.12
+   apps3:
+     base_url: apps3_host
+     interfaces:
+       private: 10.x.x.13
+   web1:
+     base_url: web1_host
+     interfaces:
+       private: 10.x.x.21
+       public: 178.x.x.x
+
+
 Importing YAML maps
 -------------------
 The easiest way to generate a :class:`~dockermap.map.container.ContainerMap` from a YAML file is
@@ -100,6 +124,18 @@ There are in total three ways to assign a name to a map during the import, in th
 2. The base file name without extension from :func:`~dockermap.map.yaml.load_map_file`, if an empty string is passed
    as the ``name`` argument.
 3. An extra ``name`` element on the root level of the map.
+
+
+Importing clients
+-----------------
+When using multiple clients, where client-specific variables (URLs, network addresses etc.) are needed, you may also
+choose to store client configurations in a YAML file. It can be imported using::
+
+    clients = yaml.load_clients_file('/path/to/example_clients.yaml')
+
+If you implement your own client configuration (especially useful if you implement a custom client), you can pass
+the class as second argument. By default, a dictionary of client names with associated
+:class:`~dockermap.map.config.ClientConfiguration` objects is returned.
 
 
 User and environment variables

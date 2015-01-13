@@ -47,8 +47,9 @@ communicating with the application server. The map could look like this::
             'binds': {'nginx_config': 'ro'},
             'uses': 'uwsgi_socket',
             'attaches': 'nginx_log',
-            'start_options': {
-                'port_bindings': {80: 80, 443: 443},
+            'exposes': {
+                80: 80,
+                443: 443,
             },
         },
         'uwsgi': {

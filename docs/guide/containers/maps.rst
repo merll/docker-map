@@ -97,9 +97,18 @@ Since version 0.2.0, a map can describe a container structure on a specific set 
 to run three application servers on a set of hosts, which are reverse-proxied by a single web server. This scenario
 would be described using the following configuration::
 
+    clients = {
+        'apps1': ClientConfiguration(base_url='apps1_host', interfaces={'private': '10.x.x.11'}),
+        'apps2': ClientConfiguration(base_url='apps2_host', interfaces={'private': '10.x.x.12'}),
+        'apps3': ClientConfiguration(base_url='apps3_host', interfaces={'private': '10.x.x.13'}),
+        'web1': ClientConfiguration(base_url='web1_host', interfaces={'private': '10.x.x.21', 'public': '178.x.x.x'}),
+    }
     apps_container_map.clients = 'apps1', 'apps2', 'apps3'
     web_container_map.clients = 'web1'
 
+The `interfaces` definition can later be used when specifying the address that a port is to be exposed on.
+
+Clients specified within a container configuration have a higher priority than map-level definitions.
 
 Container configuration
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -131,6 +140,16 @@ If you plan to launch containers from the same image with an identical configura
 system that are mapped to shared folders, these containers can be named as
 :attr:`~dockermap.map.config.ContainerConfiguration.instances`. The instance name is appended to the default container
 name on instantiation. If this property is not set, there is only one default instance.
+
+.. _container-clients:
+
+Clients
+"""""""
+The property :attr:`~dockermap.map.config.ContainerConfiguration.clients` provides the same functionality as
+:ref:`map_clients` on map level. However, if set for a container, it overrides a map-level setting. This may be useful
+for processes that you only want running exactly once per cluster of servers (e.g. celerybeat or database migrations).
+It is also possible to run a particular configuration on a larger or completely different set of clients than the map
+default specifies.
 
 Shared volumes
 """"""""""""""
@@ -202,6 +221,51 @@ non-superuser privileges usually requires permission adjustments, setting
 Similarly for :attr:`~dockermap.map.config.ContainerConfiguration.permissions`, a temporary `busybox` container performs
 a ``chmod`` command on the shared container.
 
+.. _exposed-ports:
+
+Exposed ports
+"""""""""""""
+Containers may expose networking ports to other services, either to :ref:`linked-containers` or to a host networking
+interface. The :attr:`~dockermap.map.config.ContainerConfiguration.exposes` property helps setting the ports and
+bindings appropriately during container creation and start.
+
+The configuration is set either through a list or tuple of the following:
+
+* a single string or integer - exposes a port only to a linked container
+* a pair of string / integer values - publishes the exposed port (1) to the host's port (2) on all interfaces
+* a pair of string / integer values, followed by a string - publishes the exposed port (1) to the host's port (2) on
+  the interface alias name (3), which is substituted with the interface address for that interface defined by the client
+  configuration.
+
+The publishing port and interface can also be placed together in a nested tuple, and the entire configuration also
+accepts a dictionary as input. All combinations are converted to :attr:`~dockermap.map.config.PortBinding` tuples with
+the elements ``(exposed_port, host_port, interface)``. Unused elements are set to ``None`` during the conversion.
+
+Examples::
+
+    ## Exposes
+
+    clients = {
+        'client1': ClientConfiguration({
+            'base_url': 'unix://var/run/docker.sock',
+            'interfaces': {
+                'private': '10.x.x.x',  # Example private network interface address
+                'public: '178.x.x.x',    # Example public network interface address
+            }
+        }),
+        ...
+    })
+
+    config = container_map.containers.app1
+    config.clients = ['client1']
+    config.exposes = [
+        (80, 80, 'public'),        # Exposes port 80 and binds it to port 80 on the public address only.
+        (9443, 443),               # Exposes port 9443 and binds to port 443 on all addresses.
+        (8000, 8000, 'private'),   # Binds port 8000 to the private network interface address.
+        8111,                      # Port 8111 will be exposed only to containers that link this one.
+    ]
+
+
 .. _additional-options:
 
 Additional options
@@ -245,7 +309,6 @@ related to `Docker-Map`, e.g.::
         'mem_limit': '3g',  # Sets a memory limit.
     }
     config.start_options = {
-        'port_bindings': {8000: 80},  # Map the container port 8000 to host port 80.
         'restart_policy': {'MaximumRetryCount': 0, 'Name': 'always'},  # Unlimited restart attempts.
     }
 
@@ -271,9 +334,11 @@ and::
 
     container_map.containers.app1.uses = ('volume1',)
 
-As mentioned, additional conversions are made for :attr:`~dockermap.map.config.ContainerConfiguration.binds`
-and :attr:`~dockermap.map.config.ContainerConfiguration.links`; each element in an input list or tuple is converted to
-:attr:`~dockermap.map.config.HostShare` or :attr:`~dockermap.map.config.ContainerLink`. Keep this in mind when
+As mentioned, additional conversions are made for :attr:`~dockermap.map.config.ContainerConfiguration.binds`,
+:attr:`~dockermap.map.config.ContainerConfiguration.links`, and
+:attr:`~dockermap.map.config.ContainerConfiguration.exposes`; each element in an input list or tuple is converted to
+:attr:`~dockermap.map.config.HostShare`, :attr:`~dockermap.map.config.ContainerLink`, or
+:attr:`~dockermap.map.config.PortBinding`. Keep this in mind when
 modifying existing elements, since no automated conversion is done then. For example, for adding a host-shared volume
 at run-time, use::
 
@@ -318,9 +383,10 @@ sockets::
             'binds': {'web_config': 'ro'},
             'uses': 'app_server_socket',
             'attaches': 'web_log',
-            'start_options': {
-                'port_bindings': {80: 80, 443: 443},
-            },
+            'exposes': {
+                80: 80,
+                443: 443,
+            }
         },
         'app_server': {
             'image': 'app',
@@ -372,7 +438,7 @@ results in the following actions:
    ``example_map.app_server.instance2``. Each instance is assigned a separate path on the host for ``app_data`` and
    ``app_config``. In both instances, ``app_config`` is a read-only volume.
 #. ``web_server`` is created with the name ``example_map.web_server``, mapping the host volume ``web_config`` as
-   read-only.
+   read-only. Ports 80 and 443 are exposed.
 
 Furthermore, on calling::
 
@@ -385,4 +451,9 @@ Furthermore, on calling::
 #. ``example_map.app_server.instance1`` and ``example_map.app_server.instance2`` are started and gain access to
    the volume of ``example_map.app_server_socket``.
 #. ``example_map.web_server`` is started, and shares the volume of ``example_map.app_server_socket`` with the app
-   server instances.
+   server instances. Furthermore it maps exposed ports 80 and 443 to all addresses of the host, making them available
+   to public access.
+
+Both commands can be combined by simply running::
+
+    map_client.startup('web_server')

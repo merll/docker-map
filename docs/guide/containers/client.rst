@@ -93,25 +93,30 @@ further described in :ref:`container_maps`.
 
 Instances of :class:`~dockermap.map.client.MappingDockerClient` are usually created with a map and a client.
 The former is an instance of :class:`~dockermap.map.container.ContainerMap`, the latter is
-a :class:`~dockermap.map.base.DockerClientWrapper` object. Both initializing arguments are however optional and may be
+a :class:`~docker.client.Client` object. Both initializing arguments are however optional and may be
 changed any time later using the properties :attr:`~dockermap.map.client.MappingDockerClient.maps`::
 
     map_client = MappingDockerClient(container_map, DockerClientWrapper('unix://var/run/docker.sock'))
 
 Since version 0.2.0, also multiple maps and clients are supported. If exactly one map is provided, it is considered the
-default map. That one is always used when not specified otherwise is a command (e.g. ``create``). Similarly, there can
-be a default client, which is used whenever a container map does not explicitly state a different set of clients.
-More clients can be passed as a dictionary, e.g.::
+default map. That one is always used when not specified otherwise in a command (e.g. ``create``). Similarly, there can
+be a default client, which is used whenever a container map or container configuration does not explicitly state a
+different set of clients.
 
-    map_client = MappingDockerClient([container_map1, container_map2, ...],     # Container maps as list or tuple
-                                     DockerClientWrapper('default_host'),       # Default client, optional
-                                     {'client1': DockerClientWrapper('host1'),  # Further clients
-                                      'client2': DockerClientWrapper('host2'),
-                                      ...})
+Clients are configured with :class:`~dockermap.map.config.ClientConfiguration` objects, which are passed to the
+:class:`~dockermap.map.client.MappingDockerClient` constructor::
+
+    clients = {
+        'client1': ClientConfiguration('host1'),
+        'client2': ClientConfiguration('host2'),
+        ...
+    }
+    map_client = MappingDockerClient([container_map1, container_map2, ...],     # Container maps as list, tuple or dict
+                                     clients['client1'],                        # Default client, optional
+                                     clients=clients)                           # Further clients
 
 These clients are then used according to the :ref:`map_clients` configuration on a container map.
-The default client can be referenced with the name ``__default__``. As this is implied on a container map, it
-is however not necessary there.
+The default client can be referenced with the name ``__default__``.
 
 :class:`~dockermap.map.client.MappingDockerClient` uses a policy class, that transforms the container configurations
 and their current state into actions on the client, along with keyword arguments accepted by `docker-py`.
@@ -166,10 +171,7 @@ speeding up operations. The cache is flushed automatically when the
 removing containers) are made directly, the name cache should be reset with
 :meth:`~dockermap.map.client.MappingDockerClient.refresh_names`.
 
-
-Additional methods
-------------------
-The method :meth:`~dockermap.map.client.MappingDockerClient.wait`, in addition to the original `wait` implementation,
-only provides additional (and optional) logging, and prefixes the given container name with the name of the map.
-:meth:`~dockermap.map.client.MappingDockerClient.wait_and_remove` removes the container after is has finished running.
-Both methods allow for specifying a single ``instance`` name.
+Besides aforementioned methods, you can define custom container actions such as ``custom`` and run the using
+:meth:`~dockermap.map.client.MappingDockerClient.call` with the action name as the first argument. For this purpose you
+have to implement a policy class with a method ``custom_action`` with the first arguments `container map name`,
+`container configuration name`, and `instances`. Further keyword arguments are passed through.
