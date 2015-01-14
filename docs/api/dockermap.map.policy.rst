@@ -20,6 +20,14 @@ dockermap.map.policy.base module
     :undoc-members:
     :show-inheritance:
 
+dockermap.map.policy.cache module
+---------------------------------
+
+.. automodule:: dockermap.map.policy.cache
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 dockermap.map.policy.dep module
 -------------------------------
 
@@ -40,6 +48,14 @@ dockermap.map.policy.simple module
 ----------------------------------
 
 .. automodule:: dockermap.map.policy.simple
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+dockermap.map.policy.update module
+----------------------------------
+
+.. automodule:: dockermap.map.policy.update
     :members:
     :undoc-members:
     :show-inheritance:
