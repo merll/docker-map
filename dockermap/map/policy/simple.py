@@ -11,7 +11,7 @@ from .utils import is_initial
 
 class SimpleCreateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator):
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
-        for client_name, (client, client_config) in self._policy.get_clients(c_config, c_map):
+        for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
             existing_containers = self._policy.container_names[client_name]
             images = self._policy.images[client_name]
             for a in c_config.attaches:
@@ -53,7 +53,7 @@ class SimpleCreateMixin(object):
 
 class SimpleStartGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
-        for client_name, (client, client_config) in self._policy.get_clients(c_config, c_map):
+        for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
             images = self._policy.images[client_name]
             for a in c_config.attaches:
                 a_name = self._policy.cname(map_name, a)
@@ -105,7 +105,7 @@ class SimpleRestartMixin(object):
         c_map = self._maps[map_name]
         c_config = c_map.get_existing(container)
         c_instances = instances or c_config.instances or [None]
-        for client_name, (client, client_config) in self._policy.get_clients(c_config, c_map):
+        for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
             existing_containers = self._policy.container_names[client_name]
             for instance in c_instances:
                 ci_name = self.cname(map_name, container, instance)
@@ -123,7 +123,7 @@ class SimpleStopGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         if self._stop_dependent or not flags & ACTION_DEPENDENCY_FLAG:
-            for client_name, (client, client_config) in self._policy.get_clients(c_config, c_map):
+            for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
                 existing_containers = self._policy.container_names[client_name]
                 for instance in instances:
                     ci_name = self._policy.cname(map_name, container_name, instance)
@@ -164,7 +164,7 @@ class SimpleRemoveGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         if (self._remove_dependent or not flags & ACTION_DEPENDENCY_FLAG) and (self._remove_persistent or not c_config.persistent):
-            for client_name, (client, client_config) in self._policy.get_clients(c_config, c_map):
+            for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
                 existing_containers = self._policy.container_names[client_name]
                 for instance in instances:
                     ci_name = self._policy.cname(map_name, container_name, instance)
