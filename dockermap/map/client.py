@@ -1,11 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import six
-
 import docker
 
-from .base import DockerClientWrapper
 from .config import ClientConfiguration
 from .container import ContainerMap
 from .policy import ResumeUpdatePolicy
@@ -294,7 +291,7 @@ class MappingDockerClient(object):
         """
         Clients and their configuration objects.
 
-        :return Dictionary of client names, with their client instance and a configuration object as values.
+        :return: Dictionary of client names, with their client instance and a configuration object as values.
         :rtype: dict[unicode, dockermap.map.config.ClientConfiguration]
         """
         return self._clients
