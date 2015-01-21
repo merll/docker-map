@@ -26,22 +26,28 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
         return True
 
     def _check_volumes(self, c_map, c_config, config_name, instance_name, instance_volumes):
-        def _check_config_paths(cr_config, cr_instance):
-            for share in cr_config.shares:
-                self.path_vfs[config_name, instance_name, share] = instance_volumes.get(share)
-            for host_bind in cr_config.binds:
+        def _validate_bind(b_config, b_instance):
+            for host_bind in b_config.binds:
                 bind_alias = host_bind[0]
                 bind_path = c_map.volumes[bind_alias]
                 bind_vfs = instance_volumes.get(bind_path)
-                if c_map.host.get(bind_alias, cr_instance) != bind_vfs:
+                if c_map.host.get(bind_alias, b_instance) != bind_vfs:
                     return False
                 self.path_vfs[config_name, instance_name, bind_path] = bind_vfs
-            for attached in cr_config.attaches:
+
+        def _validate_attached(a_config):
+            for attached in a_config.attaches:
                 attached_path = c_map.volumes[attached]
                 attached_vfs = instance_volumes.get(attached_path)
                 if self.path_vfs.get((attached, None, attached_path)) != attached_vfs:
                     return False
                 self.path_vfs[config_name, instance_name, attached_path] = attached_vfs
+
+        def _check_config_paths(cr_config, cr_instance):
+            for share in cr_config.shares:
+                self.path_vfs[config_name, instance_name, share] = instance_volumes.get(share)
+            _validate_bind(cr_config, cr_instance)
+            _validate_attached(cr_config)
             for used in cr_config.uses:
                 used_path = c_map.volumes.get(used)
                 if used_path:
@@ -51,7 +57,13 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                 ref_c_name, ref_i_name = self._policy.resolve_cname(used, False)
                 ref_config = c_map.get_existing(ref_c_name)
                 if ref_config:
-                    return _check_config_paths(ref_config, ref_i_name)
+                    for share in ref_config.shares:
+                        shared_path = instance_volumes.get(share)
+                        if self.path_vfs.get((ref_c_name, ref_i_name, share)) != shared_path:
+                            return False
+                        self.path_vfs[(config_name, instance_name, share)] = shared_path
+                    _validate_bind(ref_config, ref_i_name)
+                    _validate_attached(ref_config)
                 else:
                     raise ValueError("Volume alias or container reference could not be resolved: {0}".format(used))
             return True
