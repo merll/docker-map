@@ -81,9 +81,11 @@ def _get_port_binding(value):
     elif isinstance(value, sub_types):  # Port only
         return PortBinding(value, None, None)
     elif isinstance(value, (list, tuple)):  # Exposed port, host port, and possibly interface
+        if len(value) == 1 and isinstance(value[0], sub_types):
+            return PortBinding(value[0], None, None)
         if len(value) == 2:
             ex_port, host_bind = value
-            if isinstance(host_bind, sub_types):  # Port, host port
+            if isinstance(host_bind, sub_types) or host_bind is None:  # Port, host port
                 return PortBinding(ex_port, host_bind, None)
             elif isinstance(host_bind, (list, tuple)) and len(host_bind) == 2:  # Port, (host port, interface)
                 host_port, interface = host_bind
