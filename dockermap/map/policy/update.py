@@ -91,19 +91,21 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     a_remove = (not a_status['Running'] and a_status['ExitCode'] in self.remove_status) or \
                         a_image != self.base_image_ids[client_name]
                     if a_remove:
-                        ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_config, a_name)
+                        ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, a_name)
                         client.remove_container(**ar_kwargs)
                         existing_containers.remove(a_name)
                 else:
                     a_remove = False
                     a_detail = None
                 if a_remove or not a_exists:
-                    ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_config, a_name, a)
+                    ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_name, client_config,
+                                                                        a_name, a)
                     client.create_container(**ac_kwargs)
                     existing_containers.add(a_name)
-                    as_kwargs = self._policy.get_attached_start_kwargs(c_map, c_config, client_config, a_name, a)
+                    as_kwargs = self._policy.get_attached_start_kwargs(c_map, c_config, client_name, client_config,
+                                                                       a_name, a)
                     client.start(**as_kwargs)
-                    self.prepare_container(images, client, c_map, c_config, client_config, a, a_name)
+                    self.prepare_container(images, client, c_map, c_config, client_name, client_config, a, a_name)
                 else:
                     volumes = a_detail.get('Volumes')
                     if volumes:
@@ -126,18 +128,20 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                         not self._check_links(map_name, c_config, ci_links)
                     if ci_remove:
                         if ci_status['Running']:
-                            ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_config, ci_name, ci)
+                            ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_name, client_config,
+                                                                     ci_name, ci)
                             client.stop(**ip_kwargs)
-                        ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_config, ci_name)
+                        ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, ci_name)
                         client.remove_container(**ir_kwargs)
                         existing_containers.remove(ci_name)
                 else:
                     ci_remove = False
                 if ci_remove or not ci_exists:
-                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_config, ci_name, container_name)
+                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name,
+                                                               container_name)
                     yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
-                    is_kwargs = self._policy.get_start_kwargs(c_map, c_config, client_config, ci_name, ci)
+                    is_kwargs = self._policy.get_start_kwargs(c_map, c_config, client_name, client_config, ci_name, ci)
                     client.start(**is_kwargs)
 
 
