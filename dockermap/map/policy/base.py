@@ -130,6 +130,28 @@ class BasePolicy(object):
         return image
 
     @classmethod
+    def get_hostname(cls, client_name, container_name):
+        """
+        :param client_name: Client configuration name.
+        :type client_name: unicode
+        :param container_name: Container name.
+        :type container_name: unicode
+        """
+        return '-'.join((container_name, client_name))
+
+    @classmethod
+    def get_domainname(cls, container_map, container_config, client_config):
+        """
+        :param container_map: Container map object.
+        :type container_map: dockermap.map.container.ContainerMap
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.container.ContainerConfiguration
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        """
+        return client_config.get('domainname', container_map.default_domain)
+
+    @classmethod
     def get_create_kwargs(cls, container_map, container_config, client_name, client_config, container_name,
                           default_image, kwargs=None):
         """
@@ -160,6 +182,8 @@ class BasePolicy(object):
             user=extract_user(container_config.user),
             ports=[port_binding.exposed_port
                    for port_binding in container_config.exposes if port_binding.exposed_port],
+            hostname=cls.get_hostname(client_name, container_name) if container_map.set_hostname else None,
+            domainname=cls.get_domainname(container_map, container_config, client_config),
         )
         update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
         return c_kwargs

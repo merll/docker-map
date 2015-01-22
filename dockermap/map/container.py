@@ -29,6 +29,8 @@ class ContainerMap(object):
         self._volumes = DictMap()
         self._containers = defaultdict(ContainerConfiguration)
         self._clients = list()
+        self._default_domain = None
+        self._set_hostname = True
         self.update(initial, **kwargs)
         if (initial or kwargs) and check_integrity:
             self.check_integrity()
@@ -49,6 +51,8 @@ class ContainerMap(object):
                 self._host.root = value
             elif key == 'repository':
                 self._repository = value
+            elif key == 'default_domain':
+                self._default_domain = value
             elif key == 'clients':
                 self._clients = list(value)
             elif key == 'containers':
@@ -73,6 +77,12 @@ class ContainerMap(object):
             elif key == 'repository':
                 if not lists_only:
                     self._repository = value
+            elif key == 'default_domain':
+                if not lists_only:
+                    self._default_domain = value
+            elif key == 'set_hostname':
+                if not lists_only:
+                    self._default_domain = value
             elif key == 'clients':
                 self._clients.extend(set(value) - set(self._clients))
             elif key == 'containers':
@@ -95,6 +105,8 @@ class ContainerMap(object):
         self._host.update(items._host)
         self._repository = items._repository
         self._clients = items._clients
+        self._default_domain = items._default_domain
+        self._set_hostname = items._set_hostname
         for container, config in items:
             self._containers[container].update(config)
 
@@ -108,6 +120,8 @@ class ContainerMap(object):
         self._clients.extend(set(items._clients) - set(self._clients))
         if not lists_only:
             self._repository = items._repository
+            self._default_domain = items._default_domain
+            self._set_hostname = items._set_hostname
         for container, config in items:
             if container in self._containers:
                 self._containers[container].merge(config, lists_only)
@@ -181,6 +195,34 @@ class ContainerMap(object):
     @repository.setter
     def repository(self, value):
         self._repository = value
+
+    @property
+    def default_domain(self):
+        """
+        Value to use as domain name for new containers, unless the client specifies otherwise.
+
+        :return: Default domain name.
+        :rtype: unicode
+        """
+        return self._default_domain
+
+    @default_domain.setter
+    def default_domain(self, value):
+        self._default_domain = value
+
+    @property
+    def set_hostname(self):
+        """
+        Whether to set the hostname for new containers.
+
+        :return: When set to ``False``, uses Docker's default autogeneration of hostnames instead.
+        :rtype: bool
+        """
+        return self._set_hostname
+
+    @set_hostname.setter
+    def set_hostname(self, value):
+        self._set_hostname = value
 
     @property
     def dependency_items(self):
