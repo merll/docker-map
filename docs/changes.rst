@@ -3,6 +3,12 @@
 Change History
 ==============
 
+0.2.1
+-----
+* Added host and domain name setting.
+* Improved update requirement detection.
+* Fixed restart policy.
+
 0.2.0
 -----
 * Moved container handling logic to policy classes.
