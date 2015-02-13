@@ -16,6 +16,8 @@ Basic instantiation
 -------------------
 A new `Dockerfile` can be created with the following commands::
 
+    from dockermap.api import DockerFile
+
     df = DockerFile('ubuntu', maintainer='ME, me@example.com', initial='RUN apt-get update\nRUN apt-get -y upgrade')
 
 
@@ -145,6 +147,8 @@ Building the Docker image
 -------------------------
 For starting the build process, pass the :class:`~dockermap.build.dockerfile.DockerFile` to the Docker Remote API with
 the enhanced client method :meth:`~dockermap.map.base.DockerClientWrapper.build_from_file`::
+
+    from dockermap.api import DockerClientWrapper, DockerFile
 
     client = DockerClientWrapper('unix://var/run/docker.sock')
     dockerfile = DockerFile('ubuntu', maintainer='ME, me@example.com')

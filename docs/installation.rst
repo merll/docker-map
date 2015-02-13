@@ -35,6 +35,18 @@ If you do not wish to expose a public network port from the host running Docker,
 Otherwise, for setting up a secure connection, refer to the `Docker documentation`_.
 
 
+Imports
+=======
+The most essential classes are collected in the top-level :mod:`~dockermap.api` module for convenience. For example, you
+can use::
+
+    from dockermap.api import ContainerMap
+
+rather than importing the class from the actual source module such as::
+
+    from dockermap.map.container import ContainerMap
+
+
 .. _PyPI: https://pypi.python.org/pypi/docker-map
 .. _Docker-Fabric: https://pypi.python.org/pypi/docker-fabric
 .. _`Docker documentation`: http://docs.docker.com/articles/https/

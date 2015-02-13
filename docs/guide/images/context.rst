@@ -25,6 +25,8 @@ Creating a DockerContext
 For generating a :class:`~dockermap.build.context.DockerContext` explicitly
 from an existing :class:`~dockermap.build.dockerfile.DockerFile`, just pass it to the constructor::
 
+    from dockermap.api import DockerContext
+
     with DockerContext(dockerfile) as context:
         ...
 
@@ -36,6 +38,8 @@ The ``with`` (Python context manager syntax) should be used, since :class:`~dock
 generates a temporary file which is automatically removed at the end of the block.
 
 It is also possible to pass in a path to a file, e.g.::
+
+    from dockermap.api import DockerContext
 
     with DockerContext(path_to_dockerfile) as context:
         ...
@@ -62,6 +66,8 @@ and can no longer be modified.
 
 The context tarball is transferred to Docker with
 :meth:`~dockermap.map.base.DockerClientWrapper.build_from_context`::
+
+    from dockermap.api import DockerClientWrapper, DockerContext
 
     client = DockerClientWrapper('unix://var/run/docker.sock')
     with DockerContext(path_to_dockerfile) as context:

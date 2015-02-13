@@ -3,6 +3,10 @@
 Change History
 ==============
 
+0.2.2
+-----
+* Added convenience imports in ``api`` module.
+
 0.2.1
 -----
 * Added host and domain name setting.

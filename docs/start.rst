@@ -6,6 +6,8 @@ Simple Dockerfile
 -----------------
 For deriving a new image from an existing `ubuntu` base image, you can use the following code::
 
+    from dockermap.api import DockerClientWrapper, DockerFile
+
     client = DockerClientWrapper('unix://var/run/docker.sock')
     with DockerFile('ubuntu:latest') as df:
         df.run('apt-get update')
@@ -18,6 +20,8 @@ Docker image with files
 For adding files during the build process, use the :meth:`~dockermap.build.dockerfile.DockerFile.add_file` function.
 It inserts the `ADD` command into the Dockerfile, but also makes sure that file is part of the context tarball::
 
+    from dockermap.api import DockerClientWrapper, DockerFile
+
     client = DockerClientWrapper('unix://var/run/docker.sock')
     with DockerFile('ubuntu:latest') as df:
         df.add_file('/home/user/myfiles', '/var/lib/myfiles')
@@ -28,6 +32,8 @@ Removing all containers
 -----------------------
 The :class:`~dockermap.map.base.DockerClientWrapper` has enhances some of the default functionality of `docker-py` and
 adds utility functions. For example, you can remove all stopped containers from your development machine by running::
+
+    from dockermap.api import DockerClientWrapper
 
     client = DockerClientWrapper('unix://var/run/docker.sock')
     client.cleanup_containers()
@@ -40,6 +46,8 @@ their dependencies.
 
 A simple example could be a web server an an application server, where the web server uses Unix sockets for
 communicating with the application server. The map could look like this::
+
+    from dockermap.api import ContainerMap
 
     container_map = ContainerMap('main', {
         'nginx': { # Configure container creation and startup
@@ -95,6 +103,8 @@ communicating with the application server. The map could look like this::
      the :ref:`import of YAML files <container_yaml>`. It is syntactically simpler than Python code.
 
 This map can be used with a :class:`~dockermap.map.client.MappingDockerClient`::
+
+    from dockermap.api import DockerClientWrapper, MappingDockerClient
 
     map_client = MappingDockerClient(container_map, DockerClientWrapper('unix://var/run/docker.sock'))
     map_client.startup('nginx')

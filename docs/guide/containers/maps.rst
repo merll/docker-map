@@ -26,6 +26,8 @@ The implementation of :class:`~dockermap.map.container.ContainerMap` aims to add
 Container maps can be created empty and defined by code, updated from dictionaries, loaded from YAML, or combinations of
 those methods. Every map has a name, that is set on instantiation::
 
+    from dockermap.api import ContainerMap
+
     container_map = ContainerMap('new_map')
 
 Structure
@@ -96,6 +98,8 @@ Clients
 Since version 0.2.0, a map can describe a container structure on a specific set of clients. For example, it is possible
 to run three application servers on a set of hosts, which are reverse-proxied by a single web server. This scenario
 would be described using the following configuration::
+
+    from dockermap.api import ClientConfiguration
 
     clients = {
         'apps1': ClientConfiguration(base_url='apps1_host', interfaces={'private': '10.x.x.11'}),
@@ -342,6 +346,8 @@ As mentioned, additional conversions are made for :attr:`~dockermap.map.config.C
 modifying existing elements, since no automated conversion is done then. For example, for adding a host-shared volume
 at run-time, use::
 
+    from dockermap.map.config import HostShare
+
     container_map.containers.app1.binds.append(HostShare('volume1', False))
 
 Creating and using container maps
@@ -374,6 +380,8 @@ Example
 
 This is a brief example, given a web server that communicates with two app instances of the same image over unix domain
 sockets::
+
+    from dockermap.api import ContainerMap
 
     container_map = ContainerMap('example_map', {
         'repository': 'registry.example.com',
@@ -425,6 +433,8 @@ This example assumes you have two images, ``registry.example.com/nginx`` for the
 user is assigned to the group id ``2000``. The app server is running with a user that has the id ``2000``.
 
 Creating a container with::
+
+    from dockermap.api import DockerClientWrapper, MappingDockerClient
 
     map_client = MappingDockerClient(container_map, DockerClientWrapper('unix://var/run/docker.sock'))
     map_client.create('web_server')

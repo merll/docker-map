@@ -96,6 +96,8 @@ The former is an instance of :class:`~dockermap.map.container.ContainerMap`, the
 a :class:`~docker.client.Client` object. Both initializing arguments are however optional and may be
 changed any time later using the properties :attr:`~dockermap.map.client.MappingDockerClient.maps`::
 
+    from dockermap.api import DockerClientWrapper, MappingDockerClient
+
     map_client = MappingDockerClient(container_map, DockerClientWrapper('unix://var/run/docker.sock'))
 
 Since version 0.2.0, also multiple maps and clients are supported. If exactly one map is provided, it is considered the
@@ -105,6 +107,8 @@ different set of clients.
 
 Clients are configured with :class:`~dockermap.map.config.ClientConfiguration` objects, which are passed to the
 :class:`~dockermap.map.client.MappingDockerClient` constructor::
+
+    from dockermap.api import ClientConfiguration, MappingDockerClient
 
     clients = {
         'client1': ClientConfiguration('host1'),
