@@ -166,7 +166,7 @@ precedence towards the :class:`~dockermap.map.config.ContainerConfiguration` is 
 
 For limiting effects to particular :ref:`instances` of a container configuration, all these methods accept an
 ``instances`` argument, where one or multiple instance names can be specified. By implementing a custom subclass of
-:class:`~dockermap.map.client.policy.base.BasePolicy`, the aforementioned behavior can be further adjusted to
+:class:`~dockermap.map.policy.base.BasePolicy`, the aforementioned behavior can be further adjusted to
 individual needs.
 
 Note that :class:`~dockermap.map.client.MappingDockerClient` caches names of existing containers and images for

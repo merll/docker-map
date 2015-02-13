@@ -16,9 +16,6 @@ class BasePolicy(object):
     """
     Abstract base class providing the basic infrastructure for generating actions based on container state.
 
-    Status detail and images are dictionaries of callables provided by the instantiating object. Their keys are the
-    container map, and their values are functions which query the relevant client for the current status on demand.
-
     :param container_maps: Container maps.
     :type container_maps: dict[unicode, dockermap.map.container.ContainerMap]
     :param clients: Dictionary of clients.
@@ -145,7 +142,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         """
@@ -160,7 +157,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param client_config: Client configuration object.
@@ -197,7 +194,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param client_config: Client configuration object.
@@ -230,7 +227,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param client_config: Client configuration object.
@@ -266,7 +263,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param client_config: Client configuration object.
@@ -306,7 +303,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param client_config: Client configuration object.
@@ -334,7 +331,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param client_config: Client configuration object.
@@ -366,7 +363,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param client_config: Client configuration object.
@@ -393,7 +390,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param client_config: Client configuration object.
@@ -422,7 +419,7 @@ class BasePolicy(object):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.container.ContainerConfiguration
+        :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param client_config: Client configuration object.
