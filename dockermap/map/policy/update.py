@@ -122,25 +122,33 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     ci_image = ci_detail['Image']
                     ci_volumes = ci_detail.get('Volumes') or dict()
                     ci_links = ci_detail['HostConfig']['Links'] or []
-                    ci_remove = (not ci_status['Running'] and ci_status['ExitCode'] in self.remove_status) or \
+                    ci_running = ci_status['Running']
+                    ci_remove = (not ci_running and ci_status['ExitCode'] in self.remove_status) or \
                         ci_image != image_id or \
                         not self._check_volumes(c_map, c_config, container_name, ci, ci_volumes) or \
                         not self._check_links(map_name, c_config, ci_links)
                     if ci_remove:
-                        if ci_status['Running']:
+                        if ci_running:
                             ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_name, client_config,
                                                                      ci_name, ci)
                             client.stop(**ip_kwargs)
                         ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, ci_name)
                         client.remove_container(**ir_kwargs)
                         existing_containers.remove(ci_name)
+                        ci_create = True
+                        ci_start = True
+                    else:
+                        ci_create = False
+                        ci_start = not ci_running
                 else:
-                    ci_remove = False
-                if ci_remove or not ci_exists:
+                    ci_create = True
+                    ci_start = True
+                if ci_create:
                     ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name,
                                                                container_name)
                     yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
+                if ci_create or ci_start:
                     is_kwargs = self._policy.get_start_kwargs(c_map, c_config, client_name, client_config, ci_name, ci)
                     client.start(**is_kwargs)
 
