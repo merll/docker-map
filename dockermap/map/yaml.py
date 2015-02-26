@@ -5,12 +5,12 @@ import os
 import six
 import yaml
 
+from ..utils import expand_path, expand_path_lazy
 from .config import ClientConfiguration
 from .container import ContainerMap
-from ..utils import expand_path
 
 
-def expand_path_node(loader, node):
+def expand_node(loader, node, expand_method):
     """
     Expands paths on a YAML document node. If it is a sequence node (list) items on the first level are expanded. For
     a mapping node (dict), values are expanded.
@@ -19,24 +19,25 @@ def expand_path_node(loader, node):
     :type loader: yaml.loader.SafeLoader
     :param node: Document node.
     :type node: ScalarNode, MappingNode, or SequenceNode
+    :param expand_method: Callable to expand the path with.
+    :type expand_method: callable
     :return: unicode, list, or dict
     """
     if isinstance(node, yaml.nodes.ScalarNode):
         val = loader.construct_scalar(node)
-        return expand_path(val)
+        return expand_method(val)
     elif isinstance(node, yaml.nodes.MappingNode):
         val = loader.construct_mapping(node)
         for d_key, d_val in six.iteritems(val):
-            val[d_key] = expand_path(d_val)
+            val[d_key] = expand_method(d_val)
         return val
     elif isinstance(node, yaml.nodes.SequenceNode):
         val = loader.construct_sequence(node)
-        if isinstance(val, list):
-            return [expand_path(l_val) for l_val in val]
-        return map(expand_path, val)
+        return [expand_method(l_val) for l_val in val]
 
 
-yaml.add_constructor('!path', expand_path_node, yaml.SafeLoader)
+yaml.add_constructor('!path', lambda loader, node: expand_node(loader, node, expand_path), yaml.SafeLoader)
+yaml.add_constructor('!path_lazy', lambda loader, node: expand_node(loader, node, expand_path_lazy), yaml.SafeLoader)
 
 
 def load_file(filename):

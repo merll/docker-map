@@ -2,7 +2,9 @@
 from __future__ import unicode_literals
 
 import six
+from dockermap.map.policy.utils import is_initial
 
+from ...functional import resolve_value
 from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
 
 
@@ -29,15 +31,16 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
         def _validate_bind(b_config, b_instance):
             for host_bind in b_config.binds:
                 bind_alias = host_bind[0]
-                bind_path = c_map.volumes[bind_alias]
+                bind_path = resolve_value(c_map.volumes[bind_alias])
                 bind_vfs = instance_volumes.get(bind_path)
-                if c_map.host.get(bind_alias, b_instance) != bind_vfs:
+                host_path = resolve_value(c_map.host.get(bind_alias, b_instance))
+                if host_path != bind_vfs:
                     return False
                 self.path_vfs[config_name, instance_name, bind_path] = bind_vfs
 
         def _validate_attached(a_config):
             for attached in a_config.attaches:
-                attached_path = c_map.volumes[attached]
+                attached_path = resolve_value(c_map.volumes[attached])
                 attached_vfs = instance_volumes.get(attached_path)
                 if self.path_vfs.get((attached, None, attached_path)) != attached_vfs:
                     return False
@@ -45,23 +48,26 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
 
         def _check_config_paths(cr_config, cr_instance):
             for share in cr_config.shares:
-                self.path_vfs[config_name, instance_name, share] = instance_volumes.get(share)
+                cr_shared_path = resolve_value(share)
+                self.path_vfs[config_name, instance_name, cr_shared_path] = instance_volumes.get(share)
             _validate_bind(cr_config, cr_instance)
             _validate_attached(cr_config)
             for used in cr_config.uses:
-                used_path = c_map.volumes.get(used)
+                used_volume = used.volume
+                used_path = resolve_value(c_map.volumes.get(used_volume))
                 if used_path:
-                    if self.path_vfs.get((used, None, used_path)) != instance_volumes.get(used_path):
+                    if self.path_vfs.get((used_volume, None, used_path)) != instance_volumes.get(used_path):
                         return False
                     continue
-                ref_c_name, ref_i_name = self._policy.resolve_cname(used, False)
+                ref_c_name, ref_i_name = self._policy.resolve_cname(used_volume, False)
                 ref_config = c_map.get_existing(ref_c_name)
                 if ref_config:
                     for share in ref_config.shares:
-                        shared_path = instance_volumes.get(share)
-                        if self.path_vfs.get((ref_c_name, ref_i_name, share)) != shared_path:
+                        ref_shared_path = resolve_value(share)
+                        i_shared_path = instance_volumes.get(ref_shared_path)
+                        if self.path_vfs.get((ref_c_name, ref_i_name, ref_shared_path)) != i_shared_path:
                             return False
-                        self.path_vfs[(config_name, instance_name, share)] = shared_path
+                        self.path_vfs[(config_name, instance_name, ref_shared_path)] = i_shared_path
                     _validate_bind(ref_config, ref_i_name)
                     _validate_attached(ref_config)
                 else:
@@ -77,7 +83,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
         return i_name
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
-        a_paths = dict((alias, c_map.volumes[alias]) for alias in c_config.attaches)
+        a_paths = dict((alias, resolve_value(c_map.volumes[alias])) for alias in c_config.attaches)
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
             images = self._policy.images[client_name]
             existing_containers = self._policy.container_names[client_name]

@@ -6,6 +6,7 @@ import operator
 import posixpath
 import six
 
+from ..functional import lazy_type, resolve_value
 from . import DictMap
 from .base import DockerClientWrapper
 
@@ -14,7 +15,7 @@ SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent'
 DICT_ATTRIBUTES = 'create_options', 'start_options'
 LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches', 'clients'
 
-HostShare = namedtuple('HostShare', ('volume', 'readonly'))
+SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface'))
 
@@ -24,9 +25,10 @@ def _get_list(value):
         return []
     elif isinstance(value, (list, tuple)):
         return list(value)
-    elif isinstance(value, six.string_types):
+    elif isinstance(value, six.string_types + (lazy_type, )):
         return [value]
-    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value)))
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(
+        type(value).__name__))
 
 
 def _get_listed_tuples(value, element_type, conversion_func):
@@ -40,24 +42,25 @@ def _get_listed_tuples(value, element_type, conversion_func):
         return [conversion_func(e) for e in value]
     elif isinstance(value, dict):
         return [conversion_func(e) for e in six.iteritems(value)]
-    raise ValueError("Invalid type; expected {0}, list, tuple, or dict; found {1}.".format(element_type.__name__, type(value)))
+    raise ValueError("Invalid type; expected {0}, list, tuple, or dict; found {1}.".format(
+        element_type.__name__, type(value).__name__))
 
 
-def _get_host_share(value):
-    if isinstance(value, HostShare):
+def _get_shared_volume(value):
+    if isinstance(value, SharedVolume):
         return value
     elif isinstance(value, six.string_types):
-        return HostShare(value, False)
+        return SharedVolume(value, False)
     elif isinstance(value, (list, tuple)):
         if len(value) == 2:
-            return HostShare(value[0], bool(value[1]))
-        raise ValueError("Invalid element length; only tuples and lists of length 2 can be converted to a HostShare tuple.")
+            return SharedVolume(value[0], bool(value[1]))
+        raise ValueError("Invalid element length; only tuples and lists of length 2 can be converted to a SharedVolume tuple.")
     elif isinstance(value, dict):
         if len(value) == 1:
             k, v = value.items()[0]
-            return HostShare(k, bool(v))
-        raise ValueError("Invalid element length; only dicts with one element can be converted to a HostShare tuple.")
-    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value)))
+            return SharedVolume(k, bool(v))
+        raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume tuple.")
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
 def _get_container_link(value):
@@ -69,7 +72,7 @@ def _get_container_link(value):
         if len(value) == 2:
             return ContainerLink(*value)
         raise ValueError("Invalid element length; only tuples and lists of length 2 can be converted to a ContainerLink tuple.")
-    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value)))
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
 def _get_port_binding(value):
@@ -83,7 +86,7 @@ def _get_port_binding(value):
             return PortBinding(value[0], None, None)
         if len(value) == 2:
             ex_port, host_bind = value
-            if isinstance(host_bind, sub_types) or host_bind is None:  # Port, host port
+            if isinstance(host_bind, sub_types + (lazy_type, )) or host_bind is None:  # Port, host port
                 return PortBinding(ex_port, host_bind, None)
             elif isinstance(host_bind, (list, tuple)) and len(host_bind) == 2:  # Port, (host port, interface)
                 host_port, interface = host_bind
@@ -93,10 +96,10 @@ def _get_port_binding(value):
             ex_port, host_port, interface = value
             return PortBinding(ex_port, host_port, interface)
         raise ValueError("Invalid element length; only tuples and lists of length 2 or 3 can be converted to a PortBinding tuple.")
-    raise ValueError("Invalid type; expected a list, tuple, int or string type, found {0}.".format(type(value)))
+    raise ValueError("Invalid type; expected a list, tuple, int or string type, found {0}.".format(type(value).__name__))
 
 
-_get_host_shares = lambda value: _get_listed_tuples(value, HostShare, _get_host_share)
+_get_shared_volumes = lambda value: _get_listed_tuples(value, SharedVolume, _get_shared_volume)
 _get_container_links = lambda value: _get_listed_tuples(value, ContainerLink, _get_container_link)
 _get_port_bindings = lambda value: _get_listed_tuples(value, PortBinding, _get_port_binding)
 
@@ -181,13 +184,13 @@ class ContainerConfiguration(object):
         `(volume_alias: unicode, readonly: bool)`.
 
         :return: Host volumes.
-        :rtype: list[HostShare]
+        :rtype: list[SharedVolume]
         """
         return self._binds
 
     @binds.setter
     def binds(self, value):
-        self._binds = _get_host_shares(value)
+        self._binds = _get_shared_volumes(value)
 
     @property
     def uses(self):
@@ -196,13 +199,13 @@ class ContainerConfiguration(object):
         names if all volumes are to be used of that container.
 
         :return: Used volumes.
-        :rtype: list[unicode]
+        :rtype: list[SharedVolume]
         """
         return self._uses
 
     @uses.setter
     def uses(self, value):
-        self._uses = _get_list(value)
+        self._uses = _get_shared_volumes(value)
 
     @property
     def links(self):
@@ -406,7 +409,7 @@ class ContainerConfiguration(object):
 
         if isinstance(values, dict):
             get_func = values.get
-            update_binds = _get_converted_list('binds', _get_host_shares)
+            update_binds = _get_converted_list('binds', _get_shared_volumes)
             update_links = _get_converted_list('links', _get_container_links)
             update_ports = _get_converted_list('publishes', _get_port_bindings)
         elif isinstance(values, ContainerConfiguration):
@@ -464,8 +467,9 @@ class HostVolumeConfiguration(DictMap):
             path = value.get(instance or 'default')
         else:
             path = value
-        if path and self._root and (path[0] != posixpath.sep):
-            return posixpath.join(self._root, path)
+        root = resolve_value(self._root)
+        if path and root and (path[0] != posixpath.sep):
+            return posixpath.join(root, path)
         return path
 
 

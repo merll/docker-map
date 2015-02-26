@@ -2,14 +2,15 @@
 from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
-import itertools
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
+from dockermap.functional import resolve_value
 from ...shortcuts import get_user_group, str_arg
 from . import ACTION_DEPENDENCY_FLAG
 from .dep import ContainerDependencyResolver
 from .cache import ContainerCache, ImageCache
-from .utils import extract_user, get_host_binds, get_port_bindings, init_options, update_kwargs
+from .utils import (extract_user, get_host_binds, get_port_bindings, get_inherited_volumes, get_volumes, init_options,
+                    update_kwargs)
 
 
 class BasePolicy(object):
@@ -121,7 +122,7 @@ class BasePolicy(object):
             if image[0] == '/':
                 return image[1:]
             return image
-        repository = container_map.repository
+        repository = resolve_value(container_map.repository)
         if repository:
             return '/'.join((repository, image))
         return image
@@ -174,8 +175,7 @@ class BasePolicy(object):
         c_kwargs = dict(
             name=container_name,
             image=cls.iname(container_map, container_config.image or default_image),
-            volumes=list(itertools.chain(container_config.shares,
-                                         (container_map.volumes[b.volume] for b in container_config.binds))),
+            volumes=list(get_volumes(container_map, container_config)),
             user=extract_user(container_config.user),
             ports=[port_binding.exposed_port
                    for port_binding in container_config.exposes if port_binding.exposed_port],
@@ -208,12 +208,13 @@ class BasePolicy(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        path = container_map.volumes[alias]
+        path = resolve_value(container_map.volumes[alias])
+        user = resolve_value(container_config.user)
         c_kwargs = dict(
             name=container_name,
             image=cls.base_image,
             volumes=[path],
-            user=container_config.user,
+            user=user,
         )
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
@@ -245,10 +246,9 @@ class BasePolicy(object):
         c_kwargs = dict(
             container=container,
             links=dict((cls.cname(map_name, l_name), alias) for l_name, alias in container_config.links),
-            binds=get_host_binds(container_map, container_config, instance),
-            volumes_from=list(cls.cname(map_name, u_name)
-                              for u_name in itertools.chain(container_config.uses, container_config.attaches)),
-            port_bindings=get_port_bindings(container_config, client_config),
+            binds=dict(get_host_binds(container_map, container_config, instance)),
+            volumes_from=list(cls.cname(map_name, u_name) for u_name in get_inherited_volumes(container_config)),
+            port_bindings=dict(get_port_bindings(container_config, client_config)),
         )
         update_kwargs(c_kwargs, init_options(container_config.start_options), kwargs)
         return c_kwargs
@@ -278,14 +278,14 @@ class BasePolicy(object):
         :rtype: dict
         """
         def _get_cmd():
-            user = container_config.user
+            user = resolve_value(container_config.user)
             if user:
                 yield ' '.join(('chown -R', get_user_group(user), str_arg(path)))
             permissions = container_config.permissions
             if container_config.permissions:
                 yield ' '.join(('chmod -R', permissions, str_arg(path)))
 
-        path = container_map.volumes[alias]
+        path = resolve_value(container_map.volumes[alias])
         c_kwargs = dict(
             image=cls.core_image,
             command=' && '.join(_get_cmd()),

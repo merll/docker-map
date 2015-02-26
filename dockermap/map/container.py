@@ -234,7 +234,8 @@ class ContainerMap(object):
         :rtype: iterator
         """
         def _get_used_item(u):
-            c, __, i = u.partition('.')
+            v = u.volume
+            c, __, i = v.partition('.')
             if i:
                 return self._name, c, i
             return self._name, attached.get(c, c), None
@@ -334,10 +335,11 @@ class ContainerMap(object):
 
         def _get_container_items(c_name, container):
             instance_names = _get_instance_names(c_name, container.instances)
-            shared = instance_names[:] if container.shares or container.binds else []
+            shared = instance_names[:] if container.shares or container.binds or container.uses else []
             bind = [b.volume for b in container.binds]
             link = [l.container for l in container.links]
-            return instance_names, container.uses, container.attaches, shared, bind, link
+            uses = [u.volume for u in container.uses]
+            return instance_names, uses, container.attaches, shared, bind, link
 
         all_instances, all_used, all_attached, all_shared, all_binds, all_links = zip(*[_get_container_items(k, v) for k, v in self])
         volume_shared = tuple(itertools.chain.from_iterable(all_shared + all_attached))
