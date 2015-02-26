@@ -732,6 +732,9 @@ class AbstractActionGenerator(object):
         def _gen_actions(c_map_name, c_container, c_instance, c_flags=0, **c_kwargs):
             c_map = self._policy.container_maps[c_map_name]
             c_config = c_map.get_existing(c_container)
+            if not c_config:
+                raise ValueError("Container configuration '{0}' not found on map '{1}'.".format(
+                    c_container, c_map_name))
             c_instances = [c_instance] if c_instance else c_config.instances or [None]
             return self.generate_item_actions(map_name, c_map, c_container, c_config, c_instances, c_flags, **c_kwargs)
 
