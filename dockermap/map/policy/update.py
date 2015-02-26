@@ -139,7 +139,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                         ci_start = True
                     else:
                         ci_create = False
-                        ci_start = not ci_running
+                        ci_start = is_initial(ci_status) if c_config.persistent else not ci_running
                 else:
                     ci_create = True
                     ci_start = True
