@@ -6,8 +6,6 @@ import operator
 import posixpath
 import six
 
-from docker.client import DEFAULT_DOCKER_API_VERSION, DEFAULT_TIMEOUT_SECONDS
-
 from . import DictMap
 from .base import DockerClientWrapper
 
@@ -488,8 +486,7 @@ class ClientConfiguration(DictMap):
     init_kwargs = 'base_url', 'version', 'timeout', 'tls'
     client_constructor = DockerClientWrapper
 
-    def __init__(self, base_url=None, version=DEFAULT_DOCKER_API_VERSION, timeout=DEFAULT_TIMEOUT_SECONDS,
-                 *args, **kwargs):
+    def __init__(self, base_url=None, version=None, timeout=None, *args, **kwargs):
         self.base_url = base_url
         self.version = version
         self.timeout = timeout
