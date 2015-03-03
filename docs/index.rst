@@ -15,11 +15,11 @@ The project is hosted on GitHub_.
 Features
 ========
 
-* Creation of complex `Dockerfile`'s through Python code, including variables.
+* Creation of complex `Dockerfile`'s through Python code.
 * Simplified transfer of build resources (Context) to the Remote API.
+* Configuration of container landscapes, including dependencies between containers.
+* Consistency check of shared volume paths and re-creation of inconsistent or outdated containers.
 * Utility client functions.
-* Configuration of container creation and start environments, including dependencies.
-* Usage of volume aliases and simplified sharing.
 
 
 Contents
@@ -37,6 +37,7 @@ Contents
    guide/containers/client
    guide/containers/maps
    guide/containers/yaml
+   guide/containers/advanced
 
    changes
 

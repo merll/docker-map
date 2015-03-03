@@ -161,6 +161,17 @@ sub-elements:
        instance2: $CONFIG_PATH/app2
 
 
+Lazy resolution of variables
+----------------------------
+The default implementation of ``!path`` resolves variables as soon as they are instantiated. If this is not intended,
+you can use the ``!path_lazy`` tag instead. Then the variables will not be resolved to their current values until they
+are used for the first time. This option is available on the elements listed under :ref:`container_lazy`.
+
+This may have little practical relevance for paths provided in environment variables, since these are usually set before
+the application starts. It may however be useful if you extend the YAML parser with your own tags, that resolve
+variables at run-time.
+
+
 .. _Wikipedia: http://en.wikipedia.org/wiki/YAML
 .. _YAML specification: http://www.yaml.org/spec/1.2/spec.html
 .. _type list: http://yaml.org/type/index.html

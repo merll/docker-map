@@ -13,9 +13,18 @@ Submodules
 ----------
 
 dockermap.api module
---------------------------
+--------------------
 
 .. automodule:: dockermap.api
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+
+dockermap.functional module
+---------------------------
+
+.. automodule:: dockermap.functional
     :members:
     :undoc-members:
     :show-inheritance:
@@ -31,7 +40,7 @@ dockermap.shortcuts module
 
 
 dockermap.utils module
---------------------------
+----------------------
 
 .. automodule:: dockermap.utils
     :members:

@@ -71,7 +71,7 @@ class MappingDockerClient(object):
         Returns an instance of :attr:`~policy_class`.
 
         :return: An instance of the current policy class.
-        :rtype: dockermap.map.policy.BasePolicy
+        :rtype: dockermap.map.policy.base.BasePolicy
         """
         if not self._policy:
             self._policy = self._policy_class(self._maps, self._clients)

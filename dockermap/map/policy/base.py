@@ -130,6 +130,8 @@ class BasePolicy(object):
     @classmethod
     def get_hostname(cls, client_name, container_name):
         """
+        Generates a host name from the container name and the client configuration name.
+
         :param client_name: Client configuration name.
         :type client_name: unicode
         :param container_name: Container name.
@@ -140,6 +142,8 @@ class BasePolicy(object):
     @classmethod
     def get_domainname(cls, container_map, container_config, client_config):
         """
+        Provides a domain name for the container, either from the client configuration or the container map default.
+
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param container_config: Container configuration object.

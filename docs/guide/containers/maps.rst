@@ -60,7 +60,11 @@ Additionally there are the following attributes:
 * :attr:`~dockermap.map.container.ContainerMap.name`: All created containers will be prefixed with this.
 * :attr:`~dockermap.map.container.ContainerMap.repository`: A prefix, that will be added to all image names, unless they
   already have one or start with ``/`` (i.e. are only local images).
-
+* :attr:`~dockermap.map.container.ContainerMap.default_domain`: The domain name that is set on new containers; it can
+  be overridden by a client configuration. If none of the two are available, Docker's default is used.
+* :attr:`~dockermap.map.container.ContainerMap.set_hostname`: For specifying a new container's host name dependent on
+  the container name (in the format ``<client name>-<container name>``), this is by default set to ``True``. If set
+  to ``False``, Docker automatically generates a new host name for each container.
 
 Volumes
 ^^^^^^^
@@ -164,11 +168,25 @@ You do not need to specify host-mapped volumes here -- this is what
 
 Volumes shared with the host
 """"""""""""""""""""""""""""
-References to volume aliases in :attr:`~dockermap.map.container.ContainerMap.host` are set in
-:attr:`~dockermap.map.config.ContainerConfiguration.binds`, in order to make a host volume accessible to a
-container. The definition is usually a list or tuple of :attr:`~dockermap.map.config.HostShare` instances. The latter
-is a named tuple ``(volume, readonly)``, where the first element is the volume alias, and the second is a boolean
-value indicating a read-only access.
+In order to make a host volume accessible to one or more containers, follow these steps:
+
+#. Create an alias in :attr:`~dockermap.map.container.ContainerMap.volumes`, specifying the path inside the container.
+#. Add the host volume path using the same alias under :attr:`~dockermap.map.container.ContainerMap.host`.
+#. Then this alias can be used in the :attr:`~dockermap.map.config.ContainerConfiguration.binds` property of one or
+   more containers on the map.
+
+Example::
+
+    container_map.volumes.volume1 = '/var/log/service'
+    container_map.volumes.volume2 = '/var/run/service'
+    container_map.host.volume1 = '/var/app1/log'
+    container_map.host.volume2 = '/var/app1/run'
+    # Add volume1 as read-write, make volume2 read-only.
+    container_map.containers.app1.binds = ['volume1', ('volume2', True)]
+
+The definition in :attr:`~dockermap.map.container.ContainerMap.host` is usually a list or tuple of
+:attr:`~dockermap.map.config.SharedVolume` instances. The latter is a named tuple ``(volume, readonly)``, where the first
+element is the volume alias, and the second is a boolean value indicating a read-only access.
 
 For easier input, this can also be set as simple two-element Python tuples, dictionaries with each a single key;
 strings are also valid input, which will default to write-access.
@@ -185,18 +203,9 @@ You can refer to other containers names on the map, or names listed in the
 container names, this container will have access to all of their shared volumes; when referencing attached volumes, only
 the attached volume will be accessible. Either way, this declares a dependency of one container on the other.
 
-.. _linked-containers:
-
-Linked containers
-"""""""""""""""""
-Containers on the map can be linked together (similar to the ``--link`` argument on the command line) by assigning
-one or multiple elements to :attr:`~dockermap.map.config.ContainerConfiguration.links`. As a result, the container
-gains access to the network of the referenced container. This also defines a dependency of this container on the other.
-
-Elements are set as :attr:`~dockermap.map.config.ContainerLink` named tuples, with elements ``(container, alias)``.
-However, it is also possible to insert plain two-element Python tuples, single-key dictionaries, and strings. If the
-alias is not set (e.g. because only a string is provided), the alias is identical to the container name, but without
-the name prefix of the `ContainerMap`.
+Like :attr:`~dockermap.map.container.ContainerMap.host`, input to
+:attr:`~dockermap.map.container.ContainerMap.uses` can be provided as tuples, dictionaries, or single strings, which
+are converted into lists of :attr:`~dockermap.map.config.SharedVolume` tuples.
 
 .. _attached-volumes:
 
@@ -223,7 +232,31 @@ non-superuser privileges usually requires permission adjustments, setting
 :attr:`~dockermap.map.config.ContainerConfiguration.user` starts one more temporary container (based on
 `busybox`) running a ``chown`` command. Furthermore this sets the user that the current container is started with.
 Similarly for :attr:`~dockermap.map.config.ContainerConfiguration.permissions`, a temporary `busybox` container performs
-a ``chmod`` command on the shared container.
+a ``chmod`` command on the shared container::
+
+    container_map.volumes.volume1 = '/var/data1'
+    container_map.volumes.volume2 = '/var/more_data'
+    container_map.host.volume1 = '/var/app1/data1'
+    container_map.containers.app1.binds = 'volume1'
+    container_map.containers.app1.attaches = 'volume2'
+    ...
+    # app2 inherits all shared volumes from app1
+    container_map.containers.app2.uses = 'app1'
+    # app3 only gains access to 'volume2'
+    container_map.containers.app3.uses = 'volume2'
+
+.. _linked-containers:
+
+Linked containers
+"""""""""""""""""
+Containers on the map can be linked together (similar to the ``--link`` argument on the command line) by assigning
+one or multiple elements to :attr:`~dockermap.map.config.ContainerConfiguration.links`. As a result, the container
+gains access to the network of the referenced container. This also defines a dependency of this container on the other.
+
+Elements are set as :attr:`~dockermap.map.config.ContainerLink` named tuples, with elements ``(container, alias)``.
+However, it is also possible to insert plain two-element Python tuples, single-key dictionaries, and strings. If the
+alias is not set (e.g. because only a string is provided), the alias is identical to the container name, but without
+the name prefix of the `ContainerMap`.
 
 .. _exposed-ports:
 
@@ -235,8 +268,8 @@ bindings appropriately during container creation and start.
 
 The configuration is set either through a list or tuple of the following:
 
-* a single string or integer - exposes a port only to a linked container
-* a pair of string / integer values - publishes the exposed port (1) to the host's port (2) on all interfaces
+* a single string or integer - exposes a port only to a linked container;
+* a pair of string / integer values - publishes the exposed port (1) to the host's port (2) on all interfaces;
 * a pair of string / integer values, followed by a string - publishes the exposed port (1) to the host's port (2) on
   the interface alias name (3), which is substituted with the interface address for that interface defined by the client
   configuration.
@@ -339,16 +372,17 @@ and::
     container_map.containers.app1.uses = ('volume1',)
 
 As mentioned, additional conversions are made for :attr:`~dockermap.map.config.ContainerConfiguration.binds`,
+:attr:`~dockermap.map.config.ContainerConfiguration.uses`,
 :attr:`~dockermap.map.config.ContainerConfiguration.links`, and
 :attr:`~dockermap.map.config.ContainerConfiguration.exposes`; each element in an input list or tuple is converted to
-:attr:`~dockermap.map.config.HostShare`, :attr:`~dockermap.map.config.ContainerLink`, or
+:attr:`~dockermap.map.config.SharedVolume`, :attr:`~dockermap.map.config.ContainerLink`, or
 :attr:`~dockermap.map.config.PortBinding`. Keep this in mind when
 modifying existing elements, since no automated conversion is done then. For example, for adding a host-shared volume
 at run-time, use::
 
-    from dockermap.map.config import HostShare
+    from dockermap.map.config import SharedVolume
 
-    container_map.containers.app1.binds.append(HostShare('volume1', False))
+    container_map.containers.app1.binds.append(SharedVolume('volume1', False))
 
 Creating and using container maps
 ---------------------------------

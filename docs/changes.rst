@@ -3,6 +3,12 @@
 Change History
 ==============
 
+0.3.0
+-----
+* Possibility to use 'lazy' values in various settings (e.g. port bindings, volume aliases, host volumes, and user).
+* Consider read-only option for inherited volumes in ``uses`` property.
+* Further update policy fixes.
+
 0.2.2
 -----
 * Added convenience imports in ``api`` module.
