@@ -2,9 +2,10 @@
 from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
+from six import with_metaclass
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
-from dockermap.functional import resolve_value
+from ...functional import resolve_value
 from ...shortcuts import get_user_group, str_arg
 from . import ACTION_DEPENDENCY_FLAG
 from .dep import ContainerDependencyResolver
@@ -13,7 +14,7 @@ from .utils import (extract_user, get_host_binds, get_port_bindings, get_inherit
                     update_kwargs)
 
 
-class BasePolicy(object):
+class BasePolicy(with_metaclass(ABCMeta, object)):
     """
     Abstract base class providing the basic infrastructure for generating actions based on container state.
 
@@ -22,8 +23,6 @@ class BasePolicy(object):
     :param clients: Dictionary of clients.
     :type clients: dict[unicode, dockermap.map.config.ClientConfiguration]
     """
-    __metaclass__ = ABCMeta
-
     core_image = DEFAULT_COREIMAGE
     base_image = DEFAULT_BASEIMAGE
 
@@ -670,15 +669,13 @@ class BasePolicy(object):
         return self._images
 
 
-class AbstractActionGenerator(object):
+class AbstractActionGenerator(with_metaclass(ABCMeta, object)):
     """
     Abstract base implementation for an action generator, which generates actions for a policy.
 
     :param policy: Policy object instance.
     :type policy: BasePolicy
     """
-    __metaclass__ = ABCMeta
-
     def __init__(self, policy=None):
         self._policy = policy
 

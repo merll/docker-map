@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
+from six import with_metaclass
 import cStringIO
 from tempfile import NamedTemporaryFile
 
@@ -14,7 +15,7 @@ class FinalizedError(Exception):
     pass
 
 
-class DockerBuffer(object):
+class DockerBuffer(with_metaclass(ABCMeta, object)):
     """
     Abstract class for managing Docker file-like objects. Subclasses must override at least :attr:`init_fileobj` with
     a callable which constructs the actual file-like object.
@@ -22,8 +23,6 @@ class DockerBuffer(object):
     :param args: Args to :attr:`init_fileobj`.
     :param kwargs: Kwargs to :attr:`init_fileobj`.
     """
-    __metaclass__ = ABCMeta
-
     init_fileobj = None
 
     def __init__(self, *args, **kwargs):
@@ -95,12 +94,10 @@ class DockerBuffer(object):
         self._fileobj.close()
 
 
-class DockerStringBuffer(DockerBuffer):
+class DockerStringBuffer(with_metaclass(ABCMeta, DockerBuffer)):
     """
     Partial implementation of :class:`~DockerBuffer`, backed by a :class:`~cStringIO.StringIO` buffer.
     """
-    __metaclass__ = ABCMeta
-
     init_fileobj = cStringIO.StringIO
 
     def save(self, name, encoding='utf-8'):
@@ -120,12 +117,10 @@ class DockerStringBuffer(DockerBuffer):
                 f.write(self.getvalue())
 
 
-class DockerTempFile(DockerBuffer):
+class DockerTempFile(with_metaclass(ABCMeta, DockerBuffer)):
     """
     Partial implementation of :class:`~DockerBuffer`, backed by a :class:`~tempfile.NamedTemporaryFile`.
     """
-    __metaclass__ = ABCMeta
-
     init_fileobj = lambda self: NamedTemporaryFile('wb+')
 
     def save(self, name):

@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from abc import abstractmethod, ABCMeta
 from collections import namedtuple, defaultdict
-import six
+from six import iteritems, with_metaclass
 
 
 Dependency = namedtuple('Dependency', ('parent', 'dependency_found'))
@@ -13,7 +13,7 @@ def _dependency_dict(items):
     if items is None:
         return {}
     if isinstance(items, dict):
-        iterator = six.iteritems(items)
+        iterator = iteritems(items)
     else:
         iterator = items
     return dict((item, Dependency(parent, None)) for item, parent in iterator)
@@ -26,7 +26,7 @@ class CircularDependency(Exception):
     pass
 
 
-class BaseDependencyResolver(object):
+class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
     """
     Base class for resolving dependencies of hierarchical nodes. Not each node has to be relevant, and on each level
     parent dependencies can be merged with the current node.
@@ -35,8 +35,6 @@ class BaseDependencyResolver(object):
     :param initial: Optional: Iterable or dictionary in the format `(dependent_item, dependence)`.
     :type initial: iterable
     """
-    __metaclass__ = ABCMeta
-
     def __init__(self, initial=None):
         self._deps = _dependency_dict(initial)
 
@@ -110,13 +108,11 @@ class BaseDependencyResolver(object):
         self._deps.update(_dependency_dict(items))
 
 
-class SingleDependencyResolver(BaseDependencyResolver):
+class SingleDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
     """
     Abstract, partial implementation of a dependency resolver for nodes in a 1:n relationship, i.e. that each node
     depends on exactly one item.
     """
-    __metaclass__ = ABCMeta
-
     def check_circular_func(self, start_item):
         """
         Provides the check if the dependence equals the node `start_item`, that the check originally started with.
@@ -140,13 +136,11 @@ class SingleDependencyResolver(BaseDependencyResolver):
                 self._deps[si] = Dependency(parent, None)
 
 
-class MultiDependencyResolver(BaseDependencyResolver):
+class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
     """
     Abstract, partial implementation of a dependency resolver for nodes in a m:n relationship, i.e. that each node
     depends on one or multiple items.
     """
-    __metaclass__ = ABCMeta
-
     def __init__(self, initial=None):
         self._deps = defaultdict(lambda: Dependency(set(), None), _dependency_dict(initial))
 
@@ -185,7 +179,7 @@ class MultiDependencyResolver(BaseDependencyResolver):
         :param items: Iterable or dictionary in the format `(dependent_item, dependencies)`.
         :type items: iterable
         """
-        for item, parents in six.iteritems(_dependency_dict(items)):
+        for item, parents in iteritems(_dependency_dict(items)):
             dep = self._deps[item]
             self._deps[item] = Dependency(dep.parent.union(parents.parent), None)
 
@@ -198,7 +192,7 @@ class MultiDependencyResolver(BaseDependencyResolver):
         :type items: iterable
         """
         if isinstance(items, dict):
-            iterator = six.iteritems(items)
+            iterator = iteritems(items)
         else:
             iterator = items
         for parent, sub_items in iterator:

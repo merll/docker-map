@@ -2,17 +2,16 @@
 from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
+from six import with_metaclass
 
 
-class CachedItems(object):
+class CachedItems(with_metaclass(ABCMeta, object)):
     """
     Abstract implementation for a caching collection of client names or ids.
 
     :param client: Client object.
     :type client: docker.client.Client
     """
-    __metaclass__ = ABCMeta
-
     def __init__(self, client, *args, **kwargs):
         self._client = client
         super(CachedItems, self).__init__(*args, **kwargs)
@@ -68,7 +67,7 @@ class CachedContainerNames(CachedItems, set):
         self.update(name[1:] for container in current_containers for name in container['Names'])
 
 
-class DockerHostItemCache(dict):
+class DockerHostItemCache(with_metaclass(ABCMeta, dict)):
     """
     Abstract class for implementing caches of items (containers, images) present on the Docker client, so that
     their existence does not have to be checked separately for every action.
@@ -77,8 +76,6 @@ class DockerHostItemCache(dict):
     :type clients: dict[unicode, dockermap.map.config.ClientConfiguration]
     """
     item_class = None
-
-    __metaclass__ = ABCMeta
 
     def __init__(self, clients, *args, **kwargs):
         self._clients = clients

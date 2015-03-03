@@ -6,7 +6,7 @@ from abc import ABCMeta, abstractmethod
 from six import text_type, with_metaclass
 
 
-class AbstractLazyObject(with_metaclass(ABCMeta)):
+class AbstractLazyObject(with_metaclass(ABCMeta, object)):
     """
     Abstract superclass class for lazily-resolved values.
     """
