@@ -106,6 +106,8 @@ or::
     from dockermap.functional import lazy_once
     container_map.host.volume1 = lazy_once(get_path, arg1, keyword_arg1='kw1', keyword_arg2='kw2')
 
+.. _container_lazy_availability:
+
 This is available on the following points:
 
 * On container maps:
