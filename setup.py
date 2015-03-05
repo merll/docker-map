@@ -23,8 +23,8 @@ setup(
     version=__version__,
     packages=find_packages(),
     install_requires=['six', 'docker-py>=0.5.0'],
-    extras_require = {
-        'yaml':  ['PyYAML'],
+    extras_require={
+        'yaml': ['PyYAML'],
     },
     license='MIT',
     author='Matthias Erll',
