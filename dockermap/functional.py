@@ -8,8 +8,25 @@ from six import text_type, with_metaclass
 
 class AbstractLazyObject(with_metaclass(ABCMeta, object)):
     """
-    Abstract superclass class for lazily-resolved values.
+    Abstract superclass class for lazily-resolved values. Runs function ``func`` with ``*args`` and ``**kwargs``, when
+    called or the ``get`` function is used. The following also trigger an evaluation:
+
+    * String representation.
+    * Equality or inequality check.
+    * Contains operator.
+    * Iteration.
+    * Reduce (pickling).
+
+    :param func: Callable to evaluate.
+    :type func: callable
+    :param args: Arguments to pass to ``func``.
+    :param kwargs: Keyword arguments to pass to ``func``.
     """
+    def __init__(self, func, *args, **kwargs):
+        self._func = func
+        self._args = args
+        self._kwargs = kwargs
+
     def __call__(self):
         return self.get()
 
@@ -37,46 +54,6 @@ class AbstractLazyObject(with_metaclass(ABCMeta, object)):
     @abstractmethod
     def get(self):
         pass
-
-    @property
-    def value(self):
-        """
-        Resolved and and returns the value.
-
-        :return: The actual value, resolved by the object.
-        """
-        return self.get()
-
-
-class SimpleLazyObject(AbstractLazyObject):
-    """
-    Simple lazy-resolving object. Runs function ``func`` with ``*args`` and ``**kwargs``, when called or the ``get``
-    function is used. The following also trigger an evaluation:
-
-    * String representation.
-    * Equality or inequality check.
-    * Contains operator.
-    * Iteration.
-    * Reduce (pickling).
-
-    :param func: Callable to evaluate.
-    :type func: callable
-    :param args: Arguments to pass to ``func``.
-    :param kwargs: Keyword arguments to pass to ``func``.
-    """
-    def __init__(self, func, *args, **kwargs):
-        self._func = func
-        self._args = args
-        self._kwargs = kwargs
-
-    def get(self):
-        """
-        Resolves and returns the object value.
-
-        :return: The result of evaluating the object.
-        :rtype: any
-        """
-        return self._func(*self._args, **self._kwargs)
 
     @property
     def func(self):
@@ -108,8 +85,31 @@ class SimpleLazyObject(AbstractLazyObject):
         """
         return self._kwargs
 
+    @property
+    def value(self):
+        """
+        Resolved and and returns the value.
 
-class LazyOnceObject(SimpleLazyObject):
+        :return: The actual value, resolved by the object.
+        """
+        return self.get()
+
+
+class SimpleLazyObject(AbstractLazyObject):
+    """
+    Simple lazy-resolving object.
+    """
+    def get(self):
+        """
+        Resolves and returns the object value.
+
+        :return: The result of evaluating the object.
+        :rtype: any
+        """
+        return self._func(*self._args, **self._kwargs)
+
+
+class LazyOnceObject(AbstractLazyObject):
     """
     Like :class:`SimpleLazyObject`, but runs the evaluation only once. Note that even ``None`` will be re-used as a
     valid result.
@@ -132,7 +132,7 @@ class LazyOnceObject(SimpleLazyObject):
         :rtype: any
         """
         if not self._evaluated:
-            self._val = super(LazyOnceObject, self).get()
+            self._val = self._func(*self._args, **self._kwargs)
             self._evaluated = True
         return self._val
 
