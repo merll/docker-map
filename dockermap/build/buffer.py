@@ -2,8 +2,11 @@
 from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
-import cStringIO
 from tempfile import NamedTemporaryFile
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 
 class FinalizedError(Exception):
@@ -97,11 +100,11 @@ class DockerBuffer(object):
 
 class DockerStringBuffer(DockerBuffer):
     """
-    Partial implementation of :class:`~DockerBuffer`, backed by a :class:`~cStringIO.StringIO` buffer.
+    Partial implementation of :class:`~DockerBuffer`, backed by a :class:`~StringIO` buffer.
     """
     __metaclass__ = ABCMeta
 
-    init_fileobj = cStringIO.StringIO
+    init_fileobj = StringIO
 
     def save(self, name, encoding='utf-8'):
         """
