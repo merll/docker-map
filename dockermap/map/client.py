@@ -36,7 +36,8 @@ class MappingDockerClient(object):
     """
     configuration_class = ClientConfiguration
 
-    def __init__(self, container_maps=None, docker_client=None, clients=None, policy_class=ResumeUpdatePolicy):
+    def __init__(self, container_maps=None, docker_client=None, clients={},
+                 policy_class=ResumeUpdatePolicy):
         if container_maps:
             if isinstance(container_maps, ContainerMap):
                 self._default_map = container_maps.name
@@ -49,11 +50,11 @@ class MappingDockerClient(object):
                 self._maps = container_maps
             else:
                 raise ValueError("Unexpected type of 'container_maps' argument: {0}".format(type(container_maps)))
-        if clients:
-            if isinstance(clients, (list, tuple)):
-                self._clients = dict(clients)
-            else:
-                self._clients = clients
+        if clients and isinstance(clients, (list, tuple)):
+            self._clients = dict(clients)
+        else:
+            self._clients = clients
+
         if docker_client:
             if isinstance(docker_client, docker.Client):
                 default_client = self.configuration_class.from_client(docker_client)
