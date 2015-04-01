@@ -6,7 +6,7 @@ import operator
 import posixpath
 import six
 
-from ..functional import lazy_type, resolve_value
+from ..functional import lazy_type, resolve_value, type_registry
 from . import DictMap
 from .base import DockerClientWrapper
 
@@ -25,7 +25,7 @@ def _get_list(value):
         return []
     elif isinstance(value, (list, tuple)):
         return list(value)
-    elif isinstance(value, six.string_types + (lazy_type, )):
+    elif isinstance(value, six.string_types + (lazy_type, )) or type(value) in type_registry:
         return [value]
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(
         type(value).__name__))
@@ -34,7 +34,7 @@ def _get_list(value):
 def _get_listed_tuples(value, element_type, conversion_func):
     if value is None:
         return []
-    elif isinstance(value, element_type):
+    elif isinstance(value, element_type) or type(value) in type_registry:
         return [value]
     elif isinstance(value, six.string_types):
         return [conversion_func(value)]
@@ -86,7 +86,8 @@ def _get_port_binding(value):
             return PortBinding(value[0], None, None)
         if len(value) == 2:
             ex_port, host_bind = value
-            if isinstance(host_bind, sub_types + (lazy_type, )) or host_bind is None:  # Port, host port
+            if isinstance(host_bind, sub_types + (lazy_type, )) or host_bind is None or type(host_bind) in type_registry:
+                # Port, host port
                 return PortBinding(ex_port, host_bind, None)
             elif isinstance(host_bind, (list, tuple)) and len(host_bind) == 2:  # Port, (host port, interface)
                 host_port, interface = host_bind

@@ -154,4 +154,23 @@ class LazyOnceObject(AbstractLazyObject):
 lazy_type = AbstractLazyObject
 lazy = SimpleLazyObject
 lazy_once = LazyOnceObject
-resolve_value = lambda value: value.get() if isinstance(value, lazy_type) else value
+
+type_registry = {}
+
+
+def resolve_value(value):
+    if isinstance(value, lazy_type):
+        return value.get()
+    elif type_registry:
+        resolve_func = type_registry.get(type(value))
+        if resolve_func:
+            return resolve_func(value)
+    return value
+
+
+def register_type(resolve_type, resolve_func):
+    if not isinstance(resolve_type, type):
+        raise ValueError("Expected type, got {0}.".format(type(resolve_type).__name__))
+    if not callable(resolve_func):
+        raise ValueError("Function is not callable.")
+    type_registry[resolve_type] = resolve_func
