@@ -54,7 +54,10 @@ class CachedImages(CachedItems, dict):
         if full_name not in self:
             self._client.import_image(image=image, tag=tag or 'latest')
             self.refresh()
-        return self[full_name]
+        try:
+            return self[full_name]
+        except KeyError:
+            raise KeyError("Image {0} not found.".format(full_name))
 
 
 class CachedContainerNames(CachedItems, set):
