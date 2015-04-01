@@ -412,7 +412,7 @@ class ContainerConfiguration(object):
             get_func = values.get
             update_binds = _get_converted_list('binds', _get_shared_volumes)
             update_links = _get_converted_list('links', _get_container_links)
-            update_ports = _get_converted_list('publishes', _get_port_bindings)
+            update_ports = _get_converted_list('exposes', _get_port_bindings)
         elif isinstance(values, ContainerConfiguration):
             get_func = values.__getattribute__
             update_binds = values._binds
