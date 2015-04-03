@@ -11,14 +11,15 @@ Docs: https://docker-map.readthedocs.org/en/latest/
 
 Overview
 ========
-This package provides additional tools for building Docker images, create containers,
+This package provides tools for building Docker images, create containers,
 connect dependent resources, and run them in development as well as production
 environments.
 
 The library builds on functionality of the Docker Remote API client for Python,
-`docker-py`. Based on it, available deployment tools can be enhanced
-(see [docker-fabric](https://github.com/merll/docker-fabric)) or custom orchestration
-can be implemented.
+`docker-py`. Its man target is to reduce the repetitive and error-prone code that is
+required for creating and connecting containers in a non-trivial stack. It can be used
+standalone for custom orchestration or for enhancing available deployment / remote
+execution utilities (see [Docker-Fabric](https://github.com/merll/docker-fabric)).
 
 Containers and their dependencies are configured object-based, through Python dictionaries,
 or YAML files.
@@ -31,15 +32,16 @@ without having to adjust it in multiple places; or you keep frequently reoccurri
 (e.g. creating system user accounts) in your Dockerfile, and would like to use templates
 rather than copy & paste.
 
-`DockerFile`
-------------
-Generates a Dockerfile, that can either be saved locally or sent off to Docker
-through the remote API. Supports common commands such as `addfile` (`ADD`) or `run`, but
-also formats `CMD` and `ENTRYPOINT` appropriately for running a shell or exec command.
+Dockerfiles
+-----------
+A `DockerFile` object generates a Dockerfile, that can either be saved locally or sent
+off to Docker through the remote API. Supports common commands such as `addfile` (`ADD`)
+or `run`, but also formats `CMD` and `ENTRYPOINT` appropriately for running a shell or
+exec command.
 
-`DockerContext`
----------------
-Generates a Docker context tarball, that can be sent to the remote API.
+Docker file context
+-------------------
+`DockerContext` generates a Docker context tarball, that can be sent to the remote API.
 Its main purpose is to add files from `DockerFile` automatically, so that the Dockerfile
 and the context tarball are consistent.
 
@@ -59,9 +61,10 @@ by introducing the following main features:
 * Use alias names instead of paths to bind host volumes to container shares.
 * Automatically create and start containers when their dependent containers are started.
 
-`ContainerConfiguration`
-------------------------
-Keeps the elements of a configured container. Its main elements are:
+Container configuration
+-----------------------
+`ContainerConfiguration` objects keep the elements of a configured container. Their main
+elements are:
 
 * `image`: Docker image to base the container on (default is identical to container name).
 * `clients`: Optional list of clients to run the identical container configuration on.
@@ -83,11 +86,11 @@ Keeps the elements of a configured container. Its main elements are:
   arguments such as `command` or `entrypoint`, which are passed through to the `docker-py`
   client.
 
-`ContainerMap`
+Container maps
 --------------
-Contains three sets of elements:
+`ContainerMap` objects contain three sets of elements:
 
-1. Container names, associated with a `ContainerConfiguration`.
+1. Container names, each associated with a `ContainerConfiguration`.
 2. Volumes, mapping shared directory paths to alias names.
 3. Host shares, mapping host directory paths to alias names.
 
@@ -100,17 +103,18 @@ dictionary-like or attribute syntax, e.g.
 Volume aliases are stored in `container_map.volumes` and host binds in
 `container_map.host`; they support the same syntax variations as containers.
 
-`ClientConfiguration`
----------------------
-Allows for a host-specific managment of parameters, such as service URL and timeout. For
-example, the `interfaces` property translates the `exposes` setting for a configuration on each
-host into a port binding argument with the local address.
+Client configuration
+--------------------
+`ClientConfiguration` objects allow for a host-specific managment of parameters, such as
+service URL and timeout. For example, the `interfaces` property translates the `exposes`
+setting for a configuration on each host into a port binding argument with the local
+address.
 
-`MappingDockerClient`
----------------------
-Applies one or multiple `ContainerMap` instances to one or multiple Docker clients. A
-container on the map can easily be created with all its dependencies by running
-`client.create('container_name')`.
+Combining the elements
+----------------------
+An `MappingDockerClient` applies one or multiple `ContainerMap` instances to one or
+multiple Docker clients. A container on the map can easily be created with all its
+dependencies by running `client.create('container_name')`.
 
 Running the container can be as easy as
 `client.start('container_name')`

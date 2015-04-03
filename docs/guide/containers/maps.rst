@@ -4,11 +4,13 @@ Managing containers
 ===================
 Several practices have evolved around what should be part of a single image or separate. It is mainly a trade-off
 between simplicity and flexibility: On one hand, if one container instance encloses all necessary programs, it is easier
-to connect those, as they share one common file system and network. Beside security concerns, this can turn out to be
-impractical on the other hand. A single image has to be maintained and updated in this form, which can become
-complex as well and takes more time to build. In larger system landscapes monolithic images also create redundancy of
-systems that could otherwise be shared easily, e.g. databases. Separate containers for different services are usually a
-better choice in more complex scenarios, but also hard to manage through command-line and startup-scripts alone.
+to connect those, as they share one common file system and network.
+
+Beside security concerns, this can turn out to be impractical on the other hand. A single image has to be maintained and
+updated in this form, which can become complex as well and takes more time to build. In larger system landscapes
+monolithic images also create redundancy of systems that could otherwise be shared easily, e.g. databases. Separate
+containers for different services are usually a better choice in more complex scenarios, but also hard to manage through
+command-line and startup-scripts alone.
 
 A similar discussion arises around the question whether a containerized program should run as `root`. Many developers
 consider the container around everything safe enough. However, as soon as there are shared resources between containers,

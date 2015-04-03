@@ -48,11 +48,9 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         return `None`, only empty lists, strings etc.
 
         :param item: Current node.
-        :type item: any
         :param resolve_parent: Function to check on dependencies deeper in the hierarchy.
         :type resolve_parent: __builtin__.function
         :param parent: Parent node(s).
-        :type parent: any
         :return: Result of the dependency merge. May be just boolean, a set, or anything else. Should return `False`
             if there are no dependencies, not `None`.
         :rtype: bool
@@ -67,7 +65,6 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         `False` otherwise.
 
         :param start_item: Node that the dependency check started with.
-        :type start_item: any
         :return: Function that checks if interdependent items have been found.
         :rtype: __builtin__.function
         """
@@ -78,7 +75,6 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         Performs a dependency check on the given item.
 
         :param item: Node to start the dependency check with.
-        :type item: any
         :return: The result on merged dependencies down the hierarchy.
         :raise CircularDependency: If some element in the hierarchy depends on the start node.
         """
@@ -117,7 +113,6 @@ class SingleDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         """
         Provides the check if the dependence equals the node `start_item`, that the check originally started with.
 
-        :type start_item: any
         :return: Function with argument `item` that checks for `item == start_item`.
         :rtype: __builtin__.function
         """
@@ -148,7 +143,6 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         """
         Provides the check if `start_item` is in any of the dependencies.
 
-        :type start_item: any
         :return: Function with argument `items` that checks for `start_item in items`.
         :rtype: __builtin__.function
         """
@@ -160,7 +154,6 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         `item` may have multiple dependencies `parent`.
 
         :param item: Current node.
-        :type item: any
         :param resolve_parent: Function to check on dependencies deeper in the hierarchy.
         :type resolve_parent: __builtin__.function
         :param parents: Parent nodes.

@@ -106,9 +106,49 @@ or::
     from dockermap.functional import lazy_once
     container_map.host.volume1 = lazy_once(get_path, arg1, keyword_arg1='kw1', keyword_arg2='kw2')
 
+
+Special case: serialization
+"""""""""""""""""""""""""""
+In case of serialization, it may not be possible to customize the behavior this way. Provided that the input values can
+be represented during serialization using certain Python types, these types can be registered for pre-processing as
+as well using :func:`~dockermap.functional.register_type`.
+
+For example, if a library uses MsgPack for serializing data, you can represent a value for serialization with::
+
+    from msgpack import ExtType
+
+    MY_EXT_TYPE_CODE = 1
+    ...
+    container_map.host.volume1 = ExtType(MY_EXT_TYPE_CODE, b'info represented as bytes')
+
+For deserialization, you could usually reconstruct your original value by writing a simple function and passing this
+in ``ext_hook``::
+
+    def my_ext_hook(code, data):
+        if code == MY_EXT_TYPE_CODE:
+            # This function should reconstruct the necessary information from the serailized data.
+            return my_info(data)
+        return ExtType(code, data)
+
+If you do however, not have access to the loading function, you can slightly modify aforementioned function, and
+register ExtType for late value resolution as well::
+
+    from dockermap.functional import register_type
+
+    def my_ext_hook(ext_data):
+        if ext_data.code == MY_EXT_TYPE_CODE:
+            return my_info(ext_data.data)
+        return ext_data
+
+    register_type(ExtType, my_ext_hook)
+
+Note that you have to register the exact type, not a superclass of it, in order for the lookup to work.
+
 .. _container_lazy_availability:
 
-This is available on the following points:
+Availability
+""""""""""""
+Lazy value resolution is available at the following points:
 
 * On container maps:
 

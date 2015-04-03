@@ -47,7 +47,6 @@ def load_file(filename):
     :param filename: YAML file name.
     :type filename: unicode
     :return: Contents of the YAML file.
-    :rtype: any
     """
     with open(filename, 'r') as f:
         return yaml.safe_load(f)

@@ -104,7 +104,6 @@ class SimpleLazyObject(AbstractLazyObject):
         Resolves and returns the object value.
 
         :return: The result of evaluating the object.
-        :rtype: any
         """
         return self._func(*self._args, **self._kwargs)
 
@@ -129,7 +128,6 @@ class LazyOnceObject(AbstractLazyObject):
         Resolves and returns the object value. Re-uses an existing previous evaluation, if applicable.
 
         :return: The result of evaluating the object.
-        :rtype: any
         """
         if not self._evaluated:
             self._val = self._func(*self._args, **self._kwargs)

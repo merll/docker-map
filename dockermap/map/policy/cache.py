@@ -91,7 +91,6 @@ class DockerHostItemCache(with_metaclass(ABCMeta, dict)):
         :param item: Client name.
         :type item: unicode
         :return: Items in the cache.
-        :rtype: any
         """
         if item not in self:
             return self.refresh(item)
@@ -104,7 +103,7 @@ class DockerHostItemCache(with_metaclass(ABCMeta, dict)):
         :param item: Client name.
         :type item: unicode
         :return: Items in the cache.
-        :rtype: item_class
+        :rtype: DockerHostItemCache.item_class
         """
         client = self._clients[item].get_client()
         val = self.item_class(client)
