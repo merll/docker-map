@@ -16,7 +16,7 @@ connect dependent resources, and run them in development as well as production
 environments.
 
 The library builds on functionality of the Docker Remote API client for Python,
-`docker-py`. Its man target is to reduce the repetitive and error-prone code that is
+`docker-py`. Its main target is to reduce the repetitive and error-prone code that is
 required for creating and connecting containers in a non-trivial stack. It can be used
 standalone for custom orchestration or for enhancing available deployment / remote
 execution utilities (see [Docker-Fabric](https://github.com/merll/docker-fabric)).
