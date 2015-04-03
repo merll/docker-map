@@ -3,6 +3,11 @@
 Change History
 ==============
 
+0.3.1
+-----
+* Extended late value resolution to custom types.
+* Various bugfixes.
+
 0.3.0
 -----
 * Possibility to use 'lazy' values in various settings (e.g. port bindings, volume aliases, host volumes, and user).
