@@ -107,11 +107,11 @@ or::
     container_map.host.volume1 = lazy_once(get_path, arg1, keyword_arg1='kw1', keyword_arg2='kw2')
 
 
-Special case: serialization
-"""""""""""""""""""""""""""
-In case of serialization, it may not be possible to customize the behavior this way. Provided that the input values can
-be represented during serialization using certain Python types, these types can be registered for pre-processing as
-as well using :func:`~dockermap.functional.register_type`.
+Serialization issues
+""""""""""""""""""""
+In case of serialization, it may not be possible to customize the behavior using aforementioned lazy functions.
+Provided that the input values can be represented by serializable Python types, these types can be registered for
+pre-processing using :func:`~dockermap.functional.register_type`.
 
 For example, if a library uses MsgPack for serializing data, you can represent a value for serialization with::
 
@@ -121,24 +121,27 @@ For example, if a library uses MsgPack for serializing data, you can represent a
     ...
     container_map.host.volume1 = ExtType(MY_EXT_TYPE_CODE, b'info represented as bytes')
 
-For deserialization, you could usually reconstruct your original value by writing a simple function and passing this
-in ``ext_hook``::
+ExtType is supported by MsgPack's Python implementation, and therefore as long as the byte data carries all information
+necessary to reproduce the actual value, no additional steps are necessary for serialization. During deserialization,
+you could usually reconstruct your original value by writing a simple function and passing this in ``ext_hook``::
 
     def my_ext_hook(code, data):
         if code == MY_EXT_TYPE_CODE:
-            # This function should reconstruct the necessary information from the serailized data.
+            # This function should reconstruct the necessary information from the serialized data.
             return my_info(data)
         return ExtType(code, data)
 
-If you do however, not have access to the loading function, you can slightly modify aforementioned function, and
-register ExtType for late value resolution as well::
+
+This is the preferred method. If you however do not have access to the loading function (e.g. because it is embedded
+in another library you are using), you can slightly modify aforementioned function, and register ExtType for late value
+resolution::
 
     from dockermap.functional import register_type
 
     def my_ext_hook(ext_data):
         if ext_data.code == MY_EXT_TYPE_CODE:
             return my_info(ext_data.data)
-        return ext_data
+        raise ValueError("Unexpected ext type code {0}.".format(ext_data.code)
 
     register_type(ExtType, my_ext_hook)
 
