@@ -156,19 +156,64 @@ lazy_once = LazyOnceObject
 type_registry = {}
 
 
+def expand_type_name(type_):
+    """
+    Returns concatenated module and name of a type for identification.
+
+    :param type_: Type:
+    :type type_: type
+    :return: Type name, as ``<type's module name>.<type name>``.
+    :rtype: unicode
+    """
+    return '{0.__module__}.{0.__name__}'.format(type_)
+
+
 def resolve_value(value):
+    """
+    Returns the actual value for the given object, if it is a late-resolving object type.
+    If not, the value itself is simply returned.
+
+    :param value: Lazy object, registered type in :attr:`type_registry`, or a simple value. In the
+     latter case, the value is returned as-is.
+    :type value: str or unicode or int or AbstractLazyObject or unknown
+    :return: Resolved value.
+    """
     if isinstance(value, lazy_type):
         return value.get()
     elif type_registry:
-        resolve_func = type_registry.get(type(value))
+        resolve_func = type_registry.get(expand_type_name(type(value)))
         if resolve_func:
             return resolve_func(value)
     return value
 
 
 def register_type(resolve_type, resolve_func):
+    """
+    Registers a type for lazy value resolution. Instances of AbstractLazyObject do not have to
+    be registered. The exact type must be provided in ``resolve_type``, not a superclass of it.
+    Types registered will be passed through the given function by :func:`resolve_value`.
+
+    :param resolve_type: Type to consider during late value resolution.
+    :type resolve_type: type
+    :param resolve_func: Function to run for retrieving the original value. It needs to accept
+     exactly one argument - the substitute value to resolve to the actual value.
+    :type resolve_func: function
+    """
     if not isinstance(resolve_type, type):
         raise ValueError("Expected type, got {0}.".format(type(resolve_type).__name__))
     if not callable(resolve_func):
         raise ValueError("Function is not callable.")
-    type_registry[resolve_type] = resolve_func
+    type_registry[expand_type_name(resolve_type)] = resolve_func
+
+
+def uses_type_registry(value):
+    """
+    Utility function to check whether a certain value would be handled by late value resolution.
+    This does not check lazy objects, but only explicitly registered types.
+
+    :param value: Value to check.
+    :return: Whether the type of the given value is registered.
+    :rtype: bool
+    """
+    type_name = expand_type_name(type(value))
+    return type_name in type_registry
