@@ -511,7 +511,14 @@ class ClientConfiguration(DictMap):
         :type client: docker.client.Client
         :return: ClientConfiguration
         """
-        return cls(base_url=client.base_url, version=client._version, timeout=client._timeout, client=client)
+        if hasattr(client, 'timeout'):
+            timeout = client.timeout
+        elif hasattr(client, '_timeout'):
+            timeout = client._timeout
+        else:
+            timeout = None
+        return cls(base_url=client.base_url, version=client._version,
+                   timeout=timeout, client=client)
 
     def get_init_kwargs(self):
         """

@@ -25,7 +25,7 @@ class MappingDockerClient(object):
     :param container_maps: :class:`~dockermap.map.container.ContainerMap` instance or a tuple or list of such instances
       along with an associated instance.
     :type container_maps: dockermap.map.container.ContainerMap or
-      list[dockermap.map.container.ContainerMap]
+      list[dockermap.map.container.ContainerMap] or dict[unicode, dockermap.map.container.ContainerMap]
     :param docker_client: Default :class:`~docker.client.Client` instance or configuration.
     :type docker_client: dockermap.map.config.ClientConfiguration or docker.client.Client
     :param clients: Dictionary of client configurations
@@ -40,20 +40,23 @@ class MappingDockerClient(object):
         if container_maps:
             if isinstance(container_maps, ContainerMap):
                 self._default_map = container_maps.name
-                self._maps = dict(((container_maps.name, container_maps),))
+                self._maps = {container_maps.name: container_maps}
             elif isinstance(container_maps, (list, tuple)):
                 self._default_map = None
-                self._maps = dict((c_map.name, c_map) for c_map in container_maps)
+                self._maps = {c_map.name: c_map for c_map in container_maps}
             elif isinstance(container_maps, dict):
                 self._default_map = None
                 self._maps = container_maps
             else:
                 raise ValueError("Unexpected type of 'container_maps' argument: {0}".format(type(container_maps)))
-        if clients:
-            if isinstance(clients, (list, tuple)):
-                self._clients = dict(clients)
-            else:
-                self._clients = clients
+        else:
+            self._default_map = None
+            self._maps = {}
+        if clients and isinstance(clients, (list, tuple)):
+            self._clients = dict(clients)
+        else:
+            self._clients = clients or {}
+
         if docker_client:
             if isinstance(docker_client, docker.Client):
                 default_client = self.configuration_class.from_client(docker_client)
