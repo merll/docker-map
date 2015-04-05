@@ -293,7 +293,7 @@ class DockerClientWrapper(docker.Client):
         :rtype: dict
         """
         current_images = self.images()
-        tags = dict((tag, i['Id']) for i in current_images for tag in i['RepoTags'])
+        tags = {tag: i['Id'] for i in current_images for tag in i['RepoTags']}
         return tags
 
     def push_container_logs(self, container):

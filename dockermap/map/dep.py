@@ -16,7 +16,7 @@ def _dependency_dict(items):
         iterator = iteritems(items)
     else:
         iterator = items
-    return dict((item, Dependency(parent, None)) for item, parent in iterator)
+    return {item: Dependency(parent, None) for item, parent in iterator}
 
 
 class CircularDependency(Exception):

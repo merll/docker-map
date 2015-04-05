@@ -24,7 +24,7 @@ class DockerContext(DockerTempFile):
     """
     def __init__(self, dockerfile=None, compression='gz', encoding='utf-8', finalize=False, **kwargs):
         super(DockerContext, self).__init__()
-        open_mode = ':'.join(('w', compression or ''))
+        open_mode = 'w:{0}'.format(compression or '')
         if compression == 'gz':
             self._stream_encoding = 'gzip'
         elif compression == 'bz2':

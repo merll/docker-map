@@ -246,7 +246,7 @@ class ContainerMap(object):
                 return self._name, c, i
             return self._name, c, None
 
-        attached = dict((attaches, c_name) for c_name, c_config in self for attaches in c_config.attaches)
+        attached = {attaches: c_name for c_name, c_config in self for attaches in c_config.attaches}
         for c_name, c_config in self:
             used_set = set(map(_get_used_item, c_config.uses))
             linked_set = set(map(_get_linked_item, c_config.links))
@@ -329,7 +329,7 @@ class ContainerMap(object):
         """
         def _get_instance_names(c_name, instances):
             if instances:
-                return ['.'.join((c_name, instance)) for instance in instances]
+                return ['{0}.{1}'.format(c_name, instance) for instance in instances]
             else:
                 return [c_name]
 

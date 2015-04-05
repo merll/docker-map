@@ -56,7 +56,7 @@ def format_command(cmd, shell=False):
     def _split_cmd():
         line = None
         for part in cmd.split(' '):
-            line = part if line is None else ' '.join((line, part))
+            line = part if line is None else '{0} {1}'.format(line, part)
             if part[-1] != '\\':
                 yield line
                 line = None

@@ -15,7 +15,7 @@ def _update_instance(instance, obj_dict):
 class PropertyDictMeta(type):
     def __init__(cls, name, bases, dct):
         cls.core_properties = [d_name for d_name, d_type in six.iteritems(dct) if isinstance(d_type, property)]
-        cls.core_properties.extend(''.join(('_', d_name))
+        cls.core_properties.extend('_{0}'.format(d_name)
                                    for d_name, d_type in six.iteritems(dct) if isinstance(d_type, property))
         super(PropertyDictMeta, cls).__init__(name, bases, dct)
 

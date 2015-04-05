@@ -241,7 +241,7 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode, dict)]
         """
-        method_name = '_'.join((action_name, 'actions'))
+        method_name = '{0}_actions'.format(action_name)
         action_method = getattr(self.get_policy(), method_name)
         if callable(action_method):
             return action_method(map_name or self._default_map, container, instances=instances, **kwargs)

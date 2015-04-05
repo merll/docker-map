@@ -88,7 +88,7 @@ def init_options(options):
         if callable(options):
             return options()
         return options
-    return dict()
+    return {}
 
 
 def get_volumes(container_map, config):
@@ -119,7 +119,7 @@ def get_inherited_volumes(config):
     def volume_str(u):
         vol = resolve_value(u.volume)
         if u.readonly:
-            return ''.join((vol, ':ro'))
+            return '{0}:ro'.format(vol)
         return vol
 
     return itertools.chain(map(volume_str, config.uses), config.attaches)

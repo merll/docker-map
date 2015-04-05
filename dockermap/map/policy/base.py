@@ -66,8 +66,8 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :rtype: unicode
         """
         if instance:
-            return '.'.join((map_name, container, instance))
-        return '.'.join((map_name, container))
+            return '{0}.{1}.{2}'.format(map_name, container, instance)
+        return '{0}.{1}'.format(map_name, container)
 
     @classmethod
     def resolve_cname(cls, container_name, includes_map=True):
@@ -123,7 +123,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             return image
         repository = resolve_value(container_map.repository)
         if repository:
-            return '/'.join((repository, image))
+            return '{0}/{1}'.format(repository, image)
         return image
 
     @classmethod
@@ -136,7 +136,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_name: Container name.
         :type container_name: unicode
         """
-        return '-'.join((container_name, client_name))
+        return '{0}-{1}'.format(container_name, client_name)
 
     @classmethod
     def get_domainname(cls, container_map, container_config, client_config):
@@ -248,7 +248,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         map_name = container_map.name
         c_kwargs = dict(
             container=container,
-            links=dict((cls.cname(map_name, l_name), alias) for l_name, alias in container_config.links),
+            links={cls.cname(map_name, l_name): alias for l_name, alias in container_config.links},
             binds=dict(get_host_binds(container_map, container_config, instance)),
             volumes_from=list(cls.cname(map_name, u_name) for u_name in get_inherited_volumes(container_config)),
             port_bindings=dict(get_port_bindings(container_config, client_config)),
@@ -283,10 +283,10 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         def _get_cmd():
             user = resolve_value(container_config.user)
             if user:
-                yield ' '.join(('chown -R', get_user_group(user), str_arg(path)))
+                yield 'chown -R {0} {1}'.format(get_user_group(user), str_arg(path))
             permissions = container_config.permissions
-            if container_config.permissions:
-                yield ' '.join(('chmod -R', permissions, str_arg(path)))
+            if permissions:
+                yield 'chmod -R {0} {1}'.format(permissions, str_arg(path))
 
         path = resolve_value(container_map.volumes[alias])
         c_kwargs = dict(

@@ -12,9 +12,9 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
     def __init__(self, policy, *args, **kwargs):
         super(ContainerUpdateGenerator, self).__init__(policy, *args, **kwargs)
         self.remove_status = policy.remove_status
-        self.base_image_ids = dict((client_name, policy.images[client_name].ensure_image(
-            self.iname_tag(policy.base_image))) for client_name, __ in six.iteritems(policy.clients))
-        self.path_vfs = dict()
+        self.base_image_ids = {client_name: policy.images[client_name].ensure_image(
+            self.iname_tag(policy.base_image)) for client_name in policy.clients.keys()}
+        self.path_vfs = {}
 
     def _check_links(self, map_name, c_config, instance_links):
         def _extract_link_info(host_link):
@@ -77,13 +77,13 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
         return _check_config_paths(c_config, instance_name)
 
     def iname_tag(self, image, container_map=None):
-        i_name = ':'.join((image, 'latest')) if ':' not in image else image
+        i_name = '{0}:latest'.format(image) if ':' not in image else image
         if container_map:
             return self._policy.iname(container_map, i_name)
         return i_name
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
-        a_paths = dict((alias, resolve_value(c_map.volumes[alias])) for alias in c_config.attaches)
+        a_paths = {alias: resolve_value(c_map.volumes[alias]) for alias in c_config.attaches}
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
             images = self._policy.images[client_name]
             existing_containers = self._policy.container_names[client_name]
@@ -126,7 +126,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     ci_detail = client.inspect_container(ci_name)
                     ci_status = ci_detail['State']
                     ci_image = ci_detail['Image']
-                    ci_volumes = ci_detail.get('Volumes') or dict()
+                    ci_volumes = ci_detail.get('Volumes') or {}
                     ci_links = ci_detail['HostConfig']['Links'] or []
                     ci_running = ci_status['Running']
                     ci_remove = (not ci_running and ci_status['ExitCode'] in self.remove_status) or \

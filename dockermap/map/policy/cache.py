@@ -50,7 +50,7 @@ class CachedImages(CachedItems, dict):
         if tag:
             full_name = image_name
         else:
-            full_name = ':'.join((image_name, 'latest'))
+            full_name = '{0}:latest'.format(image_name)
         if full_name not in self:
             self._client.import_image(image=image, tag=tag or 'latest')
             self.refresh()

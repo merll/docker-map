@@ -22,8 +22,8 @@ def _format_cmd(cmd, *args, **kwargs):
     arg_str = ' '.join(map(str_arg, args))
     kwarg_str = ' '.join(_gen_kwargs(kwargs))
     if kwarg_str:
-        return ' '.join((cmd, kwarg_str, arg_str))
-    return ' '.join((cmd, arg_str))
+        return '{0} {1} {2}'.format(cmd, kwarg_str, arg_str)
+    return '{0} {1}'.format(cmd, arg_str)
 
 
 _NO_LOGIN = '--disabled-login'
