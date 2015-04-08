@@ -18,13 +18,13 @@ def parse_response(response):
 
     :param response: Server response as a JSON string.
     :type response: unicode
-    :return: Decoded object from the JSON string. Returns `None` if input was invalid.
-    :rtype: object
+    :return: Decoded object from the JSON string. Returns an empty dictionary if input was invalid.
+    :rtype: dict
     """
     try:
         obj = json.loads(response, encoding='utf-8')
     except ValueError:
-        return None
+        return {}
     return obj
 
 

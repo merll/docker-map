@@ -19,6 +19,24 @@ LOG_PROGRESS_FORMAT = "{0} {1} {2}"
 LOG_CONTAINER_FORMAT = "[{0}] {1}"
 
 
+class DockerStatusError(Exception):
+    def __init__(self, *args):
+        detail = args[1]
+        if isinstance(detail, dict):
+            detail.pop('message', None)
+            if not detail:
+                args = args[:1]
+        super(DockerStatusError, self).__init__(*args)
+
+    @property
+    def message(self):
+        return self.args[0]
+
+    @property
+    def detail(self):
+        return self.args[1] if len(self.args) > 1 else None
+
+
 class ContainerImageResolver(SingleDependencyResolver):
     """
     Finds dependencies of containers on images and images on one another, where each container depends on exactly one
@@ -54,16 +72,21 @@ class DockerClientWrapper(docker.Client):
     """
     Adds a few utility functions to the Docker API client.
     """
-    def _docker_log_stream(self, response):
+    def _docker_log_stream(self, response, raise_on_error):
         log_str = None
         for e in response:
             output = parse_response(e)
-            log_str = output['stream'][:-1] if output and 'stream' in output else None
-            if log_str:
+            if 'stream' in output:
+                log_str = output['stream'][:-1]
                 self.push_log(log_str, STREAM_LOG)
+            elif 'error' in output:
+                log_str = output['error']
+                self.push_log(log_str, logging.ERROR)
+                if raise_on_error:
+                    raise DockerStatusError(log_str, output.get('errorDetail'))
         return log_str  # Last line written to stdout
 
-    def _docker_status_stream(self, response):
+    def _docker_status_stream(self, response, raise_on_error):
         result = {}
         for e in response:
             output = parse_response(e)
@@ -77,7 +100,10 @@ class DockerClientWrapper(docker.Client):
                     else:
                         self.push_log(output['status'], STREAM_LOG)
                 elif 'error' in output:
-                    self.push_log(output['error'], logging.ERROR)
+                    error_message = output['error']
+                    self.push_log(error_message, logging.ERROR)
+                    if raise_on_error:
+                        raise DockerStatusError(error_message, output.get('errorDetail'))
         return result
 
     def push_progress(self, status, object_id, progress):
@@ -104,7 +130,7 @@ class DockerClientWrapper(docker.Client):
         """
         logger.log(level, info)
 
-    def build(self, tag, add_latest_tag=False, **kwargs):
+    def build(self, tag, add_latest_tag=False, raise_on_error=False, **kwargs):
         """
         Overrides the superclass `build()` and filters the output. Messages are deferred to `push_log`, whereas the
         final message is checked for a success message. If the latter is found, only the new image id is returned.
@@ -113,17 +139,25 @@ class DockerClientWrapper(docker.Client):
         :type tag: unicode
         :param add_latest_tag: In addition to the image `tag`, tag the image with `latest`.
         :type add_latest_tag: bool
+        :param raise_on_error: Raises errors in the status output as a DockerStatusException. Otherwise only logs
+         errors.
+        :type raise_on_error: bool
         :param kwargs: See :meth:`docker.client.Client.build`.
         :return: New, generated image id or `None`.
         :rtype: unicode
         """
         response = super(DockerClientWrapper, self).build(tag=tag, **kwargs)
-        last_log = self._docker_log_stream(response)
-        if last_log is not None and last_log.startswith('Successfully built '):
+        # It is not the kwargs alone that decide if we get a stream, so we have to check.
+        if isinstance(response, tuple):
+            return response[0]
+
+        last_log = self._docker_log_stream(response, raise_on_error)
+        if last_log and last_log.startswith('Successfully built '):
             image_id = last_log[19:]  # Remove prefix
-            repo, __, i_tag = tag.partition(':')
-            if i_tag and i_tag != 'latest':
-                self.tag(image_id, repo, 'latest', force=True)
+            if add_latest_tag:
+                repo, __, i_tag = tag.partition(':')
+                if i_tag and i_tag != 'latest':
+                    self.tag(image_id, repo, 'latest', force=True)
             return image_id
         return None
 
@@ -149,7 +183,7 @@ class DockerClientWrapper(docker.Client):
         response = super(DockerClientWrapper, self).login(username, password, email, registry, reauth=reauth, **kwargs)
         return response.get('Status') == 'Login Succeeded' or response.get('username') == username
 
-    def pull(self, repository, tag=None, stream=False, **kwargs):
+    def pull(self, repository, tag=None, stream=False, raise_on_error=False, **kwargs):
         """
         Pulls an image repository from the registry.
 
@@ -159,18 +193,21 @@ class DockerClientWrapper(docker.Client):
         :type tag: unicode
         :param stream: Use the stream output format with additional status information.
         :type stream: bool
+        :param raise_on_error: Raises errors in the status output as a DockerStatusException. Otherwise only logs
+         errors.
+        :type raise_on_error: bool
         :param kwargs: Additional kwargs for :meth:`docker.client.Client.pull`.
         :return: ``True`` if the image has been pulled successfully.
         :rtype: bool
         """
         response = super(DockerClientWrapper, self).pull(repository, tag=tag, stream=stream, **kwargs)
         if stream:
-            result = self._docker_status_stream(response)
+            result = self._docker_status_stream(response, raise_on_error)
         else:
-            result = self._docker_status_stream(response.split('\r\n') if response else ())
+            result = self._docker_status_stream(response.split('\r\n') if response else (), raise_on_error)
         return result and not result.get('error')
 
-    def push(self, repository, stream=False, **kwargs):
+    def push(self, repository, stream=False, raise_on_error=False, **kwargs):
         """
         Pushes an image repository to the registry.
 
@@ -178,15 +215,18 @@ class DockerClientWrapper(docker.Client):
         :type repository: unicode
         :param stream: Use the stream output format with additional status information.
         :type stream: bool
+        :param raise_on_error: Raises errors in the status output as a DockerStatusException. Otherwise only logs
+         errors.
+        :type raise_on_error: bool
         :param kwargs: Additional kwargs for :meth:`docker.client.Client.push`.
         :return: ``True`` if the image has been pushed successfully.
         :rtype: bool
         """
         response = super(DockerClientWrapper, self).push(repository, stream=stream, **kwargs)
         if stream:
-            result = self._docker_status_stream(response)
+            result = self._docker_status_stream(response, raise_on_error)
         else:
-            result = self._docker_status_stream(response.split('\r\n') if response else ())
+            result = self._docker_status_stream(response.split('\r\n') if response else (), raise_on_error)
         return result and not result.get('error')
 
     def build_from_context(self, ctx, tag, **kwargs):
