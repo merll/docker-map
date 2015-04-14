@@ -115,7 +115,7 @@ def get_inherited_volumes(config):
     :param config: Container configuration.
     :type config: dockermap.map.config.ContainerConfiguration
     :return: List of used volume names.
-    :rtype: generator[unicode]
+    :rtype: itertools.chain[unicode]
     """
     def volume_str(u):
         vol = u.volume

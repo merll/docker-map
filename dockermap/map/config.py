@@ -185,8 +185,7 @@ class ContainerConfiguration(object):
     def binds(self):
         """
         Returns the host volume shares for a container. These will be added to the shared volumes, and mapped to a host
-        volume on container start. Each bind should be an instance of :class:`HostShare` with parameters
-        `(volume_alias: unicode, readonly: bool)`.
+        volume on container start.
 
         :return: Host volumes.
         :rtype: list[SharedVolume]
@@ -448,9 +447,6 @@ class HostVolumeConfiguration(DictMap):
     def __init__(self, volume_root=None, *args, **kwargs):
         self._root = volume_root
         super(HostVolumeConfiguration, self).__init__(*args, **kwargs)
-
-    def __repr__(self):
-        return '{0} shares: {1}'.format(self.__class__.__name__, self)
 
     @property
     def root(self):
