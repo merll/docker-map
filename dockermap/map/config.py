@@ -13,7 +13,7 @@ from .base import DockerClientWrapper
 
 SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent'
 DICT_ATTRIBUTES = 'create_options', 'start_options'
-LIST_ATTRIBUTES = 'instances', 'shares', 'uses', 'attaches', 'clients'
+LIST_ATTRIBUTES = 'instances', 'shares', 'attaches', 'clients'
 
 SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
@@ -403,8 +403,6 @@ class ContainerConfiguration(object):
             current = self.__getattribute__(attr)
             current.extend(set(update_list) - set(current))
 
-        _update_single = lambda attr, new_val: self.__setattr__(attr, new_val)
-
         def _update_dict(attr, new_val):
             current_dict = self.__getattribute__(attr)
             if current_dict:
@@ -415,11 +413,13 @@ class ContainerConfiguration(object):
         if isinstance(values, dict):
             get_func = values.get
             update_binds = _get_converted_list('binds', _get_shared_volumes)
+            update_uses = _get_converted_list('uses', _get_shared_volumes)
             update_links = _get_converted_list('links', _get_container_links)
             update_ports = _get_converted_list('exposes', _get_port_bindings)
         elif isinstance(values, ContainerConfiguration):
             get_func = values.__getattribute__
             update_binds = values._binds
+            update_uses = values._uses
             update_links = values._links_to
             update_ports = values._exposes
         else:
@@ -428,11 +428,12 @@ class ContainerConfiguration(object):
         for key in LIST_ATTRIBUTES:
             _update_attr(key, _merge_list)
         _merge_first(self._binds, update_binds)
+        _merge_first(self._uses, update_uses)
         _merge_first(self._links_to, update_links)
         _merge_first(self._exposes, update_ports)
         if not lists_only:
             for key in SINGLE_ATTRIBUTES:
-                _update_attr(key, _update_single)
+                _update_attr(key, self.__setattr__)
             for key in DICT_ATTRIBUTES:
                 _update_attr(key, _update_dict)
 
