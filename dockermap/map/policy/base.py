@@ -178,7 +178,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         c_kwargs = dict(
             name=container_name,
             image=cls.iname(container_map, container_config.image or default_image),
-            volumes=list(get_volumes(container_map, container_config)),
+            volumes=get_volumes(container_map, container_config),
             user=extract_user(container_config.user),
             ports=[port_binding.exposed_port
                    for port_binding in container_config.exposes if port_binding.exposed_port],
@@ -249,9 +249,9 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         c_kwargs = dict(
             container=container,
             links={cls.cname(map_name, l_name): alias for l_name, alias in container_config.links},
-            binds=dict(get_host_binds(container_map, container_config, instance)),
-            volumes_from=list(cls.cname(map_name, u_name) for u_name in get_inherited_volumes(container_config)),
-            port_bindings=dict(get_port_bindings(container_config, client_config)),
+            binds=get_host_binds(container_map, container_config, instance),
+            volumes_from=[cls.cname(map_name, u_name) for u_name in get_inherited_volumes(container_config)],
+            port_bindings=get_port_bindings(container_config, client_config),
         )
         update_kwargs(c_kwargs, init_options(container_config.start_options), kwargs)
         return c_kwargs

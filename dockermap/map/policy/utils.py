@@ -87,7 +87,7 @@ def init_options(options):
     if options:
         if callable(options):
             return options()
-        return options
+        return options.copy()
     return {}
 
 
@@ -100,10 +100,11 @@ def get_volumes(container_map, config):
     :param config: Container configuration.
     :type config: dockermap.map.config.ContainerConfiguration
     :return: List of shared volume mount points.
-    :rtype: generator[unicode]
+    :rtype: list[unicode]
     """
-    volume_path = lambda b: resolve_value(container_map.volumes[b.volume])
-    return itertools.chain(map(resolve_value, config.shares), map(volume_path, config.binds))
+    volumes = [resolve_value(s) for s in config.shares]
+    volumes.extend([resolve_value(container_map.volumes[b.volume]) for b in config.binds])
+    return volumes
 
 
 def get_inherited_volumes(config):
@@ -136,14 +137,18 @@ def get_host_binds(container_map, config, instance):
     :param instance: Instance name. Pass ``None`` if not applicable.
     :type instance: unicode
     :return: Dictionary of shared volumes with host volumes and the read-only flag.
-    :rtype: generator[tuple[(dict, bool)]]
+    :rtype: dict[unicode, dict]
     """
+    binds = {}
     for alias, readonly in config.binds:
         share = container_map.host.get(alias, instance)
         if share:
             vol = resolve_value(container_map.volumes[alias])
             bind = dict(bind=vol, ro=readonly)
-            yield share, bind
+            binds[share] = bind
+        else:
+            raise KeyError("No host volume definition found for alias '{0}'.".format(alias))
+    return binds
 
 
 def get_port_bindings(container_config, client_config):
@@ -155,8 +160,9 @@ def get_port_bindings(container_config, client_config):
     :param client_config: Client configuration.
     :type client_config: dockermap.map.config.ClientConfiguration
     :return: Dictionary of ports with mapped port, and if applicable, with bind address
-    :rtype: generator[tuple]
+    :rtype: dict[unicode, unicode | int | tuple]
     """
+    port_bindings = {}
     for port_binding in container_config.exposes:
         exposed_port = port_binding.exposed_port
         bind_port = resolve_value(port_binding.host_port)
@@ -165,9 +171,10 @@ def get_port_bindings(container_config, client_config):
             bind_addr = resolve_value(client_config.interfaces.get(interface))
             if not bind_addr:
                 raise ValueError("Address for interface '{0}' not found in client configuration.".format(interface))
-            yield exposed_port, (bind_addr, bind_port)
+            port_bindings[exposed_port] = (bind_addr, bind_port)
         elif bind_port:
-            yield exposed_port, bind_port
+            port_bindings[exposed_port] = bind_port
+    return port_bindings
 
 
 def is_initial(container_state):
