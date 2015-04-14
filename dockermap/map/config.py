@@ -468,7 +468,7 @@ class HostVolumeConfiguration(DictMap):
         self._root = value
 
     def get(self, item, instance=None):
-        value = super(HostVolumeConfiguration, self).get(item)
+        value = resolve_value(super(HostVolumeConfiguration, self).get(item))
         if isinstance(value, dict):
             path = value.get(instance or 'default')
         else:

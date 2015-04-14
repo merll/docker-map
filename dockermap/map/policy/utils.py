@@ -117,7 +117,7 @@ def get_inherited_volumes(config):
     :rtype: generator[unicode]
     """
     def volume_str(u):
-        vol = resolve_value(u.volume)
+        vol = u.volume
         if u.readonly:
             return '{0}:ro'.format(vol)
         return vol
@@ -139,7 +139,7 @@ def get_host_binds(container_map, config, instance):
     :rtype: generator[tuple[(dict, bool)]]
     """
     for alias, readonly in config.binds:
-        share = resolve_value(container_map.host.get(alias, instance))
+        share = container_map.host.get(alias, instance)
         if share:
             vol = resolve_value(container_map.volumes[alias])
             bind = dict(bind=vol, ro=readonly)

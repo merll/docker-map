@@ -29,11 +29,11 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
 
     def _check_volumes(self, c_map, c_config, config_name, instance_name, instance_volumes):
         def _validate_bind(b_config, b_instance):
-            for host_bind in b_config.binds:
-                bind_alias = host_bind[0]
+            for shared_volume in b_config.binds:
+                bind_alias = shared_volume.volume
+                host_path = c_map.host.get(bind_alias, b_instance)
                 bind_path = resolve_value(c_map.volumes[bind_alias])
                 bind_vfs = instance_volumes.get(bind_path)
-                host_path = resolve_value(c_map.host.get(bind_alias, b_instance))
                 if host_path != bind_vfs:
                     return False
                 self.path_vfs[config_name, instance_name, bind_path] = bind_vfs

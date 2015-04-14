@@ -150,7 +150,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         """
-        return client_config.get('domainname', container_map.default_domain)
+        return resolve_value(client_config.get('domainname', container_map.default_domain))
 
     @classmethod
     def get_create_kwargs(cls, container_map, container_config, client_name, client_config, container_name,
