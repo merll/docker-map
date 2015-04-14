@@ -20,6 +20,10 @@ ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface'))
 
 
+def _read_only(value):
+    return value and value != 'rw'
+
+
 def _get_list(value):
     if value is None:
         return []
@@ -53,12 +57,12 @@ def _get_shared_volume(value):
         return SharedVolume(value, False)
     elif isinstance(value, (list, tuple)):
         if len(value) == 2:
-            return SharedVolume(value[0], bool(value[1]))
+            return SharedVolume(value[0], _read_only(value[1]))
         raise ValueError("Invalid element length; only tuples and lists of length 2 can be converted to a SharedVolume tuple.")
     elif isinstance(value, dict):
         if len(value) == 1:
             k, v = value.items()[0]
-            return SharedVolume(k, bool(v))
+            return SharedVolume(k, _read_only(v))
         raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume tuple.")
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
