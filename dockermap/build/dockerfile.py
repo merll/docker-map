@@ -111,7 +111,7 @@ class DockerFile(DockerStringBuffer):
     def __init__(self, baseimage=DEFAULT_BASEIMAGE, maintainer=None, initial=None):
         super(DockerFile, self).__init__()
         self._files = []
-        self._remove_files = []
+        self._remove_files = set()
         self._archives = []
         self._volumes = None
         self._entrypoint = None
@@ -201,6 +201,8 @@ class DockerFile(DockerStringBuffer):
          archives, which are no longer needed after building the binaries. Note that this will delete recursively, so
          use with care.
         :type remove_final: bool
+        :return: The path of the file in the Dockerfile context.
+        :rtype: unicode
         """
         if dst_path is None:
             head, tail = os.path.split(src_path)
@@ -222,7 +224,8 @@ class DockerFile(DockerStringBuffer):
         self.prefix('ADD', context_path, target_path)
         self._files.append((source_path, context_path))
         if remove_final:
-            self._remove_files.append(target_path)
+            self._remove_files.add(target_path)
+        return context_path
 
     def add_archive(self, src_file, remove_final=False):
         """
@@ -236,14 +239,21 @@ class DockerFile(DockerStringBuffer):
          top-level components of the tar archive recursively. Therefore, you should not use this on standard unix
          folders.
         :type remove_final: bool
+        :return: Name of the root files / directories added to the Dockerfile.
+        :rtype: list[unicode]
         """
-        with tarfile.open(src_file, 'r') as tf:
-            for member in tf.getmembers():
-                if not posixpath.sep in member.name:
-                    self.prefix('ADD', member.name, member.name)
-                    if remove_final:
-                        self._remove_files.append(member.name)
+        def _root_members():
+            with tarfile.open(src_file, 'r') as tf:
+                for member in tf.getmembers():
+                    if posixpath.sep not in member.name:
+                        yield member.name
+
+        member_names = list(_root_members())
+        self.prefix_all('ADD', *zip(member_names, member_names))
+        if remove_final:
+            self._remove_files.update(member_names)
         self._archives.append(src_file)
+        return member_names
 
     def add_volume(self, path):
         """
@@ -427,7 +437,7 @@ class DockerFile(DockerStringBuffer):
             return
         if self._remove_files:
             for filename in self._remove_files:
-                self.prefix('RUN', 'rm -R', filename)
+                self.prefix('RUN', 'rm -Rf', filename)
             self.blank()
         if self._volumes is not None:
             self.prefix('VOLUME', json.dumps(self._volumes, encoding='utf-8'))
