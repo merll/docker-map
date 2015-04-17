@@ -99,10 +99,6 @@ class DockerFile(DockerStringBuffer):
     Class for constructing Dockerfiles; can be saved or used in a :class:`DockerContext`. For :class:`DockerContext`, it
     keeps track of ``ADD`` operations, so that all files can easily be added to the context tarball.
 
-    :param name: Descriptive name to print in the Dockerfile, for documentation purposes only.
-    :type name: unicode
-    :param version: Version number to print in the Dockerfile comments, for documentation purposes only.
-    :type version: unicode
     :param baseimage: Base image to use for the new image. Set this to ``None`` if you want to explicitly write out the
      ``FROM`` Dockerfile command.
     :type baseimage: unicode
@@ -122,6 +118,7 @@ class DockerFile(DockerStringBuffer):
         self._command = None
         self._command_shell = False
         self._cmd_user = None
+        self._cmd_workdir = None
         self._expose = None
 
         if baseimage:
@@ -306,7 +303,7 @@ class DockerFile(DockerStringBuffer):
     @property
     def volumes(self):
         """
-        Returns the currently-set list of shared volumes.
+        Sets the list of shared volumes to be set in the Dockerfile ``VOLUME`` command. Not written before finalization.
 
         :return: Shared volumes.
         :rtype: list
@@ -315,61 +312,43 @@ class DockerFile(DockerStringBuffer):
 
     @volumes.setter
     def volumes(self, value):
-        """
-        Sets the list of shared volumes to be set in the Dockerfile ``VOLUME`` command. Not written before finalization.
-
-        :param value: List of shared volumes
-        :type value: list
-        """
         self.check_not_finalized()
         self._volumes = value
 
     @property
     def entrypoint(self):
         """
-        Returns the currently-set entry point of the Dockerfile.
+        Sets the entry point for the Dockerfile ``ENTRYPOINT`` command. Not written before finalization.
 
         :return: Entry point.
-        :rtype: unicode, list, or tuple
+        :rtype: unicode | list | tuple
         """
         return self._entrypoint
 
     @entrypoint.setter
     def entrypoint(self, value):
-        """
-        Sets the entry point for the Dockerfile ``ENTRYPOINT`` command. Not written before finalization.
-
-        :param value: Entry point.
-        :type value: unicode, list, or tuple
-        """
         self.check_not_finalized()
         self._entrypoint = value
 
     @property
     def command(self):
         """
-        Returns the currently-set default command of the Dockerfile.
+        Sets the default command for the Dockerfile ``CMD`` command. Not written before finalization.
 
         :return: Command.
-        :rtype: unicode, list, or tuple
+        :rtype: unicode | list | tuple
         """
         return self._command
 
     @command.setter
     def command(self, value):
-        """
-        Sets the default command for the Dockerfile ``CMD`` command. Not written before finalization.
-
-        :param value: Command.
-        :type value: unicode, list, or tuple
-        """
         self.check_not_finalized()
         self._command = value
 
     @property
     def command_shell(self):
         """
-        Returns if entry point and command should be formatted as a shell, or as an exec command upon finalization.
+        Sets if entry point and command should be formatted as a shell, or as an exec command upon finalization.
 
         :return: ``True``, if Docker should use a shell, ``False`` if exec is used.
         :rtype: bool
@@ -378,19 +357,15 @@ class DockerFile(DockerStringBuffer):
 
     @command_shell.setter
     def command_shell(self, value):
-        """
-        Sets if entry point and command should be formatted as a shell, or as an exec command upon finalization.
-
-        :param value: Set to ``True``, if Docker should use a shell, use ``False`` if exec is to be used.
-        :type value: bool
-        """
         self.check_not_finalized()
         self._command_shell = value
 
     @property
     def command_user(self):
         """
-        Returns the default user that should be used for the default entry point and command.
+        Sets the default user that should be used for the default entry point and command. Upon finalization, this will
+        insert a ``USER`` command right before ``ENTRYPONT`` or ``COMMAND`` if applicable. For applying this to ``RUN``
+        commands, insert the ``USER`` command manually.
 
         :return: Default user name or id.
         :rtype: unicode
@@ -399,44 +374,52 @@ class DockerFile(DockerStringBuffer):
 
     @command_user.setter
     def command_user(self, value):
-        """
-        Sets the default user that should be used for the default entry point and command. Upon finalization, this will
-        insert a ``USER`` command right before ``ENTRYPONT`` or ``COMMAND`` if applicable. For applying this to ``RUN``
-        commands, insert the ``USER`` command manually.
-
-        :param value: User name or id. Must be valid in the docker image.
-        :type value: unicode
-        """
         self.check_not_finalized()
         self._cmd_user = value
 
     @property
+    def command_workdir(self):
+        """
+        Sets the working directory that should be used for the default entry point and command. Upon finalization, this
+        will insert a ``WORKDIR`` command right before ``ENTRYPONT`` or ``COMMAND`` if applicable. For applying this to
+        other commands, insert the ``WORKDIR`` command manually.
+
+        :return: User name or id. Must be valid in the docker image.
+        :rtype: unicode
+        """
+        return self._cmd_workdir
+
+    @command_workdir.setter
+    def command_workdir(self, value):
+        self.check_not_finalized()
+        self._cmd_workdir = value
+
+    @property
     def expose(self):
         """
-        Returns the ports to be inserted with the ``EXPOSE`` command in the Dockerfile.
+        Sets the ports to be inserted with the ``EXPOSE`` command in the Dockerfile. Not written before finalization.
 
         :return: Ports.
-        :rtype: unicode, int, tuple, or list
+        :rtype: unicode | int | tuple | list
         """
         return self._expose
 
     @expose.setter
     def expose(self, value):
-        """
-        Sets the ports to be inserted with the ``EXPOSE`` command in the Dockerfile. Not written before finalization.
-
-        :param value: Ports.
-        :return: unicode, int, tuple, or list
-        """
         self.check_not_finalized()
         self._expose = value
 
     def finalize(self):
         """
         Finalizes the Dockerfile. Before the buffer is practically marked as read-only, the following Dockerfile
-        commands are written: `RUN rm -R` on each files marked for automatic removal; ``VOLUME`` for shared volumes;
-        `USER` as the default user for following commands; ``ENTRYPOINT`` and ``CMD``, each formatted as a shell or exec
-        command according to :attr:`command_shell`; and ``EXPOSE`` for exposed ports.
+        commands are written:
+
+        * ``RUN rm -R`` on each files marked for automatic removal;
+        * ``VOLUME`` for shared volumes;
+        * ``USER`` as the default user for following commands;
+        * ``WORKDIR`` as the working directory for following commands;
+        * ``ENTRYPOINT`` and ``CMD``, each formatted as a shell or exec command according to :attr:`command_shell`;
+        * and ``EXPOSE`` for exposed ports.
 
         An attempt to finalize an already-finalized instance has no effect.
         """
@@ -450,6 +433,8 @@ class DockerFile(DockerStringBuffer):
             self.prefix('VOLUME', json.dumps(self._volumes, encoding='utf-8'))
         if self._cmd_user:
             self.prefix('USER', self._cmd_user)
+        if self._cmd_workdir:
+            self.prefix('WORKDIR', self._cmd_workdir)
         if self._entrypoint is not None:
             self.prefix('ENTRYPOINT', format_command(self._entrypoint, self._command_shell))
         if self._command is not None:
