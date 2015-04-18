@@ -134,7 +134,7 @@ In contrast to inserting the ``USER`` command directly, this does not change the
 commands in the Dockerfile. You can still use ``prefix('USER', 'username')`` if you need to change users during the
 build process.
 
-Similarly, :attr:`~dockermap.build.dockerfile.DockerFile.command_user` sets the working directory for ``ENTRYPOINT``,
+Similarly, :attr:`~dockermap.build.dockerfile.DockerFile.command_workdir` sets the working directory for ``ENTRYPOINT``,
 ``CMD``. It does however not change directories immediately, i.e. does not affect ``RUN`` commands.
 
 Exposed ports
