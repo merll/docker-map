@@ -34,24 +34,28 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                 host_path = c_map.host.get(bind_alias, b_instance)
                 bind_path = resolve_value(c_map.volumes[bind_alias])
                 bind_vfs = instance_volumes.get(bind_path)
-                if host_path != bind_vfs:
+                if not (bind_vfs and host_path == bind_vfs):
                     return False
                 self.path_vfs[config_name, instance_name, bind_path] = bind_vfs
+            return True
 
         def _validate_attached(a_config):
             for attached in a_config.attaches:
                 attached_path = resolve_value(c_map.volumes[attached])
                 attached_vfs = instance_volumes.get(attached_path)
-                if self.path_vfs.get((attached, None, attached_path)) != attached_vfs:
+                if not (attached_vfs and self.path_vfs.get((attached, None, attached_path)) == attached_vfs):
                     return False
                 self.path_vfs[config_name, instance_name, attached_path] = attached_vfs
+            return True
 
         def _check_config_paths(cr_config, cr_instance):
             for share in cr_config.shares:
                 cr_shared_path = resolve_value(share)
                 self.path_vfs[config_name, instance_name, cr_shared_path] = instance_volumes.get(share)
-            _validate_bind(cr_config, cr_instance)
-            _validate_attached(cr_config)
+            if not _validate_bind(cr_config, cr_instance):
+                return False
+            if not _validate_attached(cr_config):
+                return False
             for used in cr_config.uses:
                 used_volume = used.volume
                 used_path = resolve_value(c_map.volumes.get(used_volume))
