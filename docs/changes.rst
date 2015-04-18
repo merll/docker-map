@@ -3,6 +3,14 @@
 Change History
 ==============
 
+0.3.2
+-----
+* Fixed error handling in build (issue #6).
+* New ``command_workdir`` for setting the working directory in DockerFiles.
+* Enhanced file adding functions in DockerFile to return build context paths.
+* Fixed volume consistency check in update policy.
+* Additional minor updates.
+
 0.3.1
 -----
 * Extended late value resolution to custom types.
