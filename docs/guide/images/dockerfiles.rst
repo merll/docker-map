@@ -82,7 +82,7 @@ For example, a file may also be added with the following arguments::
 * The third argument is also optional, and specifies the path inside the context archive. By default it is identical
   to the image's destination path, and can be used in case conflicts arise from adding multiple files or directories
   with identical names.
-* ``remove_final`` inserts a removal command (e.g. ``RUN rm -R /new_dir/my_file``) at the end of the Dockerfile, but
+* ``remove_final`` inserts a removal command (e.g. ``RUN rm -Rf /new_dir/my_file``) at the end of the Dockerfile, but
   before configuration commands. You may want to set this to clean up the file system of the final image from files and
   directories that were only needed during the build process. Please note that due to the file system layering that
   Docker uses, this will not actually make the image smaller.
@@ -133,6 +133,9 @@ The :attr:`~dockermap.build.dockerfile.DockerFile.command_user` property sets th
 In contrast to inserting the ``USER`` command directly, this does not change the user for other
 commands in the Dockerfile. You can still use ``prefix('USER', 'username')`` if you need to change users during the
 build process.
+
+Similarly, :attr:`~dockermap.build.dockerfile.DockerFile.command_user` sets the working directory for ``ENTRYPOINT``,
+``CMD``. It does however not change directories immediately, i.e. does not affect ``RUN`` commands.
 
 Exposed ports
 ^^^^^^^^^^^^^
