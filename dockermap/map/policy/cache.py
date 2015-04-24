@@ -1,28 +1,24 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from abc import ABCMeta, abstractmethod
-from six import with_metaclass
 
-
-class CachedItems(with_metaclass(ABCMeta, object)):
+class CachedItems(object):
     """
     Abstract implementation for a caching collection of client names or ids.
 
     :param client: Client object.
     :type client: docker.client.Client
     """
-    def __init__(self, client, *args, **kwargs):
+    def __init__(self, client):
         self._client = client
-        super(CachedItems, self).__init__(*args, **kwargs)
+        super(CachedItems, self).__init__()
         self.refresh()
 
-    @abstractmethod
     def refresh(self):
         """
         Forces a refresh of the cached items. Does not need to return anything.
         """
-        pass
+        raise NotImplementedError("Method 'refresh' is not implemented.")
 
 
 class CachedImages(CachedItems, dict):
@@ -33,9 +29,12 @@ class CachedImages(CachedItems, dict):
         """
         Fetches image and their ids from the client.
         """
-        self.clear()
         current_images = self._client.images()
-        self.update((tag, i['Id']) for i in current_images for tag in i['RepoTags'])
+        self.clear()
+        for image in current_images:
+            tags = image.get('RepoTags')
+            if tags:
+                self.update({tag: image['Id'] for tag in tags})
 
     def ensure_image(self, image_name):
         """
@@ -57,7 +56,7 @@ class CachedImages(CachedItems, dict):
         try:
             return self[full_name]
         except KeyError:
-            raise KeyError("Image {0} not found.".format(full_name))
+            raise KeyError("Image '{0}' not found.".format(full_name))
 
 
 class CachedContainerNames(CachedItems, set):
@@ -67,10 +66,13 @@ class CachedContainerNames(CachedItems, set):
         """
         current_containers = self._client.containers(all=True)
         self.clear()
-        self.update(name[1:] for container in current_containers for name in container['Names'])
+        for container in current_containers:
+            container_names = container.get('Names')
+            if container_names:
+                self.update(name[1:] for name in container_names)
 
 
-class DockerHostItemCache(with_metaclass(ABCMeta, dict)):
+class DockerHostItemCache(dict):
     """
     Abstract class for implementing caches of items (containers, images) present on the Docker client, so that
     their existence does not have to be checked separately for every action.
