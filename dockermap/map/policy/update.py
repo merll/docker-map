@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import six
 from dockermap.map.policy.utils import is_initial
 
 from ...functional import resolve_value
