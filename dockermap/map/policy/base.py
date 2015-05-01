@@ -136,6 +136,8 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_name: Container name.
         :type container_name: unicode
         """
+        if client_name == cls.get_default_client_name():
+            return container_name
         return '{0}-{1}'.format(container_name, client_name)
 
     @classmethod
