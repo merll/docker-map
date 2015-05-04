@@ -3,6 +3,11 @@
 Change History
 ==============
 
+0.3.3
+-----
+* Fix for missing container names and tags.
+* Exclude default client name from host name.
+
 0.3.2
 -----
 * Fixed error handling in build (issue #6).
