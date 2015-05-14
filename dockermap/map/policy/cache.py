@@ -25,6 +25,10 @@ class CachedImages(CachedItems, dict):
     """
     Dictionary of image names and ids, which also keeps track of the client object to pull images if necessary.
     """
+    def __init__(self, *args, **kwargs):
+        self._latest = set()
+        super(CachedImages, self).__init__(*args, **kwargs)
+
     def refresh(self):
         """
         Fetches image and their ids from the client.
@@ -36,12 +40,21 @@ class CachedImages(CachedItems, dict):
             if tags:
                 self.update({tag: image['Id'] for tag in tags})
 
-    def ensure_image(self, image_name):
+    def reset_latest(self):
+        """
+        Resets the cache which images have been pulled (i.e. updated to the latest version.)
+        """
+        self._latest = set()
+
+    def ensure_image(self, image_name, pull_latest=False):
         """
         Ensures that a particular image is present on the client. If it is not, a new copy is pulled from the server.
 
         :param image_name: Image name. If it does not include a specific tag, ``latest`` is assumed.
         :type image_name: unicode
+        :param pull_latest: If the image includes a latest-tag, pull it from the server. This is is done only once in
+         for the lifecycle of the cache, or unless `:meth:reset_latest` is called.
+        :type pull_latest: bool
         :return: Image id associated with the image name.
         :rtype: unicode
         """
@@ -50,9 +63,17 @@ class CachedImages(CachedItems, dict):
             full_name = image_name
         else:
             full_name = '{0}:latest'.format(image_name)
-        if full_name not in self:
-            self._client.import_image(image=image, tag=tag or 'latest')
-            self.refresh()
+            tag = 'latest'
+        update_latest = pull_latest and tag == 'latest' and full_name not in self._latest
+        if update_latest or full_name not in self:
+            self._client.pull(repository=image, tag=tag)
+            images = self._client.images(name=image_name)
+            if images:
+                new_image = images[0]
+                tags = new_image.get('RepoTags')
+                if tags:
+                    self._latest.update(tags)
+                    self.update({tag: new_image['Id'] for tag in tags})
         try:
             return self[full_name]
         except KeyError:

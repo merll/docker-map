@@ -11,8 +11,13 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
     def __init__(self, policy, *args, **kwargs):
         super(ContainerUpdateGenerator, self).__init__(policy, *args, **kwargs)
         self.remove_status = policy.remove_status
-        self.base_image_ids = {client_name: policy.images[client_name].ensure_image(
-            self.iname_tag(policy.base_image)) for client_name in policy.clients.keys()}
+        self.pull_latest = policy.pull_latest
+        self.update_persistent = policy.update_persistent
+        self.base_image_ids = {
+            client_name: policy.images[client_name].ensure_image(
+                self.iname_tag(policy.base_image), pull_latest=self.pull_latest)
+            for client_name in policy.clients.keys()
+        }
         self.path_vfs = {}
 
     def _check_links(self, map_name, c_config, instance_links):
@@ -98,7 +103,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     a_status = a_detail['State']
                     a_image = a_detail['Image']
                     a_remove = (not a_status['Running'] and a_status['ExitCode'] in self.remove_status) or \
-                        a_image != self.base_image_ids[client_name]
+                        (self.update_persistent and a_image != self.base_image_ids[client_name])
                     if a_remove:
                         ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, a_name)
                         client.remove_container(**ar_kwargs)
@@ -121,7 +126,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                         mapped_path = a_paths[a]
                         self.path_vfs[a, None, mapped_path] = volumes.get(mapped_path)
             image_name = self.iname_tag(c_config.image or container_name, container_map=c_map)
-            image_id = self._policy.images[client_name].ensure_image(image_name)
+            image_id = self._policy.images[client_name].ensure_image(image_name, pull_latest=self.pull_latest)
             for ci in instances:
                 ci_name = self._policy.cname(map_name, container_name, ci)
                 ci_exists = ci_name in existing_containers
@@ -133,7 +138,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     ci_links = ci_detail['HostConfig']['Links'] or []
                     ci_running = ci_status['Running']
                     ci_remove = (not ci_running and ci_status['ExitCode'] in self.remove_status) or \
-                        ci_image != image_id or \
+                        ((not c_config.persistent or self.update_persistent) and ci_image != image_id) or \
                         not self._check_volumes(c_map, c_config, container_name, ci, ci_volumes) or \
                         not self._check_links(map_name, c_config, ci_links)
                     if ci_remove:
@@ -164,6 +169,8 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
 
 class ContainerUpdateMixin(object):
     remove_status = (-127, )
+    pull_latest = False
+    update_persistent = False
 
     def update_actions(self, map_name, container, instances=None, **kwargs):
         """
