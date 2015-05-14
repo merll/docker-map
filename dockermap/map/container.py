@@ -43,23 +43,27 @@ class ContainerMap(object):
         :type items: dict
         """
         for key, value in six.iteritems(items):
-            if key == 'volumes':
-                self._volumes.update(value)
-            elif key == 'host':
-                self._host.update(value)
-            elif key == 'host_root':
+            if key == 'host_root':
                 self._host.root = value
             elif key == 'repository':
                 self._repository = value
             elif key == 'default_domain':
                 self._default_domain = value
             elif key == 'clients':
-                self._clients = list(value)
-            elif key == 'containers':
-                for container, config in six.iteritems(value):
-                    self._containers[container].update(config)
-            else:
-                self._containers[key].update(value)
+                if value is not None:
+                    self._clients = list(value)
+                else:
+                    self._clients = []
+            elif value:
+                if key == 'volumes':
+                    self._volumes.update(value)
+                elif key == 'host':
+                    self._host.update(value)
+                elif key == 'containers':
+                    for container, config in six.iteritems(value):
+                        self._containers[container].update(config)
+                else:
+                    self._containers[key].update(value)
 
     def _merge_from_dict(self, items, lists_only):
         """
@@ -67,6 +71,8 @@ class ContainerMap(object):
         :type lists_only: bool
         """
         for key, value in six.iteritems(items):
+            if not value:
+                continue
             if key == 'volumes':
                 self._volumes.update(value)
             elif key == 'host':
