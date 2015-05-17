@@ -126,8 +126,12 @@ Along the aforementioned dependency path, every container is stopped, removed, r
 
 * the image id does not match the current tag specification, e.g. since a new image version has been pulled,
 * the container is stopped and its exit status indicates that it cannot be restarted,
-* a linked container is missing, or
+* a linked container is missing,
 * the virtual filesystems refer to the same path inside the container, but on the host they do not match (e.g. due to
-  container updates along the dependency path).
+  container updates along the dependency path),
+* :ref:`port assignments <exposed-ports>` have changed, or
+* ``environment``, ``command``, or ``entrypoint`` have been modified in the
+  :attr:`~dockermap.map.config.ContainerConfiguration.create_options` since the current container was created.
 
-Non-running containers are simply started during this process.
+Non-running containers are simply started during this process, if their configuration corresponds with their current
+state.

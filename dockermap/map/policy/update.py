@@ -247,11 +247,21 @@ class ContainerUpdateMixin(object):
         Generates actions for updating a configured container, including all of its dependencies. Updating in this case
         means that:
 
+        * For each image the latest version is pulled from the registry, but only if
+          :attr:`~ContainerUpdateMixin.pull_latest` is set to ``True``.
         * An attached container is removed and re-created if its image id does not correspond with the current base
           image, or the status indicates that the container cannot be restarted (-127 in this implementation).
-        * Any other container is re-created if any of its attached volumes' paths does not match (i.e. they are not
-          actually sharing the same virtual file system), the container cannot be restarted, or if the image id does
-          not correspond with the configured image (e.g. because the image has been updated).
+          Attached and `persistent` images are not updated in case of image changes, unless
+          :attr:`~ContainerUpdateMixin.update_persistent` is set to ``True``.
+        * Any other container is re-created if
+
+          - any of its attached volumes' paths does not match (i.e. they are not actually sharing the same virtual
+            file system), or
+          - the container cannot be restarted (the error status indicates so), or
+          - the image id does not correspond with the configured image (e.g. because the image has been updated), or
+          - environment variables have been changed in the configuration, or
+          - command or entrypoint have been set or changed, or
+          - network ports differ from what is specified in the configuration.
 
         Only prior existing containers are removed and re-created. Any created container is also started by its
         configuration.
