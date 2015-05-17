@@ -1,10 +1,79 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from dockermap.map.policy.utils import is_initial
+import shlex
+import six
 
 from ...functional import resolve_value
 from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
+from .utils import is_initial, get_port_bindings, get_host_binds
+
+
+def _check_environment(c_config, instance_detail):
+    def _parse_env():
+        for env_str in instance_env:
+            var_name, sep, env_val = env_str.partition('=')
+            if sep:
+                yield var_name, env_val
+
+    if not c_config.create_options:
+        return True
+    instance_env = instance_detail['Config']['Env'] or []
+    config_env = c_config.create_options.get('environment')
+    if not config_env:
+        return True
+    current_env = dict(_parse_env())
+    for k, v in six.iteritems(config_env):
+        if current_env.get(k) != v:
+            return False
+    return True
+
+
+def _check_cmd(c_config, instance_detail):
+    if not c_config.create_options:
+        return True
+    instance_config = instance_detail['Config']
+    config_cmd = c_config.create_options.get('command') if c_config.create_options else None
+    if config_cmd:
+        instance_cmd = instance_config['Cmd'] or []
+        if isinstance(config_cmd, six.string_types):
+            if shlex.split(config_cmd) != instance_cmd:
+                return False
+        elif list(config_cmd) != instance_cmd:
+            return False
+    config_entrypoint = c_config.create_options.get('entrypoint') if c_config.create_options else None
+    if config_entrypoint:
+        instance_entrypoint = instance_config['Entrypoint'] or []
+        if isinstance(config_entrypoint, six.string_types):
+            if [config_entrypoint] != instance_entrypoint:
+                return False
+        elif list(config_entrypoint) != instance_entrypoint:
+            return False
+    return True
+
+
+def _check_network(container_config, client_config, instance_detail):
+    if not container_config.exposes:
+        return True
+    instance_ports = instance_detail['NetworkSettings']['Ports'] or {}
+    for port_binding in container_config.exposes:
+        port = port_binding.exposed_port
+        i_key = port if isinstance(port, six.string_types) and '/' in port else '{0}/tcp'.format(port)
+        if i_key not in instance_ports:
+            return False
+        i_val = instance_ports[i_key]
+        bind_port = resolve_value(port_binding.host_port)
+        if bind_port:
+            if not i_val:
+                return False
+            interface = resolve_value(port_binding.interface)
+            if interface:
+                bind_addr = resolve_value(client_config.interfaces.get(interface))
+            else:
+                bind_addr = '0.0.0.0'
+            if {'HostIp': bind_addr, 'HostPort': six.text_type(bind_port)} not in i_val:
+                return False
+    return True
 
 
 class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
@@ -20,23 +89,22 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
         }
         self.path_vfs = {}
 
-    def _check_links(self, map_name, c_config, instance_links):
+    def _check_links(self, map_name, c_config, instance_detail):
         def _extract_link_info(host_link):
             link_name, __, link_alias = host_link.partition(':')
             return link_name[1:], link_alias.rpartition('/')[2]
 
+        instance_links = instance_detail['HostConfig']['Links'] or []
         linked_dict = dict(map(_extract_link_info, instance_links))
         for link in c_config.links:
             if link.alias != linked_dict.get(self._policy.cname(map_name, link.container)):
                 return False
         return True
 
-    def _check_volumes(self, c_map, c_config, config_name, instance_name, instance_volumes):
+    def _check_volumes(self, c_map, c_config, config_name, instance_name, instance_detail):
         def _validate_bind(b_config, b_instance):
-            for shared_volume in b_config.binds:
-                bind_alias = shared_volume.volume
-                host_path = c_map.host.get(bind_alias, b_instance)
-                bind_path = resolve_value(c_map.volumes[bind_alias])
+            for host_path, bind_ro in six.iteritems(get_host_binds(c_map, b_config, b_instance)):
+                bind_path = bind_ro['bind']
                 bind_vfs = instance_volumes.get(bind_path)
                 if not (bind_vfs and host_path == bind_vfs):
                     return False
@@ -82,6 +150,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     raise ValueError("Volume alias or container reference could not be resolved: {0}".format(used))
             return True
 
+        instance_volumes = instance_detail.get('Volumes') or {}
         return _check_config_paths(c_config, instance_name)
 
     def iname_tag(self, image, container_map=None):
@@ -134,13 +203,14 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     ci_detail = client.inspect_container(ci_name)
                     ci_status = ci_detail['State']
                     ci_image = ci_detail['Image']
-                    ci_volumes = ci_detail.get('Volumes') or {}
-                    ci_links = ci_detail['HostConfig']['Links'] or []
                     ci_running = ci_status['Running']
                     ci_remove = (not ci_running and ci_status['ExitCode'] in self.remove_status) or \
                         ((not c_config.persistent or self.update_persistent) and ci_image != image_id) or \
-                        not self._check_volumes(c_map, c_config, container_name, ci, ci_volumes) or \
-                        not self._check_links(map_name, c_config, ci_links)
+                        not self._check_volumes(c_map, c_config, container_name, ci, ci_detail) or \
+                        not self._check_links(map_name, c_config, ci_detail) or \
+                        not _check_environment(c_config, ci_detail) or \
+                        not _check_cmd(c_config, ci_detail) or \
+                        not _check_network(c_config, client_config, ci_detail)
                     if ci_remove:
                         if ci_running:
                             ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_name, client_config,
