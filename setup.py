@@ -30,7 +30,7 @@ setup(
     author='Matthias Erll',
     author_email='matthias@erll.de',
     url='https://github.com/merll/docker-map',
-    description='Utilities for building and managing Docker images and containers in Python.',
+    description='Managing Docker images, containers, and their dependencies in Python.',
     long_description=include_readme(),
     platforms=['OS Independent'],
     keywords=['docker', 'deployment'],

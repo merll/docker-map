@@ -355,6 +355,11 @@ related to `Docker-Map`, e.g.::
 Instead of setting both dictionaries statically, they can also refer to a callable. This has to resolve to a
 dictionary at run-time.
 
+.. note::
+   It is discouraged to overwrite paths of volumes that are otherwise defined via ``uses`` and ``binds``, as well as
+   exposed ports as set via ``exposes``. The default policy for updating containers will not be able to detect reliably
+   whether a running container is consistent with its configuration object.
+
 Input formats
 """""""""""""
 On the attributes :attr:`~dockermap.map.config.ContainerConfiguration.instances`,

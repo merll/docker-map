@@ -1,8 +1,8 @@
 Docker-Map
 ==========
 
-Utilities for building and managing Docker images and containers in Python.
----------------------------------------------------------------------------
+Managing Docker images, containers, and their dependencies in Python.
+---------------------------------------------------------------------
 
 Project: https://github.com/merll/docker-map
 
@@ -48,16 +48,13 @@ and the context tarball are consistent.
 
 Creating, connecting, and running containers
 ============================================
-Containers can be created easily on the command line or using the Remote API, but managing
-dependencies can be tedious. Whereas the path and links may be quite individual to the
-local configuration, directory paths are typically constant within the containers.
-This package therefore intends to reduce repetitions of names and paths in API commands,
-by introducing the following main features:
+This package reduces repetitions of names and paths in API commands, by introducing the
+following main features:
 
 * Automatically create and assign shared volumes, where the only purpose is to share data
   between containers.
-* Automatically update containers if their shared volumes are inconsistent or their image
-  has been updated.
+* Automatically update containers if their shared volumes are inconsistent, their image,
+  or their configuration has been updated.
 * Use alias names instead of paths to bind host volumes to container shares.
 * Automatically create and start containers when their dependent containers are started.
 
@@ -76,13 +73,13 @@ elements are:
 * `binds`: Host volume mappings. Uses alias names instead of directory paths.
 * `uses`: Can be names of other containers, or volumes shared by another volume through
   `attaches`. Has the same effect as the `volumes_from` argument in the API, but using alias
-  names.
+  names and automatically resolving these to paths.
 * `links`: For container linking. Container names are translated to instance name on the map.
 * `attaches`: Generates a separate container for the purpose of sharing data with another
   one, assigns file system permissions as set in `permissions` and `user`. This makes
   configuration of sockets very easy.
 * `exposes`: Configures port bindings for linked containers and on host interfaces.
-* `create_options` and `start_options` provide the possibility to add additional keyword
+* `create_options` and `start_options` provide the possibility to add further keyword
   arguments such as `command` or `entrypoint`, which are passed through to the `docker-py`
   client.
 
@@ -105,7 +102,7 @@ Volume aliases are stored in `container_map.volumes` and host binds in
 
 Client configuration
 --------------------
-`ClientConfiguration` objects allow for a host-specific managment of parameters, such as
+`ClientConfiguration` objects allow for a host-specific management of parameters, such as
 service URL and timeout. For example, the `interfaces` property translates the `exposes`
 setting for a configuration on each host into a port binding argument with the local
 address.
