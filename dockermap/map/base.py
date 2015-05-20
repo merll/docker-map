@@ -274,14 +274,15 @@ class DockerClientWrapper(docker.Client):
         def _stopped_containers():
             exclude_names = set(exclude or ())
             for container in self.containers(all=True):
-                c_name = container['Names'][0][1:]
+                c_names = [name[1:] for name in container['Names'] or ()]
                 c_status = container['Status']
-                if ((include_initial and c_status == '') or c_status.startswith('Exited')) and c_name not in exclude_names:
-                    yield container['Id'], c_name
+                c_id = container['Id']
+                if ((include_initial and c_status == '') or c_status.startswith('Exited')) and not exclude_names.intersection(c_names):
+                    yield c_id, c_names[0] if c_names else c_id
 
         for cid, cn in _stopped_containers():
             try:
-                self.remove_container(cid)
+                self.remove_container(cn)
             except APIError as e:
                 if e.response.status_code != 404:
                     self.push_log("Could not remove container '{0}': {1}".format(cn, e.explanation), logging.ERROR)
