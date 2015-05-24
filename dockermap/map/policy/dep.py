@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ..dep import MultiDependencyResolver
+from itertools import chain
+
+from ..dep import MultiDependencyResolver, CircularDependency
 
 
 class ContainerDependencyResolver(MultiDependencyResolver):
@@ -29,12 +31,18 @@ class ContainerDependencyResolver(MultiDependencyResolver):
         :type parents: iterable
         :return: List of recursively resolved dependencies of this container.
         :rtype: list
+        :raise CircularDependency: If the current element depends on one found deeper in the hierarchy.
         """
-        dep = list(parents)
-        for parent in parents:
-            parent_dep = resolve_parent(parent)
+        dep = []
+        for parent_dep in chain.from_iterable(map(resolve_parent, parents)):
             if parent_dep:
-                dep.extend(set(parent_dep).difference(dep))
+                new_dep = [p for p in parent_dep if p not in dep]
+                dep.extend(new_dep)
+
+        new_dep = [p for p in parents if p not in dep]
+        dep.extend(new_dep)
+        if item in dep:
+            raise CircularDependency("Circular dependency found for item '{0}'.".format(item))
         return dep
 
     def get_container_dependencies(self, map_name, container):
