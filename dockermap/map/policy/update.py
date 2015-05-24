@@ -6,7 +6,7 @@ import six
 
 from ...functional import resolve_value
 from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
-from .utils import is_initial, get_port_bindings, get_host_binds
+from .utils import is_initial, get_host_binds
 
 
 def _check_environment(c_config, instance_detail):
