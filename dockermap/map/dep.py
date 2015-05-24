@@ -121,6 +121,13 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
 
         return _get_sub_dependency(item) or ()
 
+    def reset(self):
+        """
+        Resets all cached nodes.
+        """
+        for value in self._deps.values():
+            value.dependencies = NotInitialized
+
     def update(self, items):
         """
         Updates the dependencies with the given items. Note that this may not reset all previously-evaluated and cached
@@ -176,7 +183,7 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
 
     def update(self, items):
         """
-        Updates the dependencies with the given items. Note that this may not reset all previously-evaluated and cached
+        Updates the dependencies with the given items. Note that this does not reset all previously-evaluated and cached
         nodes.
 
         :param items: Iterable or dictionary in the format `(dependent_item, dependencies)`.
@@ -185,7 +192,6 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         for item, parents in _iterate_dependencies(items):
             dep = self._deps[item]
             dep.parent.update(parents)
-            dep.dependencies = NotInitialized
 
     def update_backward(self, items):
         """
