@@ -34,7 +34,8 @@ class ContainerDependencyResolver(MultiDependencyResolver):
         :raise CircularDependency: If the current element depends on one found deeper in the hierarchy.
         """
         dep = []
-        for parent_dep in chain.from_iterable(map(resolve_parent, parents)):
+        for parent in parents:
+            parent_dep = resolve_parent(parent)
             if parent_dep:
                 new_dep = [p for p in parent_dep if p not in dep]
                 dep.extend(new_dep)

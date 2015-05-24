@@ -113,13 +113,13 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         def _get_sub_dependency(sub_item):
             e = self._deps.get(sub_item)
             if e is None:
-                return None
+                return ()
 
             if e.dependencies is NotInitialized:
                 e.dependencies = self.merge_dependency(sub_item, _get_sub_dependency, e.parent)
             return e.dependencies
 
-        return _get_sub_dependency(item) or ()
+        return _get_sub_dependency(item)
 
     def reset(self):
         """
