@@ -147,7 +147,8 @@ class SingleDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
     def update_backward(self, items):
         """
         Updates the dependencies in the inverse relationship format, i.e. from an iterable or dict that is structured
-        as `(item, dependent_items)`.
+        as `(item, dependent_items)`. Note that this implementation is only valid for 1:1 relationships, i.e. that each
+        node has also exactly one dependent. For other cases, :class:`~MultiDependencyResolver` should be used.
 
         :param items: Iterable or dictionary in the format `(item, dependent_items)`.
         :type items: iterable
