@@ -3,6 +3,14 @@
 Change History
 ==============
 
+0.4.0
+-----
+* Added check for changes in environment, command, and network settings in update policy.
+* Added optional pull before new container creation.
+* Revised dependency resolution for avoiding duplicate actions and detecting circular dependencies more reliably.
+* Fix for handling missing container names in cleanup method.
+* Allow for merging empty dictionary keys.
+
 0.3.3
 -----
 * Fix for missing container names and tags.
