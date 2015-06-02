@@ -630,6 +630,21 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         """
         raise NotImplementedError("This policy does not support the update command.")
 
+    def run_script(self, map_name, container, instance=None, **kwargs):
+        """
+        Runs a single script or command in a container. Implementation is optional.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param script_path: Path to the script on the Docker host.
+        :param kwargs: Keyword arguments to the script runner function.
+        :return: A dictionary of client names with their log output and exit codes.
+        :rtype: dict[unicode, dict]
+        """
+        raise NotImplementedError("This policy does not support the script command.")
+
     @property
     def container_maps(self):
         """

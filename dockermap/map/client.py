@@ -247,6 +247,26 @@ class MappingDockerClient(object):
             return action_method(map_name or self._default_map, container, instances=instances, **kwargs)
         raise ValueError("The selected policy does not provide a method '{0}' for generating actions.".format(method_name))
 
+    def run_script(self, container, instance=None, map_name=None, **kwargs):
+        """
+        Runs a script or single command in the context of a container. By the default implementation this means creating
+        the container along with all of its dependencies, mounting the script path, and running the script. The result
+        is recorded in a dictionary per client, before the container is removed. Dependencies are not removed. For
+        details, see :meth:`dockermap.map.policy.script.ScriptMixin.run_script`.
+
+        :param map_name: Container map name.
+        :type map_name: unicode
+        :param instance: Instance name. Optional, if not specified runs the default instance.
+        :type instance: unicode
+        :param container: Container configuration name.
+        :type container: unicode
+        :param script_path: Path to the script on the Docker host.
+        :param kwargs: Keyword arguments to the script runner function.
+        :return: A dictionary of client names with their log output and exit codes.
+        :rtype: dict[unicode, dict]
+        """
+        return self.get_policy().run_script(map_name or self._default_map, container, instance=instance, **kwargs)
+
     def refresh_names(self):
         """
         Invalidates the policy name and status cache.

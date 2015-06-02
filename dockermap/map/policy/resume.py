@@ -2,10 +2,11 @@
 from __future__ import unicode_literals
 
 from .base import BasePolicy, AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
-from .update import ContainerUpdateMixin
-from .utils import is_initial
+from .script import ScriptMixin
 from .simple import (SimpleCreateMixin, SimpleStartMixin, SimpleStopMixin, SimpleRemoveMixin,
                      SimpleShutdownMixin, SimpleRestartMixin)
+from .update import ContainerUpdateMixin
+from .utils import is_initial
 
 
 class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
@@ -99,5 +100,5 @@ class ResumeStartupMixin(object):
 
 
 class ResumeUpdatePolicy(SimpleCreateMixin, SimpleStartMixin, SimpleRestartMixin, SimpleStopMixin, SimpleRemoveMixin,
-                         ResumeStartupMixin, SimpleShutdownMixin, ContainerUpdateMixin, BasePolicy):
+                         ResumeStartupMixin, SimpleShutdownMixin, ContainerUpdateMixin, ScriptMixin, BasePolicy):
     pass
