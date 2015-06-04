@@ -81,10 +81,12 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
         super(ContainerUpdateGenerator, self).__init__(policy, *args, **kwargs)
         self.remove_status = policy.remove_status
         self.pull_latest = policy.pull_latest
+        self.pull_insecure_registry = policy.pull_insecure_registry
         self.update_persistent = policy.update_persistent
         self.base_image_ids = {
             client_name: policy.images[client_name].ensure_image(
-                self.iname_tag(policy.base_image), pull_latest=self.pull_latest)
+                self.iname_tag(policy.base_image), pull_latest=self.pull_latest,
+                insecure_registry=self.pull_insecure_registry)
             for client_name in policy.clients.keys()
         }
         self.path_vfs = {}
@@ -195,7 +197,8 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                         mapped_path = a_paths[a]
                         self.path_vfs[a, None, mapped_path] = volumes.get(mapped_path)
             image_name = self.iname_tag(c_config.image or container_name, container_map=c_map)
-            image_id = self._policy.images[client_name].ensure_image(image_name, pull_latest=self.pull_latest)
+            image_id = self._policy.images[client_name].ensure_image(image_name, pull_latest=self.pull_latest,
+                                                                     insecure_registry=self.pull_insecure_registry)
             for ci in instances:
                 ci_name = self._policy.cname(map_name, container_name, ci)
                 ci_exists = ci_name in existing_containers
@@ -240,6 +243,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
 class ContainerUpdateMixin(object):
     remove_status = (-127, )
     pull_latest = False
+    pull_insecure_registry = False
     update_persistent = False
 
     def update_actions(self, map_name, container, instances=None, **kwargs):

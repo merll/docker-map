@@ -46,7 +46,7 @@ class CachedImages(CachedItems, dict):
         """
         self._latest = set()
 
-    def ensure_image(self, image_name, pull_latest=False):
+    def ensure_image(self, image_name, pull_latest=False, insecure_registry=False):
         """
         Ensures that a particular image is present on the client. If it is not, a new copy is pulled from the server.
 
@@ -66,7 +66,7 @@ class CachedImages(CachedItems, dict):
             tag = 'latest'
         update_latest = pull_latest and tag == 'latest' and full_name not in self._latest
         if update_latest or full_name not in self:
-            self._client.pull(repository=image, tag=tag)
+            self._client.pull(repository=image, tag=tag, insecure_registry=insecure_registry)
             images = self._client.images(name=image_name)
             if images:
                 new_image = images[0]
