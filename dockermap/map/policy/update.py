@@ -6,7 +6,7 @@ import six
 
 from ...functional import resolve_value
 from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
-from .utils import is_initial, get_host_binds
+from .utils import is_initial, get_host_binds, init_options
 
 
 def _check_environment(c_config, instance_detail):
@@ -16,24 +16,26 @@ def _check_environment(c_config, instance_detail):
             if sep:
                 yield var_name, env_val
 
-    if not c_config.create_options:
+    create_options = init_options(c_config.create_options)
+    if not create_options:
         return True
     instance_env = instance_detail['Config']['Env'] or []
-    config_env = c_config.create_options.get('environment')
+    config_env = resolve_value(create_options.get('environment'))
     if not config_env:
         return True
     current_env = dict(_parse_env())
     for k, v in six.iteritems(config_env):
-        if current_env.get(k) != v:
+        if current_env.get(k) != resolve_value(v):
             return False
     return True
 
 
 def _check_cmd(c_config, instance_detail):
-    if not c_config.create_options:
+    create_options = init_options(c_config.create_options)
+    if not create_options:
         return True
     instance_config = instance_detail['Config']
-    config_cmd = c_config.create_options.get('command') if c_config.create_options else None
+    config_cmd = resolve_value(create_options.get('command')) if create_options else None
     if config_cmd:
         instance_cmd = instance_config['Cmd'] or []
         if isinstance(config_cmd, six.string_types):
@@ -41,7 +43,7 @@ def _check_cmd(c_config, instance_detail):
                 return False
         elif list(config_cmd) != instance_cmd:
             return False
-    config_entrypoint = c_config.create_options.get('entrypoint') if c_config.create_options else None
+    config_entrypoint = resolve_value(create_options.get('entrypoint')) if create_options else None
     if config_entrypoint:
         instance_entrypoint = instance_config['Entrypoint'] or []
         if isinstance(config_entrypoint, six.string_types):
@@ -57,13 +59,13 @@ def _check_network(container_config, client_config, instance_detail):
         return True
     instance_ports = instance_detail['NetworkSettings']['Ports'] or {}
     for port_binding in container_config.exposes:
-        port = port_binding.exposed_port
+        port = resolve_value(port_binding.exposed_port)
         i_key = port if isinstance(port, six.string_types) and '/' in port else '{0}/tcp'.format(port)
         if i_key not in instance_ports:
             return False
-        i_val = instance_ports[i_key]
         bind_port = resolve_value(port_binding.host_port)
         if bind_port:
+            i_val = instance_ports[i_key]
             if not i_val:
                 return False
             interface = resolve_value(port_binding.interface)

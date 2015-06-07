@@ -182,7 +182,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             image=cls.iname(container_map, container_config.image or default_image),
             volumes=get_volumes(container_map, container_config),
             user=extract_user(container_config.user),
-            ports=[port_binding.exposed_port
+            ports=[resolve_value(port_binding.exposed_port)
                    for port_binding in container_config.exposes if port_binding.exposed_port],
             hostname=cls.get_hostname(client_name, container_name) if container_map.set_hostname else None,
             domainname=cls.get_domainname(container_map, container_config, client_config),

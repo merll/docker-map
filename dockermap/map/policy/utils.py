@@ -61,15 +61,17 @@ def update_kwargs(kwargs, *updates):
                 continue
             kw_item = kwargs.get(key)
             if isinstance(u_item, (tuple, list)):
+                u_list = map(resolve_value, u_item)
                 if kw_item:
-                    kw_item.extend(u_item)
+                    kw_item.extend(u_list)
                 else:
-                    kwargs[key] = u_item[:]
+                    kwargs[key] = list(u_list)
             elif isinstance(u_item, dict):
+                u_dict = {u_k: resolve_value(u_v) for u_k, u_v in six.iteritems(u_item)}
                 if kw_item:
-                    kw_item.update(u_item)
+                    kw_item.update(u_dict)
                 else:
-                    kwargs[key] = u_item.copy()
+                    kwargs[key] = u_dict
             else:
                 kwargs[key] = u_item
 
@@ -164,10 +166,10 @@ def get_port_bindings(container_config, client_config):
     """
     port_bindings = {}
     for port_binding in container_config.exposes:
-        exposed_port = port_binding.exposed_port
+        exposed_port = resolve_value(port_binding.exposed_port)
         bind_port = resolve_value(port_binding.host_port)
         interface = resolve_value(port_binding.interface)
-        if interface:
+        if interface and bind_port:
             bind_addr = resolve_value(client_config.interfaces.get(interface))
             if not bind_addr:
                 raise ValueError("Address for interface '{0}' not found in client configuration.".format(interface))
