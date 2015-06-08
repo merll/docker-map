@@ -276,8 +276,8 @@ class DockerClientWrapper(docker.Client):
             for container in self.containers(all=True):
                 c_names = [name[1:] for name in container['Names'] or ()]
                 c_status = container['Status']
-                c_id = container['Id']
-                if ((include_initial and c_status == '') or c_status.startswith('Exited')) and not exclude_names.intersection(c_names):
+                if ((include_initial and c_status == '') or c_status.startswith('Exited')) and exclude_names.isdisjoint(c_names):
+                    c_id = container['Id']
                     yield c_id, c_names[0] if c_names else c_id
 
         for cid, cn in _stopped_containers():
