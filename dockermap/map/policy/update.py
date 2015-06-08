@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import logging
 import shlex
 import six
 
 from ...functional import resolve_value
 from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
 from .utils import is_initial, get_host_binds, init_options
+
+
+log = logging.getLogger(__name__)
 
 
 def _check_environment(c_config, instance_detail):
@@ -24,6 +28,7 @@ def _check_environment(c_config, instance_detail):
     if not config_env:
         return True
     current_env = dict(_parse_env())
+    log.debug("Checking environment. Config / container instance:\n{0}\n{1}".format(config_env, current_env))
     for k, v in six.iteritems(config_env):
         if current_env.get(k) != resolve_value(v):
             return False
@@ -38,6 +43,7 @@ def _check_cmd(c_config, instance_detail):
     config_cmd = resolve_value(create_options.get('command')) if create_options else None
     if config_cmd:
         instance_cmd = instance_config['Cmd'] or []
+        log.debug("Checking command. Config / container instance:\n{0}\n{1}".format(config_cmd, instance_cmd))
         if isinstance(config_cmd, six.string_types):
             if shlex.split(config_cmd) != instance_cmd:
                 return False
@@ -46,6 +52,8 @@ def _check_cmd(c_config, instance_detail):
     config_entrypoint = resolve_value(create_options.get('entrypoint')) if create_options else None
     if config_entrypoint:
         instance_entrypoint = instance_config['Entrypoint'] or []
+        log.debug("Checking entrypoint. Config / container instance:\n{0}\n{1}".format(config_entrypoint,
+                                                                                       instance_entrypoint))
         if isinstance(config_entrypoint, six.string_types):
             if [config_entrypoint] != instance_entrypoint:
                 return False
@@ -61,19 +69,24 @@ def _check_network(container_config, client_config, instance_detail):
     for port_binding in container_config.exposes:
         port = resolve_value(port_binding.exposed_port)
         i_key = port if isinstance(port, six.string_types) and '/' in port else '{0}/tcp'.format(port)
+        log.debug("Looking up port {0} configuration.".format(i_key))
         if i_key not in instance_ports:
+            log.debug("Not found.")
             return False
         bind_port = resolve_value(port_binding.host_port)
         if bind_port:
             i_val = instance_ports[i_key]
             if not i_val:
+                log.debug("Port is exposed but not published.")
                 return False
             interface = resolve_value(port_binding.interface)
             if interface:
                 bind_addr = resolve_value(client_config.interfaces.get(interface))
             else:
                 bind_addr = '0.0.0.0'
-            if {'HostIp': bind_addr, 'HostPort': six.text_type(bind_port)} not in i_val:
+            bind_config = {'HostIp': bind_addr, 'HostPort': six.text_type(bind_port)}
+            log.debug("Checking port. Config / container instance:\n{0}\n{1}".format(bind_config, i_val))
+            if bind_config not in i_val:
                 return False
     return True
 
@@ -109,19 +122,23 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
         def _validate_bind(b_config, b_instance):
             for host_path, bind_ro in six.iteritems(get_host_binds(c_map, b_config, b_instance)):
                 bind_path = bind_ro['bind']
-                bind_vfs = instance_volumes.get(bind_path)
-                if not (bind_vfs and host_path == bind_vfs):
+                instance_vfs = instance_volumes.get(bind_path)
+                log.debug("Checking host bind. Config / container instance:\n{0}\n{1}".format(host_path, instance_vfs))
+                if not (instance_vfs and host_path == instance_vfs):
                     return False
-                self.path_vfs[config_name, instance_name, bind_path] = bind_vfs
+                self.path_vfs[config_name, instance_name, bind_path] = instance_vfs
             return True
 
         def _validate_attached(a_config):
             for attached in a_config.attaches:
                 attached_path = resolve_value(c_map.volumes[attached])
-                attached_vfs = instance_volumes.get(attached_path)
-                if not (attached_vfs and self.path_vfs.get((attached, None, attached_path)) == attached_vfs):
+                instance_vfs = instance_volumes.get(attached_path)
+                attached_vfs = self.path_vfs.get((attached, None, attached_path))
+                log.debug("Checking attached {0} path. Attached instance / dependent container instance:\n{1}\n"
+                          "{2}".format(attached, attached_vfs, instance_vfs))
+                if not (instance_vfs and attached_vfs == instance_vfs):
                     return False
-                self.path_vfs[config_name, instance_name, attached_path] = attached_vfs
+                self.path_vfs[config_name, instance_name, attached_path] = instance_vfs
             return True
 
         def _check_config_paths(cr_config, cr_instance):
@@ -136,16 +153,24 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                 used_volume = used.volume
                 used_path = resolve_value(c_map.volumes.get(used_volume))
                 if used_path:
-                    if self.path_vfs.get((used_volume, None, used_path)) != instance_volumes.get(used_path):
+                    used_vfs = self.path_vfs.get((used_volume, None, used_path))
+                    instance_path = instance_volumes.get(used_path)
+                    log.debug("Checking used {0} path. Parent instance / dependent container instance:\n{1}\n"
+                              "{2}".format(used.volume, used_vfs, instance_path))
+                    if used_vfs != instance_path:
                         return False
                     continue
                 ref_c_name, ref_i_name = self._policy.resolve_cname(used_volume, False)
+                log.debug("Looking up dependency {0} (instance {1}).".format(ref_c_name, ref_i_name))
                 ref_config = c_map.get_existing(ref_c_name)
                 if ref_config:
                     for share in ref_config.shares:
                         ref_shared_path = resolve_value(share)
                         i_shared_path = instance_volumes.get(ref_shared_path)
-                        if self.path_vfs.get((ref_c_name, ref_i_name, ref_shared_path)) != i_shared_path:
+                        shared_vfs = self.path_vfs.get((ref_c_name, ref_i_name, ref_shared_path))
+                        log.debug("Checking shared path {0}. Parent instance / dependent container instance:\n{1}\n"
+                                  "{2}.".format(share, shared_vfs, i_shared_path))
+                        if shared_vfs != i_shared_path:
                             return False
                         self.path_vfs[(config_name, instance_name, ref_shared_path)] = i_shared_path
                     _validate_bind(ref_config, ref_i_name)
@@ -170,21 +195,26 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
             existing_containers = self._policy.container_names[client_name]
             for a in c_config.attaches:
                 a_name = self._policy.cname(map_name, a)
+                log.debug("Checking attached container {0}.".format(a_name))
                 a_exists = a_name in existing_containers
                 if a_exists:
                     a_detail = client.inspect_container(a_name)
                     a_status = a_detail['State']
                     a_image = a_detail['Image']
+                    log.debug("Container from image {0} found with status\n{1}.".format(a_image, a_status))
                     a_remove = (not a_status['Running'] and a_status['ExitCode'] in self.remove_status) or \
                         (self.update_persistent and a_image != self.base_image_ids[client_name])
                     if a_remove:
+                        log.debug("Found to be outdated or non-restartable - removing.")
                         ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, a_name)
                         client.remove_container(**ar_kwargs)
                         existing_containers.remove(a_name)
                 else:
+                    log.debug("Container not found.")
                     a_remove = False
                     a_detail = None
                 if a_remove or not a_exists:
+                    log.debug("Creating and starting attached container {0}.".format(a_name))
                     ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_name, client_config,
                                                                         a_name, a)
                     client.create_container(**ac_kwargs)
@@ -204,11 +234,13 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
             for ci in instances:
                 ci_name = self._policy.cname(map_name, container_name, ci)
                 ci_exists = ci_name in existing_containers
+                log.debug("Checking container {0}.".format(ci_name))
                 if ci_exists:
                     ci_detail = client.inspect_container(ci_name)
                     ci_status = ci_detail['State']
                     ci_image = ci_detail['Image']
                     ci_running = ci_status['Running']
+                    log.debug("Container from image {0} found with status\n{1}.".format(ci_image, ci_status))
                     ci_remove = (not ci_running and ci_status['ExitCode'] in self.remove_status) or \
                         ((not c_config.persistent or self.update_persistent) and ci_image != image_id) or \
                         not self._check_volumes(c_map, c_config, container_name, ci, ci_detail) or \
@@ -217,6 +249,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                         not _check_cmd(c_config, ci_detail) or \
                         not _check_network(c_config, client_config, ci_detail)
                     if ci_remove:
+                        log.debug("Found to be outdated or non-restartable - removing.")
                         if ci_running:
                             ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_name, client_config,
                                                                      ci_name, ci)
@@ -230,14 +263,17 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                         ci_create = False
                         ci_start = is_initial(ci_status) if c_config.persistent else not ci_running
                 else:
+                    log.debug("Container not found.")
                     ci_create = True
                     ci_start = True
                 if ci_create:
+                    log.debug("Creating container {0}.".format(ci_name))
                     ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name,
                                                                container_name)
                     yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
                 if ci_create or ci_start:
+                    log.debug("Starting container {0}.".format(ci_name))
                     is_kwargs = self._policy.get_start_kwargs(c_map, c_config, client_name, client_config, ci_name, ci)
                     client.start(**is_kwargs)
 
