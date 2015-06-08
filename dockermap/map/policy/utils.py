@@ -39,11 +39,14 @@ def update_kwargs(kwargs, *updates):
     Utility function for merging multiple keyword arguments, depending on their type:
 
     * Non-existent keys are added.
-    * Existing lists are extended (the kwargs entry should be a list, whereas the following updates can also be tuples).
+    * Existing lists or tuples are extended.
+      The keywords ``command`` and ``entrypoint`` are however simply overwritten.
     * Nested dictionaries are updated, overriding previous key-value assignments.
-    * Other items are simply overwritten (just like in a regular dictionary update).
+    * Other items are simply overwritten (just like in a regular dictionary update) unless the updating value is
+      ``None``.
 
-    Lists/tuples and dictionaries are (shallow-)copied before adding. This function does not recurse.
+    Lists/tuples and dictionaries are (shallow-)copied before adding and late resolving values are looked up.
+    This function does not recurse.
 
     :param kwargs: Base keyword arguments.
     :type kwargs: dict
@@ -57,18 +60,25 @@ def update_kwargs(kwargs, *updates):
             continue
         for key, val in six.iteritems(update):
             u_item = resolve_value(val)
-            if not u_item:
+            if u_item is None:
                 continue
-            kw_item = kwargs.get(key)
-            if isinstance(u_item, (tuple, list)):
+            if key in ('command' or 'entrypoint'):
+                kwargs[key] = u_item
+            elif isinstance(u_item, (tuple, list)):
+                kw_item = kwargs.get(key)
                 u_list = map(resolve_value, u_item)
-                if kw_item:
+                if isinstance(kw_item, list):
                     kw_item.extend(u_list)
+                elif isinstance(kw_item, tuple):
+                    new_list = list(kw_item)
+                    new_list.extend(u_list)
+                    kwargs[key] = new_list
                 else:
                     kwargs[key] = list(u_list)
             elif isinstance(u_item, dict):
+                kw_item = kwargs.get(key)
                 u_dict = {u_k: resolve_value(u_v) for u_k, u_v in six.iteritems(u_item)}
-                if kw_item:
+                if isinstance(kw_item, dict):
                     kw_item.update(u_dict)
                 else:
                     kwargs[key] = u_dict

@@ -16,7 +16,7 @@ class ScriptMixin(object):
     remove_existing_before = False
     remove_created_after = True
 
-    def run_script(self, map_name, container, instance=None, script_path=None, entrypoint='/bin/bash',
+    def run_script(self, map_name, container, instance=None, script_path=None, entrypoint=None,
                    command_format=None, wait_timeout=None, container_script_dir='/tmp/script_run', timestamps=None,
                    tail='all'):
         """
@@ -94,7 +94,7 @@ class ScriptMixin(object):
                 else:
                     raise ValueError("Only strings and lists of strings are allowed as a command.")
             else:
-                command = ['-c', c_script_path]
+                command = None
             volumes = [container_script_dir]
             binds = {script_dir: dict(bind=container_script_dir, ro=False)}
         else:
