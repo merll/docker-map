@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
 
-from six import text_type, with_metaclass
+from six import iteritems, text_type, with_metaclass
 
 
 class AbstractLazyObject(with_metaclass(ABCMeta, object)):
@@ -185,6 +185,45 @@ def resolve_value(value):
         if resolve_func:
             return resolve_func(value)
     return value
+
+
+def resolve_deep(values, max_depth=5, types=None):
+    """
+    Resolves all late-resolving types into their current values to a certain depth in a dictionary or list.
+
+    :param values: Values to resolve of any type.
+    :param max_depth: Maximum depth to recurse into nested lists, tuples and dictionaries. Below that depth values are
+     returned as they are.
+    :type max_depth: int
+    :param: Dictionary of types and functions to resolve, that are not registered in ``type_registry``.
+    :type: dict[unicode, function]
+    :return: Resolved values.
+    """
+    def _resolve_single(value):
+        if isinstance(value, lazy_type):
+            return value.get()
+        elif all_types:
+            resolve_func = all_types.get(expand_type_name(type(value)))
+            if resolve_func:
+                return resolve_func(value)
+        return value
+
+    def _resolve_sub(v, level):
+        l1 = level + 1
+        res_val = _resolve_single(v)
+        if l1 < max_depth:
+            if isinstance(res_val, (list, tuple)):
+                return [_resolve_sub(item, l1) for item in res_val]
+            elif isinstance(res_val, dict):
+                return {_resolve_single(rk): _resolve_sub(rv, l1) for rk, rv in iteritems(res_val)}
+        return res_val
+
+    if types:
+        all_types = type_registry.copy()
+        all_types.update(types)
+    else:
+        all_types = type_registry
+    return _resolve_sub(values, -1)
 
 
 def register_type(resolve_type, resolve_func):
