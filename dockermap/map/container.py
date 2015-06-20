@@ -353,12 +353,13 @@ class ContainerMap(object):
         def _get_container_items(c_name, container):
             instance_names = _get_instance_names(c_name, container.instances)
             shared = instance_names[:] if container.shares or container.binds or container.uses else []
-            bind = [b.volume for b in container.binds]
+            bind = [b.volume for b in container.binds if not isinstance(b.volume, tuple)]
             link = [l.container for l in container.links]
             uses = [u.volume for u in container.uses]
             return instance_names, uses, container.attaches, shared, bind, link
 
-        all_instances, all_used, all_attached, all_shared, all_binds, all_links = zip(*[_get_container_items(k, v) for k, v in self])
+        all_instances, all_used, all_attached, all_shared, all_binds, all_links = zip(*[_get_container_items(k, v)
+                                                                                        for k, v in self])
         volume_shared = tuple(itertools.chain.from_iterable(all_shared + all_attached))
         if check_duplicates:
             duplicated = [name for name, count in six.iteritems(Counter(volume_shared)) if count > 1]

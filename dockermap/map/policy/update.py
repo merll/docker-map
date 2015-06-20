@@ -7,7 +7,7 @@ import six
 
 from ...functional import resolve_value
 from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
-from .utils import is_initial, get_host_binds, init_options
+from .utils import is_initial, get_shared_volume_path, get_host_binds, init_options
 
 
 log = logging.getLogger(__name__)
@@ -120,8 +120,8 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
 
     def _check_volumes(self, c_map, c_config, config_name, instance_name, instance_detail):
         def _validate_bind(b_config, b_instance):
-            for host_path, bind_ro in six.iteritems(get_host_binds(c_map, b_config, b_instance)):
-                bind_path = bind_ro['bind']
+            for shared_volume in b_config.binds:
+                bind_path, host_path = get_shared_volume_path(c_map, shared_volume.volume, b_instance)
                 instance_vfs = instance_volumes.get(bind_path)
                 log.debug("Checking host bind. Config / container instance:\n{0}\n{1}".format(host_path, instance_vfs))
                 if not (instance_vfs and host_path == instance_vfs):
