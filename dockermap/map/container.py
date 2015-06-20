@@ -9,6 +9,17 @@ from . import DictMap
 from .config import ContainerConfiguration, HostVolumeConfiguration
 
 
+class MapIntegrityError(Exception):
+    """
+    Exception for cases where the configurations are not consistent (e.g. a volume alias is missing on the map).
+    """
+    @property
+    def message(self):
+        if self.args:
+            return self.args[0]
+        return None
+
+
 class ContainerMap(object):
     """
     Class for merging container configurations, host shared volumes and volume alias names.
@@ -353,28 +364,28 @@ class ContainerMap(object):
             duplicated = [name for name, count in six.iteritems(Counter(volume_shared)) if count > 1]
             if duplicated:
                 dup_str = ', '.join(duplicated)
-                raise ValueError("Duplicated shared or attached volumes found with name(s): {0}.".format(dup_str))
+                raise MapIntegrityError("Duplicated shared or attached volumes found with name(s): {0}.".format(dup_str))
         used_set = set(itertools.chain.from_iterable(all_used))
         shared_set = set(volume_shared)
         missing_shares = used_set - shared_set
         if missing_shares:
             missing_share_str = ', '.join(missing_shares)
-            raise ValueError("No shared or attached volumes found for used volume(s): {0}.".format(missing_share_str))
+            raise MapIntegrityError("No shared or attached volumes found for used volume(s): {0}.".format(missing_share_str))
         binds_set = set(itertools.chain.from_iterable(all_binds))
         host_set = set(self._host.keys())
         missing_binds = binds_set - host_set
         if missing_binds:
             missing_mapped_str = ', '.join(missing_binds)
-            raise ValueError("No host share found for mapped volume(s): {0}.".format(missing_mapped_str))
+            raise MapIntegrityError("No host share found for mapped volume(s): {0}.".format(missing_mapped_str))
         volume_set = binds_set.union(itertools.chain.from_iterable(all_attached))
         named_set = set(self._volumes.keys())
         missing_names = volume_set - named_set
         if missing_names:
             missing_names_str = ', '.join(missing_names)
-            raise ValueError("No volume name-path-assignments found for volume(s): {0}.".format(missing_names_str))
+            raise MapIntegrityError("No volume name-path-assignments found for volume(s): {0}.".format(missing_names_str))
         instance_set = set(itertools.chain.from_iterable(all_instances))
         linked_set = set(itertools.chain.from_iterable(all_links))
         missing_links = linked_set - instance_set
         if missing_links:
             missing_links_str = ', '.join(missing_links)
-            raise ValueError("No container instance found for link(s): {0}.".format(missing_links_str))
+            raise MapIntegrityError("No container instance found for link(s): {0}.".format(missing_links_str))
