@@ -39,7 +39,10 @@ The :ref:`container_map_example` map can be more easily written as:
    host_root: /var/lib/site
    web_server:
      image: nginx
-     binds: {web_config: ro}
+     binds:
+       /etc/nginx:
+       - config/nginx
+       - ro
      uses: app_server_socket
      attaches: web_log
      exposes:
@@ -59,14 +62,12 @@ The :ref:`container_map_example` map can be more easily written as:
      user: 2000
      permissions: u=rwX,g=rX,o=
    volumes:
-     web_config: /etc/nginx
      web_log: /var/log/nginx
      app_server_socket: /var/lib/app/socket
      app_config: /var/lib/app/config
      app_log: /var/lib/app/log
      app_data: /var/lib/app/data
    host:
-     web_config: config/nginx
      app_config:
        instance1: config/app1
        instance2: config/app2

@@ -3,6 +3,13 @@
 Change History
 ==============
 
+0.4.1
+-----
+* Added automated container start, log, and removal for scripts or single commands.
+* Added separate exception type for map integrity check failures.
+* Aliases for host volumes are now optional.
+* Minor bugfixes in late value resolution, container cleanup, and input conversion.
+
 0.4.0
 -----
 * Added check for changes in environment, command, and network settings in update policy.

@@ -170,7 +170,11 @@ You do not need to specify host-mapped volumes here -- this is what
 
 Volumes shared with the host
 """"""""""""""""""""""""""""
-In order to make a host volume accessible to one or more containers, follow these steps:
+Volumes from the host, that are accessed by a single container, can be configured in one step::
+
+    container_map.containers.app1.binds = {'container_path': ('host_path', 'ro')}
+
+For making the host volume accessible to multiple containers, it may be more practical to use an volume alias:
 
 #. Create an alias in :attr:`~dockermap.map.container.ContainerMap.volumes`, specifying the path inside the container.
 #. Add the host volume path using the same alias under :attr:`~dockermap.map.container.ContainerMap.host`.
@@ -187,11 +191,32 @@ Example::
     container_map.containers.app1.binds = ['volume1', ('volume2', True)]
 
 The definition in :attr:`~dockermap.map.container.ContainerMap.host` is usually a list or tuple of
-:attr:`~dockermap.map.config.SharedVolume` instances. The latter is a named tuple ``(volume, readonly)``, where the first
-element is the volume alias, and the second is a boolean value indicating a read-only access.
+:attr:`~dockermap.map.config.SharedVolume` instances.
 
 For easier input, this can also be set as simple two-element Python tuples, dictionaries with each a single key;
-strings are also valid input, which will default to write-access.
+strings are also valid input, which will default to read-only-access (except ``rw``).
+
+The following are considered the same for a direct volume assignment (without alias), for read-only access::
+
+    container_map.containers.app1.binds = {'container_path': ('host_path', 'ro')}
+    container_map.containers.app1.binds = {'container_path': ('host_path', 'true')}
+    container_map.containers.app1.binds = [('container_path', 'host_path', True)]
+    container_map.containers.app1.binds = (['container_path', ('host_path', True)], )
+
+
+Using aliases and two different forms of access, the following has an identical result::
+
+    container_map.containers.app1.binds = {'volume1': 'rw', 'volume2': True}
+    container_map.containers.app1.binds = ['volume1', ('volume2', True)]
+    container_map.containers.app1.binds = [['volume1'], ('volume2', 'ro')]
+
+
+.. NOTE::
+
+   Volume paths on the host are prefixed with :attr:`~dockermap.map.config.HostVolumeConfiguration.root`, if the latter
+   is set and the container path does not start with a slash. This also applies to directly-assigned volume paths
+   without alias.
+
 
 .. _shared-volumes-containers:
 
@@ -404,7 +429,8 @@ in the same way as the properties of :class:`~dockermap.map.container.ContainerM
 
 For initializing a container map upon instantiation, pass the dictionary as the second argument, after the map name.
 This also performs a brief integrity check, which can be deactivated by passing ``check_integrity=False`` and repeated
-any time later with :meth:`~dockermap.map.container.ContainerMap.check_integrity`.
+any time later with :meth:`~dockermap.map.container.ContainerMap.check_integrity`. In case of failure, it raises a
+:class:`~dockermap.map.container.MapIntegrityError`.
 
 A :class:`~dockermap.map.client.MappingDockerClient` instance finally applies the container map to a Docker client. This
 can be a an instance of the Docker Remove API client. For added logging and additional functionality, using an instance
@@ -429,7 +455,9 @@ sockets::
         'host_root': '/var/lib/site',
         'web_server': { # Configure container creation and startup
             'image': 'nginx',
-            'binds': {'web_config': 'ro'},
+            # If volumes are not shared with any other container, assigning
+            # an alias in "volumes" is possible, but not neccessary:
+            'binds': {'/etc/nginx': ('config/nginx', 'ro')},
             'uses': 'app_server_socket',
             'attaches': 'web_log',
             'exposes': {
@@ -449,7 +477,6 @@ sockets::
             'permissions': 'u=rwX,g=rX,o=',
         },
         'volumes': { # Configure volume paths inside containers
-            'web_config': '/etc/nginx',
             'web_log': '/var/log/nginx',
             'app_server_socket': '/var/lib/app/socket',
             'app_config': '/var/lib/app/config',
@@ -457,7 +484,6 @@ sockets::
             'app_data': '/var/lib/app/data',
         },
         'host': { # Configure volume paths on the Docker host
-            'web_config': 'config/nginx',
             'app_config': {
                 'instance1': 'config/app1',
                 'instance2': 'config/app2',
@@ -488,8 +514,8 @@ results in the following actions:
 #. Two instances of ``app_server`` are created with the names ``example_map.app_server.instance1`` and
    ``example_map.app_server.instance2``. Each instance is assigned a separate path on the host for ``app_data`` and
    ``app_config``. In both instances, ``app_config`` is a read-only volume.
-#. ``web_server`` is created with the name ``example_map.web_server``, mapping the host volume ``web_config`` as
-   read-only. Ports 80 and 443 are exposed.
+#. ``web_server`` is created with the name ``example_map.web_server``, mapping the host path
+   ``/var/lib/site/config/nginx`` as read-only. Ports 80 and 443 are exposed.
 
 Furthermore, on calling::
 

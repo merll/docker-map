@@ -147,6 +147,22 @@ resolution::
 
 Note that you have to register the exact type, not a superclass of it, in order for the lookup to work.
 
+Pre-resolving values
+""""""""""""""""""""
+Aforementioned type registry is limited to values as listed in :ref:`container_lazy_availability`. Additionally it may
+be difficult to detect errors in the configuration beforehand. In case the data can be pre-processed at a better
+time (e.g. after deserialization, in a configuration method), the method :meth:`dockermap.funcitonal.resolve_deep` can
+resolve a structure of lists and dictionaries into their current values.
+
+Rather than registering types permanently, they can also be passed to that function for temporary use, e.g.::
+
+    from dockermap.functional import expand_type_name, resolve_deep
+
+    # assume aforementioned example of my_ext_hook
+
+    resolve_dict = {expand_type_name(ExtType): my_ext_hook}
+    map_content = resolve_deep(deserialized_map_content, types=resolve_dict)
+
 .. _container_lazy_availability:
 
 Availability
@@ -166,6 +182,8 @@ Lazy value resolution is available at the following points:
     port of the container (i.e. the first item of the tuple);
   * elements of :attr:`~dockermap.map.config.ContainerConfiguration.create_options` and
     :attr:`~dockermap.map.config.ContainerConfiguration.start_options`;
+  * items of :attr:`~dockermap.map.config.ContainerConfiguration.binds`, if they are not volume aliases, i.e. they
+    directly describe container volume and host path.
   * and elements listed in :attr:`~dockermap.map.config.ContainerConfiguration.shares`.
 * On client configuration: For addresses in :attr:`~dockermap.map.config.ClientConfiguration.interfaces`.
 

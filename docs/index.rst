@@ -36,6 +36,7 @@ Contents
    guide/shortcuts
    guide/containers/client
    guide/containers/maps
+   guide/containers/actions
    guide/containers/yaml
    guide/containers/advanced
 
