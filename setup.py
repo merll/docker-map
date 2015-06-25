@@ -22,7 +22,7 @@ setup(
     name='docker-map',
     version=__version__,
     packages=find_packages(),
-    install_requires=['six', 'docker-py>=0.5.0'],
+    install_requires=['six', 'docker-py>=1.0.0'],
     extras_require={
         'yaml': ['PyYAML'],
     },
