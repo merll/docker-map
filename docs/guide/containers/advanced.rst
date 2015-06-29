@@ -25,16 +25,16 @@ built-in classes are based on :class:`~dockermap.map.policy.base.BasePolicy`, wh
 separate container actions:
 
 * :meth:`~dockermap.map.policy.base.BasePolicy.get_create_kwargs`,
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_start_kwargs`,
+  :meth:`~dockermap.map.policy.base.BasePolicy.get_host_config_kwargs`,
   :meth:`~dockermap.map.policy.base.BasePolicy.get_restart_kwargs`,
   :meth:`~dockermap.map.policy.base.BasePolicy.get_stop_kwargs`, and
   :meth:`~dockermap.map.policy.base.BasePolicy.get_remove_kwargs` generate keyword arguments from container
   configurations, that can be used directly on the Docker client;
 * :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_create_kwargs`,
   :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_preparation_create_kwargs`,
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_start_kwargs`, and
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_preparation_start_kwargs` have similar functionality for
-  attached containers;
+  :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_host_config_kwargs`, and
+  :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_preparation_host_config_kwargs` have similar functionality
+  for attached containers;
 * :meth:`~dockermap.map.policy.base.BasePolicy.get_clients` provides the clients, that a client configuration should be
   applied to;
 * :meth:`~dockermap.map.policy.base.BasePolicy.get_dependencies` and

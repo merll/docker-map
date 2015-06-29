@@ -335,7 +335,7 @@ Examples::
 Additional options
 """"""""""""""""""
 The properties :attr:`~dockermap.map.config.ContainerConfiguration.create_options` and
-:attr:`~dockermap.map.config.ContainerConfiguration.start_options` are dictionaries of keyword arguments. They are
+:attr:`~dockermap.map.config.ContainerConfiguration.host_config` are dictionaries of keyword arguments. They are
 passed to the Docker Remote API functions in addition to the ones indirectly set by the aforementioned properties.
 
 * The user that a container is launched with, inherited from the
@@ -344,10 +344,10 @@ passed to the Docker Remote API functions in addition to the ones indirectly set
 * Entries from ``volumes`` in :attr:`~dockermap.map.config.ContainerConfiguration.create_options` are
   added to elements of :attr:`~dockermap.map.config.ContainerConfiguration.shares` and resolved aliases from
   :attr:`~dockermap.map.config.ContainerConfiguration.binds`.
-* Mappings on ``volumes_from`` in :attr:`~dockermap.map.config.ContainerConfiguration.start_options` override entries
+* Mappings on ``volumes_from`` in :attr:`~dockermap.map.config.ContainerConfiguration.host_config` override entries
   with identical keys (paths) generated from :attr:`~dockermap.map.config.ContainerConfiguration.uses`;
   non-corresponding keys are merged.
-* Similarly, ``links`` keys set in :attr:`~dockermap.map.config.ContainerConfiguration.start_options` can override
+* Similarly, ``links`` keys set in :attr:`~dockermap.map.config.ContainerConfiguration.host_config` can override
   container links derived from :attr:`~dockermap.map.config.ContainerConfiguration.links` with the same name.
   Non-conflicting names merge.
 * Containers marked with :attr:`~dockermap.map.config.ContainerConfiguration.persistent` set to ``True`` are treated
@@ -360,10 +360,16 @@ in summary the order of precedence is the following:
 #. Keyword arguments to the :meth:`~dockermap.map.client.MappingDockerClient.create` and
    :meth:`~dockermap.map.client.MappingDockerClient.start`;
 #. :attr:`~dockermap.map.config.ContainerConfiguration.create_options` and
-   :attr:`~dockermap.map.config.ContainerConfiguration.start_options`;
+   :attr:`~dockermap.map.config.ContainerConfiguration.host_config`;
 #. and finally the aforementioned attributes from the :class:`~dockermap.map.config.ContainerConfiguration`;
 
 whereas single-value properties (e.g. user) are overwritten and dictionaries merge (i.e. override matching keys).
+
+.. note::
+   Setting :attr:`~dockermap.map.config.ContainerConfiguration.start_options` has the same effect as
+   :attr:`~dockermap.map.config.ContainerConfiguration.host_config`. The API version reported by the Docker client
+   decides whether the recommended HostConfig dictionary is used during container creation (>= v1.15), or
+   if additional keyword arguments are passed during container start.
 
 Besides overriding the generated arguments, these options can also be used for addressing features not directly
 related to `Docker-Map`, e.g.::
@@ -372,7 +378,7 @@ related to `Docker-Map`, e.g.::
     config.create_options = {
         'mem_limit': '3g',  # Sets a memory limit.
     }
-    config.start_options = {
+    config.host_config = {
         'restart_policy': {'MaximumRetryCount': 0, 'Name': 'always'},  # Unlimited restart attempts.
     }
 

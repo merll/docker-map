@@ -3,6 +3,11 @@
 Change History
 ==============
 
+0.4.2
+-----
+* Implemented HostConfig during container creation, which is preferred over passing arguments during start since API
+  v1.15. For older API versions, start keyword arguments will be used.
+
 0.4.1
 -----
 * Added automated container start, log, and removal for scripts or single commands.
