@@ -3,30 +3,31 @@ from __future__ import unicode_literals
 
 import itertools
 
-from . import ACTION_DEPENDENCY_FLAG
 from .base import (BasePolicy, AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator,
                    ReverseActionGeneratorMixin)
-from .utils import is_initial
+from . import ACTION_DEPENDENCY_FLAG, utils
 
 
 class SimpleCreateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator):
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
+            use_host_config = utils.use_host_config(client)
             existing_containers = self._policy.container_names[client_name]
             images = self._policy.images[client_name]
             for a in c_config.attaches:
                 a_name = self._policy.cname(map_name, a)
                 if a_name not in existing_containers:
                     a_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_name, client_config,
-                                                                       a_name, a)
+                                                                       a_name, a, include_host_config=use_host_config)
                     images.ensure_image(a_kwargs['image'])
                     client.create_container(**a_kwargs)
                     existing_containers.add(a_name)
             for ci in instances:
                 ci_name = self._policy.cname(map_name, container_name, ci)
                 if ci_name not in existing_containers:
-                    c_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name,
-                                                              container_name, kwargs=kwargs)
+                    c_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name, ci,
+                                                              container_name, include_host_config=use_host_config,
+                                                              kwargs=kwargs)
                     images.ensure_image(c_kwargs['image'])
                     yield client_name, client.create_container(**c_kwargs)
                     existing_containers.add(ci_name)
@@ -55,21 +56,28 @@ class SimpleCreateMixin(object):
 class SimpleStartGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
+            use_host_config = utils.use_host_config(client)
             images = self._policy.images[client_name]
             for a in c_config.attaches:
                 a_name = self._policy.cname(map_name, a)
                 a_status = client.inspect_container(a_name)['State']
-                if a_status['ExitCode'] != 0 or is_initial(a_status):
-                    a_kwargs = self._policy.get_attached_start_kwargs(c_map, c_config, client_name, client_config,
-                                                                      a_name, a)
+                if a_status['ExitCode'] != 0 or utils.is_initial(a_status):
+                    if use_host_config:
+                        a_kwargs = dict(container=a_name)
+                    else:
+                        a_kwargs = self._policy.get_attached_host_config_kwargs(c_map, c_config, client_name,
+                                                                                client_config, a_name, a)
                     client.start(**a_kwargs)
                     self.prepare_container(images, client, c_map, c_config, client_name, client_config, a, a_name)
             for instance in instances:
                 ci_name = self._policy.cname(map_name, container_name, instance)
                 ci_status = client.inspect_container(ci_name)['State']
                 if not ci_status['Running']:
-                    c_kwargs = self._policy.get_start_kwargs(c_map, c_config, client_name, client_config, ci_name,
-                                                             instance, kwargs=kwargs)
+                    if use_host_config:
+                        c_kwargs = dict(container=ci_name)
+                    else:
+                        c_kwargs = self._policy.get_host_config_kwargs(c_map, c_config, client_name, client_config,
+                                                                       ci_name, instance, kwargs=kwargs)
                     client.start(**c_kwargs)
 
 

@@ -61,7 +61,7 @@ class ContainerConfiguration(object):
         self._persistent = False
         self._clients = None
         self._create_kwargs = None
-        self._start_kwargs = None
+        self._host_config_kwargs = None
         self.update(kwargs)
 
     def __repr__(self):
@@ -277,18 +277,21 @@ class ContainerConfiguration(object):
         self._create_kwargs = value
 
     @property
-    def start_options(self):
+    def host_config(self):
         """
-        Additional keyword args for :meth:`docker.client.Client.start`.
+        Additional keyword args for :meth:`docker.client.Client.start` or HostConfig options to pass to
+        :meth:`docker.client.Client.create`.
 
-        :return: Kwargs for starting the container.
+        :return: Kwargs for creating the HostConfig dict or starting the container.
         :rtype: dict
         """
-        return self._start_kwargs
+        return self._host_config_kwargs
 
-    @start_options.setter
-    def start_options(self, value):
-        self._start_kwargs = value
+    @host_config.setter
+    def host_config(self, value):
+        self._host_config_kwargs = value
+
+    start_options = host_config
 
     def update(self, values):
         """

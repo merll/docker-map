@@ -6,7 +6,7 @@ from .script import ScriptMixin
 from .simple import (SimpleCreateMixin, SimpleStartMixin, SimpleStopMixin, SimpleRemoveMixin,
                      SimpleShutdownMixin, SimpleRestartMixin)
 from .update import ContainerUpdateMixin
-from .utils import is_initial
+from . import utils
 
 
 class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
@@ -17,6 +17,7 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         recreate_attached = False
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
+            use_host_config = utils.use_host_config(client)
             existing_containers = self._policy.container_names[client_name]
             images = self._policy.images[client_name]
             for a in c_config.attaches:
@@ -32,15 +33,18 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
                 a_create = not a_exists or a_remove
                 if a_create:
                     ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_name, client_config,
-                                                                        a_name, a)
+                                                                        a_name, a, include_host_config=use_host_config)
                     images.ensure_image(ac_kwargs['image'])
                     client.create_container(**ac_kwargs)
                     existing_containers.add(a_name)
                     recreate_attached = True
-                a_start = a_create or is_initial(a_status)
+                a_start = a_create or utils.is_initial(a_status)
                 if a_start:
-                    as_kwargs = self._policy.get_attached_start_kwargs(c_map, c_config, client_name, client_config,
-                                                                       a_name, a)
+                    if use_host_config:
+                        as_kwargs = dict(container=a_name)
+                    else:
+                        as_kwargs = self._policy.get_attached_host_config_kwargs(c_map, c_config, client_name,
+                                                                                 client_config, a_name, a)
                     client.start(**as_kwargs)
                     self.prepare_container(images, client, c_map, c_config, client_name, client_config, a, a_name)
             for ci in instances:
@@ -48,26 +52,30 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
                 ci_exists = ci_name in existing_containers
                 ci_status = client.inspect_container(ci_name)['State'] if ci_exists else None
                 ci_running = ci_status and ci_status['Running']
-                ci_remove = ci_exists and not ci_running and ci_status['ExitCode'] in self._remove_status
+                ci_stop = recreate_attached and ci_running
+                if ci_stop:
+                    ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_name, client_config, ci_name, ci)
+                    client.stop(**ip_kwargs)
+                ci_remove = ci_exists and (not ci_running and ci_status['ExitCode'] in self._remove_status) or ci_stop
                 if ci_remove:
                     ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, ci_name)
                     client.remove_container(**ir_kwargs)
                     existing_containers.remove(ci_name)
                 ci_create = not ci_exists or ci_remove
                 if ci_create:
-                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name,
-                                                               container_name)
+                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name, ci,
+                                                               container_name, include_host_config=use_host_config)
                     images.ensure_image(ic_kwargs['image'])
                     yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
-                ci_stop = recreate_attached and ci_running
-                if ci_stop:
-                    ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_name, client_config, ci_name, ci)
-                    client.stop(**ip_kwargs)
-                needs_start = ci_create or is_initial(ci_status) if c_config.persistent else not ci_running
+                needs_start = ci_create or utils.is_initial(ci_status) if c_config.persistent else not ci_running
                 ci_start = ci_create or ci_stop or needs_start
                 if ci_start:
-                    is_kwargs = self._policy.get_start_kwargs(c_map, c_config, client_name, client_config, ci_name, ci)
+                    if use_host_config:
+                        is_kwargs = dict(container=ci_name)
+                    else:
+                        is_kwargs = self._policy.get_host_config_kwargs(c_map, c_config, client_name, client_config,
+                                                                        ci_name, ci)
                     client.start(**is_kwargs)
 
 

@@ -7,7 +7,7 @@ import six
 
 from ...functional import resolve_value
 from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
-from .utils import is_initial, get_shared_volume_path, get_host_binds, init_options
+from . import utils
 
 
 log = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ def _check_environment(c_config, instance_detail):
             if sep:
                 yield var_name, env_val
 
-    create_options = init_options(c_config.create_options)
+    create_options = utils.init_options(c_config.create_options)
     if not create_options:
         return True
     instance_env = instance_detail['Config']['Env'] or []
@@ -36,7 +36,7 @@ def _check_environment(c_config, instance_detail):
 
 
 def _check_cmd(c_config, instance_detail):
-    create_options = init_options(c_config.create_options)
+    create_options = utils.init_options(c_config.create_options)
     if not create_options:
         return True
     instance_config = instance_detail['Config']
@@ -121,7 +121,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
     def _check_volumes(self, c_map, c_config, config_name, instance_name, instance_detail):
         def _validate_bind(b_config, b_instance):
             for shared_volume in b_config.binds:
-                bind_path, host_path = get_shared_volume_path(c_map, shared_volume.volume, b_instance)
+                bind_path, host_path = utils.get_shared_volume_path(c_map, shared_volume.volume, b_instance)
                 instance_vfs = instance_volumes.get(bind_path)
                 log.debug("Checking host bind. Config / container instance:\n{0}\n{1}".format(host_path, instance_vfs))
                 if not (instance_vfs and host_path == instance_vfs):
@@ -191,6 +191,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         a_paths = {alias: resolve_value(c_map.volumes[alias]) for alias in c_config.attaches}
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
+            use_host_config = utils.use_host_config(client)
             images = self._policy.images[client_name]
             existing_containers = self._policy.container_names[client_name]
             for a in c_config.attaches:
@@ -216,11 +217,15 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                 if a_remove or not a_exists:
                     log.debug("Creating and starting attached container {0}.".format(a_name))
                     ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_name, client_config,
-                                                                        a_name, a)
+                                                                        a_name, a, include_host_config=use_host_config)
                     client.create_container(**ac_kwargs)
                     existing_containers.add(a_name)
-                    as_kwargs = self._policy.get_attached_start_kwargs(c_map, c_config, client_name, client_config,
-                                                                       a_name, a)
+
+                    if use_host_config:
+                        as_kwargs = dict(container=a_name)
+                    else:
+                        as_kwargs = self._policy.get_attached_host_config_kwargs(c_map, c_config, client_name,
+                                                                                 client_config, a_name, a)
                     client.start(**as_kwargs)
                     self.prepare_container(images, client, c_map, c_config, client_name, client_config, a, a_name)
                 else:
@@ -261,20 +266,24 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                         ci_start = True
                     else:
                         ci_create = False
-                        ci_start = is_initial(ci_status) if c_config.persistent else not ci_running
+                        ci_start = utils.is_initial(ci_status) if c_config.persistent else not ci_running
                 else:
                     log.debug("Container not found.")
                     ci_create = True
                     ci_start = True
                 if ci_create:
                     log.debug("Creating container {0}.".format(ci_name))
-                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name,
-                                                               container_name)
+                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name, ci,
+                                                               container_name, include_host_config=use_host_config)
                     yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
                 if ci_create or ci_start:
                     log.debug("Starting container {0}.".format(ci_name))
-                    is_kwargs = self._policy.get_start_kwargs(c_map, c_config, client_name, client_config, ci_name, ci)
+                    if use_host_config:
+                        is_kwargs = dict(container=ci_name)
+                    else:
+                        is_kwargs = self._policy.get_host_config_kwargs(c_map, c_config, client_name, client_config,
+                                                                        ci_name, ci)
                     client.start(**is_kwargs)
 
 

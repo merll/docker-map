@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import itertools
+from docker.utils import compare_version
 import six
 
 from ...functional import resolve_value
@@ -234,3 +235,16 @@ def is_initial(container_state):
     :rtype: bool
     """
     return container_state['StartedAt'] == INITIAL_START_TIME
+
+
+def use_host_config(client):
+    """
+    Checks whether the client should pass the HostConfig options when creating containers, or use the older behavior
+    of passing the keyword arguments to the start method of the client.
+
+    :param client: Client object.
+    :type client: docker.client.Client
+    :return: ``True`` if the newer behavior should be used.
+    :rtype: bool
+    """
+    return compare_version('1.15', client.api_version) >= 0

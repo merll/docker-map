@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
 from six import with_metaclass
+from docker.utils.utils import create_host_config
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from ...functional import resolve_value
@@ -11,7 +12,7 @@ from . import ACTION_DEPENDENCY_FLAG
 from .dep import ContainerDependencyResolver
 from .cache import ContainerCache, ImageCache
 from .utils import (extract_user, get_host_binds, get_port_bindings, get_inherited_volumes, get_volumes, init_options,
-                    update_kwargs)
+                    update_kwargs, use_host_config)
 
 
 class BasePolicy(with_metaclass(ABCMeta, object)):
@@ -155,8 +156,8 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         return resolve_value(client_config.get('domainname', container_map.default_domain))
 
     @classmethod
-    def get_create_kwargs(cls, container_map, container_config, client_name, client_config, container_name,
-                          default_image, kwargs=None):
+    def get_create_kwargs(cls, container_map, container_config, client_name, client_config, container_name, instance,
+                          default_image, include_host_config=True, kwargs=None):
         """
         Generates keyword arguments for the Docker client to create a container.
 
@@ -170,8 +171,12 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name.
         :type container_name: unicode
+        :param instance: Instance name.
+        :type instance: unicode | NoneType
         :param default_image: Image name to use in case the container configuration does not specify.
         :type default_image: unicode
+        :param include_host_config: Whether to generate and include the HostConfig.
+        :type include_host_config: Set to ``False``, if calling :meth:`get_start_kwargs:` later.
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
@@ -187,12 +192,59 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             hostname=cls.get_hostname(client_name, container_name) if container_map.set_hostname else None,
             domainname=cls.get_domainname(container_map, container_config, client_config),
         )
+        if include_host_config:
+            hc_kwargs = cls.get_host_config_kwargs(container_map, container_config, client_name, client_config,
+                                                   None, instance)
+            if hc_kwargs:
+                c_kwargs['host_config'] = create_host_config(**hc_kwargs)
         update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
         return c_kwargs
 
     @classmethod
+    def get_host_config_kwargs(cls, container_map, container_config, client_name, client_config, container_name,
+                               instance, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to set up the HostConfig or start a container.
+
+        :param container_map: Container map object.
+        :type container_map: dockermap.map.container.ContainerMap
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.config.ContainerConfiguration
+        :param client_name: Client configuration name.
+        :type client_name: unicode
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container_name: Container name or id.
+        :type container_name: unicode | NoneType
+        :param instance: Instance name.
+        :type instance: unicode | NoneType
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        map_name = container_map.name
+        c_kwargs = dict(
+            links={cls.cname(map_name, l_name): alias for l_name, alias in container_config.links},
+            binds=get_host_binds(container_map, container_config, instance),
+            volumes_from=[cls.cname(map_name, u_name) for u_name in get_inherited_volumes(container_config)],
+            port_bindings=get_port_bindings(container_config, client_config),
+        )
+        if container_name:
+            c_kwargs['container'] = container_name
+        update_kwargs(c_kwargs, init_options(container_config.host_config), kwargs)
+        return c_kwargs
+
+    @classmethod
+    def get_start_kwargs(cls, *args, **kwargs):
+        """
+        Same as :meth:`get_host_config_kwargs` for backwards compatibility.
+        """
+        return cls.get_host_config_kwargs(*args, **kwargs)
+
+    @classmethod
     def get_attached_create_kwargs(cls, container_map, container_config, client_name, client_config, container_name,
-                                   alias, kwargs=None):
+                                   alias, include_host_config=True, kwargs=None):
         """
         Generates keyword arguments for the Docker client to create an attached container.
 
@@ -208,27 +260,34 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :type container_name: unicode
         :param alias: Alias name of the container volume.
         :type alias: unicode
+        :param include_host_config: Whether to generate and include the HostConfig.
+        :type include_host_config: Set to ``False``, if calling :meth:`get_start_kwargs:` later.
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
         :rtype: dict
         """
         path = resolve_value(container_map.volumes[alias])
-        user = resolve_value(container_config.user)
+        user = extract_user(container_config.user)
         c_kwargs = dict(
             name=container_name,
             image=cls.base_image,
             volumes=[path],
             user=user,
         )
+        if include_host_config:
+            hc_kwargs = cls.get_attached_host_config_kwargs(container_map, container_config, client_name, client_config,
+                                                            None, alias)
+            if hc_kwargs:
+                c_kwargs['host_config'] = create_host_config(**hc_kwargs)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
     @classmethod
-    def get_start_kwargs(cls, container_map, container_config, client_name, client_config, container, instance,
-                         kwargs=None):
+    def get_attached_host_config_kwargs(cls, container_map, container_config, client_name, client_config,
+                                        container_name, alias, kwargs=None):
         """
-        Generates keyword arguments for the Docker client to start a container.
+        Generates keyword arguments for the Docker client to set up the HostConfig or start an attached container.
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
@@ -238,29 +297,30 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :type client_name: unicode
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
-        :param container: Container name or id.
-        :type container: unicode
-        :param instance: Instance name.
-        :type instance: unicode
+        :param container_name: Container name or id.
+        :type container_name: unicode | NoneType
+        :param alias: Alias name of the container volume.
+        :type alias: unicode
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        map_name = container_map.name
-        c_kwargs = dict(
-            container=container,
-            links={cls.cname(map_name, l_name): alias for l_name, alias in container_config.links},
-            binds=get_host_binds(container_map, container_config, instance),
-            volumes_from=[cls.cname(map_name, u_name) for u_name in get_inherited_volumes(container_config)],
-            port_bindings=get_port_bindings(container_config, client_config),
-        )
-        update_kwargs(c_kwargs, init_options(container_config.start_options), kwargs)
+        c_kwargs = dict(container=container_name) if container_name else {}
+        update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
     @classmethod
-    def get_attached_preparation_create_kwargs(cls, container_map, container_config, client_name, client_config, alias,
-                                               volume_container, kwargs=None):
+    def get_attached_start_kwargs(cls, *args, **kwargs):
+        """
+        Same as :meth:`get_attached_host_config_kwargs` for backwards compatibility.
+        """
+        return cls.get_attached_host_config_kwargs(*args, **kwargs)
+
+    @classmethod
+    def get_attached_preparation_create_kwargs(cls, container_map, container_config, client_name, client_config,
+                                               container_name, alias, volume_container, include_host_config=True,
+                                               kwargs=None):
         """
         Generates keyword arguments for the Docker client to prepare an attached container (i.e. adjust user and
         permissions).
@@ -273,10 +333,14 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :type client_name: unicode
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
+        :param container_name: Container name.
+        :type container_name: unicode
         :param alias: Alias name of the container volume.
         :type alias: unicode
         :param volume_container: Name of the container that shares the volume.
         :type volume_container: unicode
+        :param include_host_config: Whether to generate and include the HostConfig.
+        :type include_host_config: Set to ``False``, if calling :meth:`get_start_kwargs:` later.
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
@@ -296,14 +360,20 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             command=' && '.join(_get_cmd()),
             user='root',
         )
+        if include_host_config:
+            hc_kwargs = cls.get_attached_preparation_host_config_kwargs(container_map, container_config, client_name,
+                                                                        client_config, None, alias, volume_container)
+            if hc_kwargs:
+                c_kwargs['host_config'] = create_host_config(**hc_kwargs)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
     @classmethod
-    def get_attached_start_kwargs(cls, container_map, container_config, client_name, client_config, container, alias,
-                                  kwargs=None):
+    def get_attached_preparation_host_config_kwargs(cls, container_map, container_config, client_name, client_config,
+                                                    container_name, alias, volume_container, kwargs=None):
         """
-        Generates keyword arguments for the Docker client to start an attached container.
+        Generates keyword arguments for the Docker client to set up the HostConfig for preparing an attached container
+        (i.e. adjust user and permissions) or start the preparation.
 
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
@@ -313,36 +383,8 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :type client_name: unicode
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
-        :param container: Container name or id.
-        :type container: unicode
-        :param alias: Alias name of the container volume.
-        :type alias: unicode
-        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
-        :type kwargs: dict
-        :return: Resulting keyword arguments.
-        :rtype: dict
-        """
-        c_kwargs = dict(container=container)
-        update_kwargs(c_kwargs, kwargs)
-        return c_kwargs
-
-    @classmethod
-    def get_attached_preparation_start_kwargs(cls, container_map, container_config, client_name, client_config,
-                                              container, alias, volume_container, kwargs=None):
-        """
-        Generates keyword arguments for the Docker client to prepare an attached container (i.e. adjust user and
-        permissions).
-
-        :param container_map: Container map object.
-        :type container_map: dockermap.map.container.ContainerMap
-        :param container_config: Container configuration object.
-        :type container_config: dockermap.map.config.ContainerConfiguration
-        :param client_name: Client configuration name.
-        :type client_name: unicode
-        :param client_config: Client configuration object.
-        :type client_config: dockermap.map.config.ClientConfiguration
-        :param container: Container name or id.
-        :type container: unicode
+        :param container_name: Container name or id.
+        :type container_name: unicode | NoneType
         :param alias: Alias name of the container volume.
         :type alias: unicode
         :param volume_container: Name of the container that shares the volume.
@@ -352,15 +394,21 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(
-            container=container,
-            volumes_from=[volume_container],
-        )
+        c_kwargs = dict(volumes_from=[volume_container])
+        if container_name:
+            c_kwargs['container'] = container_name
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
     @classmethod
-    def get_restart_kwargs(cls, container_map, container_config, client_name, client_config, container, instance,
+    def get_attached_preparation_start_kwargs(cls, *args, **kwargs):
+        """
+        Same as :meth:`get_attached_preparation_host_config_kwargs` for backwards compatibility.
+        """
+        return cls.get_attached_preparation_host_config_kwargs(*args, **kwargs)
+
+    @classmethod
+    def get_restart_kwargs(cls, container_map, container_config, client_name, client_config, container_name, instance,
                            kwargs=None):
         """
         Generates keyword arguments for the Docker client to restart a container.
@@ -373,21 +421,21 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :type client_name: unicode
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
-        :param container: Container name or id.
-        :type container: unicode
+        :param container_name: Container name or id.
+        :type container_name: unicode
         :param instance: Instance name.
-        :type instance: unicode
+        :type instance: unicode | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(container=container)
+        c_kwargs = dict(container=container_name)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
     @classmethod
-    def get_stop_kwargs(cls, container_map, container_config, client_name, client_config, container, instance,
+    def get_stop_kwargs(cls, container_map, container_config, client_name, client_config, container_name, instance,
                         kwargs=None):
         """
         Generates keyword arguments for the Docker client to stop a container.
@@ -400,24 +448,24 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :type client_name: unicode
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
-        :param container: Container name or id.
-        :type container: unicode
+        :param container_name: Container name or id.
+        :type container_name: unicode
         :param instance: Instance name.
-        :type instance: unicode
+        :type instance: unicode | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
         :rtype: dict
         """
         c_kwargs = dict(
-            container=container,
+            container=container_name,
             timeout=client_config.get('stop_timeout', 10)
         )
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
     @classmethod
-    def get_remove_kwargs(cls, container_map, container_config, client_name, client_config, container, kwargs=None):
+    def get_remove_kwargs(cls, container_map, container_config, client_name, client_config, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to remove a container.
 
@@ -429,14 +477,14 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :type client_name: unicode
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
-        :param container: Container name or id.
-        :type container: unicode
+        :param container_name: Container name or id.
+        :type container_name: unicode
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(container=container)
+        c_kwargs = dict(container=container_name)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
@@ -803,15 +851,20 @@ class AttachedPreparationMixin(object):
         :type volume_container: unicode
         """
         client.wait(volume_container, timeout=client_config.get('wait_timeout'))
+        include_host_config = use_host_config(client)
         apc_kwargs = self._policy.get_attached_preparation_create_kwargs(container_map, container_config, client_name,
-                                                                         client_config, alias, volume_container)
+                                                                         client_config, None, alias, volume_container,
+                                                                         include_host_config=include_host_config)
         images.ensure_image(apc_kwargs['image'])
         temp_container = client.create_container(**apc_kwargs)
         temp_id = temp_container['Id']
         try:
-            aps_kwargs = self._policy.get_attached_preparation_start_kwargs(container_map, container_config,
-                                                                            client_name, client_config, temp_id, alias,
-                                                                            volume_container)
+            if include_host_config:
+                aps_kwargs = dict(container=temp_id)
+            else:
+                aps_kwargs = self._policy.get_attached_preparation_host_config_kwargs(container_map, container_config,
+                                                                                      client_name, client_config,
+                                                                                      temp_id, alias, volume_container)
             client.start(**aps_kwargs)
             client.wait(temp_id, timeout=client_config.get('wait_timeout'))
         finally:
