@@ -61,7 +61,7 @@ def get_list(value):
     strings and registered types are wrapped in a list.
 
     :param value: Value to return as a list.
-    :return: List with the provided ``value``(s).
+    :return: List with the provided value(s).
     :rtype: list
     """
     if value is None:
