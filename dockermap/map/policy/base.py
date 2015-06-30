@@ -178,7 +178,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param include_host_config: Whether to generate and include the HostConfig.
         :type include_host_config: Set to ``False``, if calling :meth:`get_start_kwargs:` later.
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
-        :type kwargs: dict
+        :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
         :rtype: dict
         """
@@ -192,9 +192,10 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             hostname=cls.get_hostname(client_name, container_name) if container_map.set_hostname else None,
             domainname=cls.get_domainname(container_map, container_config, client_config),
         )
+        hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         if include_host_config:
             hc_kwargs = cls.get_host_config_kwargs(container_map, container_config, client_name, client_config,
-                                                   None, instance)
+                                                   None, instance, kwargs=hc_extra_kwargs)
             if hc_kwargs:
                 c_kwargs['host_config'] = create_host_config(**hc_kwargs)
         update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
@@ -219,7 +220,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param instance: Instance name.
         :type instance: unicode | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
-        :type kwargs: dict
+        :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
         :rtype: dict
         """
@@ -263,7 +264,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param include_host_config: Whether to generate and include the HostConfig.
         :type include_host_config: Set to ``False``, if calling :meth:`get_start_kwargs:` later.
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
-        :type kwargs: dict
+        :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
         :rtype: dict
         """
@@ -275,9 +276,10 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             volumes=[path],
             user=user,
         )
+        hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         if include_host_config:
             hc_kwargs = cls.get_attached_host_config_kwargs(container_map, container_config, client_name, client_config,
-                                                            None, alias)
+                                                            None, alias, kwargs=hc_extra_kwargs)
             if hc_kwargs:
                 c_kwargs['host_config'] = create_host_config(**hc_kwargs)
         update_kwargs(c_kwargs, kwargs)
@@ -302,7 +304,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param alias: Alias name of the container volume.
         :type alias: unicode
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
-        :type kwargs: dict
+        :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
         :rtype: dict
         """
@@ -342,7 +344,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param include_host_config: Whether to generate and include the HostConfig.
         :type include_host_config: Set to ``False``, if calling :meth:`get_start_kwargs:` later.
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
-        :type kwargs: dict
+        :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
         :rtype: dict
         """
@@ -360,9 +362,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             command=' && '.join(_get_cmd()),
             user='root',
         )
+        hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         if include_host_config:
             hc_kwargs = cls.get_attached_preparation_host_config_kwargs(container_map, container_config, client_name,
-                                                                        client_config, None, alias, volume_container)
+                                                                        client_config, None, alias, volume_container,
+                                                                        kwargs=hc_extra_kwargs)
             if hc_kwargs:
                 c_kwargs['host_config'] = create_host_config(**hc_kwargs)
         update_kwargs(c_kwargs, kwargs)
@@ -390,7 +394,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param volume_container: Name of the container that shares the volume.
         :type volume_container: unicode
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
-        :type kwargs: dict
+        :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
         :rtype: dict
         """

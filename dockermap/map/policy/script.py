@@ -102,7 +102,7 @@ class ScriptMixin(object):
             binds = None
             command = command_format
         new_containers = self.create_actions(map_name, container, instances, entrypoint=entrypoint, command=command,
-                                             volumes=volumes)
+                                             volumes=volumes, host_config=dict(binds=binds))
         if not new_containers:
             raise ScriptRunException("No new containers were created.")
         results = {}

@@ -22,13 +22,14 @@ class TestPolicyClientKwargs(unittest.TestCase):
         cfg = self.sample_map.get_existing(cfg_name)
         c_name = 'main.web_server'
         kwargs = BasePolicy.get_create_kwargs(self.sample_map, cfg, '__default__', self.sample_client_config,
-                                              c_name, None, cfg_name, include_host_config=False)
+                                              c_name, None, cfg_name, include_host_config=False,
+                                              kwargs=dict(ports=[22]))
         self.assertEqual(kwargs, dict(
             name=c_name,
             image='registry.example.com/nginx',
             volumes=['/etc/nginx'],
             user=None,
-            ports=[80, 443],
+            ports=[80, 443, 22],
             hostname='main.web_server',
             domainname=None,
         ))
@@ -38,11 +39,15 @@ class TestPolicyClientKwargs(unittest.TestCase):
         cfg = self.sample_map.get_existing(cfg_name)
         c_name = 'main.web_server'
         kwargs = BasePolicy.get_host_config_kwargs(self.sample_map, cfg, '__default__', self.sample_client_config,
-                                                   c_name, None)
+                                                   c_name, None,
+                                                   kwargs=dict(binds={'/new_h': {'bind': '/new_c', 'ro': False}}))
         self.assertEqual(kwargs, dict(
             container='main.web_server',
             links={},
-            binds={'/var/lib/site/config/nginx': {'bind': '/etc/nginx', 'ro': True}},
+            binds={
+                '/var/lib/site/config/nginx': {'bind': '/etc/nginx', 'ro': True},
+                '/new_h': {'bind': '/new_c', 'ro': False},
+            },
             volumes_from=['main.app_server_socket', 'main.web_log'],
             port_bindings={80: 80, 443: 443},
         ))
@@ -51,8 +56,10 @@ class TestPolicyClientKwargs(unittest.TestCase):
         cfg_name = 'app_server'
         cfg = self.sample_map.get_existing(cfg_name)
         c_name = 'main.app_server'
+        hc_kwargs = dict(binds={'/new_h': {'bind': '/new_c', 'ro': False}})
         kwargs = BasePolicy.get_create_kwargs(self.sample_map, cfg, '__default__', self.sample_client_config,
-                                              c_name, 'instance1', cfg_name, include_host_config=True)
+                                              c_name, 'instance1', cfg_name, include_host_config=True,
+                                              kwargs=dict(host_config=hc_kwargs))
         self.assertEqual(kwargs, dict(
             name=c_name,
             image='registry.example.com/app',
@@ -69,6 +76,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                 binds={
                     '/var/lib/site/config/app1': {'bind': '/var/lib/app/config', 'ro': True},
                     '/var/lib/site/data/app1': {'bind': '/var/lib/app/data', 'ro': False},
+                    '/new_h': {'bind': '/new_c', 'ro': False},
                 },
                 volumes_from=['main.app_log', 'main.app_server_socket'],
                 port_bindings={},
