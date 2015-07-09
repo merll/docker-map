@@ -12,7 +12,7 @@ from .input import (is_path, get_list, get_shared_volumes, get_shared_host_volum
                     get_port_bindings)
 
 SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent'
-DICT_ATTRIBUTES = 'create_options', 'start_options'
+DICT_ATTRIBUTES = 'create_options', 'start_options', 'host_config'
 LIST_ATTRIBUTES = 'instances', 'shares', 'attaches', 'clients'
 
 
