@@ -79,7 +79,7 @@ elements are:
   one, assigns file system permissions as set in `permissions` and `user`. This makes
   configuration of sockets very easy.
 * `exposes`: Configures port bindings for linked containers and on host interfaces.
-* `create_options` and `start_options` provide the possibility to add further keyword
+* `create_options` and `host_config` provide the possibility to add further keyword
   arguments such as `command` or `entrypoint`, which are passed through to the `docker-py`
   client.
 
@@ -109,7 +109,7 @@ address.
 
 Combining the elements
 ----------------------
-An `MappingDockerClient` applies one or multiple `ContainerMap` instances to one or
+`MappingDockerClient` applies one or multiple `ContainerMap` instances to one or
 multiple Docker clients. A container on the map can easily be created with all its
 dependencies by running `client.create('container_name')`.
 
