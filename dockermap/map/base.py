@@ -11,12 +11,12 @@ from ..build.context import DockerContext
 from ..utils import is_latest_image, is_repo_image, parse_response
 
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 CONTAINER_LOG = logging.INFO + 2
 STREAM_LOG = logging.INFO + 1
 STREAM_PROGRESS = logging.INFO - 1
 LOG_PROGRESS_FORMAT = "{0} {1} {2}"
-LOG_CONTAINER_FORMAT = "[{0}] {1}"
+LOG_CONTAINER_FORMAT = "[%s] %s"
 
 
 class DockerStatusError(Exception):
@@ -119,7 +119,7 @@ class DockerClientWrapper(docker.Client):
         """
         pass
 
-    def push_log(self, info, level=logging.INFO):
+    def push_log(self, info, level=logging.INFO, *args, **kwargs):
         """
         Writes logs. To be fully implemented by subclasses.
 
@@ -127,8 +127,10 @@ class DockerClientWrapper(docker.Client):
         :type info: unicode
         :param level: Logging level; default is :data:`~logging.INFO`.
         :type level: int
+        :param args: Positional arguments to pass to logger.
+        :param kwargs: Keyword arguments to pass to logger.
         """
-        logger.log(level, info)
+        log.log(level, info, *args, **kwargs)
 
     def build(self, tag, add_latest_tag=False, raise_on_error=False, **kwargs):
         """
@@ -287,7 +289,7 @@ class DockerClientWrapper(docker.Client):
                 import sys
                 exc_info = sys.exc_info()
                 if e.response.status_code != 404:
-                    self.push_log("Could not remove container '{0}': {1}".format(cn, e.explanation), logging.ERROR)
+                    self.push_log("Could not remove container '%s': %s", logging.ERROR, cn, e.explanation)
                     if raise_on_error:
                         raise exc_info[0], exc_info[1], exc_info[2]
 
@@ -316,7 +318,7 @@ class DockerClientWrapper(docker.Client):
                 import sys
                 exc_info = sys.exc_info()
                 if e.response.status_code != 404:
-                    self.push_log("Could not remove image '{0}': {1}".format(iid, e.explanation), logging.ERROR)
+                    self.push_log("Could not remove image '%s': %s", logging.ERROR, iid, e.explanation)
                     if raise_on_error:
                         raise exc_info[0], exc_info[1], exc_info[2]
 
@@ -354,7 +356,7 @@ class DockerClientWrapper(docker.Client):
         if log_lines and not log_lines[-1]:
             log_lines.pop()
         for line in log_lines:
-            self.push_log(LOG_CONTAINER_FORMAT.format(container, line), CONTAINER_LOG)
+            self.push_log(LOG_CONTAINER_FORMAT, CONTAINER_LOG, container, line)
 
     def remove_container(self, container, raise_on_error=False, **kwargs):
         """
@@ -374,8 +376,7 @@ class DockerClientWrapper(docker.Client):
             import sys
             exc_info = sys.exc_info()
             if e.response.status_code != 404:
-                self.push_log("Failed to stop container '{0}': {1}".format(container, e.explanation),
-                              logging.ERROR)
+                self.push_log("Failed to stop container '%s': %s", logging.ERROR, container, e.explanation)
                 if raise_on_error:
                     raise exc_info[0], exc_info[1], exc_info[2]
 
@@ -397,8 +398,7 @@ class DockerClientWrapper(docker.Client):
             import sys
             exc_info = sys.exc_info()
             if e.response.status_code != 404:
-                self.push_log("Failed to remove container '{0}': {1}".format(container, e.explanation),
-                              logging.ERROR)
+                self.push_log("Failed to remove container '%s': %s", logging.ERROR, container, e.explanation)
                 if raise_on_error:
                     raise exc_info[0], exc_info[1], exc_info[2]
 
