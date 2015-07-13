@@ -7,6 +7,8 @@ Change History
 -----
 * Implemented HostConfig during container creation, which is preferred over passing arguments during start since API
   v1.15. For older API versions, start keyword arguments will be used.
+* Changed log functions to be better fit Python logging.
+* Bug fix in tag / repository partitioning (`PR #7 <https://github.com/merll/docker-map/pull/7>`_).
 
 0.4.1
 -----
@@ -39,14 +41,14 @@ Change History
 0.3.1
 -----
 * Extended late value resolution to custom types.
-* Various bugfixes.
+* Various bugfixes (e.g. `PR #5 <https://github.com/merll/docker-map/pull/5>`_).
 
 0.3.0
 -----
 * Possibility to use 'lazy' values in various settings (e.g. port bindings, volume aliases, host volumes, and user).
 * Consider read-only option for inherited volumes in ``uses`` property.
 * Further update policy fixes.
-* Python 3 compatibility fixes.
+* Python 3 compatibility fixes (`PR #4 <https://github.com/merll/docker-map/pull/4>`_).
 
 0.2.2
 -----
