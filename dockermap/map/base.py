@@ -157,7 +157,7 @@ class DockerClientWrapper(docker.Client):
         if last_log and last_log.startswith('Successfully built '):
             image_id = last_log[19:]  # Remove prefix
             if add_latest_tag:
-                repo, __, i_tag = tag.partition(':')
+                repo, __, i_tag = tag.rpartition(':')
                 if i_tag and i_tag != 'latest':
                     self.tag(image_id, repo, 'latest', force=True)
             return image_id

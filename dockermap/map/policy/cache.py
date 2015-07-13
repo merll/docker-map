@@ -58,7 +58,7 @@ class CachedImages(CachedItems, dict):
         :return: Image id associated with the image name.
         :rtype: unicode
         """
-        image, __, tag = image_name.partition(':')
+        image, __, tag = image_name.rpartition(':')
         if tag:
             full_name = image_name
         else:
