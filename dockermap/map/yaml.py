@@ -52,7 +52,7 @@ def load_file(filename):
         return yaml.safe_load(f)
 
 
-def load_map(stream, name=None, check_integrity=True):
+def load_map(stream, name=None, check_integrity=True, check_duplicates=True):
     """
     Loads a ContainerMap configuration from a YAML document stream.
 
@@ -63,6 +63,8 @@ def load_map(stream, name=None, check_integrity=True):
     :type name: unicode
     :param check_integrity: Performs a brief integrity check; default is ``True``.
     :type check_integrity: bool
+    :param check_duplicates: Check for duplicate attached volumes during integrity check.
+    :type check_duplicates: bool
     :return: A ContainerMap object.
     :rtype: ContainerMap
     """
@@ -71,7 +73,7 @@ def load_map(stream, name=None, check_integrity=True):
         map_name = name or map_dict.pop('name', None)
         if not map_name:
             raise ValueError("No map name provided, and none found in YAML stream.")
-        return ContainerMap(map_name, map_dict, check_integrity=check_integrity)
+        return ContainerMap(map_name, map_dict, check_integrity=check_integrity, check_duplicates=check_duplicates)
     raise ValueError("Valid map could not be decoded.")
 
 

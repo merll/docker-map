@@ -31,9 +31,11 @@ class ContainerMap(object):
     :param check_integrity: If initial values are given, the container integrity is checked by default at the end of
      this constructor. Setting this to `False` deactivates it.
     :type check_integrity: bool
+    :param check_duplicates: Check for duplicate attached volumes during integrity check.
+    :type check_duplicates: bool
     :param kwargs: Kwargs with initial container configurations, host shares, and volumes.
     """
-    def __init__(self, name, initial=None, check_integrity=True, **kwargs):
+    def __init__(self, name, initial=None, check_integrity=True, check_duplicates=True, **kwargs):
         self._name = name
         self._repository = None
         self._host = HostVolumeConfiguration()
@@ -44,7 +46,7 @@ class ContainerMap(object):
         self._set_hostname = True
         self.update(initial, **kwargs)
         if (initial or kwargs) and check_integrity:
-            self.check_integrity()
+            self.check_integrity(check_duplicates=check_duplicates)
 
     def __iter__(self):
         return six.iteritems(self._containers)
@@ -341,7 +343,7 @@ class ContainerMap(object):
         * every volume alias used in `attached` and `binds` needs to be associated with a path in `volumes`;
         * every container referred to in `links` needs to be defined.
 
-        :param: Check for duplicate attached volumes.
+        :param check_duplicates: Check for duplicate attached volumes.
         :type check_duplicates: bool
         """
         def _get_instance_names(c_name, instances):
@@ -365,7 +367,7 @@ class ContainerMap(object):
             duplicated = [name for name, count in six.iteritems(Counter(volume_shared)) if count > 1]
             if duplicated:
                 dup_str = ', '.join(duplicated)
-                raise MapIntegrityError("Duplicated shared or attached volumes found with name(s): {0}.".format(dup_str))
+                raise MapIntegrityError("Duplicated attached volumes found with name(s): {0}.".format(dup_str))
         used_set = set(itertools.chain.from_iterable(all_used))
         shared_set = set(volume_shared)
         missing_shares = used_set - shared_set
