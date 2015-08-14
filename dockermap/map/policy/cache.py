@@ -59,10 +59,11 @@ class CachedImages(CachedItems, dict):
         :rtype: unicode
         """
         image, __, tag = image_name.rpartition(':')
-        if tag:
+        if image:
             full_name = image_name
         else:
             full_name = '{0}:latest'.format(image_name)
+            image = image_name
             tag = 'latest'
         update_latest = pull_latest and tag == 'latest' and full_name not in self._latest
         if update_latest or full_name not in self:
