@@ -48,7 +48,7 @@ class DictMap(six.with_metaclass(PropertyDictMeta, dict)):
         return six.iteritems(self)
 
     def update(self, other=None, **kwargs):
-        if other:
+        if other is not None:
             if isinstance(other, self.__class__):
                 for p in self.__class__.core_properties:
                     object.__setattr__(self, p, getattr(other, p))

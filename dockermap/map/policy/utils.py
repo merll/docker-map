@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import itertools
 from docker.utils import compare_version
 import six
 
@@ -156,25 +155,6 @@ def get_volumes(container_map, config):
     volumes = [resolve_value(s) for s in config.shares]
     volumes.extend([_volume_path(b.volume) for b in config.binds])
     return volumes
-
-
-def get_inherited_volumes(config):
-    """
-    Generates external volume names for the ``volumes_from`` argument for the container start. If applicable includes a
-    read-only access indicator, but not the container map name.
-
-    :param config: Container configuration.
-    :type config: dockermap.map.config.ContainerConfiguration
-    :return: List of used volume names.
-    :rtype: itertools.chain[unicode]
-    """
-    def volume_str(u):
-        vol = u.volume
-        if u.readonly:
-            return '{0}:ro'.format(vol)
-        return vol
-
-    return itertools.chain(map(volume_str, config.uses), config.attaches)
 
 
 def get_host_binds(container_map, config, instance):

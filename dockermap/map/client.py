@@ -287,7 +287,7 @@ class MappingDockerClient(object):
             for c_map in maps:
                 for container, config in c_map:
                     for ac in config.attaches:
-                        yield cname_func(c_map.name, ac)
+                        yield aname_func(c_map.name, ac, container)
                     if config.persistent:
                         if config.instances:
                             for ci in config.instances:
@@ -295,8 +295,12 @@ class MappingDockerClient(object):
                         else:
                             yield cname_func(c_map.name, container)
 
+        if map_name:
+            maps = [m.get_extended_map() for m in self._maps.values()]
+        else:
+            maps = [self._maps[map_name].get_extended_map()]
         cname_func = self._policy_class.cname
-        maps = (self._maps[map_name], ) if map_name else self._maps.values()
+        aname_func = self._policy_class.aname
         return list(_container_names())
 
     @property

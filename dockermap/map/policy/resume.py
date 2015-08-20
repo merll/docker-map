@@ -20,20 +20,23 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
             use_host_config = utils.use_host_config(client)
             existing_containers = self._policy.container_names[client_name]
             images = self._policy.images[client_name]
+            a_parent = container_name if c_map.use_attached_parent_name else None
             for a in c_config.attaches:
-                a_name = self._policy.cname(map_name, a)
+                a_name = self._policy.aname(map_name, a, a_parent)
                 a_exists = a_name in existing_containers
                 a_status = client.inspect_container(a_name)['State'] if a_exists else None
                 a_running = a_status and a_status['Running']
                 a_remove = a_exists and not a_running and a_status['ExitCode'] in self._remove_status
                 if a_remove:
-                    ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, a_name)
+                    ar_kwargs = self._policy.get_remove_kwargs(c_map, container_name, c_config, client_name,
+                                                               client_config, a_name)
                     client.remove_container(**ar_kwargs)
                     existing_containers.remove(a_name)
                 a_create = not a_exists or a_remove
                 if a_create:
-                    ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_name, client_config,
-                                                                        a_name, a, include_host_config=use_host_config)
+                    ac_kwargs = self._policy.get_attached_create_kwargs(c_map, container_name, c_config, client_name,
+                                                                        client_config, a_name, a,
+                                                                        include_host_config=use_host_config)
                     images.ensure_image(ac_kwargs['image'])
                     client.create_container(**ac_kwargs)
                     existing_containers.add(a_name)
@@ -43,10 +46,11 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
                     if use_host_config:
                         as_kwargs = dict(container=a_name)
                     else:
-                        as_kwargs = self._policy.get_attached_host_config_kwargs(c_map, c_config, client_name,
-                                                                                 client_config, a_name, a)
+                        as_kwargs = self._policy.get_attached_host_config_kwargs(c_map, container_name, c_config,
+                                                                                 client_name, client_config, a_name, a)
                     client.start(**as_kwargs)
-                    self.prepare_container(images, client, c_map, c_config, client_name, client_config, a, a_name)
+                    self.prepare_container(c_map, container_name, c_config, client_name, client_config, client, a,
+                                           a_name)
             for ci in instances:
                 ci_name = self._policy.cname(map_name, container_name, ci)
                 ci_exists = ci_name in existing_containers
@@ -54,17 +58,20 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
                 ci_running = ci_status and ci_status['Running']
                 ci_stop = recreate_attached and ci_running
                 if ci_stop:
-                    ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_name, client_config, ci_name, ci)
+                    ip_kwargs = self._policy.get_stop_kwargs(c_map, container_name, c_config, client_name,
+                                                             client_config, ci_name, ci)
                     client.stop(**ip_kwargs)
                 ci_remove = ci_exists and (not ci_running and ci_status['ExitCode'] in self._remove_status) or ci_stop
                 if ci_remove:
-                    ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, ci_name)
+                    ir_kwargs = self._policy.get_remove_kwargs(c_map, container_name, c_config, client_name,
+                                                               client_config, ci_name)
                     client.remove_container(**ir_kwargs)
                     existing_containers.remove(ci_name)
                 ci_create = not ci_exists or ci_remove
                 if ci_create:
-                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name, ci,
-                                                               container_name, include_host_config=use_host_config)
+                    ic_kwargs = self._policy.get_create_kwargs(c_map, container_name, c_config, client_name,
+                                                               client_config, ci_name, ci,
+                                                               include_host_config=use_host_config)
                     images.ensure_image(ic_kwargs['image'])
                     yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
@@ -74,8 +81,8 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
                     if use_host_config:
                         is_kwargs = dict(container=ci_name)
                     else:
-                        is_kwargs = self._policy.get_host_config_kwargs(c_map, c_config, client_name, client_config,
-                                                                        ci_name, ci)
+                        is_kwargs = self._policy.get_host_config_kwargs(c_map, container_name, c_config, client_name,
+                                                                        client_config, ci_name, ci)
                     client.start(**is_kwargs)
 
 

@@ -14,20 +14,22 @@ class SimpleCreateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator
             use_host_config = utils.use_host_config(client)
             existing_containers = self._policy.container_names[client_name]
             images = self._policy.images[client_name]
+            a_parent = container_name if c_map.use_attached_parent_name else None
             for a in c_config.attaches:
-                a_name = self._policy.cname(map_name, a)
+                a_name = self._policy.aname(map_name, a, a_parent)
                 if a_name not in existing_containers:
-                    a_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_name, client_config,
-                                                                       a_name, a, include_host_config=use_host_config)
+                    a_kwargs = self._policy.get_attached_create_kwargs(c_map, container_name, c_config, client_name,
+                                                                       client_config, a_name, a,
+                                                                       include_host_config=use_host_config)
                     images.ensure_image(a_kwargs['image'])
                     client.create_container(**a_kwargs)
                     existing_containers.add(a_name)
             for ci in instances:
                 ci_name = self._policy.cname(map_name, container_name, ci)
                 if ci_name not in existing_containers:
-                    c_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name, ci,
-                                                              container_name, include_host_config=use_host_config,
-                                                              kwargs=kwargs)
+                    c_kwargs = self._policy.get_create_kwargs(c_map, container_name, c_config, client_name,
+                                                              client_config, ci_name, ci,
+                                                              include_host_config=use_host_config, kwargs=kwargs)
                     images.ensure_image(c_kwargs['image'])
                     yield client_name, client.create_container(**c_kwargs)
                     existing_containers.add(ci_name)
@@ -57,18 +59,19 @@ class SimpleStartGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
             use_host_config = utils.use_host_config(client)
-            images = self._policy.images[client_name]
+            a_parent = container_name if c_map.use_attached_parent_name else None
             for a in c_config.attaches:
-                a_name = self._policy.cname(map_name, a)
+                a_name = self._policy.aname(map_name, a, a_parent)
                 a_status = client.inspect_container(a_name)['State']
                 if a_status['ExitCode'] != 0 or utils.is_initial(a_status):
                     if use_host_config:
                         a_kwargs = dict(container=a_name)
                     else:
-                        a_kwargs = self._policy.get_attached_host_config_kwargs(c_map, c_config, client_name,
-                                                                                client_config, a_name, a)
+                        a_kwargs = self._policy.get_attached_host_config_kwargs(c_map, container_name, c_config,
+                                                                                client_name, client_config, a_name, a)
                     client.start(**a_kwargs)
-                    self.prepare_container(images, client, c_map, c_config, client_name, client_config, a, a_name)
+                    self.prepare_container(c_map, container_name, c_config, client_name, client_config, client, a,
+                                           a_name)
             for instance in instances:
                 ci_name = self._policy.cname(map_name, container_name, instance)
                 ci_status = client.inspect_container(ci_name)['State']
@@ -76,8 +79,8 @@ class SimpleStartGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin
                     if use_host_config:
                         c_kwargs = dict(container=ci_name)
                     else:
-                        c_kwargs = self._policy.get_host_config_kwargs(c_map, c_config, client_name, client_config,
-                                                                       ci_name, instance, kwargs=kwargs)
+                        c_kwargs = self._policy.get_host_config_kwargs(c_map, container_name, c_config, client_name,
+                                                                       client_config, ci_name, instance, kwargs=kwargs)
                     client.start(**c_kwargs)
 
 
@@ -139,8 +142,8 @@ class SimpleStopGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):
                     ci_name = self._policy.cname(map_name, container_name, instance)
                     ci_status = client.inspect_container(ci_name)['State'] if ci_name in existing_containers else None
                     if ci_status and ci_status['Running']:
-                        c_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_name, client_config, ci_name,
-                                                                instance, kwargs=kwargs)
+                        c_kwargs = self._policy.get_stop_kwargs(c_map, container_name, c_config, client_name,
+                                                                client_config, ci_name, instance, kwargs=kwargs)
                         client.stop(**c_kwargs)
 
 
@@ -173,22 +176,24 @@ class SimpleRemoveGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator
         self._remove_attached = policy.remove_attached
 
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
-        if (self._remove_dependent or not flags & ACTION_DEPENDENCY_FLAG) and (self._remove_persistent or not c_config.persistent):
+        if ((self._remove_dependent or not flags & ACTION_DEPENDENCY_FLAG) and
+                (self._remove_persistent or not c_config.persistent)):
             for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
                 existing_containers = self._policy.container_names[client_name]
                 for instance in instances:
                     ci_name = self._policy.cname(map_name, container_name, instance)
                     if ci_name in existing_containers:
-                        c_kwargs = self._policy.get_remove_kwargs(map_name, c_config, client_name, client_config,
-                                                                  ci_name, kwargs=kwargs)
+                        c_kwargs = self._policy.get_remove_kwargs(c_map, container_name, c_config, client_name,
+                                                                  client_config, ci_name, kwargs=kwargs)
                         client.remove_container(**c_kwargs)
                         existing_containers.remove(ci_name)
                 if self._remove_attached:
+                    a_parent = container_name if c_map.use_attached_parent_name else None
                     for a in c_config.attaches:
-                        a_name = self._policy.cname(map_name, a)
+                        a_name = self._policy.aname(map_name, a, a_parent)
                         if a_name in existing_containers:
-                            a_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config,
-                                                                      a_name, kwargs=kwargs)
+                            a_kwargs = self._policy.get_remove_kwargs(c_map, container_name, c_config, client_name,
+                                                                      client_config, a_name, kwargs=kwargs)
                             client.remove_container(**a_kwargs)
                             existing_containers.remove(a_name)
 

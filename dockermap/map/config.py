@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-import operator
 import posixpath
 import six
 
 from ..functional import resolve_value
 from . import DictMap
 from .base import DockerClientWrapper
-from .input import (is_path, get_list, get_shared_volumes, get_shared_host_volumes, get_container_links,
-                    get_port_bindings)
+from .input import (get_list, get_shared_volumes, get_shared_host_volumes, get_container_links,
+                    get_port_bindings, NotSet)
 
 SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent'
 DICT_ATTRIBUTES = 'create_options', 'start_options', 'host_config'
@@ -48,7 +47,9 @@ class ContainerConfiguration(object):
     :param kwargs: Optional initial values.
     """
     def __init__(self, **kwargs):
-        self._image = None
+        self._abstract = None
+        self._extends = []
+        self._image = NotSet
         self._instances = []
         self._shares = []
         self._binds = []
@@ -56,18 +57,42 @@ class ContainerConfiguration(object):
         self._links_to = []
         self._attaches = []
         self._exposes = []
-        self._user = None
-        self._permissions = None
-        self._persistent = False
-        self._clients = None
-        self._create_kwargs = None
-        self._host_config_kwargs = None
+        self._user = NotSet
+        self._permissions = NotSet
+        self._persistent = NotSet
+        self._clients = NotSet
+        self._create_kwargs = NotSet
+        self._host_config_kwargs = NotSet
         self.update(kwargs)
 
     def __repr__(self):
-        return '{0} shares: {1}; binds: {2}; uses: {3}; attaches: {4}'.format(self.__class__.__name__,
-                                                                              self._shares, self._binds, self._uses,
-                                                                              self._attaches)
+        if self._extends:
+            ext_str = 'extends {0}'.format(self._extends)
+        else:
+            ext_str = ''
+        return ("{1}{0.__class__.__name__} {2} shares: {0._shares}; binds: {0._binds}; uses: {0._uses}; "
+                "attaches: {0._attaches}").format(self, 'Abstract ' if self._abstract else '', ext_str)
+
+    @property
+    def abstract(self):
+        return self._abstract
+
+    @abstract.setter
+    def abstract(self, value):
+        self._abstract = bool(value)
+
+    @property
+    def extends(self):
+        """
+
+        :return:
+        :rtype: list[unicode]
+        """
+        return self._extends
+
+    @extends.setter
+    def extends(self, value):
+        self._extends = get_list(value)
 
     @property
     def image(self):
@@ -83,6 +108,10 @@ class ContainerConfiguration(object):
     @image.setter
     def image(self, value):
         self._image = value
+
+    @image.deleter
+    def image(self):
+        self._image = NotSet
 
     @property
     def instances(self):
@@ -218,6 +247,10 @@ class ContainerConfiguration(object):
     def user(self, value):
         self._user = value
 
+    @user.deleter
+    def user(self):
+        self._user = NotSet
+
     @property
     def permissions(self):
         """
@@ -232,6 +265,10 @@ class ContainerConfiguration(object):
     def permissions(self, value):
         self._permissions = value
 
+    @permissions.deleter
+    def permissions(self):
+        self._permissions = NotSet
+
     @property
     def persistent(self):
         """
@@ -245,7 +282,14 @@ class ContainerConfiguration(object):
 
     @persistent.setter
     def persistent(self, value):
-        self._persistent = bool(value)
+        if value is NotSet:
+            self._persistent = NotSet
+        else:
+            self._persistent = bool(value)
+
+    @persistent.deleter
+    def persistent(self):
+        self._persistent = NotSet
 
     @property
     def clients(self):
@@ -303,7 +347,7 @@ class ContainerConfiguration(object):
         """
         for key, value in six.iteritems(values):
             if hasattr(self, key):
-                self.__setattr__(key, value)
+                setattr(self, key, value)
 
     def merge(self, values, lists_only=False):
         """
@@ -325,24 +369,29 @@ class ContainerConfiguration(object):
         def _merge_first(current, update_list):
             if not update_list:
                 return
-            new_keys = set(map(operator.itemgetter(0), update_list)) - set(map(operator.itemgetter(0), current))
-            current.extend(filter(lambda u: u[0] in new_keys, update_list))
+            new_keys = set(item[0] for item in update_list) - set(item[0] for item in current)
+            current.extend(u for u in update_list if u[0] in new_keys)
 
         def _update_attr(attr, update_func):
             update = get_func(attr)
-            if update:
+            if update is not None and update is not NotSet:
                 update_func(attr, update)
 
+        def _merge_converted_list(attr, updates):
+            current = getattr(self, attr)
+            update_list = get_list(updates)
+            current.extend(u for u in update_list if u not in current)
+
         def _merge_list(attr, update_list):
-            current = self.__getattribute__(attr)
-            current.extend(set(update_list) - set(current))
+            current = getattr(self, attr)
+            current.extend(u for u in update_list if u not in current)
 
         def _update_dict(attr, new_val):
-            current_dict = self.__getattribute__(attr)
+            current_dict = getattr(self, attr)
             if current_dict:
                 current_dict.update(new_val)
-            else:
-                self.__setattr__(attr, new_val)
+            elif new_val:
+                setattr(self, attr, new_val.copy())
 
         if isinstance(values, dict):
             get_func = values.get
@@ -350,17 +399,19 @@ class ContainerConfiguration(object):
             update_uses = _get_converted_list('uses', get_shared_volumes)
             update_links = _get_converted_list('links', get_container_links)
             update_ports = _get_converted_list('exposes', get_port_bindings)
+            merge_list_func = _merge_converted_list
         elif isinstance(values, ContainerConfiguration):
             get_func = values.__getattribute__
             update_binds = values._binds
             update_uses = values._uses
             update_links = values._links_to
             update_ports = values._exposes
+            merge_list_func = _merge_list
         else:
             raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values)))
 
         for key in LIST_ATTRIBUTES:
-            _update_attr(key, _merge_list)
+            _update_attr(key, merge_list_func)
         _merge_first(self._binds, update_binds)
         _merge_first(self._uses, update_uses)
         _merge_first(self._links_to, update_links)
@@ -376,11 +427,11 @@ class HostVolumeConfiguration(DictMap):
     """
     Class for storing volumes, as shared from the host with Docker containers.
 
-    :param volume_root: Optional root directory for host volumes.
-    :type volume_root: unicode
+    :param root: Optional root directory for host volumes.
+    :type root: unicode
     """
-    def __init__(self, volume_root=None, *args, **kwargs):
-        self._root = volume_root
+    def __init__(self, root=None, *args, **kwargs):
+        self._root = root
         super(HostVolumeConfiguration, self).__init__(*args, **kwargs)
 
     @property

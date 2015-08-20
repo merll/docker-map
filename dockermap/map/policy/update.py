@@ -193,8 +193,9 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
             use_host_config = utils.use_host_config(client)
             images = self._policy.images[client_name]
             existing_containers = self._policy.container_names[client_name]
+            a_parent = container_name if c_map.use_attached_parent_name else None
             for a in c_config.attaches:
-                a_name = self._policy.cname(map_name, a)
+                a_name = self._policy.aname(map_name, a, a_parent)
                 log.debug("Checking attached container %s.", a_name)
                 a_exists = a_name in existing_containers
                 if a_exists:
@@ -202,11 +203,12 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     a_status = a_detail['State']
                     a_image = a_detail['Image']
                     log.debug("Container from image %s found with status\n%s.", a_image, a_status)
-                    a_remove = (not a_status['Running'] and a_status['ExitCode'] in self.remove_status) or \
-                        (self.update_persistent and a_image != self.base_image_ids[client_name])
+                    a_remove = ((not a_status['Running'] and a_status['ExitCode'] in self.remove_status) or
+                                (self.update_persistent and a_image != self.base_image_ids[client_name]))
                     if a_remove:
                         log.debug("Found to be outdated or non-restartable - removing.")
-                        ar_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, a_name)
+                        ar_kwargs = self._policy.get_remove_kwargs(c_map, container_name, c_config, client_name,
+                                                                   client_config, a_name)
                         client.remove_container(**ar_kwargs)
                         existing_containers.remove(a_name)
                 else:
@@ -215,26 +217,28 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     a_detail = None
                 if a_remove or not a_exists:
                     log.debug("Creating and starting attached container %s.", a_name)
-                    ac_kwargs = self._policy.get_attached_create_kwargs(c_map, c_config, client_name, client_config,
-                                                                        a_name, a, include_host_config=use_host_config)
+                    ac_kwargs = self._policy.get_attached_create_kwargs(c_map, container_name, c_config, client_name,
+                                                                        client_config, a_name, a,
+                                                                        include_host_config=use_host_config)
                     client.create_container(**ac_kwargs)
                     existing_containers.add(a_name)
 
                     if use_host_config:
                         as_kwargs = dict(container=a_name)
                     else:
-                        as_kwargs = self._policy.get_attached_host_config_kwargs(c_map, c_config, client_name,
-                                                                                 client_config, a_name, a)
+                        as_kwargs = self._policy.get_attached_host_config_kwargs(c_map, container_name, c_config,
+                                                                                 client_name, client_config, a_name, a)
                     client.start(**as_kwargs)
-                    self.prepare_container(images, client, c_map, c_config, client_name, client_config, a, a_name)
+                    self.prepare_container(c_map, container_name, c_config, client_name, client_config, client, a,
+                                           a_name)
                 else:
                     volumes = a_detail.get('Volumes')
                     if volumes:
                         mapped_path = a_paths[a]
                         self.path_vfs[a, None, mapped_path] = volumes.get(mapped_path)
             image_name = self.iname_tag(c_config.image or container_name, container_map=c_map)
-            image_id = self._policy.images[client_name].ensure_image(image_name, pull_latest=self.pull_latest,
-                                                                     insecure_registry=self.pull_insecure_registry)
+            image_id = images.ensure_image(image_name, pull_latest=self.pull_latest,
+                                           insecure_registry=self.pull_insecure_registry)
             for ci in instances:
                 ci_name = self._policy.cname(map_name, container_name, ci)
                 ci_exists = ci_name in existing_containers
@@ -245,20 +249,21 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     ci_image = ci_detail['Image']
                     ci_running = ci_status['Running']
                     log.debug("Container from image %s found with status\n%s.", ci_image, ci_status)
-                    ci_remove = (not ci_running and ci_status['ExitCode'] in self.remove_status) or \
-                        ((not c_config.persistent or self.update_persistent) and ci_image != image_id) or \
-                        not self._check_volumes(c_map, c_config, container_name, ci, ci_detail) or \
-                        not self._check_links(map_name, c_config, ci_detail) or \
-                        not _check_environment(c_config, ci_detail) or \
-                        not _check_cmd(c_config, ci_detail) or \
-                        not _check_network(c_config, client_config, ci_detail)
+                    ci_remove = ((not ci_running and ci_status['ExitCode'] in self.remove_status) or
+                                 ((not c_config.persistent or self.update_persistent) and ci_image != image_id) or
+                                 not self._check_volumes(c_map, c_config, container_name, ci, ci_detail) or
+                                 not self._check_links(map_name, c_config, ci_detail) or
+                                 not _check_environment(c_config, ci_detail) or
+                                 not _check_cmd(c_config, ci_detail) or
+                                 not _check_network(c_config, client_config, ci_detail))
                     if ci_remove:
                         log.debug("Found to be outdated or non-restartable - removing.")
                         if ci_running:
-                            ip_kwargs = self._policy.get_stop_kwargs(c_map, c_config, client_name, client_config,
-                                                                     ci_name, ci)
+                            ip_kwargs = self._policy.get_stop_kwargs(c_map, container_name, c_config, client_name,
+                                                                     client_config, ci_name, ci)
                             client.stop(**ip_kwargs)
-                        ir_kwargs = self._policy.get_remove_kwargs(c_map, c_config, client_name, client_config, ci_name)
+                        ir_kwargs = self._policy.get_remove_kwargs(c_map, container_name, c_config, client_name,
+                                                                   client_config, ci_name)
                         client.remove_container(**ir_kwargs)
                         existing_containers.remove(ci_name)
                         ci_create = True
@@ -272,8 +277,9 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     ci_start = True
                 if ci_create:
                     log.debug("Creating container %s.", ci_name)
-                    ic_kwargs = self._policy.get_create_kwargs(c_map, c_config, client_name, client_config, ci_name, ci,
-                                                               container_name, include_host_config=use_host_config)
+                    ic_kwargs = self._policy.get_create_kwargs(c_map, container_name, c_config, client_name,
+                                                               client_config, ci_name, ci,
+                                                               include_host_config=use_host_config)
                     yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
                 if ci_create or ci_start:
@@ -281,8 +287,8 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     if use_host_config:
                         is_kwargs = dict(container=ci_name)
                     else:
-                        is_kwargs = self._policy.get_host_config_kwargs(c_map, c_config, client_name, client_config,
-                                                                        ci_name, ci)
+                        is_kwargs = self._policy.get_host_config_kwargs(c_map, container_name, c_config, client_name,
+                                                                        client_config, ci_name, ci)
                     client.start(**is_kwargs)
 
 

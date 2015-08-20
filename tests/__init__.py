@@ -46,6 +46,128 @@ MAP_DATA_1 = {
     },
 }
 
+MAP_DATA_2 = {
+    'repository': 'registry.example.com',
+    'host_root': '/var/lib/site',
+    'containers': {
+        'abstract_config': {
+            'abstract': True,
+            'image': 'server',
+            'binds': {
+                'app_config': 'ro',
+            },
+            'uses': 'redis.redis_socket',
+            'attaches': 'app_log',
+            'user': 'app_user',
+            'permissions': 'u=rwX,g=rX,o=',
+        },
+        'server': {
+            'extends': 'abstract_config',
+            'binds': {
+                'app_data': 'rw',
+            },
+            'attaches': 'server_log',
+            'user': 'server_user',
+            'exposes': {
+                8443: (8443, 'private'),
+            },
+            'create_options': {
+                'mem_limit': '1g',
+                'cpu_shares': 15,
+            },
+            'host_config': {
+                'restart_policy': {
+                    'MaximumRetryCount': 3,
+                    'Name': 'always',
+                },
+            },
+        },
+        'abstract_worker': {
+            'abstract': True,
+            'extends': 'abstract_config',
+            'binds': {
+                'app_data': 'rw',
+            },
+            'create_options': {
+                'entrypoint': 'celery',
+            },
+            'host_config': {
+                'restart_policy': {
+                    'MaximumRetryCount': 0,
+                    'Name': 'always',
+                },
+            },
+        },
+        'worker': {
+            'extends': 'abstract_worker',
+            'create_options': {
+                'mem_limit': '2g',
+                'cpu_shares': 10,
+                'command': 'worker -A MyApp -Q queue1,queue2',
+            },
+        },
+        'worker_q2': {
+            'extends': 'abstract_worker',
+            'create_options': {
+                'mem_limit': '1g',
+                'cpu_shares': 30,
+                'command': 'worker -A MyApp -Q queue2',
+            },
+        },
+        'redis': {
+            'image': 'redis',
+            'instances': ['queue', 'cache'],
+            'binds': {
+                '/etc/redis': ('redis/config', 'ro'),
+                '/var/lib/redis': 'redis/data',
+            },
+            'attaches': ['redis_socket', 'redis_log'],
+            'user': 'redis',
+            'permissions': 'u=rwX,g=rX,o=',
+            'host_config': {
+                'restart_policy': {
+                    'MaximumRetryCount': 0,
+                    'Name': 'always',
+                },
+            },
+        },
+    },
+    'volumes': {
+        'redis_socket': '/var/run/redis',
+        'redis_log': '/var/log/redis',
+        'server_log': '/var/lib/server/log',
+        'app_data': '/var/lib/app/data',
+        'app_config': '/var/lib/app/config',
+        'app_log': '/var/lib/app/log',
+    },
+    'host': {
+        'app_data': 'app/data',
+        'app_config': 'app/config',
+    },
+}
+
+MAP_DATA_3 = {
+    'repository': 'registry.example.com',
+    'host_root': '/var/lib/site',
+    'containers': {
+        'abstract_config': {
+            'abstract': True,
+            'image': 'server',
+            'binds': {
+                '/var/lib/web/config': ['web/config', 'ro'],
+            },
+            'attaches': 'web_log',
+            'permissions': 'u=rwX,g=rX,o=',
+        },
+        'server': {
+            'extends': 'abstract_config',
+        }
+    },
+    'volumes': {
+        'web_log': '/var/lib/web/log',
+    }
+}
+
 CLIENT_DATA_1 = {
     'interfaces': {'private': '10.0.0.11'},
 }

@@ -7,6 +7,12 @@ import six
 
 from . import DictMap
 from .config import ContainerConfiguration, HostVolumeConfiguration
+from .input import get_list
+
+
+SINGLE_ATTRIBUTES = 'repository', 'default_domain', 'set_hostname', 'use_attached_parent_name'
+DICT_ATTRIBUTES = 'volumes', 'host'
+LIST_ATTRIBUTES = 'clients',
 
 
 class MapIntegrityError(Exception):
@@ -41,15 +47,30 @@ class ContainerMap(object):
         self._host = HostVolumeConfiguration()
         self._volumes = DictMap()
         self._containers = defaultdict(ContainerConfiguration)
-        self._clients = list()
+        self._clients = []
         self._default_domain = None
         self._set_hostname = True
+        self._use_attached_parent_name = False
+        self._extended = False
         self.update(initial, **kwargs)
         if (initial or kwargs) and check_integrity:
             self.check_integrity(check_duplicates=check_duplicates)
 
     def __iter__(self):
-        return six.iteritems(self._containers)
+        return ((c_name, c_config) for c_name, c_config in six.iteritems(self._containers) if not c_config.abstract)
+
+    @classmethod
+    def _copy_base(cls, from_obj, to_obj):
+        """
+        :type from_obj: ContainerMap
+        :type to_obj: ContainerMap
+        """
+        for attr in SINGLE_ATTRIBUTES:
+            setattr(to_obj, attr, getattr(from_obj, attr))
+        for attr in DICT_ATTRIBUTES:
+            getattr(to_obj, attr).update(getattr(from_obj, attr))
+        for attr in LIST_ATTRIBUTES:
+            setattr(to_obj, attr, getattr(from_obj, attr)[:])
 
     def _update_from_dict(self, items):
         """
@@ -58,21 +79,14 @@ class ContainerMap(object):
         for key, value in six.iteritems(items):
             if key == 'host_root':
                 self._host.root = value
-            elif key == 'repository':
-                self._repository = value
-            elif key == 'default_domain':
-                self._default_domain = value
-            elif key == 'clients':
-                if value is not None:
-                    self._clients = list(value)
-                else:
-                    self._clients = []
+            elif key in SINGLE_ATTRIBUTES:
+                setattr(self, key, value)
+            elif key in LIST_ATTRIBUTES:
+                setattr(self, key, get_list(value))
+            elif key in DICT_ATTRIBUTES:
+                getattr(self, key).update(value)
             elif value:
-                if key == 'volumes':
-                    self._volumes.update(value)
-                elif key == 'host':
-                    self._host.update(value)
-                elif key == 'containers':
+                if key == 'containers':
                     for container, config in six.iteritems(value):
                         self._containers[container].update(config)
                 else:
@@ -86,24 +100,19 @@ class ContainerMap(object):
         for key, value in six.iteritems(items):
             if not value:
                 continue
-            if key == 'volumes':
-                self._volumes.update(value)
-            elif key == 'host':
-                self._host.update(value)
-            elif key == 'host_root':
+            if key == 'host_root':
                 if not lists_only:
                     self._host.root = value
-            elif key == 'repository':
+            elif key in SINGLE_ATTRIBUTES:
                 if not lists_only:
-                    self._repository = value
-            elif key == 'default_domain':
-                if not lists_only:
-                    self._default_domain = value
-            elif key == 'set_hostname':
-                if not lists_only:
-                    self._default_domain = value
-            elif key == 'clients':
-                self._clients.extend(set(value) - set(self._clients))
+                    setattr(self, key, value)
+            elif key in LIST_ATTRIBUTES:
+                current_list = getattr(self, key)
+                updated_list = get_list(value)
+                current_list.extend(u for u in updated_list if u not in current_list)
+            elif key in DICT_ATTRIBUTES:
+                current_dict = getattr(self, key)
+                current_dict.update(value)
             elif key == 'containers':
                 for container, config in six.iteritems(value):
                     if container in self._containers:
@@ -120,12 +129,7 @@ class ContainerMap(object):
         """
         :type items: ContainerMap
         """
-        self._volumes.update(items._volumes)
-        self._host.update(items._host)
-        self._repository = items._repository
-        self._clients = items._clients
-        self._default_domain = items._default_domain
-        self._set_hostname = items._set_hostname
+        self.__class__._copy_base(items, self)
         for container, config in items:
             self._containers[container].update(config)
 
@@ -134,18 +138,21 @@ class ContainerMap(object):
         :type items: ContainerMap
         :type lists_only: bool
         """
-        self._volumes.update(items._volumes)
-        self._host.update(items._host)
-        self._clients.extend(set(items._clients) - set(self._clients))
+        for attr in LIST_ATTRIBUTES:
+            update_list = getattr(items, attr)
+            current_list = getattr(self, attr)
+            current_list.extend(c for c in update_list if c not in current_list)
+        for attr in DICT_ATTRIBUTES:
+            current_dict = getattr(self, attr)
+            current_dict.update(getattr(items, attr))
         if not lists_only:
-            self._repository = items._repository
-            self._default_domain = items._default_domain
-            self._set_hostname = items._set_hostname
+            for attr in SINGLE_ATTRIBUTES:
+                setattr(self, attr, getattr(items, attr))
         for container, config in items:
             if container in self._containers:
                 self._containers[container].merge(config, lists_only)
             else:
-                self._containers[container] = config
+                self._containers[container].update(config)
 
     @property
     def name(self):
@@ -244,6 +251,20 @@ class ContainerMap(object):
         self._set_hostname = value
 
     @property
+    def use_attached_parent_name(self):
+        """
+        Whether to include the parent name of an attached volume in the attached container name for disambiguation.
+
+        :return: When set to ``True``, prefixes each attached volume with the parent name.
+        :rtype: bool
+        """
+        return self._use_attached_parent_name
+
+    @use_attached_parent_name.setter
+    def use_attached_parent_name(self, value):
+        self._use_attached_parent_name = value
+
+    @property
     def dependency_items(self):
         """
         Generates all containers' dependencies, i.e. an iterator on tuples in the format
@@ -252,12 +273,21 @@ class ContainerMap(object):
         :return: Container dependencies.
         :rtype: iterator
         """
-        def _get_used_item(u):
+        def _get_used_item_np(u):
             v = u.volume
             c, __, i = v.partition('.')
-            if i:
-                return self._name, c, i
-            return self._name, attached.get(c, c), None
+            a = attached.get(c)
+            if a:
+                return self._name, a, None
+            return self._name, c, i or None
+
+        def _get_used_item_ap(u):
+            v = u.volume
+            c, __, i = v.partition('.')
+            a = ext_map.get_existing(c)
+            if i in a.attaches:
+                return self._name, c, None
+            return self._name, c, i or None
 
         def _get_linked_item(l):
             c, __, i = l.container.partition('.')
@@ -265,9 +295,21 @@ class ContainerMap(object):
                 return self._name, c, i
             return self._name, c, None
 
-        attached = {attaches: c_name for c_name, c_config in self for attaches in c_config.attaches}
-        for c_name, c_config in self:
-            used_set = set(map(_get_used_item, c_config.uses))
+        if self._extended:
+            ext_map = self
+        else:
+            ext_map = self.get_extended_map()
+
+        if not self._use_attached_parent_name:
+            attached = {attaches: c_name
+                        for c_name, c_config in ext_map
+                        for attaches in c_config.attaches}
+            used_func = _get_used_item_np
+        else:
+            used_func = _get_used_item_ap
+
+        for c_name, c_config in ext_map:
+            used_set = set(map(used_func, c_config.uses))
             linked_set = set(map(_get_linked_item, c_config.links))
             dep_set = used_set | linked_set
             for c_instance in c_config.instances:
@@ -297,6 +339,41 @@ class ContainerMap(object):
         :rtype: ContainerConfiguration
         """
         return self._containers.get(item)
+
+    def get_extended(self, config):
+        """
+        Generates a configuration that includes all inherited values.
+
+        :param config: Container configuration.
+        :type config: ContainerConfiguration
+        :return: A merged (shallow) copy of all inherited configurations merged with the container configuration.
+        :rtype: ContainerConfiguration
+        """
+        if not config.extends or self._extended:
+            return config
+        extended_config = ContainerConfiguration()
+        for ext_name in config.extends:
+            ext_cfg_base = self._containers.get(ext_name)
+            if not ext_cfg_base:
+                raise KeyError(ext_name)
+            ext_cfg = self.get_extended(ext_cfg_base)
+            extended_config.merge(ext_cfg)
+        extended_config.merge(config)
+        return extended_config
+
+    def get_extended_map(self):
+        """
+        Creates a copy of this map which includes all non-abstract configurations in their extended form.
+
+        :return: Copy of this map.
+        :rtype: ContainerMap
+        """
+        map_copy = self.__class__(self.name)
+        self.__class__._copy_base(self, map_copy)
+        for c_name, c_config in self:
+            map_copy.containers[c_name] = self.get_extended(c_config)
+        map_copy._extended = True
+        return map_copy
 
     def update(self, other=None, **kwargs):
         """
@@ -341,7 +418,8 @@ class ContainerMap(object):
         * every container declared as `used` needs to have at least a shared volume or a host bind;
         * every host bind declared under `binds` needs to be shared from the host;
         * every volume alias used in `attached` and `binds` needs to be associated with a path in `volumes`;
-        * every container referred to in `links` needs to be defined.
+        * every container referred to in `links` needs to be defined;
+        * every container named in `extended` is available.
 
         :param check_duplicates: Check for duplicate attached volumes.
         :type check_duplicates: bool
@@ -349,20 +427,29 @@ class ContainerMap(object):
         def _get_instance_names(c_name, instances):
             if instances:
                 return ['{0}.{1}'.format(c_name, instance) for instance in instances]
+            return [c_name]
+
+        def _get_container_items(c_name, c_config):
+            instance_names = _get_instance_names(c_name, c_config.instances)
+            shared = instance_names[:] if c_config.shares or c_config.binds or c_config.uses else []
+            bind = [b.volume for b in c_config.binds if not isinstance(b.volume, tuple)]
+            link = [l.container for l in c_config.links]
+            uses = [u.volume for u in c_config.uses]
+            if self._use_attached_parent_name:
+                attaches = [(c_name, a) for a in c_config.attaches]
             else:
-                return [c_name]
+                attaches = c_config.attaches
+            return instance_names, uses, attaches, shared, bind, link
 
-        def _get_container_items(c_name, container):
-            instance_names = _get_instance_names(c_name, container.instances)
-            shared = instance_names[:] if container.shares or container.binds or container.uses else []
-            bind = [b.volume for b in container.binds if not isinstance(b.volume, tuple)]
-            link = [l.container for l in container.links]
-            uses = [u.volume for u in container.uses]
-            return instance_names, uses, container.attaches, shared, bind, link
-
-        all_instances, all_used, all_attached, all_shared, all_binds, all_links = zip(*[_get_container_items(k, v)
-                                                                                        for k, v in self])
-        volume_shared = tuple(itertools.chain.from_iterable(all_shared + all_attached))
+        all_instances, all_used, all_attached, all_shared, all_binds, all_links = zip(*[
+            _get_container_items(k, v) for k, v in self.get_extended_map()
+        ])
+        if self._use_attached_parent_name:
+            all_attached_names = tuple('{0}.{1}'.format(c_name, a)
+                                       for c_name, a in itertools.chain.from_iterable(all_attached))
+        else:
+            all_attached_names = tuple(itertools.chain.from_iterable(all_attached))
+        volume_shared = tuple(itertools.chain.from_iterable(all_shared)) + all_attached_names
         if check_duplicates:
             duplicated = [name for name, count in six.iteritems(Counter(volume_shared)) if count > 1]
             if duplicated:
@@ -380,7 +467,10 @@ class ContainerMap(object):
         if missing_binds:
             missing_mapped_str = ', '.join(missing_binds)
             raise MapIntegrityError("No host share found for mapped volume(s): {0}.".format(missing_mapped_str))
-        volume_set = binds_set.union(itertools.chain.from_iterable(all_attached))
+        if self._use_attached_parent_name:
+            volume_set = binds_set.union(a[1] for a in itertools.chain.from_iterable(all_attached))
+        else:
+            volume_set = binds_set.union(all_attached_names)
         named_set = set(self._volumes.keys())
         missing_names = volume_set - named_set
         if missing_names:

@@ -16,6 +16,23 @@ PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface
 CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
 
 
+class _NotSet(object):
+    def __nonzero__(self):
+        return False
+
+    def __repr__(self):
+        return "<Value not set>"
+
+    def __unicode__(self):
+        return "Not set"
+
+    def __str__(self):
+        return self.__unicode__()
+
+
+NotSet = _NotSet()
+
+
 def _get_listed_tuples(value, element_type, conversion_func):
     if value is None:
         return []
