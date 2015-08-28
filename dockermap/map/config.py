@@ -304,7 +304,7 @@ class ContainerConfiguration(object):
 
     @clients.setter
     def clients(self, value):
-        self._clients = list(value)
+        self._clients = get_list(value)
 
     @property
     def create_options(self):
