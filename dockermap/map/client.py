@@ -296,9 +296,9 @@ class MappingDockerClient(object):
                             yield cname_func(c_map.name, container)
 
         if map_name:
-            maps = [m.get_extended_map() for m in self._maps.values()]
-        else:
             maps = [self._maps[map_name].get_extended_map()]
+        else:
+            maps = [m.get_extended_map() for m in self._maps.values()]
         cname_func = self._policy_class.cname
         aname_func = self._policy_class.aname
         return list(_container_names())
