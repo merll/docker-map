@@ -67,6 +67,9 @@ Additionally there are the following attributes:
 * :attr:`~dockermap.map.container.ContainerMap.set_hostname`: For specifying a new container's host name dependent on
   the container name (in the format ``<client name>-<container name>``), this is by default set to ``True``. If set
   to ``False``, Docker automatically generates a new host name for each container.
+* :attr:`~dockermap.map.container.ContainerMap.use_attached_parent_name`: If you would like to re-use the same volume
+  aliases for :ref:`attached-volumes` or apply `inheritance`_, this changes the naming scheme of attached volume
+  containers to include the name of their parent container.
 
 Volumes
 ^^^^^^^
@@ -330,6 +333,58 @@ Examples::
     ]
 
 
+Inheritance
+"""""""""""
+Container configurations can inherit settings from others, by setting their names in
+:attr:`~dockermap.map.config.ContainerConfiguration.extends`.
+
+Example::
+
+    generic_config = container_map.containers.generic
+    generic_config.uses = 'volume1'
+    generic_config.abstract = True               # Optional - config is not used directly.
+    ext_config1 = container_map.containers.app1
+    ext_config1.extends = 'generic'
+    ext_config1.uses = 'volume2'                 # Actually uses ``volume1`` and ``volume2``.
+    ext_config2 = container_map.containers.app2
+    ext_config2.extends = 'generic'
+    ext_config2.uses = 'volume3'                 # Actually uses ``volume1`` and ``volume3``.
+
+The behavior of value inheritance from other configurations is as follows:
+
+* Values are overridden or merged in the order that they occur in
+  :attr:`~dockermap.map.config.ContainerConfiguration.extends`. Extensions are followed recursively in this process.
+* Simple values, e.g. :attr:`~dockermap.map.config.ContainerConfiguration.image`, are inherited from the other
+  configurations and overridden in the extension.
+* Single-value lists, e.g. those of :attr:`~dockermap.map.config.ContainerConfiguration.clients` or
+  :attr:`~dockermap.map.config.ContainerConfiguration.uses`, are merged so that they contain the union of all values.
+* Multi-value lists and dictionaries are merged together by their first value or their key, where applicable. For
+  example, using the same local path in :attr:`~dockermap.map.config.ContainerConfiguration.binds` will use the last
+  host path and read-only flag set in the order of inheritance. Similarly,
+  :attr:`~dockermap.map.config.ContainerConfiguration.create_options` are merged so that they contain the union of
+  all values, overriding identical keys in the extended configurations.
+
+    .. note::
+    Usually :attr:`~dockermap.map.config.ContainerConfiguration.attached` containers need to have unique names across
+    multiple configurations on the same map. By default their naming on these containers follows the scheme
+    ``<map name>.<attached volume alias>``, which could become ambiguous when extending a configuration with attached
+    volumes. When setting :attr:`~dockermap.map.container.ContainerMap.use_attached_parent_name` to ``True``, the
+    naming scheme becomes ``<map name>.<parent container name>.<attached volume alias>``, leading to unique container
+    names again. In :attr:`~dockermap.map.config.ContainerConfiguration.uses`, you then need to refer to containers
+    by ``<parent container name>.<attached volume alias>``.
+
+    Example::
+
+        container_map.use_attached_parent_name = True
+        generic_config = container_map.containers.generic
+        generic_config.attaches = 'volume1'
+        ext_config = container_map.containers.app1
+        ext_config.extends = 'generic'
+        ext_config.uses = 'volume2'
+        ref_config = container_map.containers.test
+        ref_config.uses = ['app1.volume1', 'volume2']  # Now needs to specify the container for attached volume.
+
+
 .. _additional-options:
 
 Additional options
@@ -394,9 +449,10 @@ dictionary at run-time.
 Input formats
 """""""""""""
 On the attributes :attr:`~dockermap.map.config.ContainerConfiguration.instances`,
-:attr:`~dockermap.map.config.ContainerConfiguration.shares`, :attr:`~dockermap.map.config.ContainerConfiguration.binds`,
+:attr:`~dockermap.map.config.ContainerConfiguration.shares`,
 :attr:`~dockermap.map.config.ContainerConfiguration.uses`, :attr:`~dockermap.map.config.ContainerConfiguration.links`,
-and :attr:`~dockermap.map.config.ContainerConfiguration.attaches`, any assignment (property set) will be converted to
+:attr:`~dockermap.map.config.ContainerConfiguration.attaches`, and
+:attr:`~dockermap.map.config.ContainerConfiguration.clients`, any assignment (property set) will be converted to
 a list::
 
     container_map.containers.app1.uses = 'volume1'
@@ -409,7 +465,7 @@ and::
 
     container_map.containers.app1.uses = ('volume1',)
 
-As mentioned, additional conversions are made for :attr:`~dockermap.map.config.ContainerConfiguration.binds`,
+Additional conversions are made for :attr:`~dockermap.map.config.ContainerConfiguration.binds`,
 :attr:`~dockermap.map.config.ContainerConfiguration.uses`,
 :attr:`~dockermap.map.config.ContainerConfiguration.links`, and
 :attr:`~dockermap.map.config.ContainerConfiguration.exposes`; each element in an input list or tuple is converted to

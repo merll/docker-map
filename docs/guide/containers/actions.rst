@@ -23,7 +23,7 @@ The default, :class:`~dockermap.map.policy.resume.ResumeUpdatePolicy` supports t
   remove attached volumes.
 * :meth:`~dockermap.map.client.MappingDockerClient.startup`, along the dependency path,
 
-  * removes containers with unrecoverable errors (currently code ``-127``, but may be extended as needed);
+  * removes containers with unrecoverable errors (currently codes ``-127`` and ``-1``, but may be extended as needed);
   * creates missing containers; if an attached volume is missing, the parent container is restarted;
   * and starts non-running containers (like `start`).
 * :meth:`~dockermap.map.client.MappingDockerClient.shutdown` simply combines
