@@ -3,11 +3,13 @@
 Change History
 ==============
 
-0.4.2
+0.5.0
 -----
 * Implemented HostConfig during container creation, which is preferred over passing arguments during start since API
   v1.15. For older API versions, start keyword arguments will be used.
+* Added configuration inheritance and abstract configurations.
 * Changed log functions to be better fit Python logging.
+* Minor fixes in merge functions.
 * Bug fix in tag / repository partitioning (`PR #7 <https://github.com/merll/docker-map/pull/7>`_).
 
 0.4.1
