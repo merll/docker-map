@@ -364,7 +364,7 @@ The behavior of value inheritance from other configurations is as follows:
   :attr:`~dockermap.map.config.ContainerConfiguration.create_options` are merged so that they contain the union of
   all values, overriding identical keys in the extended configurations.
 
-    .. note::
+.. note::
     Usually :attr:`~dockermap.map.config.ContainerConfiguration.attached` containers need to have unique names across
     multiple configurations on the same map. By default their naming on these containers follows the scheme
     ``<map name>.<attached volume alias>``, which could become ambiguous when extending a configuration with attached
