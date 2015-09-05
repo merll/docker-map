@@ -3,6 +3,10 @@
 Change History
 ==============
 
+0.5.1
+-----
+* Adjusted volume path inspection to use ``Mounts`` on newer Docker API versions. Fixes issues with the update policy.
+
 0.5.0
 -----
 * Implemented HostConfig during container creation, which is preferred over passing arguments during start since API
