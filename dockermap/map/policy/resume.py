@@ -87,7 +87,7 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
 
 
 class ResumeStartupMixin(object):
-    remove_status = (-127, )
+    remove_status = (-127, -1)
 
     def startup_actions(self, map_name, container, instances=None, **kwargs):
         """

@@ -300,7 +300,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
 
 
 class ContainerUpdateMixin(object):
-    remove_status = (-127, -1, )
+    remove_status = (-127, -1)
     pull_latest = False
     pull_insecure_registry = False
     update_persistent = False
