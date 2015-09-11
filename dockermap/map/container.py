@@ -312,6 +312,9 @@ class ContainerMap(object):
             used_set = set(map(used_func, c_config.uses))
             linked_set = set(map(_get_linked_item, c_config.links))
             dep_set = used_set | linked_set
+            nw = c_config.network
+            if isinstance(nw, tuple):
+                dep_set.add((self._name, ) + nw)
             for c_instance in c_config.instances:
                 yield (self._name, c_name, c_instance), dep_set
             yield (self._name, c_name, None), dep_set
@@ -435,13 +438,20 @@ class ContainerMap(object):
             bind = [b.volume for b in c_config.binds if not isinstance(b.volume, tuple)]
             link = [l.container for l in c_config.links]
             uses = [u.volume for u in c_config.uses]
+            if isinstance(c_config.network, tuple):
+                if c_config.network[1]:
+                    network = '{0}.{1}'.format(*c_config.network)
+                else:
+                    network = c_config.network[0]
+            else:
+                network = None
             if self._use_attached_parent_name:
                 attaches = [(c_name, a) for a in c_config.attaches]
             else:
                 attaches = c_config.attaches
-            return instance_names, uses, attaches, shared, bind, link
+            return instance_names, uses, attaches, shared, bind, link, network
 
-        all_instances, all_used, all_attached, all_shared, all_binds, all_links = zip(*[
+        all_instances, all_used, all_attached, all_shared, all_binds, all_links, all_networks = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
         ])
         if self._use_attached_parent_name:
@@ -482,3 +492,8 @@ class ContainerMap(object):
         if missing_links:
             missing_links_str = ', '.join(missing_links)
             raise MapIntegrityError("No container instance found for link(s): {0}.".format(missing_links_str))
+        network_set = set(filter(None, all_networks))
+        missing_networks = network_set - instance_set
+        if missing_networks:
+            missing_networks_str = ', '.join(missing_networks)
+            raise MapIntegrityError("No container instance found for the following network reference(s): {0}".format(missing_networks_str))

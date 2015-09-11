@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
-from six import with_metaclass, iteritems
+from six import with_metaclass, iteritems, text_type
 from docker.utils.utils import create_host_config
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
@@ -219,6 +219,8 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             hostname=cls.get_hostname(client_name, container_name) if container_map.set_hostname else None,
             domainname=cls.get_domainname(container_map, container_config, client_config),
         )
+        if container_config.network == 'disabled':
+            c_kwargs['network_disabled'] = True
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         if include_host_config:
             hc_kwargs = cls.get_host_config_kwargs(container_map, config_name, container_config, client_name,
@@ -271,6 +273,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             volumes_from=volumes_from,
             port_bindings=get_port_bindings(container_config, client_config),
         )
+        network_mode = container_config.network
+        if isinstance(network_mode, tuple):
+            c_kwargs['network_mode'] = cls.cname(map_name, *network_mode)
+        elif isinstance(network_mode, text_type):
+            c_kwargs['network_mode'] = network_mode
         if container_name:
             c_kwargs['container'] = container_name
         update_kwargs(c_kwargs, init_options(container_config.host_config), kwargs)
@@ -317,6 +324,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             image=cls.base_image,
             volumes=[path],
             user=user,
+            network_disabled=True,
         )
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         if include_host_config:
@@ -407,6 +415,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             image=cls.core_image,
             command=' && '.join(_get_cmd()),
             user='root',
+            network_disabled=True,
         )
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         if include_host_config:

@@ -7,10 +7,10 @@ import six
 from ..functional import resolve_value
 from . import DictMap
 from .base import DockerClientWrapper
-from .input import (get_list, get_shared_volumes, get_shared_host_volumes, get_container_links,
+from .input import (get_list, get_shared_volumes, get_shared_host_volumes, get_container_links, get_network_mode,
                     get_port_bindings, NotSet)
 
-SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent', 'stop_timeout'
+SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent', 'stop_timeout', 'network'
 DICT_ATTRIBUTES = 'create_options', 'start_options', 'host_config'
 LIST_ATTRIBUTES = 'instances', 'shares', 'attaches', 'clients'
 
@@ -64,6 +64,7 @@ class ContainerConfiguration(object):
         self._create_kwargs = NotSet
         self._host_config_kwargs = NotSet
         self._stop_timeout = NotSet
+        self._network = NotSet
         self.update(kwargs)
 
     def __repr__(self):
@@ -356,6 +357,26 @@ class ContainerConfiguration(object):
     @stop_timeout.deleter
     def stop_timeout(self):
         self._stop_timeout = NotSet
+
+    @property
+    def network(self):
+        """
+        Networking to apply to this container. If not ``bridge`` or ``host`` (as described in the docker-py
+        docs), tries to locate a container configuration on this map. Prefixed with ``/`` assumes the full container
+        name. Setting it to ``disabled`` deactivates networking for the container.
+
+        :return: Container networking setting.
+        :rtype: unicode
+        """
+        return self._network
+
+    @network.setter
+    def network(self, value):
+        self._network = get_network_mode(value)
+
+    @network.deleter
+    def network(self):
+        self._network = NotSet
 
     def update(self, values):
         """

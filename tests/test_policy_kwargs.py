@@ -23,7 +23,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         c_name = 'main.web_server'
         kwargs = BasePolicy.get_create_kwargs(self.sample_map, cfg_name, cfg, '__default__', self.sample_client_config,
                                               c_name, None, include_host_config=False, kwargs=dict(ports=[22]))
-        self.assertEqual(kwargs, dict(
+        self.assertDictEqual(kwargs, dict(
             name=c_name,
             image='registry.example.com/nginx',
             volumes=['/etc/nginx'],
@@ -40,9 +40,12 @@ class TestPolicyClientKwargs(unittest.TestCase):
         kwargs = BasePolicy.get_host_config_kwargs(self.sample_map, cfg_name, cfg, '__default__',
                                                    self.sample_client_config, c_name, None,
                                                    kwargs=dict(binds={'/new_h': {'bind': '/new_c', 'ro': False}}))
-        self.assertEqual(kwargs, dict(
+        self.assertDictEqual(kwargs, dict(
             container=c_name,
-            links={},
+            links={
+                'main.app_server.instance1': 'app_server.instance1',
+                'main.app_server.instance2': 'app_server.instance2',
+            },
             binds={
                 '/var/lib/site/config/nginx': {'bind': '/etc/nginx', 'ro': True},
                 '/new_h': {'bind': '/new_c', 'ro': False},
@@ -59,7 +62,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         kwargs = BasePolicy.get_create_kwargs(self.sample_map, cfg_name, cfg, '__default__',
                                               self.sample_client_config, c_name, 'instance1',
                                               include_host_config=True, kwargs=dict(host_config=hc_kwargs))
-        self.assertEqual(kwargs, dict(
+        self.assertDictEqual(kwargs, dict(
             name=c_name,
             image='registry.example.com/app',
             volumes=[
@@ -69,7 +72,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             user='2000',
             hostname='main.app_server',
             domainname=None,
-            ports=[],
+            ports=[8880],
             host_config=create_host_config(
                 links={},
                 binds={
@@ -90,11 +93,12 @@ class TestPolicyClientKwargs(unittest.TestCase):
         kwargs = BasePolicy.get_attached_create_kwargs(self.sample_map, cfg_name, cfg, '__default__',
                                                        self.sample_client_config, c_name, alias,
                                                        include_host_config=True)
-        self.assertEqual(kwargs, dict(
+        self.assertDictEqual(kwargs, dict(
             name=c_name,
             image=BasePolicy.base_image,
             volumes=['/var/lib/app/socket'],
             user='2000',
+            network_disabled=True,
         ))
 
     def test_attached_host_config_kwargs(self):
@@ -104,7 +108,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         alias = 'app_server_socket'
         kwargs = BasePolicy.get_attached_host_config_kwargs(self.sample_map, cfg_name,  cfg, '__default__',
                                                             self.sample_client_config, c_name, alias)
-        self.assertEqual(kwargs, dict(container=c_name))
+        self.assertDictEqual(kwargs, dict(container=c_name))
 
     def test_attached_preparation_create_kwargs(self):
         cfg_name = 'app_server'
@@ -115,13 +119,14 @@ class TestPolicyClientKwargs(unittest.TestCase):
         kwargs = BasePolicy.get_attached_preparation_create_kwargs(self.sample_map, cfg_name, cfg, '__default__',
                                                                    self.sample_client_config, c_name, alias,
                                                                    v_name, include_host_config=True)
-        self.assertEqual(kwargs, dict(
+        self.assertDictEqual(kwargs, dict(
             image=BasePolicy.core_image,
             command='chown -R 2000:2000 /var/lib/app/socket && chmod -R u=rwX,g=rX,o= /var/lib/app/socket',
             user='root',
             host_config=create_host_config(
                 volumes_from=[v_name],
-            )
+            ),
+            network_disabled=True,
         ))
 
     def test_attached_preparation_host_config_kwargs(self):
@@ -133,9 +138,24 @@ class TestPolicyClientKwargs(unittest.TestCase):
         kwargs = BasePolicy.get_attached_preparation_host_config_kwargs(self.sample_map, cfg_name, cfg, '__default__',
                                                                         self.sample_client_config, c_name, alias,
                                                                         v_name)
-        self.assertEqual(kwargs, dict(
+        self.assertDictEqual(kwargs, dict(
             container='temp',
             volumes_from=[v_name],
+        ))
+
+    def test_network_setting(self):
+        cfg_name = 'app_extra'
+        cfg = self.sample_map.get_existing(cfg_name)
+        c_name = 'main.app_extra'
+        kwargs = BasePolicy.get_host_config_kwargs(self.sample_map, cfg_name, cfg, '__default__',
+                                                   self.sample_client_config, c_name, None)
+        self.assertDictEqual(kwargs, dict(
+            binds={},
+            container=c_name,
+            links={},
+            network_mode='main.app_server.instance1',
+            port_bindings={},
+            volumes_from=[],
         ))
 
     def test_restart_kwargs(self):
@@ -144,7 +164,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         c_name = 'main.web_server'
         kwargs = BasePolicy.get_restart_kwargs(self.sample_map, cfg_name, cfg, '__default__', self.sample_client_config,
                                                c_name, None)
-        self.assertEqual(kwargs, dict(
+        self.assertDictEqual(kwargs, dict(
             container=c_name,
         ))
 
@@ -154,7 +174,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         c_name = 'main.web_server'
         kwargs = BasePolicy.get_stop_kwargs(self.sample_map, cfg_name, cfg, '__default__', self.sample_client_config,
                                             c_name, None)
-        self.assertEqual(kwargs, dict(
+        self.assertDictEqual(kwargs, dict(
             container=c_name,
             timeout=5,
         ))
@@ -165,6 +185,6 @@ class TestPolicyClientKwargs(unittest.TestCase):
         c_name = 'main.web_server'
         kwargs = BasePolicy.get_remove_kwargs(self.sample_map, cfg_name, cfg, '__default__', self.sample_client_config,
                                               c_name, None)
-        self.assertEqual(kwargs, dict(
+        self.assertDictEqual(kwargs, dict(
             container=c_name,
         ))

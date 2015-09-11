@@ -11,6 +11,7 @@ MAP_DATA_1 = {
         'binds': {'/etc/nginx': ('config/nginx', 'ro')},
         'uses': 'app_server_socket',
         'attaches': 'web_log',
+        'links': ['app_server.instance1', 'app_server.instance2'],
         'exposes': {
             80: 80,
             443: 443,
@@ -20,6 +21,7 @@ MAP_DATA_1 = {
     'app_server': {
         'image': 'app',
         'instances': ('instance1', 'instance2'),
+        'exposes': [8880],
         'binds': (
             {'app_config': 'ro'},
             'app_data',
@@ -27,6 +29,9 @@ MAP_DATA_1 = {
         'attaches': ('app_log', 'app_server_socket'),
         'user': 2000,
         'permissions': 'u=rwX,g=rX,o=',
+    },
+    'app_extra': {
+        'network': 'app_server.instance1',
     },
     'volumes': { # Configure volume paths inside containers
         'web_log': '/var/log/nginx',

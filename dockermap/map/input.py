@@ -278,6 +278,32 @@ def get_container_links(value):
     return _get_listed_tuples(value, ContainerLink, get_container_link)
 
 
+def get_network_mode(value):
+    """
+    Generates input for the ``network_mode`` of a Docker host configuration. If it points at a container, the
+    configuration of the container is returned.
+
+    :param value: Network mode input.
+    :type value: unicode | tuple | list | NoneType
+    :return: Network mode or container to re-use the network stack of.
+    :rtype: unicode | tuple | NoneType
+    """
+    if not value or value == 'disabled':
+        return None
+    if isinstance(value, (tuple, list)):
+        if len(value) == 2:
+            return tuple(value)
+        return ValueError("Tuples or lists need to have length 2 for container network references.")
+    if value in ('bridge', 'host'):
+        return value
+    if value.startswith('container:'):
+        return value
+    if value.startswith('/'):
+        return 'container:{0}'.format(value[1:])
+    ref_name, __, ref_instance = value.partition('.')
+    return ref_name, ref_instance or None
+
+
 def get_port_bindings(value):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of PortBinding tuples.
