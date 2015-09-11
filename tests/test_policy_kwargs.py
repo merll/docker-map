@@ -156,7 +156,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                                             c_name, None)
         self.assertEqual(kwargs, dict(
             container=c_name,
-            timeout=10,
+            timeout=5,
         ))
 
     def test_remove_kwargs(self):

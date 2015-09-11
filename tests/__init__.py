@@ -14,7 +14,8 @@ MAP_DATA_1 = {
         'exposes': {
             80: 80,
             443: 443,
-        }
+        },
+        'stop_timeout': 5,
     },
     'app_server': {
         'image': 'app',

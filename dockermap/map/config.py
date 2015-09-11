@@ -10,7 +10,7 @@ from .base import DockerClientWrapper
 from .input import (get_list, get_shared_volumes, get_shared_host_volumes, get_container_links,
                     get_port_bindings, NotSet)
 
-SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent'
+SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent', 'stop_timeout'
 DICT_ATTRIBUTES = 'create_options', 'start_options', 'host_config'
 LIST_ATTRIBUTES = 'instances', 'shares', 'attaches', 'clients'
 
@@ -63,6 +63,7 @@ class ContainerConfiguration(object):
         self._clients = NotSet
         self._create_kwargs = NotSet
         self._host_config_kwargs = NotSet
+        self._stop_timeout = NotSet
         self.update(kwargs)
 
     def __repr__(self):
@@ -336,6 +337,25 @@ class ContainerConfiguration(object):
         self._host_config_kwargs = value
 
     start_options = host_config
+
+    @property
+    def stop_timeout(self):
+        """
+        Individual timeout for stopping a container, i.e. the time between sending a ``SIGINT`` and a ``SIGKILL`` to
+        the container.
+
+        :return: Container stop timeout.
+        :rtype: int
+        """
+        return self._stop_timeout
+
+    @stop_timeout.setter
+    def stop_timeout(self, value):
+        self._stop_timeout = value
+
+    @stop_timeout.deleter
+    def stop_timeout(self):
+        self._stop_timeout = NotSet
 
     def update(self, values):
         """

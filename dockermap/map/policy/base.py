@@ -8,6 +8,7 @@ from docker.utils.utils import create_host_config
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from ...functional import resolve_value
 from ...shortcuts import get_user_group, str_arg
+from ..input import NotSet
 from . import ACTION_DEPENDENCY_FLAG
 from .dep import ContainerDependencyResolver
 from .cache import ContainerCache, ImageCache
@@ -515,8 +516,13 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         """
         c_kwargs = dict(
             container=container_name,
-            timeout=client_config.get('stop_timeout', 10)
         )
+        if container_config.stop_timeout is NotSet:
+            timeout = client_config.get('stop_timeout')
+            if timeout is not None:
+                c_kwargs['timeout'] = timeout
+        else:
+            c_kwargs['timeout'] = container_config.stop_timeout
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
