@@ -166,6 +166,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                                                c_name, None)
         self.assertDictEqual(kwargs, dict(
             container=c_name,
+            timeout=5,
         ))
 
     def test_stop_kwargs(self):

@@ -495,6 +495,12 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :rtype: dict
         """
         c_kwargs = dict(container=container_name)
+        if container_config.stop_timeout is NotSet:
+            timeout = client_config.get('stop_timeout')
+            if timeout is not None:
+                c_kwargs['timeout'] = timeout
+        else:
+            c_kwargs['timeout'] = container_config.stop_timeout
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
