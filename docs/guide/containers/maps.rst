@@ -164,6 +164,19 @@ for processes that you only want running exactly once per cluster of servers (e.
 It is also possible to run a particular configuration on a larger or completely different set of clients than the map
 default specifies.
 
+Stop timeout
+""""""""""""
+When stopping or restarting a container, Docker sends a ``SIGINT`` signal to its main process. After a timeout period,
+if the process is still not shut down, it receives a ``SIGKILL``. Some containers, e.g. database servers, may take
+longer than Docker's default timeout of 10 seconds. For this purpose
+:attr:`~dockermap.map.config.ContainerConfiguration.stop_timeout` can be set to a higher value.
+
+.. tip::
+
+    This setting is also available on client level. The container configuration takes precedence over the client
+    setting.
+
+
 Shared volumes
 """"""""""""""
 Volume paths can be set in :attr:`~dockermap.map.config.ContainerConfiguration.shares`, just like the
@@ -332,6 +345,22 @@ Examples::
         8111,                      # Port 8111 will be exposed only to containers that link this one.
     ]
 
+
+Networking
+""""""""""
+Docker offers further options for controlling how containers communicate with each other. By default, it creates a new
+network stack of each, but it is also possible to re-use the stack of an existing container or disable networking
+entirely. The following syntax is supported:
+
+* ``bridge`` or ``host`` have the same effect as when used inside ``host_config``. The former is the default, and
+  creates a network interface connected to ``docker0``, whereas the latter uses the Docker host's network stack.
+* Similarly, ``container:`` followed by a container name or id reuses the network of an existing container. In this
+  syntax, the container is assumed not to be managed by Docker-Map and therefore dependencies are not checked. The
+  same applies for ``/`` followed by a container name or id.
+* Setting it to the name of another container configuration (without the map name) will re-use that container's network.
+  This declares a dependency, i.e. the container referred to will be created and started before the container that is
+  re-using its network. Note that if there are multiple instances, you need to specify which instance the container
+  is supposed to connect to in the pattern ``<container name>.<instance name>``.
 
 Inheritance
 """""""""""

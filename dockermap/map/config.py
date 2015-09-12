@@ -342,8 +342,8 @@ class ContainerConfiguration(object):
     @property
     def stop_timeout(self):
         """
-        Individual timeout for stopping a container, i.e. the time between sending a ``SIGINT`` and a ``SIGKILL`` to
-        the container.
+        Individual timeout (in seconds) for stopping a container, i.e. the time between sending a ``SIGINT`` and a
+        ``SIGKILL`` to the container.
 
         :return: Container stop timeout.
         :rtype: int
