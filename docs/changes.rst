@@ -3,6 +3,11 @@
 Change History
 ==============
 
+0.5.2
+-----
+* Added network modes and their dependencies. Attached volumes are no longer enabled for networking.
+* Added per-container stop timeout. Also applies to restart.
+
 0.5.1
 -----
 * Adjusted volume path inspection to use ``Mounts`` on newer Docker API versions. Fixes issues with the update policy.
