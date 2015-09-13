@@ -153,7 +153,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             binds={},
             container=c_name,
             links={},
-            network_mode='main.app_server.instance1',
+            network_mode='container:main.app_server.instance1',
             port_bindings={},
             volumes_from=[],
         ))

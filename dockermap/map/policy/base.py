@@ -275,7 +275,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         )
         network_mode = container_config.network
         if isinstance(network_mode, tuple):
-            c_kwargs['network_mode'] = cls.cname(map_name, *network_mode)
+            c_kwargs['network_mode'] = 'container:{0}'.format(cls.cname(map_name, *network_mode))
         elif isinstance(network_mode, text_type):
             c_kwargs['network_mode'] = network_mode
         if container_name:
