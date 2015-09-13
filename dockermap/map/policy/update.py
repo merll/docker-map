@@ -9,15 +9,7 @@ from ...functional import resolve_value
 from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
 from . import utils
 
-
 log = logging.getLogger(__name__)
-
-
-def _get_container_volumes(instance_detail):
-    if 'Mounts' in instance_detail:
-        return {m['Destination']: m['Source']
-                for m in instance_detail['Mounts']}
-    return instance_detail.get('Volumes') or {}
 
 
 def _check_environment(c_config, instance_detail):
@@ -185,7 +177,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     raise ValueError("Volume alias or container reference could not be resolved: {0}".format(used))
             return True
 
-        instance_volumes = _get_container_volumes(instance_detail)
+        instance_volumes = utils.get_instance_volumes(instance_detail)
         return _check_config_paths(c_config, instance_name)
 
     def iname_tag(self, image, container_map=None):
@@ -239,7 +231,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     self.prepare_container(c_map, container_name, c_config, client_name, client_config, client, a,
                                            a_name)
                 else:
-                    volumes = _get_container_volumes(a_detail)
+                    volumes = utils.get_instance_volumes(a_detail)
                     if volumes:
                         mapped_path = a_paths[a]
                         self.path_vfs[a, None, mapped_path] = volumes.get(mapped_path)
