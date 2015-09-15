@@ -5,6 +5,7 @@ from docker.utils import compare_version
 import six
 
 from ...functional import resolve_value
+from ...shortcuts import get_user_group, str_arg
 from ..config import get_host_path
 from ..input import is_path
 
@@ -244,3 +245,27 @@ def get_instance_volumes(instance_detail):
         return {m['Destination']: m['Source']
                 for m in instance_detail['Mounts']}
     return instance_detail.get('Volumes') or {}
+
+
+def get_preparation_cmd(container_config, path):
+    """
+    Generates the command lines for adjusting a volume's ownership and permission flags. Returns an empty list if there
+    is nothing to adjust.
+
+    :param container_config: Container configuration.
+    :type container_config: dockermap.map.config.ContainerConfiguration
+    :param path: Path to adjust permissions on.
+    :type path: unicode
+    :return: Resulting command strings.
+    :rtype: list[unicode]
+    """
+    def _get_cmd():
+        if user:
+            yield 'chown -R {0} {1}'.format(get_user_group(user), path_str)
+        if permissions:
+            yield 'chmod -R {0} {1}'.format(permissions, path_str)
+
+    user = resolve_value(container_config.user)
+    permissions = container_config.permissions
+    path_str = str_arg(path)
+    return list(_get_cmd())

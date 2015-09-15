@@ -7,13 +7,12 @@ from docker.utils.utils import create_host_config
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from ...functional import resolve_value
-from ...shortcuts import get_user_group, str_arg
 from ..input import NotSet
 from . import ACTION_DEPENDENCY_FLAG
 from .dep import ContainerDependencyResolver
 from .cache import ContainerCache, ImageCache
 from .utils import (extract_user, get_host_binds, get_port_bindings, get_volumes, init_options, update_kwargs,
-                    use_host_config)
+                    use_host_config, get_instance_volumes, get_preparation_cmd)
 
 
 class BasePolicy(with_metaclass(ABCMeta, object)):
@@ -402,18 +401,13 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        def _get_cmd():
-            user = resolve_value(container_config.user)
-            if user:
-                yield 'chown -R {0} {1}'.format(get_user_group(user), str_arg(path))
-            permissions = container_config.permissions
-            if permissions:
-                yield 'chmod -R {0} {1}'.format(permissions, str_arg(path))
-
         path = resolve_value(container_map.volumes[alias])
+        cmd = get_preparation_cmd(container_config, path)
+        if not cmd:
+            return None
         c_kwargs = dict(
             image=cls.core_image,
-            command=' && '.join(_get_cmd()),
+            command=' && '.join(cmd),
             user='root',
             network_disabled=True,
         )
@@ -908,8 +902,10 @@ class AttachedPreparationMixin(object):
     """
     Utility mixin for preparing attached containers with file system owners and permissions.
     """
-    def prepare_container(self, container_map, config_name, container_config, client_name, client_config, client, alias,
-                          volume_container):
+    prepare_local = True
+
+    def _prepare_container(self, container_map, config_name, container_config, client_name, client_config, client, alias,
+                           volume_container):
         """
         Runs a temporary container for preparing an attached volume for a container configuration.
 
@@ -930,14 +926,16 @@ class AttachedPreparationMixin(object):
         :param volume_container: The full name or id of the container sharing the volume.
         :type volume_container: unicode
         """
-        images = self._policy.images[client_name]
-        client.wait(volume_container, timeout=client_config.get('wait_timeout'))
         include_host_config = use_host_config(client)
         apc_kwargs = self._policy.get_attached_preparation_create_kwargs(container_map, config_name, container_config,
                                                                          client_name, client_config, None, alias,
                                                                          volume_container,
                                                                          include_host_config=include_host_config)
+        if not apc_kwargs:
+            return
+        images = self._policy.images[client_name]
         images.ensure_image(apc_kwargs['image'])
+        client.wait(volume_container, timeout=client_config.get('wait_timeout'))
         temp_container = client.create_container(**apc_kwargs)
         temp_id = temp_container['Id']
         try:
@@ -952,6 +950,41 @@ class AttachedPreparationMixin(object):
             client.wait(temp_id, timeout=client_config.get('wait_timeout'))
         finally:
             client.remove_container(temp_id)
+
+    def prepare_container(self, container_map, config_name, container_config, client_name, client_config, client, alias,
+                          volume_container):
+        """
+        Prepares an attached volume for a container configuration.
+
+        :param container_map: Container map instance.
+        :type container_map: dockermap.map.container.ContainerMap
+        :param config_name: Container configuration name.
+        :type config_name: unicode
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.config.ContainerConfiguration
+        :param client_name: Client configuration name.
+        :type client_name: unicode
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param client: Client object.
+        :type client: docker.client.Client
+        :param alias: The alias name of the attached volume in the configuration.
+        :type alias: unicode
+        :param volume_container: The full name or id of the container sharing the volume.
+        :type volume_container: unicode
+        """
+        if not (self.prepare_local and hasattr(client, 'run_cmd')):
+            return self._prepare_container(container_map, config_name, container_config, client_name, client_config,
+                                           client, alias, volume_container)
+        instance_detail = client.inspect_container(volume_container)
+        volumes = get_instance_volumes(instance_detail)
+        path = resolve_value(container_map.volumes[alias])
+        local_path = volumes.get(path)
+        if not local_path:
+            raise ValueError("Could not locate local path of volume alias '{0}' / "
+                             "path '{1}' in container {2}.".format(alias, path, volume_container))
+        for cmd in get_preparation_cmd(container_config, local_path):
+            client.run_cmd(cmd)
 
 
 class ForwardActionGeneratorMixin(object):
