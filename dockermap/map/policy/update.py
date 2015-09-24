@@ -89,6 +89,105 @@ def _check_network(container_config, client_config, instance_detail):
     return True
 
 
+class SingleContainerVfsCheck(object):
+    """
+    :type vfs_paths: dict[tuple, unicode]
+    :type container_map: dockermap.map.container.ContainerMap
+    :type config_name: unicode
+    :type instance_name: unicode
+    :type instance_volumes: dict[unicode, unicode]
+    """
+    def __init__(self, vfs_paths, container_map, config_name, instance_name, instance_volumes):
+        self._vfs_paths = vfs_paths
+        self._instance_volumes = instance_volumes
+        self._container_map = container_map
+        self._config_name = config_name
+        self._instance_name = instance_name
+        self._use_parent_name = container_map.use_attached_parent_name
+        self._volumes = container_map.volumes
+
+    def check_bind(self, config, instance):
+        for shared_volume in config.binds:
+            bind_path, host_path = utils.get_shared_volume_path(self._container_map, shared_volume.volume, instance)
+            instance_vfs = self._instance_volumes.get(bind_path)
+            log.debug("Checking host bind. Config / container instance:\n%s\n%s", host_path, instance_vfs)
+            if not (instance_vfs and host_path == instance_vfs):
+                return False
+            self._vfs_paths[self._config_name, self._instance_name, bind_path] = instance_vfs
+        return True
+
+    def check_attached(self, config, parent_name):
+        for attached in config.attaches:
+            a_name = '{0}.{1}'.format(parent_name, attached) if self._use_parent_name else attached
+            attached_path = resolve_value(self._volumes[attached])
+            instance_vfs = self._instance_volumes.get(attached_path)
+            attached_vfs = self._vfs_paths.get((a_name, None, attached_path))
+            log.debug("Checking attached %s path. Attached instance / dependent container instance:\n%s\n%s",
+                      attached, attached_vfs, instance_vfs)
+            if not (instance_vfs and attached_vfs == instance_vfs):
+                return False
+            self._vfs_paths[self._config_name, self._instance_name, attached_path] = instance_vfs
+        return True
+
+    def check_used(self, config):
+        for used in config.uses:
+            used_volume = used.volume
+            if self._use_parent_name:
+                used_alias = used_volume.partition('.')[2]
+            else:
+                used_alias = used_volume
+            used_path = resolve_value(self._volumes.get(used_alias))
+            if used_path:
+                used_vfs = self._vfs_paths.get((used_volume, None, used_path))
+                instance_path = self._instance_volumes.get(used_path)
+                log.debug("Checking used %s path. Parent instance / dependent container instance:\n%s\n%s",
+                          used_volume, used_vfs, instance_path)
+                if used_vfs != instance_path:
+                    return False
+                continue
+            ref_c_name, __, ref_i_name = used_volume.partition('.')
+            log.debug("Looking up dependency %s (instance %s).", ref_c_name, ref_i_name)
+            ref_config = self._container_map.get_existing(ref_c_name)
+            if ref_config:
+                for share in ref_config.shares:
+                    ref_shared_path = resolve_value(share)
+                    i_shared_path = self._instance_volumes.get(ref_shared_path)
+                    shared_vfs = self._vfs_paths.get((ref_c_name, ref_i_name, ref_shared_path))
+                    log.debug("Checking shared path %s. Parent instance / dependent container instance:\n%s\n%s",
+                              share, shared_vfs, i_shared_path)
+                    if shared_vfs != i_shared_path:
+                        return False
+                    self._vfs_paths[(self._config_name, self._instance_name, ref_shared_path)] = i_shared_path
+                self.check_bind(ref_config, ref_i_name)
+                self.check_attached(ref_config, ref_c_name)
+            else:
+                raise ValueError("Volume alias or container reference could not be resolved: {0}".format(used))
+        return True
+
+
+class ContainerVolumeChecker(object):
+    def __init__(self):
+        self._vfs_paths = {}
+
+    def register_attached(self, mapped_path, path, alias, parent_name=None):
+        alias = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
+        self._vfs_paths[alias, None, mapped_path] = path
+
+    def check(self, container_map, container_config, config_name, instance_name, instance_detail):
+        instance_volumes = utils.get_instance_volumes(instance_detail)
+        vfs = SingleContainerVfsCheck(self._vfs_paths, container_map, container_config, instance_name, instance_volumes)
+        for share in container_config.shares:
+            cr_shared_path = resolve_value(share)
+            self._vfs_paths[config_name, instance_name, cr_shared_path] = instance_volumes.get(share)
+        if not vfs.check_bind(container_config, instance_name):
+            return False
+        if not vfs.check_attached(container_config, config_name):
+            return False
+        if not vfs.check_used(container_config):
+            return False
+        return True
+
+
 class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
     def __init__(self, policy, *args, **kwargs):
         super(ContainerUpdateGenerator, self).__init__(policy, *args, **kwargs)
@@ -102,7 +201,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                 insecure_registry=self.pull_insecure_registry)
             for client_name in policy.clients.keys()
         }
-        self.path_vfs = {}
+        self._volume_checker = ContainerVolumeChecker()
 
     def _check_links(self, map_name, c_config, instance_detail):
         def _extract_link_info(host_link):
@@ -114,67 +213,6 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
         for link in c_config.links:
             if link.alias != linked_dict.get(self._policy.cname(map_name, link.container)):
                 return False
-        return True
-
-    def _check_volumes(self, c_map, c_config, config_name, instance_name, instance_detail):
-        def _validate_bind(b_config, b_instance):
-            for shared_volume in b_config.binds:
-                bind_path, host_path = utils.get_shared_volume_path(c_map, shared_volume.volume, b_instance)
-                instance_vfs = instance_volumes.get(bind_path)
-                log.debug("Checking host bind. Config / container instance:\n%s\n%s", host_path, instance_vfs)
-                if not (instance_vfs and host_path == instance_vfs):
-                    return False
-                self.path_vfs[config_name, instance_name, bind_path] = instance_vfs
-            return True
-
-        def _validate_attached(a_config):
-            for attached in a_config.attaches:
-                attached_path = resolve_value(c_map.volumes[attached])
-                instance_vfs = instance_volumes.get(attached_path)
-                attached_vfs = self.path_vfs.get((attached, None, attached_path))
-                log.debug("Checking attached %s path. Attached instance / dependent container instance:\n%s\n%s",
-                          attached, attached_vfs, instance_vfs)
-                if not (instance_vfs and attached_vfs == instance_vfs):
-                    return False
-                self.path_vfs[config_name, instance_name, attached_path] = instance_vfs
-            return True
-
-        instance_volumes = utils.get_instance_volumes(instance_detail)
-        for share in c_config.shares:
-            cr_shared_path = resolve_value(share)
-            self.path_vfs[config_name, instance_name, cr_shared_path] = instance_volumes.get(share)
-        if not _validate_bind(c_config, instance_name):
-            return False
-        if not _validate_attached(c_config):
-            return False
-        for used in c_config.uses:
-            used_volume = used.volume
-            used_path = resolve_value(c_map.volumes.get(used_volume))
-            if used_path:
-                used_vfs = self.path_vfs.get((used_volume, None, used_path))
-                instance_path = instance_volumes.get(used_path)
-                log.debug("Checking used %s path. Parent instance / dependent container instance:\n%s\n%s",
-                          used.volume, used_vfs, instance_path)
-                if used_vfs != instance_path:
-                    return False
-                continue
-            ref_c_name, ref_i_name = self._policy.resolve_cname(used_volume, False)
-            log.debug("Looking up dependency %s (instance %s).", ref_c_name, ref_i_name)
-            ref_config = c_map.get_existing(ref_c_name)
-            if ref_config:
-                for share in ref_config.shares:
-                    ref_shared_path = resolve_value(share)
-                    i_shared_path = instance_volumes.get(ref_shared_path)
-                    shared_vfs = self.path_vfs.get((ref_c_name, ref_i_name, ref_shared_path))
-                    log.debug("Checking shared path %s. Parent instance / dependent container instance:\n%s\n%s",
-                              share, shared_vfs, i_shared_path)
-                    if shared_vfs != i_shared_path:
-                        return False
-                    self.path_vfs[(config_name, instance_name, ref_shared_path)] = i_shared_path
-                _validate_bind(ref_config, ref_i_name)
-                _validate_attached(ref_config)
-            else:
-                raise ValueError("Volume alias or container reference could not be resolved: {0}".format(used))
         return True
 
     def iname_tag(self, image, container_map=None):
@@ -231,7 +269,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     volumes = utils.get_instance_volumes(a_detail)
                     if volumes:
                         mapped_path = a_paths[a]
-                        self.path_vfs[a, None, mapped_path] = volumes.get(mapped_path)
+                        self._volume_checker.register_attached(mapped_path, volumes.get(mapped_path), a, a_parent)
             image_name = self.iname_tag(c_config.image or container_name, container_map=c_map)
             image_id = images.ensure_image(image_name, pull_latest=self.pull_latest,
                                            insecure_registry=self.pull_insecure_registry)
@@ -247,7 +285,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                     log.debug("Container from image %s found with status\n%s.", ci_image, ci_status)
                     ci_remove = ((not ci_running and ci_status['ExitCode'] in self.remove_status) or
                                  ((not c_config.persistent or self.update_persistent) and ci_image != image_id) or
-                                 not self._check_volumes(c_map, c_config, container_name, ci, ci_detail) or
+                                 not self._volume_checker.check(c_map, c_config, container_name, ci, ci_detail) or
                                  not self._check_links(map_name, c_config, ci_detail) or
                                  not _check_environment(c_config, ci_detail) or
                                  not _check_cmd(c_config, ci_detail) or
