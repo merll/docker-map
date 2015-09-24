@@ -139,46 +139,43 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                 self.path_vfs[config_name, instance_name, attached_path] = instance_vfs
             return True
 
-        def _check_config_paths(cr_config, cr_instance):
-            for share in cr_config.shares:
-                cr_shared_path = resolve_value(share)
-                self.path_vfs[config_name, instance_name, cr_shared_path] = instance_volumes.get(share)
-            if not _validate_bind(cr_config, cr_instance):
-                return False
-            if not _validate_attached(cr_config):
-                return False
-            for used in cr_config.uses:
-                used_volume = used.volume
-                used_path = resolve_value(c_map.volumes.get(used_volume))
-                if used_path:
-                    used_vfs = self.path_vfs.get((used_volume, None, used_path))
-                    instance_path = instance_volumes.get(used_path)
-                    log.debug("Checking used %s path. Parent instance / dependent container instance:\n%s\n%s",
-                              used.volume, used_vfs, instance_path)
-                    if used_vfs != instance_path:
-                        return False
-                    continue
-                ref_c_name, ref_i_name = self._policy.resolve_cname(used_volume, False)
-                log.debug("Looking up dependency %s (instance %s).", ref_c_name, ref_i_name)
-                ref_config = c_map.get_existing(ref_c_name)
-                if ref_config:
-                    for share in ref_config.shares:
-                        ref_shared_path = resolve_value(share)
-                        i_shared_path = instance_volumes.get(ref_shared_path)
-                        shared_vfs = self.path_vfs.get((ref_c_name, ref_i_name, ref_shared_path))
-                        log.debug("Checking shared path %s. Parent instance / dependent container instance:\n%s\n%s",
-                                  share, shared_vfs, i_shared_path)
-                        if shared_vfs != i_shared_path:
-                            return False
-                        self.path_vfs[(config_name, instance_name, ref_shared_path)] = i_shared_path
-                    _validate_bind(ref_config, ref_i_name)
-                    _validate_attached(ref_config)
-                else:
-                    raise ValueError("Volume alias or container reference could not be resolved: {0}".format(used))
-            return True
-
         instance_volumes = utils.get_instance_volumes(instance_detail)
-        return _check_config_paths(c_config, instance_name)
+        for share in c_config.shares:
+            cr_shared_path = resolve_value(share)
+            self.path_vfs[config_name, instance_name, cr_shared_path] = instance_volumes.get(share)
+        if not _validate_bind(c_config, instance_name):
+            return False
+        if not _validate_attached(c_config):
+            return False
+        for used in c_config.uses:
+            used_volume = used.volume
+            used_path = resolve_value(c_map.volumes.get(used_volume))
+            if used_path:
+                used_vfs = self.path_vfs.get((used_volume, None, used_path))
+                instance_path = instance_volumes.get(used_path)
+                log.debug("Checking used %s path. Parent instance / dependent container instance:\n%s\n%s",
+                          used.volume, used_vfs, instance_path)
+                if used_vfs != instance_path:
+                    return False
+                continue
+            ref_c_name, ref_i_name = self._policy.resolve_cname(used_volume, False)
+            log.debug("Looking up dependency %s (instance %s).", ref_c_name, ref_i_name)
+            ref_config = c_map.get_existing(ref_c_name)
+            if ref_config:
+                for share in ref_config.shares:
+                    ref_shared_path = resolve_value(share)
+                    i_shared_path = instance_volumes.get(ref_shared_path)
+                    shared_vfs = self.path_vfs.get((ref_c_name, ref_i_name, ref_shared_path))
+                    log.debug("Checking shared path %s. Parent instance / dependent container instance:\n%s\n%s",
+                              share, shared_vfs, i_shared_path)
+                    if shared_vfs != i_shared_path:
+                        return False
+                    self.path_vfs[(config_name, instance_name, ref_shared_path)] = i_shared_path
+                _validate_bind(ref_config, ref_i_name)
+                _validate_attached(ref_config)
+            else:
+                raise ValueError("Volume alias or container reference could not be resolved: {0}".format(used))
+        return True
 
     def iname_tag(self, image, container_map=None):
         i_name = '{0}:latest'.format(image) if ':' not in image else image
