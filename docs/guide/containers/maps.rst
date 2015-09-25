@@ -270,12 +270,7 @@ name of the extra container, and other container configurations can refer to it 
 :attr:`~dockermap.map.config.ContainerConfiguration.uses` property.
 
 `Attached` containers are by default automatically created and launched from a minimal startable base image
-`tianon/true`. They are also shared with the owning container. Since sharing data with other containers with
-non-superuser privileges usually requires permission adjustments, setting
-:attr:`~dockermap.map.config.ContainerConfiguration.user` starts one more temporary container (based on
-`busybox`) running a ``chown`` command. Furthermore this sets the user that the current container is started with.
-Similarly for :attr:`~dockermap.map.config.ContainerConfiguration.permissions`, a temporary `busybox` container performs
-a ``chmod`` command on the shared container::
+`tianon/true`. They are also shared with the owning container::
 
     container_map.volumes.volume1 = '/var/data1'
     container_map.volumes.volume2 = '/var/more_data'
@@ -287,6 +282,14 @@ a ``chmod`` command on the shared container::
     container_map.containers.app2.uses = 'app1'
     # app3 only gains access to 'volume2'
     container_map.containers.app3.uses = 'volume2'
+
+Sharing data with other containers with non-superuser privileges usually requires permission adjustments. Setting
+:attr:`~dockermap.map.config.ContainerConfiguration.user` starts one more temporary container (based on `busybox`)
+running a ``chown`` command. Furthermore this sets the user that the current container is started with.
+Similarly for :attr:`~dockermap.map.config.ContainerConfiguration.permissions`, the temporary `busybox` container
+performs a ``chmod`` command on the shared container. If the client supports running local commands via a method
+``run_cmd``, instead of running the temporary container, ``chmod``  and ``chown`` will be run on the mounted volume path
+of the Docker host.
 
 .. _linked-containers:
 

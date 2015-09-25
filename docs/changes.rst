@@ -3,6 +3,13 @@
 Change History
 ==============
 
+0.5.3
+-----
+* Bugfixes for network mode and volume check of inherited configurations.
+* Fixed deprecation warnings from ``docker-py``.
+* Added option to prepare attached volumes with local commands instead of temporary containers, for clients that
+  support it.
+
 0.5.2
 -----
 * Added network modes and their dependencies. Attached volumes are no longer enabled for networking.
