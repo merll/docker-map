@@ -15,6 +15,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         self.maxDiff = 2048
         self.map_name = 'main'
         self.sample_map = ContainerMap('main', MAP_DATA_1)
+        self.client_version = CLIENT_DATA_1['version']
         self.sample_client_config = ClientConfiguration(**CLIENT_DATA_1)
 
     def test_create_kwargs_without_host_config(self):
@@ -52,6 +53,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             },
             volumes_from=['main.app_server_socket', 'main.web_log'],
             port_bindings={80: 80, 443: 443},
+            version=self.client_version,
         ))
 
     def test_create_kwargs_with_host_config(self):
@@ -82,6 +84,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                 },
                 volumes_from=['main.app_log', 'main.app_server_socket'],
                 port_bindings={},
+                version=self.client_version,
             ),
         ))
 
@@ -108,7 +111,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         alias = 'app_server_socket'
         kwargs = BasePolicy.get_attached_host_config_kwargs(self.sample_map, cfg_name,  cfg, '__default__',
                                                             self.sample_client_config, c_name, alias)
-        self.assertDictEqual(kwargs, dict(container=c_name))
+        self.assertDictEqual(kwargs, dict(container=c_name, version=self.client_version))
 
     def test_attached_preparation_create_kwargs(self):
         cfg_name = 'app_server'
@@ -125,6 +128,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             user='root',
             host_config=create_host_config(
                 volumes_from=[v_name],
+                version=self.client_version,
             ),
             network_disabled=True,
         ))
@@ -141,6 +145,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         self.assertDictEqual(kwargs, dict(
             container='temp',
             volumes_from=[v_name],
+            version=self.client_version,
         ))
 
     def test_network_setting(self):
@@ -156,6 +161,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             network_mode='container:main.app_server.instance1',
             port_bindings={},
             volumes_from=[],
+            version=self.client_version,
         ))
 
     def test_restart_kwargs(self):

@@ -271,6 +271,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             binds=get_host_binds(container_map, container_config, instance),
             volumes_from=volumes_from,
             port_bindings=get_port_bindings(container_config, client_config),
+            version=client_config.version,
         )
         network_mode = container_config.network
         if isinstance(network_mode, tuple):
@@ -359,7 +360,9 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(container=container_name) if container_name else {}
+        c_kwargs = dict(version=client_config.version)
+        if container_name:
+            c_kwargs['container'] = container_name
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
@@ -450,7 +453,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(volumes_from=[volume_container])
+        c_kwargs = dict(volumes_from=[volume_container], version=client_config.version)
         if container_name:
             c_kwargs['container'] = container_name
         update_kwargs(c_kwargs, kwargs)

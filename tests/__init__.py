@@ -176,4 +176,5 @@ MAP_DATA_3 = {
 
 CLIENT_DATA_1 = {
     'interfaces': {'private': '10.0.0.11'},
+    'version': '1.19',
 }
