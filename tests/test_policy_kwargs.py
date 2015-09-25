@@ -92,7 +92,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         alias = 'app_server_socket'
         kwargs = BasePolicy.get_attached_create_kwargs(self.sample_map, cfg_name, cfg, '__default__',
                                                        self.sample_client_config, c_name, alias,
-                                                       include_host_config=True)
+                                                       include_host_config=False)
         self.assertDictEqual(kwargs, dict(
             name=c_name,
             image=BasePolicy.base_image,
