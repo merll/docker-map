@@ -512,9 +512,9 @@ class ClientConfiguration(DictMap):
     client_constructor = DockerClientWrapper
 
     def __init__(self, base_url=None, version=None, timeout=None, *args, **kwargs):
-        self.base_url = base_url
-        self.version = version
-        self.timeout = timeout
+        self._base_url = base_url
+        self._version = version
+        self._timeout = timeout
         if 'interfaces' in kwargs:
             self._interfaces = DictMap(kwargs.pop('interfaces'))
         else:
@@ -561,7 +561,56 @@ class ClientConfiguration(DictMap):
         if not client:
             client = self.client_constructor(**self.get_init_kwargs())
             self._client = client
+            # Client might update the version number after construction.
+            self._version = client.api_version
         return client
+
+    @property
+    def base_url(self):
+        """
+        Base URL of the Docker client. If this is changed after the client has been instantiated, it is not updated on
+        the client.
+
+        :return: URL
+        :rtype: unicode
+        """
+        return self._base_url
+
+    @base_url.setter
+    def base_url(self, value):
+        self._base_url = value
+
+    @property
+    def version(self):
+        """
+        API version of the Docker client. When set to ``auto`` it is updated with the Docker hosts' version number
+        upon instantiation of the client. If this is changed after the client has been instantiated, it is not updated
+        on the client.
+
+        :return: Docker API version.
+        :rtype: unicode
+        """
+        return self._version
+
+    @version.setter
+    def version(self, value):
+        self._version = value
+
+    @property
+    def timeout(self):
+        """
+        Timeout in seconds of the Docker client. If changed after client instantiation, the client's value is updated
+        as well.
+
+        :return:
+        """
+        return self._timeout
+
+    @timeout.setter
+    def timeout(self, value):
+        self._timeout = value
+        if self._client:
+            self._client.timeout = value
 
     @property
     def interfaces(self):
