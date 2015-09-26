@@ -56,12 +56,15 @@ MAP_DATA_2 = {
     'repository': 'registry.example.com',
     'host_root': '/var/lib/site',
     'containers': {
+        'svc': {
+        },
         'abstract_config': {
             'abstract': True,
             'image': 'server',
             'binds': {
                 'app_config': 'ro',
             },
+            'links': [('svc', 'svc_alias1')],
             'uses': 'redis.redis_socket',
             'attaches': 'app_log',
             'user': 'app_user',
@@ -72,6 +75,7 @@ MAP_DATA_2 = {
             'binds': {
                 'app_data': 'rw',
             },
+            'links': [('svc', 'svc_alias2')],
             'attaches': 'server_log',
             'user': 'server_user',
             'exposes': {

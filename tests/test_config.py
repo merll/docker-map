@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import unittest
 
 from dockermap.map.container import ContainerMap
-from dockermap.map.input import SharedVolume, PortBinding, NotSet
+from dockermap.map.input import SharedVolume, PortBinding, NotSet, ContainerLink
 from tests import MAP_DATA_2, MAP_DATA_3
 
 
@@ -34,6 +34,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'server_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertEqual(cfg.create_options, {
             'mem_limit': '1g',
             'cpu_shares': 15,
@@ -54,6 +55,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'app_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertIs(cfg.create_options, NotSet)
         self.assertIs(cfg.host_config, NotSet)
 
@@ -66,6 +68,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'server_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertEqual(cfg.create_options, {
             'mem_limit': '1g',
             'cpu_shares': 15,
@@ -86,6 +89,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'app_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertIs(cfg.create_options, NotSet)
         self.assertIs(cfg.host_config, NotSet)
 
@@ -96,6 +100,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'server_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertEqual(cfg.create_options, {
             'mem_limit': '1g',
             'cpu_shares': 15,

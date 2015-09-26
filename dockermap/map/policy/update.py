@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from collections import defaultdict
 import logging
 import shlex
 import six
@@ -204,15 +205,17 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
         self._volume_checker = ContainerVolumeChecker()
 
     def _check_links(self, map_name, c_config, instance_detail):
-        def _extract_link_info(host_link):
-            link_name, __, link_alias = host_link.partition(':')
-            return link_name[1:], link_alias.rpartition('/')[2]
-
         instance_links = instance_detail['HostConfig']['Links'] or []
-        linked_dict = dict(map(_extract_link_info, instance_links))
+        link_dict = defaultdict(set)
+        for host_link in instance_links:
+            link_name, __, link_alias = host_link.partition(':')
+            link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
         for link in c_config.links:
-            if link.alias != linked_dict.get(self._policy.cname(map_name, link.container)):
+            instance_aliases = link_dict.get(self._policy.cname(map_name, link.container))
+            if not instance_aliases or link.alias not in instance_aliases:
+                log.debug("Checked link %s - could not find alias %s", link.container, link.alias)
                 return False
+            log.debug("Checked link %s - found alias %s", link.container, link.alias)
         return True
 
     def iname_tag(self, image, container_map=None):

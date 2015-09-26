@@ -455,8 +455,8 @@ class ContainerConfiguration(object):
             _update_attr(key, merge_list_func)
         _merge_first(self._binds, update_binds)
         _merge_first(self._uses, update_uses)
-        _merge_first(self._links_to, update_links)
         _merge_first(self._exposes, update_ports)
+        _merge_list('links', update_links)
         if not lists_only:
             for key in SINGLE_ATTRIBUTES:
                 _update_attr(key, self.__setattr__)

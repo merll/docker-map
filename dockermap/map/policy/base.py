@@ -267,7 +267,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
             volumes_from.extend([cls.aname(map_name, attached)
                                  for attached in container_config.attaches])
         c_kwargs = dict(
-            links={cls.cname(map_name, l_name): alias for l_name, alias in container_config.links},
+            links=[(cls.cname(map_name, l_name), alias) for l_name, alias in container_config.links],
             binds=get_host_binds(container_map, container_config, instance),
             volumes_from=volumes_from,
             port_bindings=get_port_bindings(container_config, client_config),

@@ -43,10 +43,10 @@ class TestPolicyClientKwargs(unittest.TestCase):
                                                    kwargs=dict(binds={'/new_h': {'bind': '/new_c', 'ro': False}}))
         self.assertDictEqual(kwargs, dict(
             container=c_name,
-            links={
-                'main.app_server.instance1': 'app_server.instance1',
-                'main.app_server.instance2': 'app_server.instance2',
-            },
+            links=[
+                ('main.app_server.instance1', 'app_server.instance1'),
+                ('main.app_server.instance2', 'app_server.instance2'),
+            ],
             binds={
                 '/var/lib/site/config/nginx': {'bind': '/etc/nginx', 'ro': True},
                 '/new_h': {'bind': '/new_c', 'ro': False},
@@ -157,7 +157,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         self.assertDictEqual(kwargs, dict(
             binds={},
             container=c_name,
-            links={},
+            links=[],
             network_mode='container:main.app_server.instance1',
             port_bindings={},
             volumes_from=[],
