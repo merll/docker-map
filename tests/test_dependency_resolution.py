@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import unittest
+import six
 
 from dockermap.map.base import ContainerImageResolver
 from dockermap.map.container import ContainerMap
@@ -37,7 +38,7 @@ class ContainerDependencyTest(unittest.TestCase):
 
     def assertOrder(self, dependency_list, *items):
         iterator = iter(items)
-        last_item = iterator.next()
+        last_item = six.next(iterator)
         last_idx = dependency_list.index(last_item)
         for item in iterator:
             index = dependency_list.index(item)

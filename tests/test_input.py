@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import unittest
+import six
 
 from dockermap.functional import lazy_once
 from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume, get_shared_volumes,
@@ -48,8 +49,8 @@ class InputConversionTest(unittest.TestCase):
 
     def test_get_shared_volumes(self):
         assert_a = lambda a: self.assertEqual(get_shared_volumes(a), [SharedVolume('a', False)])
-        assert_b = lambda b: self.assertItemsEqual(get_shared_volumes(b), [SharedVolume('a', False),
-                                                                           SharedVolume('b', True)])
+        assert_b = lambda b: six.assertCountEqual(self, get_shared_volumes(b), [SharedVolume('a', False),
+                                                                                SharedVolume('b', True)])
 
         assert_a(SharedVolume('a', False))
         assert_a('a')
@@ -81,10 +82,10 @@ class InputConversionTest(unittest.TestCase):
 
     def test_get_shared_host_volumes(self):
         assert_a = lambda a: self.assertEqual(get_shared_host_volumes(a), [SharedVolume('a', False)])
-        assert_b = lambda b: self.assertItemsEqual(get_shared_host_volumes(b), [SharedVolume('a', False),
-                                                                                SharedVolume('b', True),
-                                                                                SharedVolume(('c', 'ch'), False),
-                                                                                SharedVolume(('d', 'dh'), True)])
+        assert_b = lambda b: six.assertCountEqual(self, get_shared_host_volumes(b), [SharedVolume('a', False),
+                                                                                     SharedVolume('b', True),
+                                                                                     SharedVolume(('c', 'ch'), False),
+                                                                                     SharedVolume(('d', 'dh'), True)])
 
         assert_a('a')
         assert_a([('a', )])
@@ -104,8 +105,8 @@ class InputConversionTest(unittest.TestCase):
 
     def test_get_container_links(self):
         assert_a = lambda a: self.assertEqual(get_container_links(a), [ContainerLink('a', 'a')])
-        assert_b = lambda b: self.assertItemsEqual(get_container_links(b), [ContainerLink('a', 'a'),
-                                                                            ContainerLink('b', 'b_')])
+        assert_b = lambda b: six.assertCountEqual(self, get_container_links(b), [ContainerLink('a', 'a'),
+                                                                                 ContainerLink('b', 'b_')])
 
         assert_a('a')
         assert_a((ContainerLink('a', 'a'), ))
@@ -127,9 +128,9 @@ class InputConversionTest(unittest.TestCase):
 
     def test_get_get_port_bindings(self):
         assert_a = lambda a: self.assertEqual(get_port_bindings(a), [PortBinding('1234', None, None)])
-        assert_b = lambda b: self.assertItemsEqual(get_port_bindings(b), [PortBinding('1234', None, None),
-                                                                          PortBinding(1234, 1234, None),
-                                                                          PortBinding(1235, 1235, '0.0.0.0')])
+        assert_b = lambda b: six.assertCountEqual(self, get_port_bindings(b), [PortBinding('1234', None, None),
+                                                                               PortBinding(1234, 1234, None),
+                                                                               PortBinding(1235, 1235, '0.0.0.0')])
 
         assert_a('1234')
         assert_a(PortBinding('1234', None, None))

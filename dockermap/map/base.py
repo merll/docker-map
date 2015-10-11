@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import sys
 import logging
 
+import six
 import docker
 from docker.errors import APIError
 
@@ -286,12 +288,10 @@ class DockerClientWrapper(docker.Client):
             try:
                 self.remove_container(cn)
             except APIError as e:
-                import sys
-                exc_info = sys.exc_info()
                 if e.response.status_code != 404:
                     self.push_log("Could not remove container '%s': %s", logging.ERROR, cn, e.explanation)
                     if raise_on_error:
-                        raise exc_info[0], exc_info[1], exc_info[2]
+                        six.reraise(*sys.exc_info())
 
     def cleanup_images(self, remove_old=False, raise_on_error=False):
         """
@@ -315,12 +315,10 @@ class DockerClientWrapper(docker.Client):
             try:
                 self.remove_image(iid)
             except APIError as e:
-                import sys
-                exc_info = sys.exc_info()
                 if e.response.status_code != 404:
                     self.push_log("Could not remove image '%s': %s", logging.ERROR, iid, e.explanation)
                     if raise_on_error:
-                        raise exc_info[0], exc_info[1], exc_info[2]
+                        six.reraise(*sys.exc_info())
 
     def get_container_names(self):
         """
@@ -373,12 +371,10 @@ class DockerClientWrapper(docker.Client):
         try:
             super(DockerClientWrapper, self).remove_container(container, **kwargs)
         except APIError as e:
-            import sys
-            exc_info = sys.exc_info()
             if e.response.status_code != 404:
                 self.push_log("Failed to stop container '%s': %s", logging.ERROR, container, e.explanation)
                 if raise_on_error:
-                    raise exc_info[0], exc_info[1], exc_info[2]
+                    six.reraise(*sys.exc_info())
 
     def stop(self, container, raise_on_error=False, **kwargs):
         """
@@ -395,12 +391,10 @@ class DockerClientWrapper(docker.Client):
         try:
             super(DockerClientWrapper, self).stop(container, **kwargs)
         except APIError as e:
-            import sys
-            exc_info = sys.exc_info()
             if e.response.status_code != 404:
                 self.push_log("Failed to remove container '%s': %s", logging.ERROR, container, e.explanation)
                 if raise_on_error:
-                    raise exc_info[0], exc_info[1], exc_info[2]
+                    six.reraise(*sys.exc_info())
 
     def remove_all_containers(self):
         """
@@ -413,18 +407,14 @@ class DockerClientWrapper(docker.Client):
                 try:
                     self.stop(c_id)
                 except APIError as e:
-                    import sys
-                    exc_info = sys.exc_info()
                     if e.response.status_code != 404:
-                        raise exc_info[0], exc_info[1], exc_info[2]
+                        six.reraise(*sys.exc_info())
         for c_id, __ in containers:
             try:
                 self.remove_container(c_id)
             except APIError as e:
-                import sys
-                exc_info = sys.exc_info()
                 if e.response.status_code != 404:
-                    raise exc_info[0], exc_info[1], exc_info[2]
+                    six.reraise(*sys.exc_info())
 
     def copy_resource(self, container, resource, local_filename):
         """
