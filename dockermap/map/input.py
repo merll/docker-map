@@ -19,6 +19,7 @@ CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
 class _NotSet(object):
     def __nonzero__(self):
         return False
+    __bool__ = __nonzero__
 
     def __repr__(self):
         return "<Value not set>"
@@ -117,7 +118,7 @@ def get_shared_volume(value):
     elif isinstance(value, dict):
         v_len = len(value)
         if v_len == 1:
-            k, v = value.items()[0]
+            k, v = list(value.items())[0]
             return SharedVolume(k, read_only(v))
         raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
                          "tuple. Found length {0}.".format(v_len))
@@ -174,7 +175,7 @@ def get_shared_host_volume(value):
     elif isinstance(value, dict):
         v_len = len(value)
         if v_len == 1:
-            c_path, v = value.items()[0]
+            c_path, v = list(value.items())[0]
             if isinstance(v, (list, tuple)):
                 return _shared_host_volume_from_tuple(c_path, *v)
             return _shared_host_volume_from_tuple(c_path, v)
@@ -218,7 +219,7 @@ def get_port_binding(value):
     :return: PortBinding tuple.
     :rtype: PortBinding
     """
-    sub_types = six.string_types + (int, long)
+    sub_types = six.string_types + six.integer_types
     if isinstance(value, PortBinding):
         return value
     elif isinstance(value, sub_types):  # Port only

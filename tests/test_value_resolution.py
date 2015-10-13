@@ -112,4 +112,4 @@ class LazyValueResolutionTest(unittest.TestCase):
         self.assertIsInstance(data['d'][2]['a'], lazy_once)
         self.assertFalse(data['d'][2]['a'].evaluated)
         # Placing functions as dictionary keys may not be a good idea, but should work at least for tuples.
-        self.assertDictContainsSubset(dict(test_value_2='e'), data)
+        self.assertEqual(data.get('test_value_2'), 'e')
