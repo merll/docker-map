@@ -32,7 +32,7 @@ def extract_user(user_value):
         return None
     if isinstance(user, tuple):
         return user[0]
-    if isinstance(user, int):
+    if isinstance(user, six.integer_types):
         return six.text_type(user)
     return user.partition(':')[0]
 

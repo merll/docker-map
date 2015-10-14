@@ -4,7 +4,8 @@ from __future__ import unicode_literals
 import six
 
 
-str_arg = lambda arg: six.text_type(arg).replace(' ', '\\ ')
+def str_arg(arg):
+    return six.text_type(arg).replace(' ', '\\ ')
 
 
 def _gen_kwargs(kwargs):
@@ -55,16 +56,15 @@ def get_user_group(user_group):
 
     :param user_group: User name, user id, user and group in format ``user:group``, ``user_id:group_id``, or tuple of
       ``(user, group)``.
-    :type user_group: unicode, int, or tuple
+    :type user_group: unicode | int | tuple
     :return: Formatted string with in the format ``user:group``.
     :rtype: unicode
     """
     if isinstance(user_group, tuple):
         return '{0}:{1}'.format(*user_group)
-    elif isinstance(user_group, int) or not ':' in user_group:
+    elif isinstance(user_group, six.integer_types) or ':' not in user_group:
         return '{0}:{0}'.format(user_group)
-    else:
-        return user_group
+    return user_group
 
 
 def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no_password=False, gecos=None, sudo=False):
