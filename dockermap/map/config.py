@@ -151,7 +151,7 @@ class ContainerConfiguration(object):
         volume on container start.
 
         :return: Host volumes.
-        :rtype: list[SharedVolume]
+        :rtype: list[dockermap.map.input.SharedVolume]
         """
         return self._binds
 
@@ -166,7 +166,7 @@ class ContainerConfiguration(object):
         names if all volumes are to be used of that container.
 
         :return: Used volumes.
-        :rtype: list[SharedVolume]
+        :rtype: list[unicode]
         """
         return self._uses
 
@@ -181,7 +181,7 @@ class ContainerConfiguration(object):
         container's name, and the alias name the alias to use for this container instance.
 
         :return: Containers to be linked to when the container is started.
-        :rtype: list[ContainerLink]
+        :rtype: list[dockermap.map.input.ContainerLink]
         """
         return self._links_to
 
@@ -225,7 +225,7 @@ class ContainerConfiguration(object):
         default). Otherwise the relevant IP address to expose the service on will be looked up at run-time.
 
         :return: List of port bindings.
-        :rtype: list[PortBinding]
+        :rtype: list[dockermap.map.input.PortBinding]
         """
         return self._exposes
 
@@ -241,7 +241,7 @@ class ContainerConfiguration(object):
         (`(user_name, group_name)`), or int (`user_id`).
 
         :return: User name and (optional) group.
-        :rtype: unicode, tuple, or int
+        :rtype: unicode | tuple | int
         """
         return self._user
 
