@@ -124,8 +124,8 @@ class SimpleRestartMixin(object):
                 ci_name = self.cname(map_name, container, instance)
                 ci_status = client.inspect_container(ci_name)['State'] if ci_name in existing_containers else None
                 if ci_status and ci_status['Running']:
-                    c_kwargs = self.get_restart_kwargs(c_map, c_config, client_name, client_config, ci_name, instance,
-                                                       kwargs=kwargs)
+                    c_kwargs = self.get_restart_kwargs(c_map, container, c_config, client_name, client_config, ci_name,
+                                                       instance, kwargs=kwargs)
                     client.restart(**c_kwargs)
 
 
