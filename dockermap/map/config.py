@@ -425,7 +425,8 @@ class ContainerConfiguration(object):
 
         def _merge_list(attr, update_list):
             current = getattr(self, attr)
-            current.extend(u for u in update_list if u not in current)
+            if update_list:
+                current.extend(u for u in update_list if u not in current)
 
         def _update_dict(attr, new_val):
             current_dict = getattr(self, attr)
