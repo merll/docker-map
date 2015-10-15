@@ -126,7 +126,7 @@ class InputConversionTest(unittest.TestCase):
         assert_c((1234, 1234, '0.0.0.0'))
         assert_c((1234, [1234, '0.0.0.0']))
 
-    def test_get_get_port_bindings(self):
+    def test_get_port_bindings(self):
         assert_a = lambda a: self.assertEqual(get_port_bindings(a), [PortBinding('1234', None, None)])
         assert_b = lambda b: six.assertCountEqual(self, get_port_bindings(b), [PortBinding('1234', None, None),
                                                                                PortBinding(1234, 1234, None),
