@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 
 import itertools
 
-from .base import (BasePolicy, AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator,
-                   ReverseActionGeneratorMixin)
+from .base import (BasePolicy, AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin,
+                   AbstractActionGenerator, ReverseActionGeneratorMixin)
 from . import ACTION_DEPENDENCY_FLAG, utils
 
 
@@ -55,7 +55,7 @@ class SimpleCreateMixin(object):
         return SimpleCreateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
-class SimpleStartGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
+class SimpleStartGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
     def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
             use_host_config = utils.use_host_config(client)
@@ -82,6 +82,8 @@ class SimpleStartGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin
                         c_kwargs = self._policy.get_host_config_kwargs(c_map, container_name, c_config, client_name,
                                                                        client_config, ci_name, instance, kwargs=kwargs)
                     client.start(**c_kwargs)
+                    self.exec_container_commands(c_map, container_name, c_config, client_name, client_config, client,
+                                                 ci_name, instance)
 
 
 class SimpleStartMixin(object):
@@ -101,7 +103,7 @@ class SimpleStartMixin(object):
         SimpleStartGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
 
-class SimpleRestartMixin(object):
+class SimpleRestartMixin(ExecMixin):
     def restart_actions(self, map_name, container, instances=None, **kwargs):
         """
         Generates actions for restarting a configured container. Does not consider dependencies.
@@ -127,6 +129,8 @@ class SimpleRestartMixin(object):
                     c_kwargs = self.get_restart_kwargs(c_map, container, c_config, client_name, client_config, ci_name,
                                                        instance, kwargs=kwargs)
                     client.restart(**c_kwargs)
+                    self.exec_container_commands(c_map, container, c_config, client_name, client_config, client,
+                                                 ci_name, instance)
 
 
 class SimpleStopGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):

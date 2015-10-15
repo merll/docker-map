@@ -8,7 +8,7 @@ from ..functional import resolve_value
 from . import DictMap
 from .base import DockerClientWrapper
 from .input import (get_list, get_shared_volumes, get_shared_host_volumes, get_container_links, get_network_mode,
-                    get_port_bindings, NotSet)
+                    get_port_bindings, get_exec_commands, NotSet)
 
 SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent', 'stop_timeout', 'network'
 DICT_ATTRIBUTES = 'create_options', 'start_options', 'host_config'
@@ -57,6 +57,7 @@ class ContainerConfiguration(object):
         self._links_to = []
         self._attaches = []
         self._exposes = []
+        self._exec = []
         self._user = NotSet
         self._permissions = NotSet
         self._persistent = NotSet
@@ -232,6 +233,21 @@ class ContainerConfiguration(object):
     @exposes.setter
     def exposes(self, value):
         self._exposes = get_port_bindings(value)
+
+    @property
+    def exec_commands(self):
+        """
+        Commands to run as soon as the container is started. Set in the format `ExecCommand(cmd, user)`, where the
+        user is set to the same as this configuration's user by default (or root, if not available).
+
+        :return: Commands to run when the container is started.
+        :rtype: list[dockermap.map.input.ExecCommand]
+        """
+        return self._exec
+
+    @exec_commands.setter
+    def exec_commands(self, value):
+        self._exec = get_exec_commands(value)
 
     @property
     def user(self):
@@ -441,6 +457,7 @@ class ContainerConfiguration(object):
             update_uses = _get_converted_list('uses', get_shared_volumes)
             update_links = _get_converted_list('links', get_container_links)
             update_ports = _get_converted_list('exposes', get_port_bindings)
+            update_cmds = _get_converted_list('exec_commands', get_exec_commands)
             merge_list_func = _merge_converted_list
         elif isinstance(values, ContainerConfiguration):
             get_func = values.__getattribute__
@@ -448,6 +465,7 @@ class ContainerConfiguration(object):
             update_uses = values._uses
             update_links = values._links_to
             update_ports = values._exposes
+            update_cmds = values._exec
             merge_list_func = _merge_list
         else:
             raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values)))
@@ -457,7 +475,8 @@ class ContainerConfiguration(object):
         _merge_first(self._binds, update_binds)
         _merge_first(self._uses, update_uses)
         _merge_first(self._exposes, update_ports)
-        _merge_list('links', update_links)
+        _merge_list('_links_to', update_links)
+        _merge_list('_exec', update_cmds)
         if not lists_only:
             for key in SINGLE_ATTRIBUTES:
                 _update_attr(key, self.__setattr__)

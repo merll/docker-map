@@ -11,6 +11,7 @@ from ..functional import lazy_type, uses_type_registry
 SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface'))
+ExecCommand = namedtuple('ExecCommand', ('cmd', 'user'))
 
 
 CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
@@ -246,6 +247,31 @@ def get_port_binding(value):
                      "{0}.".format(type(value).__name__))
 
 
+def get_exec_command(value):
+    """
+    Converts the input to a ExecCommand tuple. It can be from a single string, list, or tuple. Single values (also
+    single-element lists or tuples) are considered a command string, whereas two-element items are read as
+    ``(command string, user name)``.
+
+    :param value: Input value for conversion.
+    :return: ExecCommand tuple.
+    :rtype: ExecCommand
+    """
+    if isinstance(value, ExecCommand):
+        return value
+    elif isinstance(value, six.string_types + (lazy_type, )):
+        return ExecCommand(value, None)
+    elif isinstance(value, (list, tuple)):
+        v_len = len(value)
+        if v_len == 2:
+            return ExecCommand(*value)
+        elif v_len == 1:
+            return ExecCommand(value[0], None)
+        raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
+                         "ExecCommand tuple. Found length {0}.".format(v_len))
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+
+
 def get_shared_volumes(value):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume tuples.
@@ -277,6 +303,17 @@ def get_container_links(value):
     :rtype: list[ContainerLink]
     """
     return _get_listed_tuples(value, ContainerLink, get_container_link)
+
+
+def get_exec_commands(value):
+    """
+    Converts a single value, a list or tuple, or a dictionary into a list of ExecCommand tuples.
+
+    :param value: Input value to convert.
+    :return: List of ExecCommand tuples.
+    :rtype: list[ExecCommand]
+    """
+    return _get_listed_tuples(value, ExecCommand, get_exec_command)
 
 
 def get_network_mode(value):

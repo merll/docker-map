@@ -8,7 +8,8 @@ from dockermap.functional import lazy_once
 from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume, get_shared_volumes,
                                  get_shared_host_volume, get_shared_host_volumes, SharedVolume,
                                  get_container_link, get_container_links, ContainerLink,
-                                 get_port_binding, get_port_bindings, PortBinding)
+                                 get_port_binding, get_port_bindings, PortBinding,
+                                 get_exec_command, get_exec_commands, ExecCommand)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -138,3 +139,30 @@ class InputConversionTest(unittest.TestCase):
         assert_b(['1234', (1234, 1234), (1235, 1235, '0.0.0.0')])
         assert_b([('1234', [None, None]), PortBinding(1234, 1234, None), (1235, [1235, '0.0.0.0'])])
         assert_b({'1234': None, 1234: 1234, 1235: (1235, '0.0.0.0')})
+
+    def test_get_exec_command(self):
+        assert_a = lambda a: self.assertEqual(get_exec_command(a), ExecCommand('a b c', None))
+        assert_b = lambda b: self.assertEqual(get_exec_command(b), ExecCommand(['a', 'b', 'c'], None))
+        assert_c = lambda c: self.assertEqual(get_exec_command(c), ExecCommand('a b c', 'user'))
+        assert_d = lambda d: self.assertEqual(get_exec_command(d), ExecCommand(['a', 'b', 'c'], 'user'))
+
+        assert_a('a b c')
+        assert_a(('a b c', ))
+        assert_a(['a b c', None])
+        assert_a(lazy_once(lambda: 'a b c'))
+        assert_b((['a', 'b', 'c'],))
+        assert_b([['a', 'b', 'c'], None])
+        assert_c(('a b c', 'user'))
+        assert_c([lazy_once(lambda: 'a b c'), lazy_once(lambda: 'user')])
+        assert_d((['a', 'b', 'c'], 'user'))
+        assert_d([lazy_once(lambda: ['a', 'b', 'c']), lazy_once(lambda: 'user')])
+
+    def test_get_exec_commmands(self):
+        assert_a = lambda a: self.assertEqual(get_exec_commands(a), [ExecCommand('a b c', None)])
+        assert_b = lambda b: six.assertCountEqual(self, get_exec_commands(b), [ExecCommand(['a', 'b', 'c'], None),
+                                                                               ExecCommand('a b c', 'user')])
+        assert_a('a b c')
+        assert_a([ExecCommand('a b c', None)])
+        assert_a(['a b c'])
+        assert_b([(['a', 'b', 'c', ],), ('a b c', 'user')])
+        assert_b([(['a', 'b', 'c'], None), ExecCommand('a b c', 'user')])

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from .base import BasePolicy, AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
+from .base import BasePolicy, AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
 from .script import ScriptMixin
 from .simple import (SimpleCreateMixin, SimpleStartMixin, SimpleStopMixin, SimpleRemoveMixin,
                      SimpleShutdownMixin, SimpleRestartMixin)
@@ -9,7 +9,7 @@ from .update import ContainerUpdateMixin
 from . import utils
 
 
-class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
+class ResumeStartupGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
     def __init__(self, policy, *args, **kwargs):
         super(ResumeStartupGenerator, self).__init__(policy, *args, **kwargs)
         self._remove_status = policy.remove_status
@@ -84,6 +84,8 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ForwardActionGeneratorMix
                         is_kwargs = self._policy.get_host_config_kwargs(c_map, container_name, c_config, client_name,
                                                                         client_config, ci_name, ci)
                     client.start(**is_kwargs)
+                    self.exec_container_commands(c_map, container_name, c_config, client_name, client_config, client,
+                                                 ci_name, ci)
 
 
 class ResumeStartupMixin(object):

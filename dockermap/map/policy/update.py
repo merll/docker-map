@@ -7,10 +7,14 @@ import shlex
 import six
 
 from ...functional import resolve_value
-from .base import AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
+from .base import AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
 from . import utils
 
 log = logging.getLogger(__name__)
+
+CMD_CHECK_FULL = 'full'
+CMD_CHECK_PARTIAL = 'partial'
+CMD_CHECK_NONE = 'none'
 
 
 def _check_environment(c_config, instance_detail):
@@ -189,13 +193,15 @@ class ContainerVolumeChecker(object):
         return True
 
 
-class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
+class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin,
+                               AbstractActionGenerator):
     def __init__(self, policy, *args, **kwargs):
         super(ContainerUpdateGenerator, self).__init__(policy, *args, **kwargs)
         self.remove_status = policy.remove_status
         self.pull_latest = policy.pull_latest
         self.pull_insecure_registry = policy.pull_insecure_registry
         self.update_persistent = policy.update_persistent
+        self.check_commands = policy.check_exec_commands
         self.base_image_ids = {
             client_name: policy.images[client_name].ensure_image(
                 self.iname_tag(policy.base_image), pull_latest=self.pull_latest,
@@ -217,6 +223,49 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                 return False
             log.debug("Checked link %s - found alias %s", link.container, link.alias)
         return True
+
+    def _run_missing_commands(self, container_map, config_name, container_config, client_name, client_config, client,
+                              container_name, instance_name):
+        def _find_full_command(f_cmd, f_user):
+            for __, c_user, c_cmd in current_commands:
+                if c_user == f_user and c_cmd == f_cmd:
+                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
+                    return True
+            return False
+
+        def _find_partial_command(f_cmd, f_user):
+            for __, c_user, c_cmd in current_commands:
+                if c_user == f_user and f_cmd in c_cmd:
+                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
+                    return True
+            return False
+
+        if not self.check_commands or self.check_commands == CMD_CHECK_NONE or not container_config.exec_commands:
+            return
+        log.debug("Checking commands for container %s.", container_name)
+        current_commands = client.top(container_name, ps_args='-eo pid,user,args')['Processes']
+        if self.check_commands == CMD_CHECK_FULL:
+            cmd_exists = _find_full_command
+        elif self.check_commands == CMD_CHECK_PARTIAL:
+            cmd_exists = _find_partial_command
+        else:
+            log.debug("Invalid check mode %s - skipping.", self.check_commands)
+            return
+        for cmd, cmd_user in container_config.exec_commands:
+            res_cmd = resolve_value(cmd)
+            if isinstance(res_cmd, (list, tuple)):
+                res_cmd = ' '.join(res_cmd)
+            if cmd_user is not None:
+                res_user = resolve_value(cmd_user)
+            else:
+                res_user = utils.extract_user(container_config.user)
+            if res_user is None:
+                res_user = 'root'
+            log.debug("Looking up %s command for user %s: %s", self.check_commands, res_user, res_cmd)
+            if not cmd_exists(res_cmd, res_user):
+                log.debug("Not found.")
+                self.exec_single_command(container_map, config_name, container_config, client_name, client_config,
+                                         client, container_name, instance_name, cmd, cmd_user)
 
     def iname_tag(self, image, container_map=None):
         i_name = '{0}:latest'.format(image) if ':' not in image else image
@@ -327,6 +376,11 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ForwardActionGeneratorM
                         is_kwargs = self._policy.get_host_config_kwargs(c_map, container_name, c_config, client_name,
                                                                         client_config, ci_name, ci)
                     client.start(**is_kwargs)
+                    self.exec_container_commands(c_map, container_name, c_config, client_name, client_config, client,
+                                                 ci_name, ci)
+                elif ci_running:
+                    self._run_missing_commands(c_map, container_name, c_config, client_name, client_config, client,
+                                               ci_name, ci)
 
 
 class ContainerUpdateMixin(object):
@@ -334,6 +388,7 @@ class ContainerUpdateMixin(object):
     pull_latest = False
     pull_insecure_registry = False
     update_persistent = False
+    check_exec_commands = CMD_CHECK_FULL
 
     def update_actions(self, map_name, container, instances=None, **kwargs):
         """

@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
 from six import with_metaclass, iteritems, text_type
+import logging
 from docker.utils.utils import create_host_config
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
@@ -13,6 +14,9 @@ from .dep import ContainerDependencyResolver
 from .cache import ContainerCache, ImageCache
 from .utils import (extract_user, get_host_binds, get_port_bindings, get_volumes, init_options, update_kwargs,
                     use_host_config, get_instance_volumes, get_preparation_cmd)
+
+
+log = logging.getLogger(__name__)
 
 
 class BasePolicy(with_metaclass(ABCMeta, object)):
@@ -565,6 +569,73 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
+    @classmethod
+    def get_exec_create_kwargs(cls, container_map, config_name, container_config, client_name, client_config,
+                               container_name, instance, exec_cmd, exec_user, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to set up the HostConfig or start a container.
+
+        :param container_map: Container map object.
+        :type container_map: dockermap.map.container.ContainerMap
+        :param config_name: Container configuration name.
+        :type config_name: unicode
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.config.ContainerConfiguration
+        :param client_name: Client configuration name.
+        :type client_name: unicode
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container_name: Container name or id.
+        :type container_name: unicode | NoneType
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict | NoneType
+        :param exec_cmd: Command to be executed.
+        :type exec_cmd: unicode
+        :param exec_user: User to run the command.
+        :type exec_user: unicode
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        c_kwargs = dict(
+            container=container_name,
+            cmd=resolve_value(exec_cmd),
+        )
+        if exec_user is not None:
+            c_kwargs['user'] = resolve_value(exec_user)
+        elif container_config.user is not NotSet:
+            c_kwargs['user'] = extract_user(container_config.user)
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
+    @classmethod
+    def get_exec_start_kwargs(cls, container_map, config_name, container_config, client_name, client_config,
+                              container_name, instance, exec_id, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to set up the HostConfig or start a container.
+
+        :param container_map: Container map object.
+        :type container_map: dockermap.map.container.ContainerMap
+        :param config_name: Container configuration name.
+        :type config_name: unicode
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.config.ContainerConfiguration
+        :param client_name: Client configuration name.
+        :type client_name: unicode
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param container_name: Container name or id.
+        :type container_name: unicode | NoneType
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict | NoneType
+        :param exec_id: Id of the exec instance.
+        :type exec_id: long
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        c_kwargs = dict(exec_id=exec_id)
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
     def get_clients(self, c_config, c_map):
         """
         Returns the Docker client objects for a given container configuration or map. If there are no clients specified
@@ -988,6 +1059,72 @@ class AttachedPreparationMixin(object):
                              "path '{1}' in container {2}.".format(alias, path, volume_container))
         for cmd in get_preparation_cmd(container_config, local_path):
             client.run_cmd(cmd)
+
+
+class ExecMixin(object):
+    """
+    Utility mixin for executing configured commands inside containers.
+    """
+    def exec_single_command(self, container_map, config_name, container_config, client_name, client_config, client,
+                            container_name, instance_name, cmd, cmd_user):
+        """
+        Runs a single command inside a container.
+
+        :param container_map: Container map instance.
+        :type container_map: dockermap.map.container.ContainerMap
+        :param config_name: Container configuration name.
+        :type config_name: unicode
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.config.ContainerConfiguration
+        :param client_name: Client configuration name.
+        :type client_name: unicode
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param client: Client object.
+        :type client: docker.client.Client
+        :param container_name: Container to run the command in.
+        :type container_name: unicode
+        :param instance_name: Container instance name.
+        :type instance_name: unicode
+        :param cmd: Command to run.
+        :type cmd: unicode | list[unicode]
+        :param cmd_user: User to run the command as.
+        :type cmd_user: unicode | int
+        """
+        log.debug("Creating exec command in container %s with user %s: %s.", container_name, cmd_user, cmd)
+        ec_kwargs = self._policy.get_exec_create_kwargs(container_map, config_name, container_config, client_name,
+                                                        client_config, container_name, instance_name, cmd, cmd_user)
+        e_id = client.exec_create(**ec_kwargs)['Id']
+        log.debug("Starting exec command with id %s.", e_id)
+        es_kwargs = self._policy.get_exec_start_kwargs(container_map, config_name, container_config, client_name,
+                                                       client_config, container_name, instance_name, e_id)
+        client.exec_start(**es_kwargs)
+
+    def exec_container_commands(self, container_map, config_name, container_config, client_name, client_config, client,
+                                container_name, instance_name):
+        """
+        Runs all configured commands of a container configuration inside the container instance.
+
+        :param container_map: Container map instance.
+        :type container_map: dockermap.map.container.ContainerMap
+        :param config_name: Container configuration name.
+        :type config_name: unicode
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.config.ContainerConfiguration
+        :param client_name: Client configuration name.
+        :type client_name: unicode
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param client: Client object.
+        :type client: docker.client.Client
+        :param container_name: Container to run the command in.
+        :type container_name: unicode
+        :param instance_name: Container instance name.
+        :type instance_name: unicode
+        """
+        for cmd, cmd_user in container_config.exec_commands:
+            self.exec_single_command(container_map, config_name, container_config, client_name, client_config, client,
+                                     container_name, instance_name, cmd, cmd_user)
 
 
 class ForwardActionGeneratorMixin(object):
