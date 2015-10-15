@@ -7,6 +7,7 @@ import shlex
 import six
 
 from ...functional import resolve_value
+from ..input import EXEC_POLICY_INITIAL
 from .base import AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
 from . import utils
 
@@ -251,7 +252,9 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, ForwardActio
         else:
             log.debug("Invalid check mode %s - skipping.", self.check_commands)
             return
-        for cmd, cmd_user in container_config.exec_commands:
+        for cmd, cmd_user, cmd_policy in container_config.exec_commands:
+            if cmd_policy == EXEC_POLICY_INITIAL:
+                continue
             res_cmd = resolve_value(cmd)
             if isinstance(res_cmd, (list, tuple)):
                 res_cmd = ' '.join(res_cmd)
@@ -354,13 +357,16 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, ForwardActio
                         existing_containers.remove(ci_name)
                         ci_create = True
                         ci_start = True
+                        ci_initial = True
                     else:
                         ci_create = False
-                        ci_start = utils.is_initial(ci_status) if c_config.persistent else not ci_running
+                        ci_initial = utils.is_initial(ci_status)
+                        ci_start = ci_initial if c_config.persistent else not ci_running
                 else:
                     log.debug("Container not found.")
                     ci_create = True
                     ci_start = True
+                    ci_initial = True
                 if ci_create:
                     log.debug("Creating container %s.", ci_name)
                     ic_kwargs = self._policy.get_create_kwargs(c_map, config_name, c_config, client_name,
@@ -377,7 +383,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, ForwardActio
                                                                         client_config, ci_name, ci)
                     client.start(**is_kwargs)
                     self.exec_container_commands(c_map, config_name, c_config, client_name, client_config, client,
-                                                 ci_name, ci)
+                                                 ci_name, ci, ci_initial)
                 elif ci_running:
                     self._run_missing_commands(c_map, config_name, c_config, client_name, client_config, client,
                                                ci_name, ci)

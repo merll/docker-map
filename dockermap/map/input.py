@@ -11,8 +11,11 @@ from ..functional import lazy_type, uses_type_registry
 SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface'))
-ExecCommand = namedtuple('ExecCommand', ('cmd', 'user'))
+ExecCommand = namedtuple('ExecCommand', ('cmd', 'user', 'policy'))
 
+
+EXEC_POLICY_RESTART = 'restart'
+EXEC_POLICY_INITIAL = 'initial'
 
 CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
 
@@ -260,14 +263,16 @@ def get_exec_command(value):
     if isinstance(value, ExecCommand):
         return value
     elif isinstance(value, six.string_types + (lazy_type, )):
-        return ExecCommand(value, None)
+        return ExecCommand(value, None, EXEC_POLICY_RESTART)
     elif isinstance(value, (list, tuple)):
         v_len = len(value)
-        if v_len == 2:
+        if v_len == 3:
             return ExecCommand(*value)
+        elif v_len == 2:
+            return ExecCommand(value[0], value[1], EXEC_POLICY_RESTART)
         elif v_len == 1:
-            return ExecCommand(value[0], None)
-        raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
+            return ExecCommand(value[0], None, EXEC_POLICY_RESTART)
+        raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
                          "ExecCommand tuple. Found length {0}.".format(v_len))
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 

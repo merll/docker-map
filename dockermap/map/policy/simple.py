@@ -83,7 +83,7 @@ class SimpleStartGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionGen
                                                                        client_config, ci_name, instance, kwargs=kwargs)
                     client.start(**c_kwargs)
                     self.exec_container_commands(c_map, config_name, c_config, client_name, client_config, client,
-                                                 ci_name, instance)
+                                                 ci_name, instance, utils.is_initial(ci_status))
 
 
 class SimpleStartMixin(object):
@@ -130,7 +130,7 @@ class SimpleRestartMixin(ExecMixin):
                                                        instance, kwargs=kwargs)
                     client.restart(**c_kwargs)
                     self.exec_container_commands(c_map, container, c_config, client_name, client_config, client,
-                                                 ci_name, instance)
+                                                 ci_name, instance, False)
 
 
 class SimpleStopGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):

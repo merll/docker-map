@@ -8,7 +8,7 @@ from docker.utils.utils import create_host_config
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from ...functional import resolve_value
-from ..input import NotSet
+from ..input import NotSet, EXEC_POLICY_INITIAL
 from . import ACTION_DEPENDENCY_FLAG
 from .dep import ContainerDependencyResolver
 from .cache import ContainerCache, ImageCache
@@ -1101,7 +1101,7 @@ class ExecMixin(object):
         client.exec_start(**es_kwargs)
 
     def exec_container_commands(self, container_map, config_name, container_config, client_name, client_config, client,
-                                container_name, instance_name):
+                                container_name, instance_name, is_initial):
         """
         Runs all configured commands of a container configuration inside the container instance.
 
@@ -1121,10 +1121,13 @@ class ExecMixin(object):
         :type container_name: unicode
         :param instance_name: Container instance name.
         :type instance_name: unicode
+        :param is_initial: Set to ``True`` if the container has just been created or had never been started before.
+        :type is_initial: bool
         """
-        for cmd, cmd_user in container_config.exec_commands:
-            self.exec_single_command(container_map, config_name, container_config, client_name, client_config, client,
-                                     container_name, instance_name, cmd, cmd_user)
+        for cmd, cmd_user, cmd_policy in container_config.exec_commands:
+            if cmd_policy != EXEC_POLICY_INITIAL or not is_initial:
+                self.exec_single_command(container_map, config_name, container_config, client_name, client_config,
+                                         client, container_name, instance_name, cmd, cmd_user)
 
 
 class ForwardActionGeneratorMixin(object):

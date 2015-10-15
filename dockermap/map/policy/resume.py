@@ -75,8 +75,9 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionG
                     images.ensure_image(ic_kwargs['image'])
                     yield client_name, client.create_container(**ic_kwargs)
                     existing_containers.add(ci_name)
-                needs_start = ci_create or utils.is_initial(ci_status) if c_config.persistent else not ci_running
-                ci_start = ci_create or ci_stop or needs_start
+                is_initial = ci_create or utils.is_initial(ci_status)
+                needs_start = is_initial if c_config.persistent else not ci_running
+                ci_start = ci_stop or needs_start
                 if ci_start:
                     if use_host_config:
                         is_kwargs = dict(container=ci_name)
@@ -85,7 +86,7 @@ class ResumeStartupGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionG
                                                                         client_config, ci_name, ci)
                     client.start(**is_kwargs)
                     self.exec_container_commands(c_map, config_name, c_config, client_name, client_config, client,
-                                                 ci_name, ci)
+                                                 ci_name, ci, is_initial)
 
 
 class ResumeStartupMixin(object):
