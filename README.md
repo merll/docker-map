@@ -19,7 +19,8 @@ The library builds on functionality of the Docker Remote API client for Python,
 `docker-py`. Its main target is to reduce the repetitive and error-prone code that is
 required for creating and connecting containers in a non-trivial stack. It can be used
 standalone for custom orchestration or for enhancing available deployment / remote
-execution utilities (see [Docker-Fabric](https://github.com/merll/docker-fabric)).
+execution utilities (see [Docker-Fabric](https://github.com/merll/docker-fabric),
+[Salt Container-Map](https://github.com/merll/salt-container-map)).
 
 Containers and their dependencies are configured object-based, through Python dictionaries,
 or YAML files.
@@ -79,6 +80,7 @@ elements are:
   one, assigns file system permissions as set in `permissions` and `user`. This makes
   configuration of sockets very easy.
 * `exposes`: Configures port bindings for linked containers and on host interfaces.
+* `exec_commands`: Launches commands on containers after they have been created and started.
 * `create_options` and `host_config` provide the possibility to add further keyword
   arguments such as `command` or `entrypoint`, which are passed through to the `docker-py`
   client.

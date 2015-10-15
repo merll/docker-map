@@ -365,6 +365,42 @@ entirely. The following syntax is supported:
   re-using its network. Note that if there are multiple instances, you need to specify which instance the container
   is supposed to connect to in the pattern ``<container name>.<instance name>``.
 
+Commands
+""""""""
+By default every container is started with its pre-configured entrypoint and command. These can be overwritten in each
+configuration by setting ``entrypoint`` or ``command`` in
+:attr:`~dockermap.map.config.ContainerConfiguration.create_options`.
+
+In addition to that, :attr:`~dockermap.map.config.ContainerConfiguration.exec_commands` allows for setting commands to
+run directly after the container has started, e.g. for processing additional scripts. The following input formats are
+considered:
+
+* A simple command line is launched with the configured
+  :attr:`~dockermap.map.config.ContainerConfiguration.user` of the container, or ``root`` if none has been set::
+
+    config.exec_commands = "/bin/bash -c 'script.sh'"
+    config.exec_commands = ["/bin/bash -c 'script.sh'"]
+
+* A tuple of two elements is read as ``command line, user``. This allows for overriding the user that launches the
+  command. In this case, the command line can also be a list (executeable + arguments, as allowed by the Docker API::
+
+    config.exec_commands = [
+        ("/bin/bash -c 'script1.sh'", 'root'),
+        (['/bin/bash', '-c', 'script2.sh']", 'user'),
+    ]
+
+* A third element in a tuple defines when the command should be run. :const:`dockermap.map.input.EXEC_POLICY_RESTART`
+  is the default, and starts the command each time the container is started. Setting it to
+  :const:`dockermap.map.input.EXEC_POLICY_INITIAL` indicates that the command should only be run once at container
+  creation, but not at a later time, e.g. when the container is restarted or updated::
+
+    from dockermap.map.input import EXEC_POLICY_INITIAL
+    config.exec_commands = [
+        ("/bin/bash -c 'script1.sh'", 'root'),                              # Run each time the container is started.
+        (['/bin/bash', '-c', 'script2.sh']", 'user', EXEC_POLICY_INITIAL),  # Run only when the container is created.
+    ]
+
+
 Inheritance
 """""""""""
 Container configurations can inherit settings from others, by setting their names in

@@ -76,6 +76,30 @@ The :ref:`container_map_example` map can be more easily written as:
        instance2: data/app2
 
 
+.. note::
+
+   It is possible to write nested lists in YAML, either in JSON notation, e.g.
+
+   .. code-block:: yaml
+
+      ...
+      exec_commands:
+      - [['/bin/bash', '-c', 'script.sh'], 'root']
+
+   or described in YAML syntax
+
+   .. code-block:: yaml
+
+      ...
+      exec_commands:
+      -
+        -
+          - /bin/bash
+          - -c
+          - script.sh
+        - root
+
+
 A configuration of clients, such as briefly described in :ref:`map_clients`, would be written in the following format:
 
 .. code-block:: yaml

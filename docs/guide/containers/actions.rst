@@ -47,6 +47,14 @@ applies:
   * Exposed ports of the container are checked against :attr:`~dockermap.map.config.ContainerConfiguration.exposes`.
     If any ports are missing or configured differently, this also causes a container update.
 
+Post-start commands in :attr:`~dockermap.map.config.ContainerConfiguration.exec_commands` are checked if they can
+be found on a running container, matching command line and user. If not, the configured command is executed, unless
+:const:`dockermap.map.input.EXEC_POLICY_INITIAL` has been set for the command. By default
+the entire command line is matched. For considering partial matches (i.e. if the command in the process overview gets
+modified), you can set :attr:`~dockermap.map.update.ContainerUpdateMixin.check_exec_commands` to
+:const:`dockermap.map.update.CMD_CHECK_PARTIAL`. Setting it to :const:`dockermap.map.update.CMD_CHECK_NONE`
+deactivates this check entirely.
+
 For ensuring the integrity, all missing containers are created and started along the dependency path.
 In order to see what defines a dependency, see :ref:`shared-volumes-containers` and :ref:`linked-containers`.
 
