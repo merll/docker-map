@@ -893,21 +893,21 @@ class AbstractActionGenerator(with_metaclass(ABCMeta, object)):
         self._policy = policy
 
     @abstractmethod
-    def get_dependency_path(self, map_name, container_name):
+    def get_dependency_path(self, map_name, config_name):
         """
         To be implemented by subclasses (or using :class:`ForwardActionGeneratorMixin` or
         class:`ReverseActionGeneratorMixin`). Should provide an iterable of objects to be handled before the explicitly
         selected container configuration.
 
         :param map_name: Container map name.
-        :param container_name: Container configuration name.
+        :param config_name: Container configuration name.
         :return: Iterable of dependency objects in tuples of map name, container (config) name, instance.
         :rtype: list[tuple]
         """
         pass
 
     @abstractmethod
-    def generate_item_actions(self, map_name, c_map, container_name, c_config, instances, flags, *args, **kwargs):
+    def generate_item_actions(self, map_name, c_map, config_name, c_config, instances, flags, *args, **kwargs):
         """
         To be implemented by subclasses. Should generate the actions on a single item, which can be either a dependency
         or a explicitly selected container.
@@ -916,8 +916,8 @@ class AbstractActionGenerator(with_metaclass(ABCMeta, object)):
         :type map_name: unicode
         :param c_map: Container map instance.
         :type c_map: dockermap.map.container.ContainerMap
-        :param container_name: Container configuration name.
-        :type container_name: unicode
+        :param config_name: Container configuration name.
+        :type config_name: unicode
         :param c_config: Container configuration object.
         :type c_config: dockermap.map.config.ContainerConfiguration
         :param instances: Instance names as a list. Can be ``[None]``
@@ -1131,13 +1131,13 @@ class ForwardActionGeneratorMixin(object):
     """
     Defines the dependency path as dependencies of a container configuration.
     """
-    def get_dependency_path(self, map_name, container_name):
-        return self._policy.get_dependencies(map_name, container_name)
+    def get_dependency_path(self, map_name, config_name):
+        return self._policy.get_dependencies(map_name, config_name)
 
 
 class ReverseActionGeneratorMixin(object):
     """
     Defines the dependency path as dependents of a container configuration.
     """
-    def get_dependency_path(self, map_name, container_name):
-        return self._policy.get_dependents(map_name, container_name)
+    def get_dependency_path(self, map_name, config_name):
+        return self._policy.get_dependents(map_name, config_name)
