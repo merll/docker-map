@@ -3,6 +3,14 @@
 Change History
 ==============
 
+0.6.0
+-----
+* Added ``exec_commands`` to start additional commands (e.g. scripts) along with the container.
+* Container links are now passed as lists to the API, so that the same container can be linked with multiple
+  aliases.
+* Various compatibility fixes with Python 3 (`PR #9 <https://github.com/merll/docker-map/pull/9>`_).
+* Bugfixes on container restart and configuration merge.
+
 0.5.3
 -----
 * Bugfixes for network mode and volume check of inherited configurations.
