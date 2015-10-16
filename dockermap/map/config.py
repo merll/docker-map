@@ -237,8 +237,9 @@ class ContainerConfiguration(object):
     @property
     def exec_commands(self):
         """
-        Commands to run as soon as the container is started. Set in the format `ExecCommand(cmd, user)`, where the
-        user is set to the same as this configuration's user by default (or root, if not available).
+        Commands to run as soon as the container is started. Set in the format `ExecCommand(cmd, user, policy)`, where
+        the user is set to the same as this configuration's user by default (or root, if not available). The policy
+        decides when to start the command.
 
         :return: Commands to run when the container is started.
         :rtype: list[dockermap.map.input.ExecCommand]

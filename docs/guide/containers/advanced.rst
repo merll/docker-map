@@ -184,6 +184,7 @@ Lazy value resolution is available at the following points:
     :attr:`~dockermap.map.config.ContainerConfiguration.start_options`;
   * items of :attr:`~dockermap.map.config.ContainerConfiguration.binds`, if they are not volume aliases, i.e. they
     directly describe container volume and host path.
+  * command line and user defined in each element of :attr:`~dockermap.map.config.ContainerConfiguration.exec_commands`;
   * and elements listed in :attr:`~dockermap.map.config.ContainerConfiguration.shares`.
 * On client configuration: For addresses in :attr:`~dockermap.map.config.ClientConfiguration.interfaces`.
 

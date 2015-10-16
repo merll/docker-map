@@ -519,6 +519,7 @@ Input formats
 On the attributes :attr:`~dockermap.map.config.ContainerConfiguration.instances`,
 :attr:`~dockermap.map.config.ContainerConfiguration.shares`,
 :attr:`~dockermap.map.config.ContainerConfiguration.uses`, :attr:`~dockermap.map.config.ContainerConfiguration.links`,
+:attr:`~dockermap.map.config.ContainerConfiguration.exec_commands`,
 :attr:`~dockermap.map.config.ContainerConfiguration.attaches`, and
 :attr:`~dockermap.map.config.ContainerConfiguration.clients`, any assignment (property set) will be converted to
 a list::
@@ -535,10 +536,11 @@ and::
 
 Additional conversions are made for :attr:`~dockermap.map.config.ContainerConfiguration.binds`,
 :attr:`~dockermap.map.config.ContainerConfiguration.uses`,
-:attr:`~dockermap.map.config.ContainerConfiguration.links`, and
-:attr:`~dockermap.map.config.ContainerConfiguration.exposes`; each element in an input list or tuple is converted to
-:attr:`~dockermap.map.config.SharedVolume`, :attr:`~dockermap.map.config.ContainerLink`, or
-:attr:`~dockermap.map.config.PortBinding`. Keep this in mind when
+:attr:`~dockermap.map.config.ContainerConfiguration.links`,
+:attr:`~dockermap.map.config.ContainerConfiguration.exposes`, and
+:attr:`~dockermap.map.config.ContainerConfiguration.exec_commands`; each element in an input list or tuple is converted
+to :attr:`~dockermap.map.config.SharedVolume`, :attr:`~dockermap.map.config.ContainerLink`,
+:attr:`~dockermap.map.config.PortBinding` or :attr:`~dockermap.map.config.ExecCommand`. Keep this in mind when
 modifying existing elements, since no automated conversion is done then. For example, for adding a host-shared volume
 at run-time, use::
 
