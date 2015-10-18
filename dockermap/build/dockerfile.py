@@ -440,7 +440,7 @@ class DockerFile(DockerStringBuffer):
                 self.prefix('RUN', 'rm -Rf', filename)
             self.blank()
         if self._volumes is not None:
-            self.prefix('VOLUME', json.dumps(self._volumes, encoding='utf-8'))
+            self.prefix('VOLUME', json.dumps(self._volumes))
         if self._cmd_user:
             self.prefix('USER', self._cmd_user)
         if self._cmd_workdir:
