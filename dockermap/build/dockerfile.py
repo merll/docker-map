@@ -293,7 +293,7 @@ class DockerFile(DockerStringBuffer):
         :type input_str: unicode
         """
         self.check_not_finalized()
-        self.fileobj.write(input_str)
+        self.fileobj.write(input_str.encode('utf-8'))
 
     def writelines(self, sequence):
         """
@@ -307,8 +307,8 @@ class DockerFile(DockerStringBuffer):
 
     def writeline(self, input_str):
         self.check_not_finalized()
-        self.fileobj.write(input_str)
-        self.fileobj.write('\n')
+        self.fileobj.write(input_str.encode('utf-8'))
+        self.fileobj.write(b'\n')
 
     @property
     def volumes(self):

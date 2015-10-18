@@ -22,7 +22,7 @@ def parse_response(response):
     :rtype: dict
     """
     try:
-        obj = json.loads(response, encoding='utf-8')
+        obj = json.loads(response.decode('utf-8'))
     except ValueError:
         return {}
     return obj
