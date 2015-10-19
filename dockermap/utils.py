@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import json
 import os
+import six
 
 from .functional import lazy_once
 
@@ -21,8 +22,10 @@ def parse_response(response):
     :return: Decoded object from the JSON string. Returns an empty dictionary if input was invalid.
     :rtype: dict
     """
+    if isinstance(response, six.binary_type):
+        response = response.decode('utf-8')
     try:
-        obj = json.loads(response.decode('utf-8'))
+        obj = json.loads(response)
     except ValueError:
         return {}
     return obj
