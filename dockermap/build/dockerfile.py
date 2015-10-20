@@ -72,9 +72,9 @@ def format_command(cmd, shell=False):
             return cmd
     else:
         if isinstance(cmd, (list, tuple)):
-            return json.dumps(cmd, encoding='utf-8')
+            return json.dumps(cmd)
         elif isinstance(cmd, six.string_types):
-            return json.dumps([c for c in _split_cmd()], encoding='utf-8')
+            return json.dumps([c for c in _split_cmd()])
     raise ValueError("Invalid type of command string or sequence: {0}".format(cmd))
 
 
@@ -293,7 +293,7 @@ class DockerFile(DockerStringBuffer):
         :type input_str: unicode
         """
         self.check_not_finalized()
-        self.fileobj.write(input_str)
+        self.fileobj.write(input_str.encode('utf-8'))
 
     def writelines(self, sequence):
         """
@@ -307,8 +307,8 @@ class DockerFile(DockerStringBuffer):
 
     def writeline(self, input_str):
         self.check_not_finalized()
-        self.fileobj.write(input_str)
-        self.fileobj.write('\n')
+        self.fileobj.write(input_str.encode('utf-8'))
+        self.fileobj.write(b'\n')
 
     @property
     def volumes(self):
@@ -440,7 +440,7 @@ class DockerFile(DockerStringBuffer):
                 self.prefix('RUN', 'rm -Rf', filename)
             self.blank()
         if self._volumes is not None:
-            self.prefix('VOLUME', json.dumps(self._volumes, encoding='utf-8'))
+            self.prefix('VOLUME', json.dumps(self._volumes))
         if self._cmd_user:
             self.prefix('USER', self._cmd_user)
         if self._cmd_workdir:
