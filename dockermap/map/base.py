@@ -12,11 +12,8 @@ from .dep import SingleDependencyResolver
 from ..build.context import DockerContext
 from ..utils import is_latest_image, is_repo_image, parse_response
 
-
 log = logging.getLogger(__name__)
-CONTAINER_LOG = logging.INFO + 2
-STREAM_LOG = logging.INFO + 1
-STREAM_PROGRESS = logging.INFO - 1
+
 LOG_PROGRESS_FORMAT = "{0} {1} {2}"
 LOG_CONTAINER_FORMAT = "[%s] %s"
 
@@ -80,7 +77,7 @@ class DockerClientWrapper(docker.Client):
             output = parse_response(e)
             if 'stream' in output:
                 log_str = output['stream'][:-1]
-                self.push_log(log_str, STREAM_LOG)
+                self.push_log(log_str, logging.INFO)
             elif 'error' in output:
                 log_str = output['error']
                 self.push_log(log_str, logging.ERROR)
@@ -100,7 +97,7 @@ class DockerClientWrapper(docker.Client):
                     if oid:
                         self.push_progress(output['status'], oid, progress)
                     else:
-                        self.push_log(output['status'], STREAM_LOG)
+                        self.push_log(output['status'], logging.INFO)
                 elif 'error' in output:
                     error_message = output['error']
                     self.push_log(error_message, logging.ERROR)
@@ -121,13 +118,13 @@ class DockerClientWrapper(docker.Client):
         """
         pass
 
-    def push_log(self, info, level=logging.INFO, *args, **kwargs):
+    def push_log(self, info, level, *args, **kwargs):
         """
         Writes logs. To be fully implemented by subclasses.
 
         :param info: Log message content.
         :type info: unicode
-        :param level: Logging level; default is :data:`~logging.INFO`.
+        :param level: Logging level.
         :type level: int
         :param args: Positional arguments to pass to logger.
         :param kwargs: Keyword arguments to pass to logger.
@@ -354,7 +351,7 @@ class DockerClientWrapper(docker.Client):
         if log_lines and not log_lines[-1]:
             log_lines.pop()
         for line in log_lines:
-            self.push_log(LOG_CONTAINER_FORMAT, CONTAINER_LOG, container, line)
+            self.push_log(LOG_CONTAINER_FORMAT, logging.INFO, container, line)
 
     def remove_container(self, container, raise_on_error=False, **kwargs):
         """
