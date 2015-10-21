@@ -76,7 +76,9 @@ class DockerClientWrapper(docker.Client):
         for e in response:
             output = parse_response(e)
             if 'stream' in output:
-                log_str = output['stream'][:-1]
+                log_str = output['stream']
+                if log_str and log_str[-1] == '\n':
+                    log_str = log_str[:-1]
                 self.push_log(log_str, logging.INFO)
             elif 'error' in output:
                 log_str = output['error']
