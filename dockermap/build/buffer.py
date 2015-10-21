@@ -63,7 +63,7 @@ class DockerBuffer(with_metaclass(ABCMeta, object)):
         Returns the current value of the buffer.
 
         :return: Representation if the buffer.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._fileobj.getvalue()
 
@@ -81,9 +81,9 @@ class DockerBuffer(with_metaclass(ABCMeta, object)):
         object. Implementations will usually finalize the buffer.
 
         :param name: Name to store the contents under.
-        :type name: unicode
+        :type name: unicode | str
         :param encoding: Optional, apply content encoding before saving.
-        :type encoding: unicode
+        :type encoding: unicode | str
         """
         pass
 
@@ -105,9 +105,9 @@ class DockerStringBuffer(with_metaclass(ABCMeta, DockerBuffer)):
         Save the string buffer to a file. Finalizes prior to saving.
 
         :param name: File path.
-        :type name: unicode
+        :type name: unicode | str
         :param encoding: Optional, default is `utf-8`.
-        :type encoding: unicode
+        :type encoding: unicode | str
         """
         self.finalize()
         with open(name, 'wb+') as f:
@@ -128,7 +128,7 @@ class DockerTempFile(with_metaclass(ABCMeta, DockerBuffer)):
         Copy the contents of the temporary file somewhere else. Finalizes prior to saving.
 
         :param name: File path.
-        :type name: unicode
+        :type name: unicode | str
         """
         self.finalize()
         with open(name, 'wb+') as f:

@@ -21,13 +21,13 @@ def get_host_path(root, path, instance=None):
     name.
 
     :param root: Root path to prepend, if ``path`` does not already describe an absolute path.
-    :type root: unicode | AbstractLazyObject
+    :type root: unicode | str | AbstractLazyObject
     :param path: Path string or dictionary of per-instance paths.
-    :type path: unicode | dict | AbstractLazyObject
+    :type path: unicode | str | dict | AbstractLazyObject
     :param instance: Optional instance name.
-    :type instance: unicode
+    :type instance: unicode | str
     :return: Path on the host that is mapped to the container volume.
-    :rtype: unicode
+    :rtype: unicode | str
     """
     r_val = resolve_value(path)
     if isinstance(r_val, dict):
@@ -89,7 +89,7 @@ class ContainerConfiguration(object):
         """
 
         :return:
-        :rtype: list[unicode]
+        :rtype: list[unicode | str]
         """
         return self._extends
 
@@ -104,7 +104,7 @@ class ContainerConfiguration(object):
         has the same name.
 
         :return: Base image name.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._image
 
@@ -123,7 +123,7 @@ class ContainerConfiguration(object):
         containers will be created for each instance in the format `map_name.container_name.instance`.
 
         :return: Instance names.
-        :rtype: list[unicode]
+        :rtype: list[unicode | str]
         """
         return self._instances
 
@@ -137,7 +137,7 @@ class ContainerConfiguration(object):
         Shared volumes for a container.
 
         :return: Shared volumes.
-        :rtype: list[unicode]
+        :rtype: list[unicode | str]
         """
         return self._shares
 
@@ -167,7 +167,7 @@ class ContainerConfiguration(object):
         names if all volumes are to be used of that container.
 
         :return: Used volumes.
-        :rtype: list[unicode]
+        :rtype: list[unicode | str]
         """
         return self._uses
 
@@ -198,7 +198,7 @@ class ContainerConfiguration(object):
         available to other containers.
 
         :return: Attached containers.
-        :rtype: list[unicode]
+        :rtype: list[unicode | str]
         """
         return self._attaches
 
@@ -258,7 +258,7 @@ class ContainerConfiguration(object):
         (`(user_name, group_name)`), or int (`user_id`).
 
         :return: User name and (optional) group.
-        :rtype: unicode | tuple | int
+        :rtype: unicode | str | tuple | int
         """
         return self._user
 
@@ -276,7 +276,7 @@ class ContainerConfiguration(object):
         Permission flags to be set for attached volumes. Can be in any notation accepted by `chmod`.
 
         :return: Permission flags.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._permissions
 
@@ -317,7 +317,7 @@ class ContainerConfiguration(object):
         specified globally for a map.
 
         :return: Container configuration clients.
-        :rtype: list[unicode]
+        :rtype: list[unicode | str]
         """
         return self._clients
 
@@ -383,7 +383,7 @@ class ContainerConfiguration(object):
         name. Setting it to ``disabled`` deactivates networking for the container.
 
         :return: Container networking setting.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._network
 
@@ -490,7 +490,7 @@ class HostVolumeConfiguration(DictMap):
     Class for storing volumes, as shared from the host with Docker containers.
 
     :param root: Optional root directory for host volumes.
-    :type root: unicode
+    :type root: unicode | str
     """
     def __init__(self, root=None, *args, **kwargs):
         self._root = root
@@ -503,7 +503,7 @@ class HostVolumeConfiguration(DictMap):
         this.
 
         :return: Root directory for host volumes.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._root
 
@@ -521,9 +521,9 @@ class ClientConfiguration(DictMap):
     instances.
 
     :param base_url: URL of the Docker Remote API.
-    :type base_url: unicode
+    :type base_url: unicode | str
     :param version: Docker Remote API version.
-    :type version: unicode
+    :type version: unicode | str
     :param timeout: Request timeout.
     :type timeout: int
     :param args: Further initializing dictionary with values.
@@ -593,7 +593,7 @@ class ClientConfiguration(DictMap):
         the client.
 
         :return: URL
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._base_url
 
@@ -609,7 +609,7 @@ class ClientConfiguration(DictMap):
         on the client.
 
         :return: Docker API version.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._version
 

@@ -56,9 +56,9 @@ def get_user_group(user_group):
 
     :param user_group: User name, user id, user and group in format ``user:group``, ``user_id:group_id``, or tuple of
       ``(user, group)``.
-    :type user_group: unicode | int | tuple
+    :type user_group: unicode | str | int | tuple
     :return: Formatted string with in the format ``user:group``.
-    :rtype: unicode
+    :rtype: unicode | str
     """
     if isinstance(user_group, tuple):
         return '{0}:{1}'.format(*user_group)
@@ -73,7 +73,7 @@ def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no
     Has the same effect as combining :func:`~addgroup`, :func:`~adduser`, and :func:`~assignuser`.
 
     :param username: User name to create.
-    :type username: unicode
+    :type username: unicode | str
     :param uid: User id to use.
     :type uid: int
     :param groupnames: Iterable with additional group names to assign the user to.
@@ -85,11 +85,11 @@ def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no
     :param no_password: Do not set a password for the new user.
     :type: no_password: bool
     :param gecos: Provide GECOS info and suppress prompt.
-    :type gecos: unicode
+    :type gecos: unicode | str
     :param sudo: Prepend `sudo` to the command. Default is ``False``. When using Fabric, use its `sudo` command instead.
     :type sudo: bool
     :return: Unix shell command line.
-    :rtype: unicode
+    :rtype: unicode | str
     """
     group = addgroup(username, uid, system)
     user = adduser(username, uid, system, no_login, no_password, False, gecos)
@@ -105,14 +105,14 @@ def mkdir(path, create_parent=True, check_if_exists=False):
     Generates a unix command line for creating a directory.
 
     :param path: Directory path.
-    :type path: unicode
+    :type path: unicode | str
     :param create_parent: Create parent directories, if necessary. Default is ``True``.
     :type create_parent: bool
     :param check_if_exists: Prepend a check if the directory exists; in that case, the command is not run.
       Default is ``False``.
     :type check_if_exists: bool
     :return: Unix shell command line.
-    :rtype: unicode
+    :rtype: unicode | str
     """
     cmd = _format_cmd('mkdir', path, _p=create_parent)
     if check_if_exists:
@@ -129,12 +129,12 @@ def mkdir_chown(paths, user_group=None, permissions='ug=rwX,o=rX', create_parent
     `user_group` and `permissions` are still be applied.
 
     :param paths: Can be a single path string, or a list or tuple of path strings.
-    :type paths: unicode or iterable
+    :type paths: unicode | str | iterable
     :param: Optional owner of the directory. For notation, see :func:`~get_user_group`.
-    :type user_group: unicode, int, or tuple
+    :type user_group: unicode | str | int | tuple
     :param permissions: Optional permission mode, in any notation accepted by the unix `chmod` command.
       Default is ``ug=rwX,o=rX``.
-    :type permissions: unicode
+    :type permissions: unicode | str
     :param create_parent: Parent directories are created if not present (`-p` argument to `mkdir`).
     :type create_parent: bool
     :param check_if_exists: Prior to creating the directory, checks if it already exists.
@@ -142,7 +142,7 @@ def mkdir_chown(paths, user_group=None, permissions='ug=rwX,o=rX', create_parent
     :param recursive: Apply permissions and owner change recursively.
     :type recursive: bool
     :return: Unix shell command line.
-    :rtype: unicode
+    :rtype: unicode | str
     """
 
     def _generate_str(path):

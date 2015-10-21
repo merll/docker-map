@@ -97,11 +97,11 @@ def _check_network(container_config, client_config, instance_detail):
 
 class SingleContainerVfsCheck(object):
     """
-    :type vfs_paths: dict[tuple, unicode]
+    :type vfs_paths: dict[tuple, unicode | str]
     :type container_map: dockermap.map.container.ContainerMap
-    :type config_name: unicode
-    :type instance_name: unicode
-    :type instance_volumes: dict[unicode, unicode]
+    :type config_name: unicode | str
+    :type instance_name: unicode | str
+    :type instance_volumes: dict[unicode | str, unicode | str]
     """
     def __init__(self, vfs_paths, container_map, config_name, instance_name, instance_volumes):
         self._vfs_paths = vfs_paths
@@ -421,7 +421,7 @@ class ContainerUpdateMixin(object):
         configuration.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
         :type container: unicode
         :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is

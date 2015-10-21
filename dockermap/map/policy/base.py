@@ -24,9 +24,9 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
     Abstract base class providing the basic infrastructure for generating actions based on container state.
 
     :param container_maps: Container maps.
-    :type container_maps: dict[unicode, dockermap.map.container.ContainerMap]
+    :type container_maps: dict[unicode | str, dockermap.map.container.ContainerMap]
     :param clients: Dictionary of clients.
-    :type clients: dict[unicode, dockermap.map.config.ClientConfiguration]
+    :type clients: dict[unicode | str, dockermap.map.config.ClientConfiguration]
     """
     core_image = DEFAULT_COREIMAGE
     base_image = DEFAULT_BASEIMAGE
@@ -65,13 +65,13 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         provided, it is just ``<map name>.<container name>``.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instance: Instance name (optional).
-        :type instance: unicode
+        :type instance: unicode | str
         :return: Container name.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         if instance:
             return '{0}.{1}.{2}'.format(map_name, container, instance)
@@ -87,13 +87,13 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         if the parent container configuration name is provided.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param attached_name: Attached container alias.
-        :type attached_name: unicode
+        :type attached_name: unicode | str
         :param parent_name: Container configuration name that has contains attached container.
-        :type parent_name: unicode
+        :type parent_name: unicode | str
         :return: Container name.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         if parent_name:
             return '{0}.{1}.{2}'.format(map_name, parent_name, attached_name)
@@ -108,11 +108,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         name.
 
         :param container_name: Container name.
-        :type container_name: unicode
+        :type container_name: unicode | str
         :param includes_map: Whether the name includes a map name (e.g. for running containers) or not (e.g. for
          references within the same map).
         :return: Tuple of container map name (optional), container configuration name, and instance.
-        :rtype: tuple[unicode]
+        :rtype: tuple[unicode | str]
         """
         if includes_map:
             map_name, __, ci_name = container_name.partition('.')
@@ -143,9 +143,9 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param image: Image name.
-        :type image: unicode.
+        :type image: unicode | str.
         :return: Image name, where applicable prefixed with a repository.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         if '/' in image:
             if image[0] == '/':
@@ -162,9 +162,9 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         Generates a host name from the container name and the client configuration name.
 
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param container_name: Container name.
-        :type container_name: unicode
+        :type container_name: unicode | str
         """
         if client_name == cls.get_default_client_name():
             return container_name
@@ -194,17 +194,17 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name.
-        :type container_name: unicode
+        :type container_name: unicode | str
         :param instance: Instance name.
-        :type instance: unicode | NoneType
+        :type instance: unicode | str | NoneType
         :param include_host_config: Whether to generate and include the HostConfig.
         :type include_host_config: Set to ``False``, if calling :meth:`get_start_kwargs:` later.
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
@@ -242,15 +242,15 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name or id.
-        :type container_name: unicode | NoneType
+        :type container_name: unicode | str | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
@@ -303,17 +303,17 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name.
-        :type container_name: unicode
+        :type container_name: unicode | str
         :param alias: Alias name of the container volume.
-        :type alias: unicode
+        :type alias: unicode | str
         :param include_host_config: Whether to generate and include the HostConfig.
         :type include_host_config: Set to ``False``, if calling :meth:`get_start_kwargs:` later.
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
@@ -348,17 +348,17 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name or id.
-        :type container_name: unicode | NoneType
+        :type container_name: unicode | str | NoneType
         :param alias: Alias name of the container volume.
-        :type alias: unicode
+        :type alias: unicode | str
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
@@ -388,19 +388,19 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name.
-        :type container_name: unicode
+        :type container_name: unicode | str
         :param alias: Alias name of the container volume.
-        :type alias: unicode
+        :type alias: unicode | str
         :param volume_container: Name of the container that shares the volume.
-        :type volume_container: unicode
+        :type volume_container: unicode | str
         :param include_host_config: Whether to generate and include the HostConfig.
         :type include_host_config: Set to ``False``, if calling :meth:`get_start_kwargs:` later.
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
@@ -439,19 +439,19 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name or id.
-        :type container_name: unicode | NoneType
+        :type container_name: unicode | str | NoneType
         :param alias: Alias name of the container volume.
-        :type alias: unicode
+        :type alias: unicode | str
         :param volume_container: Name of the container that shares the volume.
-        :type volume_container: unicode
+        :type volume_container: unicode | str
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
@@ -479,17 +479,17 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name or id.
-        :type container_name: unicode
+        :type container_name: unicode | str
         :param instance: Instance name.
-        :type instance: unicode | NoneType
+        :type instance: unicode | str | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
@@ -514,17 +514,17 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name or id.
-        :type container_name: unicode
+        :type container_name: unicode | str
         :param instance: Instance name.
-        :type instance: unicode | NoneType
+        :type instance: unicode | str | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
@@ -551,15 +551,15 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name or id.
-        :type container_name: unicode
+        :type container_name: unicode | str
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
@@ -578,21 +578,21 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name or id.
-        :type container_name: unicode | NoneType
+        :type container_name: unicode | str | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict | NoneType
         :param exec_cmd: Command to be executed.
-        :type exec_cmd: unicode
+        :type exec_cmd: unicode | str
         :param exec_user: User to run the command.
-        :type exec_user: unicode
+        :type exec_user: unicode | str
         :return: Resulting keyword arguments.
         :rtype: dict
         """
@@ -616,15 +616,15 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param container_map: Container map object.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param container_name: Container name or id.
-        :type container_name: unicode | NoneType
+        :type container_name: unicode | str | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict | NoneType
         :param exec_id: Id of the exec instance.
@@ -647,7 +647,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         :param c_map: Container map instance.
         :type c_map: dockermap.map.container.ContainerMap
         :return: Docker client objects.
-        :rtype: tuple[tuple[unicode, docker.client.Client, dockermap.map.config.ClientConfiguration]]
+        :rtype: tuple[tuple[unicode | str, docker.client.Client, dockermap.map.config.ClientConfiguration]]
         """
         def _get_client(client_name):
             client_config = self._clients[client_name]
@@ -665,11 +665,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         Generates the list of dependency containers, in reverse order (i.e. the last dependency coming first).
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :return: Dependency container map names, container configuration names, and instances.
-        :rtype: iterator[tuple(unicode, unicode, unicode)]
+        :rtype: iterator[(unicode | str, unicode | str, unicode | str)]
         """
         return reversed(self._f_resolver.get_container_dependencies(map_name, container))
 
@@ -678,11 +678,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         Generates the list of dependent containers, in reverse order (i.e. the last dependent coming first).
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :return: Dependent container map names, container configuration names, and instances.
-        :rtype: iterator[tuple(unicode, unicode, unicode)]
+        :rtype: iterator[(unicode | str, unicode | str, unicode | str)]
         """
         return reversed(self._r_resolver.get_container_dependencies(map_name, container))
 
@@ -693,11 +693,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         remove) as necessary. To be implemented by subclasses.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Should accept a single string, a list or tuple, or ``None``.
-        :type instances: list or tuple or unicode
+        :type instances: list | tuple | unicode | str
         :param kwargs: Additional keyword arguments to pass. Should only be applied to create actions, if any.
         :return: Generator for container actions.
         :rtype: generator[dockermap.map.policy.action.ContainerAction]
@@ -711,11 +711,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         remove) as necessary. To be implemented by subclasses.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Should accept a single string, a list or tuple, or ``None``.
-        :type instances: list or tuple or unicode
+        :type instances: list | tuple | unicode | str
         :param kwargs: Additional keyword arguments to pass. Should only be applied to start actions, if any.
         :return: Generator for container actions.
         :rtype: generator[dockermap.map.policy.action.ContainerAction]
@@ -729,11 +729,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         remove) as necessary. To be implemented by subclasses.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Should accept a single string, a list or tuple, or ``None``.
-        :type instances: list or tuple or unicode
+        :type instances: list | tuple | unicode | str
         :param kwargs: Additional keyword arguments to pass. Should only be applied to stop actions, if any.
         :return: Generator for container actions.
         :rtype: generator[dockermap.map.policy.action.ContainerAction]
@@ -747,11 +747,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         remove) as necessary. To be implemented by subclasses.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Should accept a single string, a list or tuple, or ``None``.
-        :type instances: list or tuple or unicode
+        :type instances: list | tuple | unicode | str
         :param kwargs: Additional keyword arguments to pass. Should only be applied to remove actions, if any.
         :return: Generator for container actions.
         :rtype: generator[dockermap.map.policy.action.ContainerAction]
@@ -764,11 +764,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         remove) as necessary. Implementation by subclasses is optional.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Should accept a single string, a list or tuple, or ``None``.
-        :type instances: list or tuple or unicode
+        :type instances: list | tuple | unicode | str
         :param kwargs: Additional keyword arguments to pass.
         :return: Generator for container actions.
         :rtype: generator[dockermap.map.policy.action.ContainerAction]
@@ -781,11 +781,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         remove) as necessary. Implementation by subclasses is optional.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Should accept a single string, a list or tuple, or ``None``.
-        :type instances: list or tuple or unicode
+        :type instances: list | tuple | unicode | str
         :param kwargs: Additional keyword arguments to pass.
         :return: Generator for container actions.
         :rtype: generator[dockermap.map.policy.action.ContainerAction]
@@ -798,11 +798,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         remove) as necessary. Implementation by subclasses is optional.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Should accept a single string, a list or tuple, or ``None``.
-        :type instances: list or tuple or unicode
+        :type instances: list | tuple | unicode | str
         :param kwargs: Additional keyword arguments to pass.
         :return: Generator for container actions.
         :rtype: generator[dockermap.map.policy.action.ContainerAction]
@@ -815,11 +815,11 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         remove) as necessary. Implementation by subclasses is optional.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Should accept a single string, a list or tuple, or ``None``.
-        :type instances: list or tuple or unicode
+        :type instances: list | tuple | unicode | str
         :param kwargs: Additional keyword arguments to pass.
         :return: Generator for container actions.
         :rtype: generator[dockermap.map.policy.action.ContainerAction]
@@ -831,13 +831,13 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         Runs a single script or command in a container. Implementation is optional.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param script_path: Path to the script on the Docker host.
         :param kwargs: Keyword arguments to the script runner function.
         :return: A dictionary of client names with their log output and exit codes.
-        :rtype: dict[unicode, dict]
+        :rtype: dict[unicode | str, dict]
         """
         raise NotImplementedError("This policy does not support the script command.")
 
@@ -847,7 +847,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         Container maps with container configurations to base actions on.
 
         :return: Dictionary of container maps.
-        :rtype: dict[unicode, dockermap.map.container.ContainerMap]
+        :rtype: dict[unicode | str, dockermap.map.container.ContainerMap]
         """
         return self._maps
 
@@ -857,7 +857,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         Docker client objects and configurations.
 
         :return: Dictionary of Docker client objects.
-        :rtype: dict[unicode, dockermap.map.config.ClientConfiguration]
+        :rtype: dict[unicode | str, dockermap.map.config.ClientConfiguration]
         """
         return self._clients
 
@@ -867,7 +867,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         Names of existing containers on each map.
 
         :return: Dictionary of container names.
-        :rtype: dict[unicode, dockermap.map.policy.cache.CachedContainerNames]
+        :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedContainerNames]
         """
         return self._container_names
 
@@ -877,7 +877,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         Image information functions.
 
         :return: Dictionary of image names per client.
-        :rtype: dict[unicode, dockermap.map.policy.cache.CachedImages]
+        :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedImages]
         """
         return self._images
 
@@ -913,15 +913,15 @@ class AbstractActionGenerator(with_metaclass(ABCMeta, object)):
         or a explicitly selected container.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param c_map: Container map instance.
         :type c_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param c_config: Container configuration object.
         :type c_config: dockermap.map.config.ContainerConfiguration
         :param instances: Instance names as a list. Can be ``[None]``
-        :type instances: list[unicode]
+        :type instances: list[unicode | str]
         :param flags: Flags for the current container, as defined in :mod:`~dockermap.map.policy.actions`.
         :type flags: int
         :param args: Additional positional arguments.
@@ -934,14 +934,14 @@ class AbstractActionGenerator(with_metaclass(ABCMeta, object)):
         Generates and performs actions for the selected container and its dependencies / dependents.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Main container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names.
         :type instances: list or tuple
         :param kwargs: Additional keyword arguments to pass to the main container action.
         :return: Return values of created main containers.
-        :rtype: list[(unicode, dict)]
+        :rtype: list[(unicode | str, dict)]
         """
         def _gen_actions(c_map_name, c_container, c_instance, c_flags=0, **c_kwargs):
             c_map = self._policy.container_maps[c_map_name]
@@ -986,19 +986,19 @@ class AttachedPreparationMixin(object):
         :param container_map: Container map instance.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param client: Client object.
         :type client: docker.client.Client
         :param alias: The alias name of the attached volume in the configuration.
-        :type alias: unicode
+        :type alias: unicode | str
         :param volume_container: The full name or id of the container sharing the volume.
-        :type volume_container: unicode
+        :type volume_container: unicode | str
         """
         include_host_config = use_host_config(client)
         apc_kwargs = self._policy.get_attached_preparation_create_kwargs(container_map, config_name, container_config,
@@ -1033,19 +1033,19 @@ class AttachedPreparationMixin(object):
         :param container_map: Container map instance.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param client: Client object.
         :type client: docker.client.Client
         :param alias: The alias name of the attached volume in the configuration.
-        :type alias: unicode
+        :type alias: unicode | str
         :param volume_container: The full name or id of the container sharing the volume.
-        :type volume_container: unicode
+        :type volume_container: unicode | str
         """
         if not (self.prepare_local and hasattr(client, 'run_cmd')):
             return self._prepare_container(container_map, config_name, container_config, client_name, client_config,
@@ -1073,23 +1073,23 @@ class ExecMixin(object):
         :param container_map: Container map instance.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param client: Client object.
         :type client: docker.client.Client
         :param container_name: Container to run the command in.
-        :type container_name: unicode
+        :type container_name: unicode | str
         :param instance_name: Container instance name.
-        :type instance_name: unicode
+        :type instance_name: unicode | str
         :param cmd: Command to run.
-        :type cmd: unicode | list[unicode]
+        :type cmd: unicode | str | list[unicode | str]
         :param cmd_user: User to run the command as.
-        :type cmd_user: unicode | int
+        :type cmd_user: unicode | str | int
         """
         log.debug("Creating exec command in container %s with user %s: %s.", container_name, cmd_user, cmd)
         ec_kwargs = self._policy.get_exec_create_kwargs(container_map, config_name, container_config, client_name,
@@ -1108,19 +1108,19 @@ class ExecMixin(object):
         :param container_map: Container map instance.
         :type container_map: dockermap.map.container.ContainerMap
         :param config_name: Container configuration name.
-        :type config_name: unicode
+        :type config_name: unicode | str
         :param container_config: Container configuration object.
         :type container_config: dockermap.map.config.ContainerConfiguration
         :param client_name: Client configuration name.
-        :type client_name: unicode
+        :type client_name: unicode | str
         :param client_config: Client configuration object.
         :type client_config: dockermap.map.config.ClientConfiguration
         :param client: Client object.
         :type client: docker.client.Client
         :param container_name: Container to run the command in.
-        :type container_name: unicode
+        :type container_name: unicode | str
         :param instance_name: Container instance name.
-        :type instance_name: unicode
+        :type instance_name: unicode | str
         :param is_initial: Set to ``True`` if the container has just been created or had never been started before.
         :type is_initial: bool
         """

@@ -104,15 +104,15 @@ class ResumeStartupMixin(object):
           Non-existing containers are created and started.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
           updated.
-        :type instances: list[unicode]
+        :type instances: list[unicode | str]
         :param kwargs: Has no effect in this implementation.
         :return: Return values of created main containers.
-        :rtype: list[(unicode, dict)]
+        :rtype: list[(unicode | str, dict)]
         """
         return ResumeStartupGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 

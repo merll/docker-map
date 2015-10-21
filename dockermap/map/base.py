@@ -43,7 +43,7 @@ class ContainerImageResolver(SingleDependencyResolver):
     in order to perform a clean-up.
 
     :param container_images: Set of image ids currently used by containers.
-    :type container_images: set[unicode]
+    :type container_images: set[unicode | str]
     :param images: Iterable or dictionary of images in the format `(image, parent_image)`.
     :type images: iterable
     """
@@ -58,7 +58,7 @@ class ContainerImageResolver(SingleDependencyResolver):
         images.
 
         :param item: Image id to check for dependent items.
-        :type item: unicode
+        :type item: unicode | str
         :param resolve_parent: Function to check parent image for dependencies.
         :param parent: Parent image id.
         :return: `True` if any dependency has been found, `False` otherwise.
@@ -110,11 +110,11 @@ class DockerClientWrapper(docker.Client):
         Handles streamed progress information.
 
         :param status: Status text.
-        :type status: unicode
+        :type status: unicode | str
         :param object_id: Object that the progress is reported on.
-        :type object_id: unicode
+        :type object_id: unicode | str
         :param progress: Progress bar.
-        :type progress: unicode
+        :type progress: unicode | str
         """
         pass
 
@@ -123,7 +123,7 @@ class DockerClientWrapper(docker.Client):
         Writes logs. To be fully implemented by subclasses.
 
         :param info: Log message content.
-        :type info: unicode
+        :type info: unicode | str
         :param level: Logging level.
         :type level: int
         :param args: Positional arguments to pass to logger.
@@ -137,7 +137,7 @@ class DockerClientWrapper(docker.Client):
         final message is checked for a success message. If the latter is found, only the new image id is returned.
 
         :param tag: Tag of the new image to be built. Unlike in the superclass, this is obligatory.
-        :type tag: unicode
+        :type tag: unicode | str
         :param add_latest_tag: In addition to the image `tag`, tag the image with `latest`.
         :type add_latest_tag: bool
         :param raise_on_error: Raises errors in the status output as a DockerStatusException. Otherwise only logs
@@ -145,7 +145,7 @@ class DockerClientWrapper(docker.Client):
         :type raise_on_error: bool
         :param kwargs: See :meth:`docker.client.Client.build`.
         :return: New, generated image id or `None`.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         response = super(DockerClientWrapper, self).build(tag=tag, **kwargs)
         # It is not the kwargs alone that decide if we get a stream, so we have to check.
@@ -167,13 +167,13 @@ class DockerClientWrapper(docker.Client):
         Login to a Docker registry server.
 
         :param username: User name for login.
-        :type username: unicode
+        :type username: unicode | str
         :param password: Login password; may be ``None`` if blank.
-        :type password: unicode
+        :type password: unicode | str
         :param email: Optional; email address for login.
-        :type email: unicode
+        :type email: unicode | str
         :param registry: Optional registry URL to log in to. Uses the Docker index by default.
-        :type registry: unicode
+        :type registry: unicode | str
         :param reauth: Re-authenticate, even if the login has been successful before.
         :type reauth: bool
         :param kwargs: Additional kwargs to :meth:`docker.client.Client.login`.
@@ -189,9 +189,9 @@ class DockerClientWrapper(docker.Client):
         Pulls an image repository from the registry.
 
         :param repository: Name of the repository.
-        :type repository: unicode
+        :type repository: unicode | str
         :param tag: Optional tag to pull; by default pulls all tags of the given repository.
-        :type tag: unicode
+        :type tag: unicode | str
         :param stream: Use the stream output format with additional status information.
         :type stream: bool
         :param raise_on_error: Raises errors in the status output as a DockerStatusException. Otherwise only logs
@@ -213,7 +213,7 @@ class DockerClientWrapper(docker.Client):
         Pushes an image repository to the registry.
 
         :param repository: Name of the repository (can include a tag).
-        :type repository: unicode
+        :type repository: unicode | str
         :param stream: Use the stream output format with additional status information.
         :type stream: bool
         :param raise_on_error: Raises errors in the status output as a DockerStatusException. Otherwise only logs
@@ -237,10 +237,10 @@ class DockerClientWrapper(docker.Client):
         :param ctx: An instance of :class:`~.context.DockerContext`.
         :type ctx: dockermap.build.context.DockerContext
         :param tag: New image tag.
-        :type tag: unicode
+        :type tag: unicode | str
         :param kwargs: See :meth:`docker.client.Client.build`.
         :return: New, generated image id or `None`.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self.build(fileobj=ctx.fileobj, tag=tag, custom_context=True, encoding=ctx.stream_encoding, **kwargs)
 
@@ -252,10 +252,10 @@ class DockerClientWrapper(docker.Client):
         :param dockerfile: An instance of :class:`~dockermap.build.dockerfile.DockerFile`.
         :type dockerfile: dockermap.build.dockerfile.DockerFile
         :param tag: New image tag.
-        :type tag: unicode
+        :type tag: unicode | str
         :param kwargs: See :meth:`docker.client.Client.build`.
         :return: New, generated image id or ``None``.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         with DockerContext(dockerfile, finalize=True) as ctx:
             return self.build_from_context(ctx, tag, **kwargs)
@@ -344,7 +344,7 @@ class DockerClientWrapper(docker.Client):
         prefixes each log line with the container name.
 
         :param container: Container name or id.
-        :type container: unicode
+        :type container: unicode | str
         """
         logs = self.logs(container).decode('utf-8')
         log_lines = logs.split('\n')
@@ -358,7 +358,7 @@ class DockerClientWrapper(docker.Client):
         Removes a container. For convenience optionally ignores 404 errors.
 
         :param container: Container name.
-        :type container: unicode
+        :type container: unicode | str
         :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
           affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
           ``True``. Please note that 404 errors (on non-existing containers) are always ignored.
@@ -378,7 +378,7 @@ class DockerClientWrapper(docker.Client):
         Removes a container. For convenience optionally ignores 404 errors.
 
         :param container: Container name.
-        :type container: unicode
+        :type container: unicode | str
         :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
           affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
           ``True``. Please note that 404 errors (on non-existing containers) are always ignored.
@@ -419,11 +419,11 @@ class DockerClientWrapper(docker.Client):
         :meth:`docker.client.Client.copy`.
 
         :param container: Container name or id.
-        :type container: unicode
+        :type container: unicode | str
         :param resource: Resource inside the container.
-        :type resource: unicode
+        :type resource: unicode | str
         :param local_filename: Local file to store resource into. Will be overwritten if present.
-        :type local_filename: unicode
+        :type local_filename: unicode | str
         """
         raw = self.copy(container, resource)
         with open(local_filename, 'wb+') as f:
@@ -436,9 +436,9 @@ class DockerClientWrapper(docker.Client):
         :meth:`docker.client.Client.get_image`.
 
         :param image: Image name or id.
-        :type image: unicode
+        :type image: unicode | str
         :param local_filename: Local file to store image into. Will be overwritten if present.
-        :type local_filename: unicode
+        :type local_filename: unicode | str
         """
         raw = self.get_image(image)
         with open(local_filename, 'wb+') as f:

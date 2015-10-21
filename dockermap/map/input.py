@@ -327,9 +327,9 @@ def get_network_mode(value):
     configuration of the container is returned.
 
     :param value: Network mode input.
-    :type value: unicode | tuple | list | NoneType
+    :type value: unicode | str | tuple | list | NoneType
     :return: Network mode or container to re-use the network stack of.
-    :rtype: unicode | tuple | NoneType
+    :rtype: unicode | str | tuple | NoneType
     """
     if not value or value == 'disabled':
         return None

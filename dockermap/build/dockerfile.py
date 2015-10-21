@@ -16,7 +16,7 @@ def prepare_path(path, replace_space, replace_sep, expandvars, expanduser):
     Performs `os.path` replacement operations on a path string.
 
     :param path: Path string
-    :type path: unicode
+    :type path: unicode | str
     :param replace_space: Mask spaces with backslash.
     :param replace_sep: Replace potentially different path separators with POSIX path notation (use :const:`posixpath.sep`).
     :type replace_sep: bool
@@ -25,7 +25,7 @@ def prepare_path(path, replace_space, replace_sep, expandvars, expanduser):
     :param expanduser: Expand user variables (:func:`~os.path.expanduser`).
     :type expanduser: bool
     :return: Path string from `path` with aforementioned replacements.
-    :rtype: unicode
+    :rtype: unicode | str
     """
     r_path = path
     if expandvars:
@@ -46,11 +46,11 @@ def format_command(cmd, shell=False):
     arguments.
 
     :param cmd: Command line as a string or tuple.
-    :type cmd: unicode, string, or tuple
+    :type cmd: unicode | str | tuple | list
     :param shell: Use the notation so that Docker runs the command in a shell. Default is ``False``.
     :type shell: bool
     :return: The command string.
-    :rtype: unicode
+    :rtype: unicode | str
     """
 
     def _split_cmd():
@@ -83,7 +83,7 @@ def format_expose(expose):
     Converts a port number or multiple port numbers, as used in the Dockerfile ``EXPOSE`` command, to a tuple.
 
     :param: Port numbers, can be as integer, string, or a list/tuple of those.
-    :type expose: int, unicode, list, or tuple
+    :type expose: int | unicode | str | list | tuple
     :return: A tuple, to be separated by spaces before inserting in a Dockerfile.
     :rtype: tuple
     """
@@ -101,12 +101,12 @@ class DockerFile(DockerStringBuffer):
 
     :param baseimage: Base image to use for the new image. Set this to ``None`` if you want to explicitly write out the
      ``FROM`` Dockerfile command.
-    :type baseimage: unicode
+    :type baseimage: unicode | str
     :param maintainer: Optional maintainer, to be used for the ``MAINTAINER`` Dockerfile command.
-    :type maintainer: unicode
+    :type maintainer: unicode | str
     :param initial: Optional initial Dockerfile contents. Should only include header comments, ``FROM``, or
      ``MAINTAINER``, if those are not set in aforementioned parameters.
-    :type initial: unicode
+    :type initial: unicode | str
     """
     def __init__(self, baseimage=DEFAULT_BASEIMAGE, maintainer=None, initial=None):
         super(DockerFile, self).__init__()
@@ -139,7 +139,7 @@ class DockerFile(DockerStringBuffer):
         be separated by a space.
 
         :param prefix: Dockerfile command to use, e.g. ``ENV`` or ``RUN``.
-        :type prefix: unicode
+        :type prefix: unicode | str
         :param args: Arguments to be prefixed.
         """
         self.writeline(' '.join((prefix, ) + args))
@@ -149,7 +149,7 @@ class DockerFile(DockerStringBuffer):
         Same as :func:`~prefix`, for multiple lines.
 
         :param prefix: Dockerfile command to use, e.g. ``ENV`` or ``RUN``.
-        :type prefix: unicode
+        :type prefix: unicode | str
         :param lines: Lines with arguments to be prefixed.
         :type lines: iterable
         """
@@ -185,12 +185,12 @@ class DockerFile(DockerStringBuffer):
         the context tarball.
 
         :param src_path: Path to the file or directory.
-        :type src_path: unicode
+        :type src_path: unicode | str
         :param dst_path: Destination path during the Docker build. By default uses the last element of `src_path`.
-        :type dst_path: unicode
+        :type dst_path: unicode | str
         :param ctx_path: Path inside the context tarball. Can be set in order to avoid name clashes. By default
          identical to the destination path.
-        :type ctx_path: unicode
+        :type ctx_path: unicode | str
         :param replace_space: Mask spaces in path names with a backslash. Default is ``True``.
         :type replace_space: bool
         :param expandvars: Expand local environment variables. Default is ``False``.
@@ -202,7 +202,7 @@ class DockerFile(DockerStringBuffer):
          use with care.
         :type remove_final: bool
         :return: The path of the file in the Dockerfile context.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         if dst_path is None:
             head, tail = os.path.split(src_path)
@@ -234,13 +234,13 @@ class DockerFile(DockerStringBuffer):
         present in the base image.
 
         :param src_file: Tar archive to add.
-        :type src_file: unicode
+        :type src_file: unicode | str
         :param remove_final: Remove the contents after the build operation has completed. Note that this will remove all
          top-level components of the tar archive recursively. Therefore, you should not use this on standard unix
          folders.
         :type remove_final: bool
         :return: Name of the root files / directories added to the Dockerfile.
-        :rtype: list[unicode]
+        :rtype: list[unicode | str]
         """
         def _root_members():
             with tarfile.open(src_file, 'r') as tf:
@@ -272,7 +272,7 @@ class DockerFile(DockerStringBuffer):
         Adds a comment to the Dockerfile. If not defined, adds an empty comment line.
 
         :param input_str: Comment.
-        :type input_str: unicode
+        :type input_str: unicode | str
         """
         if input_str:
             self.prefix('#', input_str)
@@ -290,7 +290,7 @@ class DockerFile(DockerStringBuffer):
         Adds content to the Dockerfile.
 
         :param input_str: Content.
-        :type input_str: unicode
+        :type input_str: unicode | str
         """
         self.check_not_finalized()
         self.fileobj.write(input_str.encode('utf-8'))
@@ -331,7 +331,7 @@ class DockerFile(DockerStringBuffer):
         Sets the entry point for the Dockerfile ``ENTRYPOINT`` command. Not written before finalization.
 
         :return: Entry point.
-        :rtype: unicode | list | tuple
+        :rtype: unicode | str | list | tuple
         """
         return self._entrypoint
 
@@ -346,7 +346,7 @@ class DockerFile(DockerStringBuffer):
         Sets the default command for the Dockerfile ``CMD`` command. Not written before finalization.
 
         :return: Command.
-        :rtype: unicode | list | tuple
+        :rtype: unicode | str | list | tuple
         """
         return self._command
 
@@ -378,7 +378,7 @@ class DockerFile(DockerStringBuffer):
         commands, insert the ``USER`` command manually.
 
         :return: Default user name or id.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._cmd_user
 
@@ -395,7 +395,7 @@ class DockerFile(DockerStringBuffer):
         other commands, insert the ``WORKDIR`` command manually.
 
         :return: User name or id. Must be valid in the docker image.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._cmd_workdir
 
@@ -410,7 +410,7 @@ class DockerFile(DockerStringBuffer):
         Sets the ports to be inserted with the ``EXPOSE`` command in the Dockerfile. Not written before finalization.
 
         :return: Ports.
-        :rtype: unicode | int | tuple | list
+        :rtype: unicode | str | int | tuple | list
         """
         return self._expose
 

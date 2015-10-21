@@ -25,7 +25,7 @@ class ContainerDependencyResolver(MultiDependencyResolver):
         but without duplicating any entries.
 
         :param item: Container name.
-        :type item: tuple[unicode]
+        :type item: tuple[unicode | str]
         :param resolve_parent: Function to resolve parent dependencies.
         :type resolve_parent: function
         :type parents: iterable

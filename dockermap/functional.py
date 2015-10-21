@@ -163,7 +163,7 @@ def expand_type_name(type_):
     :param type_: Type:
     :type type_: type
     :return: Type name, as ``<type's module name>.<type name>``.
-    :rtype: unicode
+    :rtype: unicode | str
     """
     return '{0.__module__}.{0.__name__}'.format(type_)
 
@@ -175,7 +175,7 @@ def resolve_value(value):
 
     :param value: Lazy object, registered type in :attr:`type_registry`, or a simple value. In the
      latter case, the value is returned as-is.
-    :type value: str or unicode or int or AbstractLazyObject or unknown
+    :type value: str | unicode | int | AbstractLazyObject | unknown
     :return: Resolved value.
     """
     if isinstance(value, lazy_type):
@@ -196,7 +196,7 @@ def resolve_deep(values, max_depth=5, types=None):
      returned as they are.
     :type max_depth: int
     :param: Dictionary of types and functions to resolve, that are not registered in ``type_registry``.
-    :type: dict[unicode, function]
+    :type: dict[unicode | str, function]
     :return: Resolved values.
     """
     def _resolve_single(value):

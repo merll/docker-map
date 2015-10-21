@@ -23,9 +23,9 @@ def extract_user(user_value):
     * String in the format ``user:group``
 
     :param user_value: User name, uid, user-group tuple, or user:group string.
-    :type user_value: int or tuple or unicode
+    :type user_value: int | tuple | unicode | str
     :return: User name or id.
-    :rtype: unicode
+    :rtype: unicode | str
     """
     user = resolve_value(user_value)
     if not user and user != 0 and user != '0':
@@ -113,11 +113,11 @@ def get_shared_volume_path(container_map, volume, instance=None):
     :param container_map: Container map.
     :type container_map: dockermap.map.container.ContainerMap
     :param volume: Volume alias or tuple of paths.
-    :type volume: unicode | AbstractLazyObject | tuple[unicode] | tuple[AbstractLazyObject]
+    :type volume: unicode | str | AbstractLazyObject | tuple[unicode | str] | tuple[AbstractLazyObject]
     :param instance: Optional instance name.
-    :type instance: unicode
+    :type instance: unicode | str
     :return: Tuple of host path and container bind path.
-    :rtype: tuple[unicode]
+    :rtype: tuple[unicode | str]
     """
     if isinstance(volume, tuple):
         v_len = len(volume)
@@ -143,7 +143,7 @@ def get_volumes(container_map, config):
     :param config: Container configuration.
     :type config: dockermap.map.config.ContainerConfiguration
     :return: List of shared volume mount points.
-    :rtype: list[unicode]
+    :rtype: list[unicode | str]
     """
     def _volume_path(vol):
         if isinstance(vol, tuple) and len(vol) == 2:
@@ -167,9 +167,9 @@ def get_host_binds(container_map, config, instance):
     :param config: Container configuration.
     :type config: dockermap.map.config.ContainerConfiguration
     :param instance: Instance name. Pass ``None`` if not applicable.
-    :type instance: unicode
+    :type instance: unicode | str
     :return: Dictionary of shared volumes with host volumes and the read-only flag.
-    :rtype: dict[unicode, dict]
+    :rtype: dict[unicode | str, dict]
     """
     host_binds = {}
     for shared_volume in config.binds:
@@ -189,7 +189,7 @@ def get_port_bindings(container_config, client_config):
     :param client_config: Client configuration.
     :type client_config: dockermap.map.config.ClientConfiguration
     :return: Dictionary of ports with mapped port, and if applicable, with bind address
-    :rtype: dict[unicode, unicode | int | tuple]
+    :rtype: dict[unicode | str, unicode | str | int | tuple]
     """
     port_bindings = {}
     for port_binding in container_config.exposes:
@@ -239,7 +239,7 @@ def get_instance_volumes(instance_detail):
     :type instance_detail: dict
     :return: Dictionary of volumes, with the destination (inside the container) as a key, and the source (external to
      the container) as values.
-    :rtype: dict[unicode, unicode]
+    :rtype: dict[unicode | str, unicode | str]
     """
     if 'Mounts' in instance_detail:
         return {m['Destination']: m['Source']
@@ -255,9 +255,9 @@ def get_preparation_cmd(container_config, path):
     :param container_config: Container configuration.
     :type container_config: dockermap.map.config.ContainerConfiguration
     :param path: Path to adjust permissions on.
-    :type path: unicode
+    :type path: unicode | str
     :return: Resulting command strings.
-    :rtype: list[unicode]
+    :rtype: list[unicode | str]
     """
     def _get_cmd():
         if user:

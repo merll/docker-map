@@ -13,11 +13,11 @@ class DockerContext(DockerTempFile):
     instance is added, the resulting Dockerfile and files added there are considered automatically.
 
     :param dockerfile: Optional :class:`~DockerFile` instance, or file path to a Dockerfile.
-    :type dockerfile: DockerFile or unicode
+    :type dockerfile: DockerFile | unicode | str
     :param compression: Compression for the tarball; default is gzip (`gz`); use `bz2` for bzip2.
-    :type compression: unicode
+    :type compression: unicode | str
     :param encoding: Encoding for the tarfile; default is `utf-8`.
-    :type encoding: unicode
+    :type encoding: unicode | str
     :param finalize: Finalize the tarball immediately.
     :type finalize: bool
     :param kwargs: Additional kwargs for :func:`tarfile.open`.
@@ -44,7 +44,7 @@ class DockerContext(DockerTempFile):
         Add a file or directory to the context tarball.
 
         :param name: File or directory path.
-        :type name: unicode
+        :type name: unicode | str
         :param args: Additional args for :meth:`tarfile.TarFile.add`.
         :param kwargs: Additional kwargs for :meth:`tarfile.TarFile.add`.
         """
@@ -65,7 +65,7 @@ class DockerContext(DockerTempFile):
         Add (i.e. copy) the contents of another tarball to this one.
 
         :param name: File path to the tar archive.
-        :type name: unicode
+        :type name: unicode | str
         """
         with tarfile.open(name, 'r') as st:
             for member in st.getmembers():
@@ -77,7 +77,7 @@ class DockerContext(DockerTempFile):
         will automatically be copied to the tarball. The :class:`DockerFile` will be finalized.
 
         :param dockerfile: :class:`DockerFile` instance or file path to a Dockerfile.
-        :type dockerfile: DockerFile or unicode
+        :type dockerfile: DockerFile | unicode | str
         """
         if isinstance(dockerfile, DockerFile):
             dockerfile.finalize()
@@ -118,7 +118,7 @@ class DockerContext(DockerTempFile):
         Returns the name of the underlying file object.
 
         :return: Name of the file object.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._fileobj.name
 
@@ -128,7 +128,7 @@ class DockerContext(DockerTempFile):
         Returns the stream encoding, as used when calling :meth:`docker.client.Client.build`.
 
         :return: Stream encoding.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._stream_encoding
 
@@ -137,7 +137,7 @@ class DockerContext(DockerTempFile):
         Saves the entire Docker context tarball to a separate file.
 
         :param name: File path to save the tarball into.
-        :type name: unicode
+        :type name: unicode | str
         """
         with open(name, 'wb+') as f:
             while True:

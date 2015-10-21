@@ -18,7 +18,7 @@ def parse_response(response):
     only.
 
     :param response: Server response as a JSON string.
-    :type response: unicode
+    :type response: unicode | str
     :return: Decoded object from the JSON string. Returns an empty dictionary if input was invalid.
     :rtype: dict
     """

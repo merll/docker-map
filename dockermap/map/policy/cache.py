@@ -51,12 +51,12 @@ class CachedImages(CachedItems, dict):
         Ensures that a particular image is present on the client. If it is not, a new copy is pulled from the server.
 
         :param image_name: Image name. If it does not include a specific tag, ``latest`` is assumed.
-        :type image_name: unicode
+        :type image_name: unicode | str
         :param pull_latest: If the image includes a latest-tag, pull it from the server. This is is done only once in
          for the lifecycle of the cache, or unless `:meth:reset_latest` is called.
         :type pull_latest: bool
         :return: Image id associated with the image name.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         image, __, tag = image_name.rpartition(':')
         if image:
@@ -100,7 +100,7 @@ class DockerHostItemCache(dict):
     their existence does not have to be checked separately for every action.
 
     :param clients: Dictionary of clients with alias and client object.
-    :type clients: dict[unicode, dockermap.map.config.ClientConfiguration]
+    :type clients: dict[unicode | str, dockermap.map.config.ClientConfiguration]
     """
     item_class = None
 
@@ -113,7 +113,7 @@ class DockerHostItemCache(dict):
         Retrieves the items associated with the given client. Returned results are cached for later use.
 
         :param item: Client name.
-        :type item: unicode
+        :type item: unicode | str
         :return: Items in the cache.
         """
         if item not in self:
@@ -125,7 +125,7 @@ class DockerHostItemCache(dict):
         Forces a refresh of a cached item.
 
         :param item: Client name.
-        :type item: unicode
+        :type item: unicode | str
         :return: Items in the cache.
         :rtype: DockerHostItemCache.item_class
         """

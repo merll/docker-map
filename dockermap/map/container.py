@@ -31,7 +31,7 @@ class ContainerMap(object):
     Class for merging container configurations, host shared volumes and volume alias names.
 
     :param name: Name for this container map.
-    :type name: unicode
+    :type name: unicode | str
     :param initial: Initial container configurations, host shares, and volumes.
     :type initial: dict
     :param check_integrity: If initial values are given, the container integrity is checked by default at the end of
@@ -160,7 +160,7 @@ class ContainerMap(object):
         Container map name.
 
         :return: Container map name.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._name
 
@@ -170,7 +170,7 @@ class ContainerMap(object):
         Alias names of clients associated with this container map.
 
         :return: Client names.
-        :rtype: list[unicode]
+        :rtype: list[unicode | str]
         """
         return self._clients
 
@@ -184,7 +184,7 @@ class ContainerMap(object):
         Container configurations of the map.
 
         :return: Container configurations.
-        :rtype: dict[unicode, dockermap.map.config.ContainerConfiguration]
+        :rtype: dict[unicode | str, dockermap.map.config.ContainerConfiguration]
         """
         return self._containers
 
@@ -214,7 +214,7 @@ class ContainerMap(object):
         Repository prefix for images. This is prepended to image names used by container configurations.
 
         :return: Repository prefix.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._repository
 
@@ -228,7 +228,7 @@ class ContainerMap(object):
         Value to use as domain name for new containers, unless the client specifies otherwise.
 
         :return: Default domain name.
-        :rtype: unicode
+        :rtype: unicode | str
         """
         return self._default_domain
 
@@ -325,7 +325,7 @@ class ContainerMap(object):
         returned (to avoid this, use :meth:`get_existing` instead). `item` can be any valid Docker container name.
 
         :param item: Container name.
-        :type item: unicode
+        :type item: unicode | str
         :return: A container configuration.
         :rtype: ContainerConfiguration
         """
@@ -337,7 +337,7 @@ class ContainerMap(object):
         returned instead in this case.
 
         :param item: Container name.
-        :type item: unicode
+        :type item: unicode | str
         :return: A container configuration
         :rtype: ContainerConfiguration
         """

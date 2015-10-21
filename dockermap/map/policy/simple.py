@@ -42,15 +42,15 @@ class SimpleCreateMixin(object):
         dependencies.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
           created.
-        :type instances: list[unicode]
+        :type instances: list[unicode | str]
         :param kwargs: Additional keyword args for the create action.
         :return: Return values of created main containers.
-        :rtype: list[(unicode, dict)]
+        :rtype: list[(unicode | str, dict)]
         """
         return SimpleCreateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
 
@@ -92,12 +92,12 @@ class SimpleStartMixin(object):
         Generates actions for starting any configured container that is not running, including all of its dependencies.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
           started.
-        :type instances: list[unicode]
+        :type instances: list[unicode | str]
         :param kwargs: Additional keyword args for the start action.
         """
         SimpleStartGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
@@ -109,12 +109,12 @@ class SimpleRestartMixin(ExecMixin):
         Generates actions for restarting a configured container. Does not consider dependencies.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
           restarted.
-        :type instances: list[unicode]
+        :type instances: list[unicode | str]
         :param kwargs: Additional keyword args for the restart action.
         """
         c_map = self._maps[map_name]
@@ -161,12 +161,12 @@ class SimpleStopMixin(object):
         subclasses.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
           stopped.
-        :type instances: list[unicode]
+        :type instances: list[unicode | str]
         :param kwargs: Additional keyword args for the stop action.
         """
         SimpleStopGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
@@ -216,12 +216,12 @@ class SimpleRemoveMixin(object):
         This behavior can be changed by setting ``remove_persistent`` and ``remove_attached`` in subclasses.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
           removed.
-        :type instances: list[unicode]
+        :type instances: list[unicode | str]
         :param kwargs: Additional keyword args for the remove action.
         """
         SimpleRemoveGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
@@ -234,15 +234,15 @@ class SimpleStartupMixin(object):
         containers. This also applies to all of its dependencies.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
           created and started.
-        :type instances: list[unicode]
+        :type instances: list[unicode | str]
         :param kwargs: Has no effect in this implementation.
         :return: Return values of created main containers.
-        :rtype: list[(unicode, dict)]
+        :rtype: list[(unicode | str, dict)]
         """
         return itertools.chain(self.create_actions(map_name, container, instances) or (),
                                self.start_actions(map_name, container, instances) or ())
@@ -261,12 +261,12 @@ class SimpleShutdownMixin(object):
         ``remove_attached`` in subclasses.
 
         :param map_name: Container map name.
-        :type map_name: unicode
+        :type map_name: unicode | str
         :param container: Container configuration name.
-        :type container: unicode
+        :type container: unicode | str
         :param instances: Instance names. Optional, if ``None`` the configured instances or one default instance is
           stopped and removed.
-        :type instances: list[unicode]
+        :type instances: list[unicode | str]
         :param kwargs: Has no effect in this implementation.
         """
         self.stop_actions(map_name, container, instances)
