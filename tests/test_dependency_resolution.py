@@ -68,6 +68,8 @@ class ContainerDependencyTest(unittest.TestCase):
         f_dep = self.r_res.get_container_dependencies('test_map', 'f')
         self.assertOrder(f_dep,
                          ('test_map', 'x', None),
+                         ('test_map', 'b', None))
+        self.assertOrder(f_dep,
                          ('test_map', 'a', None),
                          ('test_map', 'b', None))
         e_dep = self.r_res.get_container_dependencies('test_map', 'e')
