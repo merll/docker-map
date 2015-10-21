@@ -83,7 +83,7 @@ class ImageDependencyTest(unittest.TestCase):
     def setUp(self):
         self.res = ContainerImageResolver(TEST_CONTAINER_IMAGES, TEST_IMG_DATA)
 
-    def test_iamge_dependencies(self):
+    def test_image_dependencies(self):
         self.assertTrue(self.res.get_dependencies('a'))
         self.assertTrue(self.res.get_dependencies('b'))
         self.assertTrue(self.res.get_dependencies('c'))
