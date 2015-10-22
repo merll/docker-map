@@ -3,6 +3,13 @@
 Change History
 ==============
 
+0.6.1
+-----
+* Many more Python 3 fixes (`PR #10 <https://github.com/merll/docker-map/pull/10>`_).
+* Cleaned up logging; only using default levels.
+* Port bindings are passed as lists to the API, allowing container ports to be published to multiple host
+  ports and interfaces.
+
 0.6.0
 -----
 * Added ``exec_commands`` to start additional commands (e.g. scripts) along with the container.
@@ -32,7 +39,7 @@ Change History
 * Implemented HostConfig during container creation, which is preferred over passing arguments during start since API
   v1.15. For older API versions, start keyword arguments will be used.
 * Added configuration inheritance and abstract configurations.
-* Changed log functions to be better fit Python logging.
+* Changed log functions to better fit Python logging.
 * Minor fixes in merge functions.
 * Bug fix in tag / repository partitioning (`PR #7 <https://github.com/merll/docker-map/pull/7>`_).
 
