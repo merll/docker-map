@@ -166,7 +166,7 @@ default specifies.
 
 Stop timeout
 """"""""""""
-When stopping or restarting a container, Docker sends a ``SIGINT`` signal to its main process. After a timeout period,
+When stopping or restarting a container, Docker sends a ``SIGTERM`` signal to its main process. After a timeout period,
 if the process is still not shut down, it receives a ``SIGKILL``. Some containers, e.g. database servers, may take
 longer than Docker's default timeout of 10 seconds. For this purpose
 :attr:`~dockermap.map.config.ContainerConfiguration.stop_timeout` can be set to a higher value.
