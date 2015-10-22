@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 from docker.utils import compare_version
+import itertools
 import six
 
 from ...functional import resolve_value
@@ -180,6 +181,23 @@ def get_host_binds(container_map, config, instance):
     return host_binds
 
 
+def _get_ex_port(port_binding):
+    return resolve_value(port_binding.exposed_port)
+
+
+def _get_port_bindings(ex_group, interfaces):
+    for port_binding in ex_group:
+        bind_port = resolve_value(port_binding.host_port)
+        interface = resolve_value(port_binding.interface)
+        if interface and bind_port:
+            bind_addr = resolve_value(interfaces.get(interface))
+            if not bind_addr:
+                raise ValueError("Address for interface '{0}' not found in client configuration.".format(interface))
+            yield (bind_addr, bind_port)
+        elif bind_port:
+            yield bind_port
+
+
 def get_port_bindings(container_config, client_config):
     """
     Generates the input dictionary contents for the ``port_bindings`` argument.
@@ -189,20 +207,15 @@ def get_port_bindings(container_config, client_config):
     :param client_config: Client configuration.
     :type client_config: dockermap.map.config.ClientConfiguration
     :return: Dictionary of ports with mapped port, and if applicable, with bind address
-    :rtype: dict[unicode | str, unicode | str | int | tuple]
+    :rtype: dict[unicode | str, list[unicode | str | int | tuple]]
     """
     port_bindings = {}
-    for port_binding in container_config.exposes:
-        exposed_port = resolve_value(port_binding.exposed_port)
-        bind_port = resolve_value(port_binding.host_port)
-        interface = resolve_value(port_binding.interface)
-        if interface and bind_port:
-            bind_addr = resolve_value(client_config.interfaces.get(interface))
-            if not bind_addr:
-                raise ValueError("Address for interface '{0}' not found in client configuration.".format(interface))
-            port_bindings[exposed_port] = (bind_addr, bind_port)
-        elif bind_port:
-            port_bindings[exposed_port] = bind_port
+    interfaces = client_config.interfaces
+    for exposed_port, ex_port_bindings in itertools.groupby(
+            sorted(container_config.exposes, key=_get_ex_port), _get_ex_port):
+        bind_list = list(_get_port_bindings(ex_port_bindings, interfaces))
+        if bind_list:
+            port_bindings[exposed_port] = bind_list
     return port_bindings
 
 

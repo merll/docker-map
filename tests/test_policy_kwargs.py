@@ -52,7 +52,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                 '/new_h': {'bind': '/new_c', 'ro': False},
             },
             volumes_from=['main.app_server_socket', 'main.web_log'],
-            port_bindings={80: 80, 443: 443},
+            port_bindings={80: [80], 443: [443]},
             version=self.client_version,
         ))
 
