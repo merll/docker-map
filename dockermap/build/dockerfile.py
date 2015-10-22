@@ -293,7 +293,10 @@ class DockerFile(DockerStringBuffer):
         :type input_str: unicode | str
         """
         self.check_not_finalized()
-        self.fileobj.write(input_str.encode('utf-8'))
+        if isinstance(input_str, six.binary_type):
+            self.fileobj.write(input_str)
+        else:
+            self.fileobj.write(input_str.encode('utf-8'))
 
     def writelines(self, sequence):
         """
@@ -307,7 +310,10 @@ class DockerFile(DockerStringBuffer):
 
     def writeline(self, input_str):
         self.check_not_finalized()
-        self.fileobj.write(input_str.encode('utf-8'))
+        if isinstance(input_str, six.binary_type):
+            self.fileobj.write(input_str)
+        else:
+            self.fileobj.write(input_str.encode('utf-8'))
         self.fileobj.write(b'\n')
 
     @property
