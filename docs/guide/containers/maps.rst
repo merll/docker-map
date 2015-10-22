@@ -386,7 +386,7 @@ considered:
 
     config.exec_commands = [
         ("/bin/bash -c 'script1.sh'", 'root'),
-        (['/bin/bash', '-c', 'script2.sh']", 'user'),
+        (['/bin/bash', '-c', 'script2.sh'], 'user'),
     ]
 
 * A third element in a tuple defines when the command should be run. :const:`dockermap.map.input.EXEC_POLICY_RESTART`
@@ -397,7 +397,7 @@ considered:
     from dockermap.map.input import EXEC_POLICY_INITIAL
     config.exec_commands = [
         ("/bin/bash -c 'script1.sh'", 'root'),                              # Run each time the container is started.
-        (['/bin/bash', '-c', 'script2.sh']", 'user', EXEC_POLICY_INITIAL),  # Run only when the container is created.
+        (['/bin/bash', '-c', 'script2.sh'], 'user', EXEC_POLICY_INITIAL),   # Run only when the container is created.
     ]
 
 
