@@ -357,7 +357,7 @@ class DockerClientWrapper(docker.Client):
 
     def remove_container(self, container, raise_on_error=False, **kwargs):
         """
-        Removes a container. For convenience optionally ignores 404 errors.
+        Removes a container. For convenience optionally ignores API errors.
 
         :param container: Container name.
         :type container: unicode | str
@@ -377,7 +377,7 @@ class DockerClientWrapper(docker.Client):
 
     def stop(self, container, raise_on_error=False, **kwargs):
         """
-        Removes a container. For convenience optionally ignores 404 errors.
+        Removes a container. For convenience optionally ignores API errors.
 
         :param container: Container name.
         :type container: unicode | str
@@ -403,17 +403,9 @@ class DockerClientWrapper(docker.Client):
                       for container in self.containers(all=True)]
         for c_id, stopped in containers:
             if not stopped:
-                try:
-                    self.stop(c_id)
-                except APIError as e:
-                    if e.response.status_code != 404:
-                        six.reraise(*sys.exc_info())
+                self.stop(c_id)
         for c_id, __ in containers:
-            try:
-                self.remove_container(c_id)
-            except APIError as e:
-                if e.response.status_code != 404:
-                    six.reraise(*sys.exc_info())
+            self.remove_container(c_id)
 
     def copy_resource(self, container, resource, local_filename):
         """
