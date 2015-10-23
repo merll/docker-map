@@ -391,7 +391,7 @@ class DockerClientWrapper(docker.Client):
             super(DockerClientWrapper, self).stop(container, **kwargs)
         except APIError as e:
             if e.response.status_code != 404:
-                self.push_log("Failed to remove container '%s': %s", logging.ERROR, container, e.explanation)
+                self.push_log("Failed to stop container '%s': %s", logging.ERROR, container, e.explanation)
                 if raise_on_error:
                     six.reraise(*sys.exc_info())
 
