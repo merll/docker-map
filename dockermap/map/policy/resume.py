@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from .base import BasePolicy, AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
+from .base import (BasePolicy, AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin,
+                   AbstractDependentActionGenerator)
 from .script import ScriptMixin
 from .simple import (SimpleCreateMixin, SimpleStartMixin, SimpleStopMixin, SimpleRemoveMixin,
                      SimpleShutdownMixin, SimpleRestartMixin)
@@ -9,7 +10,8 @@ from .update import ContainerUpdateMixin
 from . import utils
 
 
-class ResumeStartupGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
+class ResumeStartupGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin,
+                             AbstractDependentActionGenerator):
     def __init__(self, policy, *args, **kwargs):
         super(ResumeStartupGenerator, self).__init__(policy, *args, **kwargs)
         self._remove_status = policy.remove_status
@@ -114,7 +116,7 @@ class ResumeStartupMixin(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return ResumeStartupGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        return ResumeStartupGenerator(self).get_all_actions(map_name, container, instances=instances, **kwargs)
 
 
 class ResumeUpdatePolicy(SimpleCreateMixin, SimpleStartMixin, SimpleRestartMixin, SimpleStopMixin, SimpleRemoveMixin,

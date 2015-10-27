@@ -2,13 +2,14 @@
 from __future__ import unicode_literals
 
 import itertools
+from requests.exceptions import ReadTimeout
 
 from .base import (BasePolicy, AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin,
-                   AbstractActionGenerator, ReverseActionGeneratorMixin)
+                   AbstractActionGenerator, AbstractDependentActionGenerator, ReverseActionGeneratorMixin, SignalMixin)
 from . import ACTION_DEPENDENCY_FLAG, utils
 
 
-class SimpleCreateGenerator(ForwardActionGeneratorMixin, AbstractActionGenerator):
+class SimpleCreateGenerator(ForwardActionGeneratorMixin, AbstractDependentActionGenerator):
     def generate_item_actions(self, map_name, c_map, config_name, c_config, instances, flags, *args, **kwargs):
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
             use_host_config = utils.use_host_config(client)
@@ -52,10 +53,10 @@ class SimpleCreateMixin(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return SimpleCreateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        return SimpleCreateGenerator(self).get_all_actions(map_name, container, instances=instances, **kwargs)
 
 
-class SimpleStartGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractActionGenerator):
+class SimpleStartGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractDependentActionGenerator):
     def generate_item_actions(self, map_name, c_map, config_name, c_config, instances, flags, *args, **kwargs):
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
             use_host_config = utils.use_host_config(client)
@@ -100,11 +101,11 @@ class SimpleStartMixin(object):
         :type instances: list[unicode | str]
         :param kwargs: Additional keyword args for the start action.
         """
-        SimpleStartGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        SimpleStartGenerator(self).get_all_actions(map_name, container, instances=instances, **kwargs)
 
 
-class SimpleRestartMixin(ExecMixin):
-    def restart_actions(self, map_name, container, instances=None, **kwargs):
+class SimpleRestartGenerator(ExecMixin, SignalMixin, AbstractActionGenerator):
+    def generate_item_actions(self, map_name, c_map, config_name, c_config, instances, flags, *args, **kwargs):
         """
         Generates actions for restarting a configured container. Does not consider dependencies.
 
@@ -117,23 +118,36 @@ class SimpleRestartMixin(ExecMixin):
         :type instances: list[unicode | str]
         :param kwargs: Additional keyword args for the restart action.
         """
-        c_map = self._maps[map_name]
-        c_config = c_map.get_existing(container)
-        c_instances = instances or c_config.instances or [None]
-        for client_name, client, client_config in self.get_clients(c_config, c_map):
-            existing_containers = self.container_names[client_name]
-            for instance in c_instances:
-                ci_name = self.cname(map_name, container, instance)
+        for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
+            existing_containers = self._policy.container_names[client_name]
+            for instance in instances:
+                ci_name = self._policy.cname(map_name, config_name, instance)
                 ci_status = client.inspect_container(ci_name)['State'] if ci_name in existing_containers else None
-                if ci_status and ci_status['Running']:
-                    c_kwargs = self.get_restart_kwargs(c_map, container, c_config, client_name, client_config, ci_name,
-                                                       instance, kwargs=kwargs)
+                if not utils.is_initial(ci_status):
+                    if c_config.stop_signal:
+                        try:
+                            stop_timeout = kwargs.get('timeout')
+                            if stop_timeout is not None:
+                                stop_kwargs = {'timeout': stop_timeout}
+                            else:
+                                stop_kwargs = None
+                            self.signal_stop(c_map, config_name, c_config, client_name, client_config, client, ci_name,
+                                             instance, kwargs=stop_kwargs)
+                        except ReadTimeout:
+                            pass  # Restart will force it, or fail with a timeout as well.
+                    c_kwargs = self._policy.get_restart_kwargs(c_map, config_name, c_config, client_name, client_config,
+                                                               ci_name, instance, kwargs=kwargs)
                     client.restart(**c_kwargs)
-                    self.exec_container_commands(c_map, container, c_config, client_name, client_config, client,
+                    self.exec_container_commands(c_map, config_name, c_config, client_name, client_config, client,
                                                  ci_name, instance, False)
 
 
-class SimpleStopGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):
+class SimpleRestartMixin(ExecMixin, SignalMixin):
+    def restart_actions(self, map_name, container, instances=None, **kwargs):
+        SimpleRestartGenerator(self).generate_actions(map_name, container, instances, **kwargs)
+
+
+class SimpleStopGenerator(ReverseActionGeneratorMixin, SignalMixin, AbstractDependentActionGenerator):
     def __init__(self, policy, *args, **kwargs):
         super(SimpleStopGenerator, self).__init__(policy, *args, **kwargs)
         self._stop_dependent = policy.stop_dependent
@@ -145,10 +159,9 @@ class SimpleStopGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):
                 for instance in instances:
                     ci_name = self._policy.cname(map_name, config_name, instance)
                     ci_status = client.inspect_container(ci_name)['State'] if ci_name in existing_containers else None
-                    if ci_status and ci_status['Running']:
-                        c_kwargs = self._policy.get_stop_kwargs(c_map, config_name, c_config, client_name,
-                                                                client_config, ci_name, instance, kwargs=kwargs)
-                        client.stop(**c_kwargs)
+                    if not utils.is_initial(ci_status):
+                        self.signal_stop(c_map, config_name, c_config, client_name, client_config, client, ci_name,
+                                         instance, kwargs=kwargs)
 
 
 class SimpleStopMixin(object):
@@ -169,10 +182,10 @@ class SimpleStopMixin(object):
         :type instances: list[unicode | str]
         :param kwargs: Additional keyword args for the stop action.
         """
-        SimpleStopGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        SimpleStopGenerator(self).get_all_actions(map_name, container, instances=instances, **kwargs)
 
 
-class SimpleRemoveGenerator(ReverseActionGeneratorMixin, AbstractActionGenerator):
+class SimpleRemoveGenerator(ReverseActionGeneratorMixin, AbstractDependentActionGenerator):
     def __init__(self, policy, *args, **kwargs):
         super(SimpleRemoveGenerator, self).__init__(policy, *args, **kwargs)
         self._remove_dependent = policy.remove_dependent
@@ -224,7 +237,7 @@ class SimpleRemoveMixin(object):
         :type instances: list[unicode | str]
         :param kwargs: Additional keyword args for the remove action.
         """
-        SimpleRemoveGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        SimpleRemoveGenerator(self).get_all_actions(map_name, container, instances=instances, **kwargs)
 
 
 class SimpleStartupMixin(object):

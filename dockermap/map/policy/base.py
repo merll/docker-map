@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from abc import ABCMeta, abstractmethod
 from six import with_metaclass, iteritems, text_type
 import logging
+import signal
 from docker.utils.utils import create_host_config
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
@@ -882,7 +883,7 @@ class BasePolicy(with_metaclass(ABCMeta, object)):
         return self._images
 
 
-class AbstractActionGenerator(with_metaclass(ABCMeta, object)):
+class AbstractActionGenerator(with_metaclass(ABCMeta)):
     """
     Abstract base implementation for an action generator, which generates actions for a policy.
 
@@ -891,20 +892,6 @@ class AbstractActionGenerator(with_metaclass(ABCMeta, object)):
     """
     def __init__(self, policy=None):
         self._policy = policy
-
-    @abstractmethod
-    def get_dependency_path(self, map_name, config_name):
-        """
-        To be implemented by subclasses (or using :class:`ForwardActionGeneratorMixin` or
-        class:`ReverseActionGeneratorMixin`). Should provide an iterable of objects to be handled before the explicitly
-        selected container configuration.
-
-        :param map_name: Container map name.
-        :param config_name: Container configuration name.
-        :return: Iterable of dependency objects in tuples of map name, container (config) name, instance.
-        :rtype: list[tuple]
-        """
-        pass
 
     @abstractmethod
     def generate_item_actions(self, map_name, c_map, config_name, c_config, instances, flags, *args, **kwargs):
@@ -929,33 +916,14 @@ class AbstractActionGenerator(with_metaclass(ABCMeta, object)):
         """
         pass
 
-    def get_actions(self, map_name, container, instances=None, **kwargs):
-        """
-        Generates and performs actions for the selected container and its dependencies / dependents.
-
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param container: Main container configuration name.
-        :type container: unicode | str
-        :param instances: Instance names.
-        :type instances: list or tuple
-        :param kwargs: Additional keyword arguments to pass to the main container action.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
-        """
-        def _gen_actions(c_map_name, c_container, c_instance, c_flags=0, **c_kwargs):
-            c_map = self._policy.container_maps[c_map_name]
-            c_config = c_map.get_existing(c_container)
-            if not c_config:
-                raise KeyError("Container configuration '{0}' not found on map '{1}'.".format(
-                    c_container, c_map_name))
-            c_instances = [c_instance] if c_instance else c_config.instances or [None]
-            return self.generate_item_actions(map_name, c_map, c_container, c_config, c_instances, c_flags, **c_kwargs)
-
-        dependency_path = self.get_dependency_path(map_name, container)
-        for d in dependency_path:
-            list(_gen_actions(*d, c_flags=ACTION_DEPENDENCY_FLAG) or ())
-        return list(_gen_actions(map_name, container, instances, c_flags=0, **kwargs) or ())
+    def generate_actions(self, map_name, config_name, instance_name, c_flags=0, **c_kwargs):
+        c_map = self._policy.container_maps[map_name]
+        c_config = c_map.get_existing(config_name)
+        if not c_config:
+            raise KeyError("Container configuration '{0}' not found on map '{1}'.".format(
+                config_name, map_name))
+        c_instances = [instance_name] if instance_name else c_config.instances or [None]
+        return self.generate_item_actions(map_name, c_map, config_name, c_config, c_instances, c_flags, **c_kwargs)
 
     @property
     def policy(self):
@@ -970,6 +938,44 @@ class AbstractActionGenerator(with_metaclass(ABCMeta, object)):
     @policy.setter
     def policy(self, value):
         self._policy = value
+
+
+class AbstractDependentActionGenerator(AbstractActionGenerator):
+    """
+    Abstract extension for an action generator, which generates actions for a policy, considering dependencies.
+    """
+    @abstractmethod
+    def get_dependency_path(self, map_name, config_name):
+        """
+        To be implemented by subclasses (or using :class:`ForwardActionGeneratorMixin` or
+        class:`ReverseActionGeneratorMixin`). Should provide an iterable of objects to be handled before the explicitly
+        selected container configuration.
+
+        :param map_name: Container map name.
+        :param config_name: Container configuration name.
+        :return: Iterable of dependency objects in tuples of map name, container (config) name, instance.
+        :rtype: list[tuple]
+        """
+        pass
+
+    def get_all_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates and performs actions for the selected container and its dependencies / dependents.
+
+        :param map_name: Container map name.
+        :type map_name: unicode | str
+        :param container: Main container configuration name.
+        :type container: unicode | str
+        :param instances: Instance names.
+        :type instances: list or tuple
+        :param kwargs: Additional keyword arguments to pass to the main container action.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode | str, dict)]
+        """
+        dependency_path = self.get_dependency_path(map_name, container)
+        for d in dependency_path:
+            list(self.generate_actions(*d, c_flags=ACTION_DEPENDENCY_FLAG) or ())
+        return list(self.generate_actions(map_name, container, instances, c_flags=0, **kwargs) or ())
 
 
 class AttachedPreparationMixin(object):
@@ -1128,6 +1134,43 @@ class ExecMixin(object):
             if cmd_policy != EXEC_POLICY_INITIAL or not is_initial:
                 self.exec_single_command(container_map, config_name, container_config, client_name, client_config,
                                          client, container_name, instance_name, cmd, cmd_user)
+
+
+class SignalMixin(object):
+    def signal_stop(self, container_map, config_name, container_config, client_name, client_config, client,
+                    container_name, instance_name, kwargs=None):
+        """
+        Stops a container, either using the default client stop method, or sending a custom signal and waiting
+        for the container to stop.
+
+        :param container_map: Container map instance.
+        :type container_map: dockermap.map.container.ContainerMap
+        :param config_name: Container configuration name.
+        :type config_name: unicode | str
+        :param container_config: Container configuration object.
+        :type container_config: dockermap.map.config.ContainerConfiguration
+        :param client_name: Client configuration name.
+        :type client_name: unicode | str
+        :param client_config: Client configuration object.
+        :type client_config: dockermap.map.config.ClientConfiguration
+        :param client: Client object.
+        :type client: docker.client.Client
+        :param container_name: Name of the container to stop.
+        :type container_name: unicode | str
+        :param instance_name: Container instance name.
+        :type instance_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        """
+        sig = container_config.stop_signal
+        stop_kwargs = self._policy.get_stop_kwargs(container_map, config_name, container_config, client_name,
+                                                   client_config, container_name, instance_name, kwargs=kwargs)
+        if not sig or sig == 'SIGTERM' or sig == signal.SIGTERM:
+            client.stop(**stop_kwargs)
+        else:
+            log.debug("Sending signal %s to the container %s and waiting for stop.", sig, container_name)
+            client.kill(container_name, signal=sig)
+            client.wait(container_name, timeout=stop_kwargs.get('timeout', 10))
 
 
 class ForwardActionGeneratorMixin(object):
