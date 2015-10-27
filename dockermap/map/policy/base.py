@@ -925,6 +925,22 @@ class AbstractActionGenerator(with_metaclass(ABCMeta)):
         c_instances = [instance_name] if instance_name else c_config.instances or [None]
         return self.generate_item_actions(map_name, c_map, config_name, c_config, c_instances, c_flags, **c_kwargs)
 
+    def get_all_actions(self, map_name, container, instances=None, **kwargs):
+        """
+        Generates and performs actions for the selected container.
+
+        :param map_name: Container map name.
+        :type map_name: unicode | str
+        :param container: Main container configuration name.
+        :type container: unicode | str
+        :param instances: Instance names.
+        :type instances: list or tuple
+        :param kwargs: Additional keyword arguments to pass to the main container action.
+        :return: Return values of created main containers.
+        :rtype: list[(unicode | str, dict)]
+        """
+        return list(self.generate_actions(map_name, container, instances, c_flags=0, **kwargs) or ())
+
     @property
     def policy(self):
         """
@@ -975,7 +991,7 @@ class AbstractDependentActionGenerator(AbstractActionGenerator):
         dependency_path = self.get_dependency_path(map_name, container)
         for d in dependency_path:
             list(self.generate_actions(*d, c_flags=ACTION_DEPENDENCY_FLAG) or ())
-        return list(self.generate_actions(map_name, container, instances, c_flags=0, **kwargs) or ())
+        return super(AbstractDependentActionGenerator, self).get_all_actions(map_name, container, instances, **kwargs)
 
 
 class AttachedPreparationMixin(object):
