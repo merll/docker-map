@@ -142,7 +142,10 @@ class DockerFile(DockerStringBuffer):
         :type prefix: unicode | str
         :param args: Arguments to be prefixed.
         """
-        self.writeline(' '.join((prefix, ) + args))
+        self.write(prefix)
+        if args:
+            self.write(' ')
+            self.writeline(' '.join(map(six.text_type, args)))
 
     def prefix_all(self, prefix='#', *lines):
         """
