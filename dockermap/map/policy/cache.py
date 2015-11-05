@@ -69,8 +69,7 @@ class CachedImages(CachedItems, dict):
         if update_latest or full_name not in self:
             self._client.pull(repository=image, tag=tag, insecure_registry=insecure_registry)
             images = self._client.images(name=image_name)
-            if images:
-                new_image = images[0]
+            for new_image in images:
                 tags = new_image.get('RepoTags')
                 if tags:
                     self._latest.update(tags)
