@@ -3,6 +3,13 @@
 Change History
 ==============
 
+0.6.2
+-----
+* Added ``stop_signal`` for customizing the signal that is used for shutting down or restarting containers.
+* Minor changes in docs and log messages.
+* Fixed image cache update with multiple tags.
+* Bugfix in Dockerfile module.
+
 0.6.1
 -----
 * Many more Python 3 fixes (`PR #10 <https://github.com/merll/docker-map/pull/10>`_).
