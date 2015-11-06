@@ -176,6 +176,18 @@ longer than Docker's default timeout of 10 seconds. For this purpose
     This setting is also available on client level. The container configuration takes precedence over the client
     setting.
 
+Stop signal
+"""""""""""
+Not all applications handle ``SIGTERM`` in a way that is expected by Docker, so setting
+:attr:`~dockermap.map.config.ContainerConfiguration.stop_timeout` may not be sufficient. For example, PostgreSQL
+on a ``SIGTERM`` signal enters `Smart Shutdown <http://www.postgresql.org/docs/9.4/static/server-shutdown.html>`_
+mode, preventing it from accepting new connections, but not interrupting existing ones either, which can lead to a
+longer shutdown time than expected.
+
+In this case you can use a more appropriate signal, e.g. ``SIGINT``. Set either the text representation (``SIGINT``,
+``SIGQUIT``, ``SIGHUP`` etc.) or the numerical constant (see the `signal` man page) in the property
+:attr:`~dockermap.map.config.ContainerConfiguration.stop_signal`. It will be considered during stop and restart actions
+of the container. As usual, ``SIGKILL`` will be used after, if necessary.
 
 Shared volumes
 """"""""""""""

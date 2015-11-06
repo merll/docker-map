@@ -8,7 +8,8 @@ import six
 
 from ...functional import resolve_value
 from ..input import EXEC_POLICY_INITIAL
-from .base import AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, AbstractActionGenerator
+from .base import (AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin, SignalMixin,\
+                   AbstractDependentActionGenerator)
 from . import utils
 
 log = logging.getLogger(__name__)
@@ -194,8 +195,8 @@ class ContainerVolumeChecker(object):
         return True
 
 
-class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, ForwardActionGeneratorMixin,
-                               AbstractActionGenerator):
+class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, SignalMixin, ForwardActionGeneratorMixin,
+                               AbstractDependentActionGenerator):
     def __init__(self, policy, *args, **kwargs):
         super(ContainerUpdateGenerator, self).__init__(policy, *args, **kwargs)
         self.remove_status = policy.remove_status
@@ -348,9 +349,8 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, ForwardActio
                     if ci_remove:
                         log.debug("Found to be outdated or non-restartable - removing.")
                         if ci_running:
-                            ip_kwargs = self._policy.get_stop_kwargs(c_map, config_name, c_config, client_name,
-                                                                     client_config, ci_name, ci)
-                            client.stop(**ip_kwargs)
+                            self.signal_stop(c_map, config_name, c_config, client_name, client_config, client,
+                                             ci_name, ci)
                         ir_kwargs = self._policy.get_remove_kwargs(c_map, config_name, c_config, client_name,
                                                                    client_config, ci_name)
                         client.remove_container(**ir_kwargs)
@@ -431,4 +431,4 @@ class ContainerUpdateMixin(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode, dict)]
         """
-        return ContainerUpdateGenerator(self).get_actions(map_name, container, instances=instances, **kwargs)
+        return ContainerUpdateGenerator(self).get_all_actions(map_name, container, instances=instances, **kwargs)

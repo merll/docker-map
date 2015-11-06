@@ -10,7 +10,7 @@ from .base import DockerClientWrapper
 from .input import (get_list, get_shared_volumes, get_shared_host_volumes, get_container_links, get_network_mode,
                     get_port_bindings, get_exec_commands, NotSet)
 
-SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent', 'stop_timeout', 'network'
+SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent', 'stop_timeout', 'stop_signal', 'network'
 DICT_ATTRIBUTES = 'create_options', 'start_options', 'host_config'
 LIST_ATTRIBUTES = 'instances', 'shares', 'attaches', 'clients'
 
@@ -65,6 +65,7 @@ class ContainerConfiguration(object):
         self._create_kwargs = NotSet
         self._host_config_kwargs = NotSet
         self._stop_timeout = NotSet
+        self._stop_signal = NotSet
         self._network = NotSet
         self.update(kwargs)
 
@@ -359,7 +360,7 @@ class ContainerConfiguration(object):
     @property
     def stop_timeout(self):
         """
-        Individual timeout (in seconds) for stopping a container, i.e. the time between sending a ``SIGINT`` and a
+        Individual timeout (in seconds) for stopping a container, i.e. the time between sending a ``SIGTERM`` and a
         ``SIGKILL`` to the container.
 
         :return: Container stop timeout.
@@ -374,6 +375,26 @@ class ContainerConfiguration(object):
     @stop_timeout.deleter
     def stop_timeout(self):
         self._stop_timeout = NotSet
+
+    @property
+    def stop_signal(self):
+        """
+        By default Docker sends ``SIGTERM`` to containers on stop or restart. This may not always be the best signal
+        to get the main process to shut down properly. This property can for example be set to ``SIGINT``, where
+        more appropriate.
+
+        :return: Stop signal.
+        :rtype: int | unicode | str
+        """
+        return self._stop_signal
+
+    @stop_signal.setter
+    def stop_signal(self, value):
+        self._stop_signal = value
+
+    @stop_signal.deleter
+    def stop_signal(self):
+        self._stop_signal = NotSet
 
     @property
     def network(self):
