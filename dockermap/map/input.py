@@ -88,6 +88,8 @@ def get_list(value):
     """
     if value is None:
         return []
+    elif value is NotSet:
+        return NotSet
     elif isinstance(value, (list, tuple)):
         return list(value)
     elif isinstance(value, six.string_types + (lazy_type, )) or uses_type_registry(value):
