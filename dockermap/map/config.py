@@ -418,15 +418,49 @@ class ContainerConfiguration(object):
 
     def update(self, values):
         """
-        Updates the container configuration with the contents of the given dictionary, if keys are valid attributes for
-        this class. Existing attributes are replaced with the new values.
+        Updates the container configuration with the contents of the given configuration object or dictionary. In case
+        of a dictionary, only valid attributes for this class are considered. Existing attributes are replaced with
+        the new values.
 
-        :param values: Dictionary to update this container configuration with.
-        :type values: dict
+        :param values: Dictionary or ContainerConfiguration object to update this container configuration with.
+        :type values: dict | ContainerConfiguration
         """
-        for key, value in six.iteritems(values):
-            if hasattr(self, key):
-                setattr(self, key, value)
+        if isinstance(values, ContainerConfiguration):
+            self._abstract = values._abstract
+            self._extends = values._extends[:]
+            self._image = values._image
+            self._instances = values._instances[:]
+            self._shares = values._shares[:]
+            self._binds = values._binds[:]
+            self._uses = values._uses[:]
+            self._links_to = values._links_to[:]
+            self._attaches = values._attaches[:]
+            self._exposes = values._exposes[:]
+            self._exec = values._exec[:]
+            self._user = values._user
+            self._permissions = values._permissions
+            self._persistent = values._persistent
+            if values._clients is NotSet:
+                self._clients = NotSet
+            else:
+                self._clients = values._clients[:]
+            if values._create_kwargs is NotSet:
+                self._create_kwargs = NotSet
+            else:
+                self._create_kwargs = values._create_kwargs.copy()
+            if values._host_config_kwargs is NotSet:
+                self._host_config_kwargs = NotSet
+            else:
+                self._host_config_kwargs = values._host_config_kwargs.copy()
+            self._stop_timeout = values._stop_timeout
+            self._stop_signal = values._stop_signal
+            self._network = values._network
+        elif isinstance(values, dict):
+            for key, value in six.iteritems(values):
+                if hasattr(self, key):
+                    setattr(self, key, value)
+        else:
+            raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values)))
 
     def merge(self, values, lists_only=False):
         """
