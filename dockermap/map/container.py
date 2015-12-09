@@ -130,7 +130,7 @@ class ContainerMap(object):
         :type items: ContainerMap
         """
         self.__class__._copy_base(items, self)
-        for container, config in items:
+        for container, config in six.iteritems(items._containers):
             self._containers[container].update(config)
 
     def _merge_from_obj(self, items, lists_only):
@@ -148,7 +148,7 @@ class ContainerMap(object):
         if not lists_only:
             for attr in SINGLE_ATTRIBUTES:
                 setattr(self, attr, getattr(items, attr))
-        for container, config in items:
+        for container, config in six.iteritems(items._containers):
             if container in self._containers:
                 self._containers[container].merge(config, lists_only)
             else:
