@@ -395,7 +395,7 @@ class DockerClientWrapper(docker.Client):
                 if raise_on_error:
                     six.reraise(*sys.exc_info())
 
-    def remove_all_containers(self):
+    def remove_all_containers(self, stop_timeout=10):
         """
         First stops (if necessary) and them removes all containers present on the Docker instance.
         """
@@ -403,7 +403,7 @@ class DockerClientWrapper(docker.Client):
                       for container in self.containers(all=True)]
         for c_id, stopped in containers:
             if not stopped:
-                self.stop(c_id)
+                self.stop(c_id, timeout=stop_timeout)
         for c_id, __ in containers:
             self.remove_container(c_id)
 
