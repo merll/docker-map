@@ -619,9 +619,10 @@ class ClientConfiguration(DictMap):
         """
         def _if_set():
             for k in self.init_kwargs:
-                v = self.get(k)
-                if v:
-                    yield k, v
+                if hasattr(self, k):
+                    yield k, getattr(self, k)
+                elif k in self:
+                    yield k, self[k]
 
         return dict(_if_set())
 
