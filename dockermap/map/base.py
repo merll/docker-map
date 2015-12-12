@@ -398,6 +398,9 @@ class DockerClientWrapper(docker.Client):
     def remove_all_containers(self, stop_timeout=10):
         """
         First stops (if necessary) and them removes all containers present on the Docker instance.
+
+        :param stop_timeout: Timeout to stopping each container.
+        :type stop_timeout: int
         """
         containers = [(container['Id'], container['Status'].startswith('Exited'))
                       for container in self.containers(all=True)]
