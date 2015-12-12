@@ -2,6 +2,12 @@
 
 Change History
 ==============
+0.6.3
+-----
+* Improved fixed behavior when merging container maps and embedded container configurations. Can also be used for
+  creating copies.
+* Added ``stop_timeout`` argument to ``remove_all_containers``.
+* Fixed transfer of configuration variables into client instance.
 
 0.6.2
 -----
