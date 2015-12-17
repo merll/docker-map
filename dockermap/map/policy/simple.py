@@ -159,7 +159,7 @@ class SimpleStopGenerator(ReverseActionGeneratorMixin, SignalMixin, AbstractDepe
                 for instance in instances:
                     ci_name = self._policy.cname(map_name, config_name, instance)
                     ci_status = client.inspect_container(ci_name)['State'] if ci_name in existing_containers else None
-                    if not utils.is_initial(ci_status):
+                    if ci_status and not utils.is_initial(ci_status):
                         self.signal_stop(c_map, config_name, c_config, client_name, client_config, client, ci_name,
                                          instance, kwargs=kwargs)
 
