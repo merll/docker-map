@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import posixpath
 import six
+from docker.utils import compare_version
 
 from ..functional import resolve_value
 from . import DictMap
@@ -168,7 +169,7 @@ class ContainerConfiguration(object):
         names if all volumes are to be used of that container.
 
         :return: Used volumes.
-        :rtype: list[unicode | str]
+        :rtype: list[dockermap.map.input.SharedVolume]
         """
         return self._uses
 
@@ -590,6 +591,7 @@ class ClientConfiguration(DictMap):
     def __init__(self, base_url=None, version=None, timeout=None, *args, **kwargs):
         self._base_url = base_url
         self._version = version
+        self.use_host_config = None
         self._timeout = timeout
         if 'interfaces' in kwargs:
             self._interfaces = DictMap(kwargs.pop('interfaces'))
@@ -597,6 +599,7 @@ class ClientConfiguration(DictMap):
             self._interfaces = DictMap()
         self._client = kwargs.pop('client', None)
         super(ClientConfiguration, self).__init__(*args, **kwargs)
+        self.update_version(version)
 
     @classmethod
     def from_client(cls, client):
@@ -609,6 +612,12 @@ class ClientConfiguration(DictMap):
         """
         return cls(base_url=client.base_url, version=client.api_version,
                    timeout=client.timeout, client=client)
+
+    def update_version(self, version):
+        if version == 'auto':
+            return
+        self._version = version
+        self.use_host_config = compare_version('1.15', version) >= 0
 
     def get_init_kwargs(self):
         """
@@ -639,7 +648,7 @@ class ClientConfiguration(DictMap):
             client = self.client_constructor(**self.get_init_kwargs())
             self._client = client
             # Client might update the version number after construction.
-            self._version = client.api_version
+            self.update_version(client.api_version)
         return client
 
     @property
@@ -671,7 +680,7 @@ class ClientConfiguration(DictMap):
 
     @version.setter
     def version(self, value):
-        self._version = value
+        self.update_version(value)
 
     @property
     def timeout(self):
