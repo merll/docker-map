@@ -2,6 +2,10 @@
 
 Change History
 ==============
+0.6.4
+-----
+* Fixed exception on stopping a container configuration when the container does not exist.
+
 0.6.3
 -----
 * Improved fixed behavior when merging container maps and embedded container configurations. Can also be used for
