@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from docker.utils import compare_version
 import itertools
+
 import six
 
 from ...functional import resolve_value
-from ...shortcuts import get_user_group, str_arg
+from ...shortcuts import chown, chmod
 from ..config import get_host_path
 from ..input import is_path
 
@@ -231,19 +231,6 @@ def is_initial(container_state):
     return container_state['StartedAt'] == INITIAL_START_TIME
 
 
-def use_host_config(client):
-    """
-    Checks whether the client should pass the HostConfig options when creating containers, or use the older behavior
-    of passing the keyword arguments to the start method of the client.
-
-    :param client: Client object.
-    :type client: docker.client.Client
-    :return: ``True`` if the newer behavior should be used.
-    :rtype: bool
-    """
-    return compare_version('1.15', client.api_version) >= 0
-
-
 def get_instance_volumes(instance_detail):
     """
     Extracts the mount points and mapped directories of a Docker container.
@@ -274,11 +261,10 @@ def get_preparation_cmd(container_config, path):
     """
     def _get_cmd():
         if user:
-            yield 'chown -R {0} {1}'.format(get_user_group(user), path_str)
+            yield chown(user, path)
         if permissions:
-            yield 'chmod -R {0} {1}'.format(permissions, path_str)
+            yield chmod(permissions, path)
 
     user = resolve_value(container_config.user)
     permissions = container_config.permissions
-    path_str = str_arg(path)
     return list(_get_cmd())

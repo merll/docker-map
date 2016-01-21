@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from distutils.version import StrictVersion
 import posixpath
 import six
-from docker.utils import compare_version
 
 from ..functional import resolve_value
 from . import DictMap
@@ -14,6 +14,8 @@ from .input import (get_list, get_shared_volumes, get_shared_host_volumes, get_c
 SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent', 'stop_timeout', 'stop_signal', 'network'
 DICT_ATTRIBUTES = 'create_options', 'start_options', 'host_config'
 LIST_ATTRIBUTES = 'instances', 'shares', 'attaches', 'clients'
+
+HOST_CONFIG_VERSION = StrictVersion(str('1.15'))
 
 
 def get_host_path(root, path, instance=None):
@@ -614,10 +616,10 @@ class ClientConfiguration(DictMap):
                    timeout=client.timeout, client=client)
 
     def update_version(self, version):
-        if version == 'auto':
+        if version == 'auto' or not version:
             return
         self._version = version
-        self.use_host_config = compare_version('1.15', version) >= 0
+        self.use_host_config = str(version) >= HOST_CONFIG_VERSION
 
     def get_init_kwargs(self):
         """

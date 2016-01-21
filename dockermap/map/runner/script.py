@@ -7,18 +7,21 @@ import posixpath
 from requests import Timeout
 import six
 
+from ..action import UTIL_ACTION_SCRIPT
+
 
 class ScriptRunException(Exception):
     pass
 
 
 class ScriptMixin(object):
-    remove_existing_before = False
+    instance_action_method_names = [
+        (UTIL_ACTION_SCRIPT, 'run_script'),
+    ]
     remove_created_after = True
 
-    def run_script(self, map_name, container, instance=None, script_path=None, entrypoint=None,
-                   command_format=None, wait_timeout=None, container_script_dir='/tmp/script_run', timestamps=None,
-                   tail='all'):
+    def run_script(self, client, config, c_name, script_path=None, entrypoint=None, command_format=None,
+                   wait_timeout=None, container_script_dir='/tmp/script_run', timestamps=None, tail='all'):
         """
         Creates a container from its configuration to run a script or single command. The container is specifically
         created for this action. If it exists prior to the script run, it fails; optionally it can be removed by setting
@@ -26,12 +29,12 @@ class ScriptMixin(object):
         mounting the directory containing the script to the new container. After the script run, the container is
         destroyed (excluding its dependencies), unless :attr:`remove_created_after` is set to ``False``.
 
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param container: Container configuration name.
-        :type container: unicode | str
-        :param instance: Optional instance to use for running the script.
-        :type instance: unicode | str
+        :param client: Docker client.
+        :type client: docker.Client
+        :param config: Configuration.
+        :type config: dockermap.map.runner.base.ActionConfig
+        :param c_name: Container name.
+        :type c_name: unicode | str
         :param script_path: Path to the script on the Docker host. Note that this needs to have the executable bit
          set, if the script runtime (e.g. bash) requires it. If no script is to be used, (e.g. for a single command),
          this can point to a directory for writing back results to.
@@ -58,27 +61,9 @@ class ScriptMixin(object):
          a wait timeout occurred, instead of ``log`` and ``exit_code`` returns a key ``error``.
         :rtype: dict[unicode | str, dict]
         """
-        c_name = self.cname(map_name, container, instance)
-        c_map = self.container_maps[map_name]
-        c_config = c_map.get_existing(container)
-        config_clients = {client_name: (client, client_config)
-                          for client_name, client, client_config in self.get_clients(c_config, c_map)}
-        instances = [instance] if instance else None
-
-        if self.remove_existing_before:
-            # Remove container if it exists.
-            self.shutdown_actions(map_name, container, instances)
-        else:
-            # Check if containers exist prior to any action.
-            for client_name in config_clients.keys():
-                if c_name in self.container_names[client_name]:
-                    if client_name == self.get_default_client_name():
-                        error_msg = "Container {0} existed prior to running the script.".format(c_name, client_name)
-                    else:
-                        error_msg = ("Container {0} existed on client {1} prior to running the "
-                                     "script.").format(c_name, client_name)
-                    raise ScriptRunException(error_msg)
-
+        client_config = config.client_config
+        client_timeout = client_config.get('timeout')
+        use_host_config = client_config.get('use_host_config')
         if script_path:
             if os.path.isdir(script_path):
                 script_dir = script_path
@@ -101,28 +86,32 @@ class ScriptMixin(object):
             volumes = None
             binds = None
             command = command_format
-        new_containers = self.create_actions(map_name, container, instances, entrypoint=entrypoint, command=command,
-                                             volumes=volumes, host_config=dict(binds=binds))
-        if not new_containers:
+
+        if use_host_config:
+            create_extra_kwargs = {'host_config': dict(binds=binds)}
+            start_extra_kwargs = {}
+        else:
+            create_extra_kwargs = {}
+            start_extra_kwargs = {'binds': binds}
+        created = self.create_instance(client, config, c_name, entrypoint=entrypoint, command=command,
+                                       volumes=volumes, **create_extra_kwargs)
+        if not created:
             raise ScriptRunException("No new containers were created.")
-        results = {}
         try:
-            self.start_actions(map_name, container, instances, binds=binds)
-            for client_name, container_info in new_containers:
-                client, client_config = config_clients[client_name]
-                timeout = wait_timeout or client_config.get('wait_timeout')
-                container_id = container_info['Id']
-                try:
-                    client.wait(container_id, timeout=timeout)
-                except Timeout:
-                    results[client_name] = {'id': container_id, 'error': ("Timed out while waiting for the container "
-                                                                          "to finish.")}
-                else:
-                    c_info = client.inspect_container(container_id)
-                    exit_code = c_info['State']['ExitCode']
-                    log_str = client.logs(container_id, timestamps=timestamps, tail=tail)
-                    results[client_name] = {'id': container_id, 'log': log_str, 'exit_code': exit_code}
+            self.start_instance(client, config, c_name, **start_extra_kwargs)
+            timeout = wait_timeout or client_config.get('wait_timeout') or client_timeout
+            container_id = created['Id']
+            try:
+                self.wait_instance(client, config, c_name, timeout=timeout)
+            except Timeout:
+                result = {'id': container_id, 'error': "Timed out while waiting for the container to finish."}
+            else:
+                c_info = client.inspect_container(container_id)
+                exit_code = c_info['State']['ExitCode']
+                log_str = client.logs(container_id, timestamps=timestamps, tail=tail)
+                result = {'id': container_id, 'log': log_str, 'exit_code': exit_code}
         finally:
             if self.remove_created_after:
-                self.shutdown_actions(map_name, container, instances)
-        return results
+                self.stop_instance(client, config, c_name, timeout=1)
+                self.remove_instance(client, config, c_name)
+        return result

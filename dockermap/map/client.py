@@ -3,9 +3,13 @@ from __future__ import unicode_literals
 
 import docker
 
+from .action import simple, script, update
 from .config import ClientConfiguration
 from .container import ContainerMap
-from .policy import ResumeUpdatePolicy
+from .policy.base import BasePolicy
+from .runner.base import DockerClientRunner
+from .state.base import SingleStateGenerator, DependencyStateGenerator, DependentStateGenerator
+from .state.update import UpdateStateGenerator
 
 
 class MappingDockerClient(object):
@@ -30,13 +34,23 @@ class MappingDockerClient(object):
     :type docker_client: dockermap.map.config.ClientConfiguration or docker.client.Client
     :param clients: Dictionary of client configurations
     :type clients: dict[unicode | str, dockermap.map.config.ClientConfiguration]
-    :param policy_class: Policy class based on :class:`~dockermap.map.policy.base.BasePolicy` for generating container
-      actions.
-    :type policy_class: class
     """
     configuration_class = ClientConfiguration
+    policy_class = BasePolicy
+    generators = {
+        'create': (DependencyStateGenerator, simple.CreateActionGenerator),
+        'start': (DependencyStateGenerator, simple.StartActionGenerator),
+        'restart': (SingleStateGenerator, simple.RestartActionGenerator),
+        'stop': (DependentStateGenerator, simple.StopActionGenerator),
+        'remove': (DependentStateGenerator, simple.RemoveActionGenerator),
+        'startup': (DependencyStateGenerator, simple.StartupActionGenerator),
+        'shutdown': (DependentStateGenerator, simple.ShutdownActionGenerator),
+        'update': (UpdateStateGenerator, update.UpdateActionGenerator),
+        'script': (DependencyStateGenerator, script.ScriptActionGenerator),
+    }
+    runner_class = DockerClientRunner
 
-    def __init__(self, container_maps=None, docker_client=None, clients=None, policy_class=ResumeUpdatePolicy):
+    def __init__(self, container_maps=None, docker_client=None, clients=None):
         if container_maps:
             if isinstance(container_maps, ContainerMap):
                 self._default_map = container_maps.name
@@ -64,9 +78,8 @@ class MappingDockerClient(object):
                 default_client = docker_client
             else:
                 raise ValueError("Unexpected type of 'docker_client' argument: {0}".format(type(docker_client)))
-            default_name = policy_class.get_default_client_name()
+            default_name = self.policy_class.get_default_client_name()
             self._clients[default_name] = default_client
-        self._policy_class = policy_class
         self._policy = None
 
     def get_policy(self):
@@ -77,8 +90,22 @@ class MappingDockerClient(object):
         :rtype: dockermap.map.policy.base.BasePolicy
         """
         if not self._policy:
-            self._policy = self._policy_class(self._maps, self._clients)
+            self._policy = self.policy_class(self._maps, self._clients)
         return self._policy
+
+    def run_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
+        policy = self.get_policy()
+        state_generator_cls, action_generator_cls = self.generators[action_name]
+        state_generator = state_generator_cls(policy)
+        action_generator = action_generator_cls(policy)
+        runner = self.runner_class(policy)
+        results = []
+
+        for states in state_generator.get_states(map_name or self._default_map, config_name, instances=instances):
+            actions = action_generator.get_actions(states)
+            results.extend(runner.run_actions(*actions, **kwargs))
+
+        return results
 
     def create(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -96,7 +123,7 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.get_policy().create_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.run_actions('create', container, instances=instances, map_name=map_name, **kwargs)
 
     def start(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -114,7 +141,7 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.get_policy().start_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.run_actions('start', container, instances=instances, map_name=map_name, **kwargs)
 
     def restart(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -132,7 +159,7 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.get_policy().restart_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.run_actions('restart', container, instances=instances, map_name=map_name, **kwargs)
 
     def stop(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -154,7 +181,7 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.get_policy().stop_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.run_actions('stop', container, instances=instances, map_name=map_name, **kwargs)
 
     def remove(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -172,7 +199,7 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.get_policy().remove_actions(map_name or self._default_map, container, instances, **kwargs)
+        return self.run_actions('remove', container, instances=instances, map_name=map_name, **kwargs)
 
     def startup(self, container, instances=None, map_name=None):
         """
@@ -189,7 +216,7 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.get_policy().startup_actions(map_name or self._default_map, container, instances)
+        return self.run_actions('startup', container, instances=instances, map_name=map_name)
 
     def shutdown(self, container, instances=None, map_name=None):
         """
@@ -206,9 +233,9 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.get_policy().shutdown_actions(map_name or self._default_map, container, instances)
+        return self.run_actions('shutdown', container, instances=instances, map_name=map_name)
 
-    def update(self, container, instances=None, map_name=None):
+    def update(self, container, instances=None, map_name=None, **kwargs):
         """
         Updates instances from a container configuration. Typically this means restarting or recreating containers based
         on detected changes in the configuration or environment.  Note that not all policy classes necessarily implement
@@ -224,12 +251,14 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.get_policy().update_actions(map_name or self._default_map, container, instances)
+        return self.run_actions('update', container, instances=instances, map_name=map_name, **kwargs)
 
     def call(self, action_name, container, instances=None, map_name=None, **kwargs):
         """
         Generic function for running container actions based on a policy.
 
+        :param action_name: Action name.
+        :type action_name: unicode | str
         :param container: Container name.
         :type container: unicode | str
         :param instances: Instance names to remove. If not specified, runs on all instances as specified in the
@@ -241,11 +270,7 @@ class MappingDockerClient(object):
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        method_name = '{0}_actions'.format(action_name)
-        action_method = getattr(self.get_policy(), method_name)
-        if callable(action_method):
-            return action_method(map_name or self._default_map, container, instances=instances, **kwargs)
-        raise ValueError("The selected policy does not provide a method '{0}' for generating actions.".format(method_name))
+        return self.run_actions(action_name, container, instances=instances, map_name=map_name, **kwargs)
 
     def run_script(self, container, instance=None, map_name=None, **kwargs):
         """
@@ -260,12 +285,11 @@ class MappingDockerClient(object):
         :type instance: unicode | str
         :param container: Container configuration name.
         :type container: unicode | str
-        :param script_path: Path to the script on the Docker host.
         :param kwargs: Keyword arguments to the script runner function.
         :return: A dictionary of client names with their log output and exit codes.
         :rtype: dict[unicode | str, dict]
         """
-        return self.get_policy().run_script(map_name or self._default_map, container, instance=instance, **kwargs)
+        return self.run_actions('script', container, instances=instance, map_name=map_name, **kwargs)
 
     def refresh_names(self):
         """
@@ -299,8 +323,8 @@ class MappingDockerClient(object):
             maps = [self._maps[map_name].get_extended_map()]
         else:
             maps = [m.get_extended_map() for m in self._maps.values()]
-        cname_func = self._policy_class.cname
-        aname_func = self._policy_class.aname
+        cname_func = self.policy_class.cname
+        aname_func = self.policy_class.aname
         return list(_container_names())
 
     @property
@@ -338,18 +362,3 @@ class MappingDockerClient(object):
         if value in self._maps:
             raise ValueError("Default name must match an available map name.")
         self._default_map = value
-
-    @property
-    def policy_class(self):
-        """
-        The policy class, that transforms commands into actions on containers, considering potential dependencies.
-
-        :return: Subclass of :class:`~dockermap.map.policy.base.BasePolicy`.
-        :rtype: class
-        """
-        return self._policy_class
-
-    @policy_class.setter
-    def policy_class(self, value):
-        self._policy = None
-        self._policy_class = value
