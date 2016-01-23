@@ -2,16 +2,14 @@
 from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
-from itertools import chain
 import logging
 
 from six import with_metaclass
 
-from dockermap.map.state import STATE_FLAG_RESTARTING
 from ..policy import (CONFIG_FLAG_DEPENDENT, CONFIG_FLAG_ATTACHED, CONFIG_FLAG_PERSISTENT,
                       PolicyUtil, ForwardGeneratorMixin, ReverseGeneratorMixin)
 from . import (INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, STATE_FLAG_INITIAL,
-               STATE_FLAG_NONRECOVERABLE, ContainerConfigStates, ContainerInstanceState)
+               STATE_FLAG_RESTARTING, STATE_FLAG_NONRECOVERABLE, ContainerConfigStates, ContainerInstanceState)
 
 
 log = logging.getLogger(__name__)
@@ -202,15 +200,9 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCMeta, SingleStateGenera
         """
         dependency_path = self.get_dependency_path(map_name, config_name)
         log.debug("Following dependency path for %s.%s.", map_name, config_name)
-        maps = self._policy.container_maps
-        for d_map_name, d_config_name, d_instance in dependency_path:
-            log.debug("Dependency path at %s.%s, instance %s.", d_map_name, d_config_name, d_instance or '<default>')
-            d_map = maps[d_map_name]
-            d_config = d_map.get_existing(d_config_name)
-            if not d_config:
-                raise KeyError("Container configuration '{0}' not found on map '{1}'."
-                               "".format(d_config_name, d_map_name))
-            for state in self.generate_config_states(d_map_name, d_map, d_config_name, d_config, [d_instance],
+        for d_map_name, d_map, d_config_name, d_config, d_instances in dependency_path:
+            log.debug("Dependency path at %s.%s, instances %s.", d_map_name, d_config_name, d_instances)
+            for state in self.generate_config_states(d_map_name, d_map, d_config_name, d_config, d_instances,
                                                      is_dependency=True):
                 yield state
 

@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from collections import OrderedDict
+
+from six import iteritems
+
 from ..dep import MultiDependencyResolver, CircularDependency
 
 
@@ -8,14 +12,7 @@ class ContainerDependencyResolver(MultiDependencyResolver):
     """
     Resolves dependencies between :class:`~dockermap.map.config.ContainerConfiguration` instances, based on shared and
     used volumes.
-
-    :param container_map: Optional :class:`~dockermap.map.container.ContainerMap` instance for initialization.
-    :type container_map: dockermap.map.container.ContainerMap
     """
-    def __init__(self, container_map=None):
-        items = container_map.dependency_items if container_map else None
-        super(ContainerDependencyResolver, self).__init__(items)
-
     def merge_dependency(self, item, resolve_parent, parents):
         """
         Merge dependencies of current container with further dependencies; in this instance, it means that first parent
@@ -31,39 +28,26 @@ class ContainerDependencyResolver(MultiDependencyResolver):
         :rtype: list
         :raise CircularDependency: If the current element depends on one found deeper in the hierarchy.
         """
-        dep = []
-        for parent in parents:
-            parent_dep = resolve_parent(parent)
-            if parent_dep:
-                new_dep = [p for p in parent_dep if p not in dep]
-                dep.extend(new_dep)
+        def _merge_instances(merge_deps):
+            for mm, mc, mi in merge_deps:
+                key = mm, mc
+                dep_instances = dep.get(key)
+                if dep_instances is None:
+                    dep[key] = list(mi)
+                elif None not in dep_instances:
+                    if None in mi:
+                        dep[key] = [None]
+                    else:
+                        new_instances = [ni for ni in mi if ni not in dep_instances]
+                        dep_instances.extend(new_instances)
 
-        new_dep = [p for p in parents if p not in dep]
-        dep.extend(new_dep)
+        dep = OrderedDict()
+        for p_map, p_config, __ in parents:
+            parent_dep = resolve_parent((p_map, p_config))
+            if parent_dep:
+                _merge_instances(parent_dep)
+        _merge_instances(parents)
         if item in dep:
             raise CircularDependency("Circular dependency found for item '{0}'.".format(item))
-        return dep
-
-    def get_container_dependencies(self, map_name, container):
-        item = map_name, container, None
-        return super(ContainerDependencyResolver, self).get_dependencies(item)
-
-    def update(self, container_map):
-        """
-        Overrides the `update` function of the superclass to use a :class:`~dockermap.map.container.ContainerMap`
-        instance.
-
-        :param container_map: :class:`ContainerMap` instance
-        :type container_map: dockermap.map.container.ContainerMap
-        """
-        super(ContainerDependencyResolver, self).update(container_map.dependency_items)
-
-    def update_backward(self, container_map):
-        """
-        Overrides the `update_backward` function of the superclass to use a
-        :class:`~dockermap.map.container.ContainerMap` instance.
-
-        :param container_map: :class:`~dockermap.map.container.ContainerMap` instance
-        :type container_map: dockermap.map.container.ContainerMap
-        """
-        super(ContainerDependencyResolver, self).update_backward(container_map.dependency_items)
+        return [(d_map, d_config, d_instances)
+                for (d_map, d_config), d_instances in iteritems(dep)]

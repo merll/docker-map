@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 from collections import Counter, defaultdict
 import itertools
+from operator import itemgetter
+
 import six
 
 from . import DictMap
@@ -13,6 +15,8 @@ from .input import get_list
 SINGLE_ATTRIBUTES = 'repository', 'default_domain', 'set_hostname', 'use_attached_parent_name'
 DICT_ATTRIBUTES = 'volumes', 'host'
 LIST_ATTRIBUTES = 'clients',
+
+get_map_config = itemgetter(0, 1)
 
 
 class MapIntegrityError(Exception):
@@ -85,7 +89,7 @@ class ContainerMap(object):
                 setattr(self, key, get_list(value))
             elif key in DICT_ATTRIBUTES:
                 getattr(self, key).update(value)
-            elif value:
+            else:
                 if key == 'containers':
                     for container, config in six.iteritems(value):
                         self._containers[container].update(config)
@@ -264,8 +268,7 @@ class ContainerMap(object):
     def use_attached_parent_name(self, value):
         self._use_attached_parent_name = value
 
-    @property
-    def dependency_items(self):
+    def dependency_items(self, reverse=False):
         """
         Generates all containers' dependencies, i.e. an iterator on tuples in the format
         ``(container_name, used_containers)``, whereas the used containers are a set, and can be empty.
@@ -308,16 +311,38 @@ class ContainerMap(object):
         else:
             used_func = _get_used_item_ap
 
-        for c_name, c_config in ext_map:
-            used_set = set(map(used_func, c_config.uses))
-            linked_set = set(map(_get_linked_item, c_config.links))
-            dep_set = used_set | linked_set
-            nw = c_config.network
+        def _get_dep_set(config):
+            used_set = set(map(used_func, config.uses))
+            linked_set = set(map(_get_linked_item, config.links))
+            d_set = used_set | linked_set
+            nw = config.network
             if isinstance(nw, tuple):
-                dep_set.add((self._name, ) + nw)
-            for c_instance in c_config.instances:
-                yield (self._name, c_name, c_instance), dep_set
-            yield (self._name, c_name, None), dep_set
+                d_set.add((self._name, ) + nw)
+            return d_set
+
+        def _get_grouped_instances(d_map_config, d_instances):
+            d_map_name, d_config_name = d_map_config
+            d_config = ext_map.get_existing(d_config_name)
+            if not d_config:
+                raise KeyError("Dependency {0}.{1} for {2}.{3} not found.".format(
+                               d_map_name, d_config_name, self._name, c_name))
+            if d_config.instances and (None in d_instances or len(d_instances) == len(d_config.instances)):
+                return d_map_name, d_config_name, (None, )
+            return d_map_name, d_config_name, d_instances
+
+        if reverse:
+            # Consolidate dependents.
+            for c_name, c_config in ext_map:
+                dep_set = set(map(get_map_config, _get_dep_set(c_config)))
+                yield (self._name, c_name, (None, )), dep_set
+        else:
+            # Group instances, or replace with None where all of them are used.
+            for c_name, c_config in ext_map:
+                dep_set = _get_dep_set(c_config)
+                instance_set = set(_get_grouped_instances(map_config, tuple(di[2] for di in items))
+                                   for map_config, items in itertools.groupby(sorted(dep_set, key=get_map_config),
+                                                                              get_map_config))
+                yield (self._name, c_name), instance_set
 
     def get(self, item):
         """
