@@ -81,7 +81,7 @@ class UpdateActionGenerator(AbstractActionGenerator):
             log.debug("Evaluating container instance %s.", instance_name)
             ci_initial = instance_state.flags & STATE_FLAG_INITIAL
             if instance_state.base_state == STATE_ABSENT:
-                log.debug("Not found - creating and starting attached container %s.", instance_name)
+                log.debug("Not found - creating and starting instance container %s.", instance_name)
                 action = DERIVED_ACTION_STARTUP
             elif ci_initial:
                 log.debug("Container found but initial, starting %s.", instance_name)
