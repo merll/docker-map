@@ -185,12 +185,16 @@ def _get_ex_port(port_binding):
     return resolve_value(port_binding.exposed_port)
 
 
-def _get_port_bindings(ex_group, interfaces):
+def _get_port_bindings(ex_group, interfaces_ipv4, interfaces_ipv6):
     for port_binding in ex_group:
         bind_port = resolve_value(port_binding.host_port)
         interface = resolve_value(port_binding.interface)
+        ipv6 = resolve_value(port_binding.ipv6)
         if interface and bind_port:
-            bind_addr = resolve_value(interfaces.get(interface))
+            if ipv6:
+                bind_addr = resolve_value(interfaces_ipv6.get(interface))
+            else:
+                bind_addr = resolve_value(interfaces_ipv4.get(interface))
             if not bind_addr:
                 raise ValueError("Address for interface '{0}' not found in client configuration.".format(interface))
             yield (bind_addr, bind_port)
@@ -210,10 +214,11 @@ def get_port_bindings(container_config, client_config):
     :rtype: dict[unicode | str, list[unicode | str | int | tuple]]
     """
     port_bindings = {}
-    interfaces = client_config.interfaces
+    if_ipv4 = client_config.interfaces
+    if_ipv6 = client_config.interfaces_ipv6
     for exposed_port, ex_port_bindings in itertools.groupby(
             sorted(container_config.exposes, key=_get_ex_port), _get_ex_port):
-        bind_list = list(_get_port_bindings(ex_port_bindings, interfaces))
+        bind_list = list(_get_port_bindings(ex_port_bindings, if_ipv4, if_ipv6))
         if bind_list:
             port_bindings[exposed_port] = bind_list
     return port_bindings

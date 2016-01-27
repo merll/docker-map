@@ -33,7 +33,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'server_user')
-        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertEqual(cfg.create_options, {
             'mem_limit': '1g',
@@ -54,7 +54,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'app_user')
-        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertIs(cfg.create_options, NotSet)
         self.assertIs(cfg.host_config, NotSet)
@@ -67,7 +67,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'server_user')
-        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertEqual(cfg.create_options, {
             'mem_limit': '1g',
@@ -88,7 +88,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'app_user')
-        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertIs(cfg.create_options, NotSet)
         self.assertIs(cfg.host_config, NotSet)
@@ -99,7 +99,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
         self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
         self.assertEqual(cfg.user, 'server_user')
-        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private')])
+        self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
         self.assertEqual(cfg.create_options, {
             'mem_limit': '1g',

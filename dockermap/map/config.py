@@ -595,6 +595,10 @@ class ClientConfiguration(DictMap):
             self._interfaces = DictMap(kwargs.pop('interfaces'))
         else:
             self._interfaces = DictMap()
+        if 'interfaces_ipv6' in kwargs:
+            self._interfaces_ipv6 = DictMap(kwargs.pop('interfaces_ipv6'))
+        else:
+            self._interfaces_ipv6 = DictMap()
         self._client = kwargs.pop('client', None)
         super(ClientConfiguration, self).__init__(*args, **kwargs)
 
@@ -703,6 +707,20 @@ class ClientConfiguration(DictMap):
     @interfaces.setter
     def interfaces(self, value):
         self._interfaces = DictMap(value)
+
+    @property
+    def interfaces_ipv6(self):
+        """
+        Same as :prop:`interfaces`, but for assigning IPv6 interface addresses.
+
+        :return: Network interface configuration.
+        :rtype: DictMap
+        """
+        return self._interfaces_ipv6
+
+    @interfaces_ipv6.setter
+    def interfaces_ipv6(self, value):
+        self._interfaces_ipv6 = DictMap(value)
 
     @property
     def client(self):
