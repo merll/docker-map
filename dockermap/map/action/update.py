@@ -30,7 +30,7 @@ class UpdateActionGenerator(AbstractActionGenerator):
         attached_actions = []
         for attached_state in states.attached:
             log.debug("Evaluating attached container %s.", attached_state.instance)
-            if attached_state.flags == STATE_ABSENT:
+            if attached_state.base_state == STATE_ABSENT:
                 log.debug("Not found - creating and starting attached container %s.", attached_state.instance)
                 action_type = DERIVED_ACTION_STARTUP
             elif attached_state.flags & STATE_FLAG_INITIAL:
