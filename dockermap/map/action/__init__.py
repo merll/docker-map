@@ -19,7 +19,7 @@ UTIL_ACTION_SCRIPT = 'script'                               # Create & start con
 UTIL_ACTION_SIGNAL_STOP = 'signal_stop'                     # Send signal (kill) & wait.
 UTIL_ACTION_PREPARE_CONTAINER = 'prepare_container'         # Set up attached volume permissions.
 
-DERIVED_ACTION_STARTUP = [ACTION_CREATE, ACTION_START, UTIL_ACTION_EXEC_ALL]      # Create & start
+DERIVED_ACTION_STARTUP = [ACTION_CREATE, ACTION_START]                            # Create & start
 DERIVED_ACTION_SHUTDOWN = [UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE]                # Stop & remove
 DERIVED_ACTION_RESET = [UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE,
                         ACTION_CREATE, ACTION_START]                              # Stop, remove, create, & start
