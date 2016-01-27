@@ -102,7 +102,7 @@ class MappingDockerClient(object):
         results = []
 
         for states in state_generator.get_states(map_name or self._default_map, config_name, instances=instances):
-            actions = action_generator.get_actions(states)
+            actions = action_generator.get_state_actions(states)
             results.extend(runner.run_actions(*actions, **kwargs))
 
         return results

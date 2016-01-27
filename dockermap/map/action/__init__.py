@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from six import string_types
+
 # Base actions provided by client.
 ACTION_CREATE = 'create'
 ACTION_START = 'start'
@@ -25,12 +27,13 @@ DERIVED_ACTION_RELAUNCH = [ACTION_REMOVE, ACTION_CREATE, ACTION_START]          
 
 
 class InstanceAction(object):
-    def __init__(self, client_name, map_name, config_name, instance_name, action_type=None, extra_data=None, **kwargs):
+    def __init__(self, client_name, map_name, config_name, instance_name, action_types=None, extra_data=None, **kwargs):
         self._client = client_name
         self._map = map_name
         self._config = config_name
         self._instance = instance_name
-        self._action_type = action_type
+        self._action_types = []
+        self.action_types = action_types
         self._extra_data = extra_data or {}
         self._extra_data.update(kwargs)
 
@@ -49,9 +52,9 @@ class InstanceAction(object):
         :return: Function with arguments ``instance_name`, ``action_type``, and ``extra_data``.
         :rtype: (unicode | str, unicode | str, dict) -> InstanceAction
         """
-        def _new_instance(instance_name, action_type=None, extra_data=None, **kwargs):
+        def _new_instance(instance_name, action_types=None, extra_data=None, **kwargs):
             return cls(client_name, map_name, config_name, instance_name,
-                       action_type=action_type, extra_data=extra_data, **kwargs)
+                       action_types=action_types, extra_data=extra_data, **kwargs)
 
         return _new_instance
 
@@ -105,12 +108,20 @@ class InstanceAction(object):
         return self._client, self._map, self._config, self._instance
 
     @property
-    def action_type(self):
-        return self._action_type
+    def action_types(self):
+        return self._action_types
 
-    @action_type.setter
-    def action_type(self, value):
-        self._action_type = value
+    @action_types.setter
+    def action_types(self, value):
+        if isinstance(value, list):
+            self._action_types = value
+        elif isinstance(value, string_types):
+            self._action_types = [value]
+        elif value:
+            raise ValueError("String or list must be provided for 'action_types'. Found {0}.".format(
+                    type(value).__name__))
+        else:
+            self._action_types = []
 
     @property
     def extra_data(self):
@@ -119,7 +130,3 @@ class InstanceAction(object):
     @extra_data.setter
     def extra_data(self, value):
         self._extra_data = value
-
-    def copy(self, action_type=None, extra_data=None):
-        return self.__class__(self._client, self._map, self._config, self._instance,
-                              action_type=action_type, extra_data=extra_data)

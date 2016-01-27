@@ -16,33 +16,6 @@ log = logging.getLogger(__name__)
 
 
 class UpdateActionGenerator(AbstractActionGenerator):
-    stop_dependent_before = False
-
-    def expand_instance_actions(self, actions):
-        """
-
-        :param actions: Action list to expand.
-        :type actions: list[dockermap.map.action.InstanceAction]
-        :return: __generator[dockermap.map.action.InstanceAction]
-        """
-        if self.stop_dependent_before:
-            for action in super(UpdateActionGenerator, self).expand_instance_actions(actions):
-                if action.action_type in (ACTION_STOP, UTIL_ACTION_SIGNAL_STOP):
-                    # Anticipate the stop of a dependency container by stopping all dependents first.
-                    dependent = self._policy.get_dependents(action.map_name, action.config_name)
-                    for d_map_name, d_config_name, d_instance in dependent:
-                        log.debug("Stopping dependent container %s.%s instance %s.", d_map_name, d_config_name,
-                                  d_instance or '<default>')
-                        d_map = self._policy.container_maps[d_map_name]
-                        d_config = d_map.get_existing(d_config_name)
-                        stop_action_type = UTIL_ACTION_SIGNAL_STOP if d_config.stop_signal else ACTION_STOP
-                        yield InstanceAction(action.client_name, d_map_name, d_config_name, d_instance,
-                                             stop_action_type)
-                yield action
-        else:
-            for action in super(UpdateActionGenerator, self).expand_instance_actions(actions):
-                yield action
-
     def get_state_actions(self, states):
         """
 
@@ -59,20 +32,20 @@ class UpdateActionGenerator(AbstractActionGenerator):
             log.debug("Evaluating attached container %s.", attached_state.instance)
             if attached_state.flags == STATE_ABSENT:
                 log.debug("Not found - creating and starting attached container %s.", attached_state.instance)
-                action = DERIVED_ACTION_STARTUP
+                action_type = DERIVED_ACTION_STARTUP
             elif attached_state.flags & STATE_FLAG_INITIAL:
                 log.debug("Container found but initial, starting %s.", attached_state.instance)
-                action = ACTION_START
+                action_type = ACTION_START
             elif attached_state.flags & (STATE_FLAG_NONRECOVERABLE | STATE_FLAG_OUTDATED):
                 if attached_state.base_state == STATE_RUNNING:
                     log.debug("Found to be outdated or non-recoverable - resetting %s.", attached_state.instance)
-                    action = DERIVED_ACTION_RESET
+                    action_type = DERIVED_ACTION_RESET
                 else:
                     log.debug("Found to be outdated or non-recoverable - relaunching %s.", attached_state.instance)
-                    action = DERIVED_ACTION_RELAUNCH
+                    action_type = DERIVED_ACTION_RELAUNCH
             else:
                 continue
-            attached_actions.append(new_action(attached_state.instance, action))
+            attached_actions.append(new_action(attached_state.instance, action_type))
             attached_actions.append(new_action(attached_state.instance, UTIL_ACTION_PREPARE_CONTAINER))
 
         instance_actions = []
@@ -82,17 +55,17 @@ class UpdateActionGenerator(AbstractActionGenerator):
             ci_initial = instance_state.flags & STATE_FLAG_INITIAL
             if instance_state.base_state == STATE_ABSENT:
                 log.debug("Not found - creating and starting instance container %s.", instance_name)
-                action = DERIVED_ACTION_STARTUP
+                action_type = DERIVED_ACTION_STARTUP
             elif ci_initial:
                 log.debug("Container found but initial, starting %s.", instance_name)
-                action = ACTION_START
+                action_type = ACTION_START
             elif instance_state.flags & (STATE_FLAG_NONRECOVERABLE | STATE_FLAG_OUTDATED):
                 if instance_state.base_state == STATE_RUNNING or instance_state.flags & STATE_FLAG_RESTARTING:
                     log.debug("Found to be outdated or non-recoverable - resetting %s.", instance_name)
-                    action = DERIVED_ACTION_RESET
+                    action_type = DERIVED_ACTION_RESET
                 else:
                     log.debug("Found to be outdated or non-recoverable - relaunching %s.", instance_name)
-                    action = DERIVED_ACTION_RELAUNCH
+                    action_type = DERIVED_ACTION_RELAUNCH
             else:
                 run_cmds = [
                     exec_cmd
@@ -103,7 +76,7 @@ class UpdateActionGenerator(AbstractActionGenerator):
                     instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_COMMANDS,
                                                        run_cmds=run_cmds))
                 continue
-            instance_actions.append(new_action(instance_state.instance, action))
+            instance_actions.append(new_action(instance_state.instance, action_type))
             instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
 
         return attached_actions, instance_actions

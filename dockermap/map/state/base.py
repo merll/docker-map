@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import itertools
 from abc import ABCMeta, abstractmethod
 import logging
 
@@ -72,7 +73,8 @@ class AbstractStateGenerator(with_metaclass(ABCMeta, PolicyUtil)):
             return container_name, c_detail, STATE_PRESENT, state_flag, {}
         return container_name, None, STATE_ABSENT, 0, {}
 
-    def generate_config_states(self, map_name, c_map, config_name, c_config, instances, is_dependency=False):
+    def generate_config_states(self, map_name, c_map, config_name, c_config, instances, client_names=None,
+                               is_dependency=False):
         """
         Generates the actions on a single item, which can be either a dependency or a explicitly selected
         container.
@@ -87,6 +89,8 @@ class AbstractStateGenerator(with_metaclass(ABCMeta, PolicyUtil)):
         :type c_config: dockermap.map.config.ContainerConfiguration
         :param instances: Instance names as a list. Can be ``[None]``
         :type instances: list[unicode | str]
+        :param client_names: Optional client list. By default uses the client list from the map or configuration.
+        :type client_names: list[unicode | str]
         :param is_dependency: Whether the state check is on a dependency or dependent container.
         :type is_dependency: bool
         :return: Generator for container state information.
@@ -96,7 +100,11 @@ class AbstractStateGenerator(with_metaclass(ABCMeta, PolicyUtil)):
         a_flags = config_flags | CONFIG_FLAG_ATTACHED
         if c_config.persistent:
             config_flags |= CONFIG_FLAG_PERSISTENT
-        for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
+        if client_names is not None:
+            clients = [cc for cc in self._policy.get_clients(c_config, c_map) if cc[0] in client_names]
+        else:
+            clients = self._policy.get_clients(c_config, c_map)
+        for client_name, client_config in clients:
             def _get_state(c_flags, items):
                 for item in items:
                     state = self.get_container_state(map_name, c_map, config_name, c_config, client_name, client_config,
@@ -104,8 +112,9 @@ class AbstractStateGenerator(with_metaclass(ABCMeta, PolicyUtil)):
                     # Extract base state, state flags, and extra info.
                     yield ContainerInstanceState(item, state[2], state[3], state[4])
 
-            attached_states = list(_get_state(a_flags, c_config.attaches))
-            instance_states = list(_get_state(config_flags, instances))
+            client = client_config.get_client()
+            attached_states = [a_state for a_state in _get_state(a_flags, c_config.attaches)]
+            instance_states = [i_state for i_state in _get_state(config_flags, instances)]
             states = ContainerConfigStates(client_name, map_name, config_name, config_flags, instance_states,
                                            attached_states)
             log.debug("Container state information: %s", states)
@@ -143,7 +152,7 @@ class AbstractStateGenerator(with_metaclass(ABCMeta, PolicyUtil)):
 
 
 class SingleStateGenerator(AbstractStateGenerator):
-    def get_states(self, map_name, config_name, instances=None):
+    def get_states(self, map_name, config_name, instances=None, client_names=None):
         """
         Generates state information for the selected container.
 
@@ -151,8 +160,10 @@ class SingleStateGenerator(AbstractStateGenerator):
         :type map_name: unicode | str
         :param config_name: Main container configuration name.
         :type config_name: unicode | str
-        :param instances: Instance names.
-        :type instances: list or tuple
+        :param instances: Optional instance names. By default follows the instances from the configuration.
+        :type instances: list[unicode | str]
+        :param client_names: Optional client list. By default uses the client list from the map or configuration.
+        :type client_names: list[unicode | str]
         :return: Return values of created main containers.
         :rtype: __generator[dockermap.map.state.ContainerConfigStates]
         """
@@ -167,12 +178,13 @@ class SingleStateGenerator(AbstractStateGenerator):
             c_instances = instances
         else:
             c_instances = [instances]
-        return self.generate_config_states(map_name, c_map, config_name, c_config, c_instances)
+        return self.generate_config_states(map_name, c_map, config_name, c_config, c_instances,
+                                           client_names=client_names)
 
 
 class AbstractDependencyStateGenerator(with_metaclass(ABCMeta, SingleStateGenerator)):
     @abstractmethod
-    def get_dependency_path(self, map_name, config_name):
+    def get_dependency_path(self, map_name, config_name, client_names=None):
         """
         To be implemented by subclasses (or using :class:`ForwardActionGeneratorMixin` or
         class:`ReverseActionGeneratorMixin`). Should provide an iterable of objects to be handled before the explicitly
@@ -180,12 +192,35 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCMeta, SingleStateGenera
 
         :param map_name: Container map name.
         :param config_name: Container configuration name.
+        :param client_names: Optional client list. By default uses the client list from the map or each configuration.
+        :type client_names: list[unicode | str]
         :return: Iterable of dependency objects in tuples of map name, container (config) name, instance.
         :rtype: list[tuple]
         """
         pass
 
-    def get_states(self, map_name, config_name, instances=None):
+    def get_dependency_states(self, map_name, config_name, client_names=None):
+        """
+        Generates state information for a container configuration dependencies / dependents.
+
+        :param map_name: Container map name.
+        :type map_name: unicode | str
+        :param config_name: Main container configuration name.
+        :type config_name: unicode | str
+        :param client_names: Optional client list. By default uses the client list from the map or each configuration.
+        :type client_names: list[unicode | str]
+        :return: Return values of created main containers.
+        :rtype: __generator[dockermap.map.state.ContainerConfigStates]
+        """
+        dependency_path = self.get_dependency_path(map_name, config_name)
+        log.debug("Following dependency path for %s.%s.", map_name, config_name)
+        for d_map_name, d_map, d_config_name, d_config, d_instances in dependency_path:
+            log.debug("Dependency path at %s.%s, instances %s.", d_map_name, d_config_name, d_instances)
+            for state in self.generate_config_states(d_map_name, d_map, d_config_name, d_config, d_instances,
+                                                     client_names=client_names, is_dependency=True):
+                yield state
+
+    def get_states(self, map_name, config_name, instances=None, client_names=None):
         """
         Generates state information for the selected container and its dependencies / dependents.
 
@@ -195,20 +230,16 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCMeta, SingleStateGenera
         :type config_name: unicode | str
         :param instances: Instance names.
         :type instances: list or tuple
+        :param client_names: Optional client list. By default uses the client list from the map or configuration.
+        :type client_names: list[unicode | str]
         :return: Return values of created main containers.
-        :rtype: __generator[dockermap.map.state.ContainerConfigStates]
+        :rtype: itertools.chain[dockermap.map.state.ContainerConfigStates]
         """
-        dependency_path = self.get_dependency_path(map_name, config_name)
-        log.debug("Following dependency path for %s.%s.", map_name, config_name)
-        for d_map_name, d_map, d_config_name, d_config, d_instances in dependency_path:
-            log.debug("Dependency path at %s.%s, instances %s.", d_map_name, d_config_name, d_instances)
-            for state in self.generate_config_states(d_map_name, d_map, d_config_name, d_config, d_instances,
-                                                     is_dependency=True):
-                yield state
-
-        for state in super(AbstractDependencyStateGenerator,
-                           self).get_states(map_name, config_name, instances=instances):
-            yield state
+        return itertools.chain(
+            self.get_dependency_states(map_name, config_name, client_names=client_names),
+            super(AbstractDependencyStateGenerator, self).get_states(map_name, config_name, instances=instances,
+                                                                     client_names=client_names)
+        )
 
 
 class DependencyStateGenerator(ForwardGeneratorMixin, AbstractDependencyStateGenerator):

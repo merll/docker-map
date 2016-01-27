@@ -160,18 +160,14 @@ class BasePolicy(object):
         :param c_map: Container map instance.
         :type c_map: dockermap.map.container.ContainerMap
         :return: Docker client objects.
-        :rtype: tuple[tuple[unicode | str, docker.client.Client, dockermap.map.config.ClientConfiguration]]
+        :rtype: list[(unicode | str, dockermap.map.config.ClientConfiguration)]
         """
-        def _get_client(client_name):
-            client_config = self._clients[client_name]
-            return client_name, client_config.get_client(), client_config
-
         if c_config.clients:
-            return tuple(map(_get_client, c_config.clients))
+            return [(client_name, self._clients[client_name]) for client_name in c_config.clients]
         if c_map.clients:
-            return tuple(map(_get_client, c_map.clients))
+            return [(client_name, self._clients[client_name]) for client_name in c_map.clients]
         default_name = self.get_default_client_name()
-        return _get_client(default_name),
+        return [(default_name, self._clients[default_name])]
 
     def _get_dependency_config(self, map_name, config_name, instances):
         c_map = self._maps[map_name]
