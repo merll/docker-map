@@ -73,6 +73,7 @@ class UpdateActionGenerator(AbstractActionGenerator):
                     if not running and (ci_initial or exec_cmd.policy != EXEC_POLICY_INITIAL)
                 ]
                 if run_cmds:
+                    log.debug("Container %s up-to-date, but with missing commands %s.", instance_name, run_cmds)
                     instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_COMMANDS,
                                                        run_cmds=run_cmds))
                 continue
