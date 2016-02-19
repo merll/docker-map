@@ -26,14 +26,26 @@ DERIVED_ACTION_RESET = [UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE,
 DERIVED_ACTION_RELAUNCH = [ACTION_REMOVE, ACTION_CREATE, ACTION_START]            # Remove, create, & start
 
 
+def _action_type_list(value):
+    if isinstance(value, list):
+        return value
+    elif isinstance(value, tuple):
+        return list(value)
+    elif isinstance(value, string_types):
+        return [value]
+    elif value:
+        raise ValueError("String or list must be provided for 'action_types'. Found {0}.".format(
+                type(value).__name__))
+    return []
+
+
 class InstanceAction(object):
     def __init__(self, client_name, map_name, config_name, instance_name, action_types=None, extra_data=None, **kwargs):
         self._client = client_name
         self._map = map_name
         self._config = config_name
         self._instance = instance_name
-        self._action_types = []
-        self.action_types = action_types
+        self._action_types = _action_type_list(action_types)
         self._extra_data = extra_data or {}
         self._extra_data.update(kwargs)
 
@@ -113,15 +125,7 @@ class InstanceAction(object):
 
     @action_types.setter
     def action_types(self, value):
-        if isinstance(value, list):
-            self._action_types = value
-        elif isinstance(value, string_types):
-            self._action_types = [value]
-        elif value:
-            raise ValueError("String or list must be provided for 'action_types'. Found {0}.".format(
-                    type(value).__name__))
-        else:
-            self._action_types = []
+        self._action_types = _action_type_list(value)
 
     @property
     def extra_data(self):
