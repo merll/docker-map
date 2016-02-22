@@ -2,6 +2,17 @@
 
 Change History
 ==============
+0.6.5
+-----
+* Better support for IPv6 addresses. Added ``ipv6`` flag to port bindings and ``interfaces_ipv6`` property to client
+  configuration.
+* Command elements are converted into strings so that Dockerfiles with a numeric command line element do not raise
+  errors.
+
+0.6.4
+-----
+* Fixed exception on stopping a container configuration when the container does not exist.
+
 0.6.3
 -----
 * Improved fixed behavior when merging container maps and embedded container configurations. Can also be used for

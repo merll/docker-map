@@ -330,11 +330,13 @@ The configuration is set either through a list or tuple of the following:
 * a pair of string / integer values - publishes the exposed port (1) to the host's port (2) on all interfaces;
 * a pair of string / integer values, followed by a string - publishes the exposed port (1) to the host's port (2) on
   the interface alias name (3), which is substituted with the interface address for that interface defined by the client
-  configuration.
+  configuration;
+* additionally a fourth element - a boolean value - indicating whether it is an IPv6 address to be published. The
+  default (``False``) is to use the IPv4 address from the client configuration of the interface alias in (3).
 
-The publishing port and interface can also be placed together in a nested tuple, and the entire configuration also
-accepts a dictionary as input. All combinations are converted to :attr:`~dockermap.map.config.PortBinding` tuples with
-the elements ``(exposed_port, host_port, interface)``. Unused elements are set to ``None`` during the conversion.
+The publishing port, interface, and IPv6 flag can also be placed together in a nested tuple, and the entire
+configuration accepts a dictionary as input. All combinations are converted to :attr:`~dockermap.map.config.PortBinding`
+tuples with the elements ``(exposed_port, host_port, interface, ipv6)``.
 
 Examples::
 
@@ -344,9 +346,12 @@ Examples::
         'client1': ClientConfiguration({
             'base_url': 'unix://var/run/docker.sock',
             'interfaces': {
-                'private': '10.x.x.x',  # Example private network interface address
-                'public: '178.x.x.x',    # Example public network interface address
-            }
+                'private': '10.x.x.x',  # Example private network interface IPv4 address
+                'public: '178.x.x.x',   # Example public network interface IPv4 address
+            },
+            'interfaces_ipv6': {
+                'private': '2001:a01:a02:12f0::1',  # Example private network interface IPv6 address
+            },
         }),
         ...
     })
@@ -354,10 +359,12 @@ Examples::
     config = container_map.containers.app1
     config.clients = ['client1']
     config.exposes = [
-        (80, 80, 'public'),        # Exposes port 80 and binds it to port 80 on the public address only.
-        (9443, 443),               # Exposes port 9443 and binds to port 443 on all addresses.
-        (8000, 8000, 'private'),   # Binds port 8000 to the private network interface address.
-        8111,                      # Port 8111 will be exposed only to containers that link this one.
+        (80, 80, 'public'),           # Exposes port 80 and binds it to port 80 on the public address only.
+        (9443, 443),                  # Exposes port 9443 and binds to port 443 on all addresses.
+        (8000, 8000, 'private'),      # Binds port 8000 to the private network interface address.
+        8111,                         # Port 8111 will be exposed only to containers that link this one.
+        (8000, 80, 'private', True),  # Publishes port 8000 from the container to port 80 on the host under its private
+                                      # IPv6 address.
     ]
 
 
@@ -394,7 +401,7 @@ considered:
     config.exec_commands = ["/bin/bash -c 'script.sh'"]
 
 * A tuple of two elements is read as ``command line, user``. This allows for overriding the user that launches the
-  command. In this case, the command line can also be a list (executeable + arguments, as allowed by the Docker API::
+  command. In this case, the command line can also be a list (executeable + arguments), as allowed by the Docker API::
 
     config.exec_commands = [
         ("/bin/bash -c 'script1.sh'", 'root'),
@@ -600,7 +607,7 @@ sockets::
         'web_server': { # Configure container creation and startup
             'image': 'nginx',
             # If volumes are not shared with any other container, assigning
-            # an alias in "volumes" is possible, but not neccessary:
+            # an alias in "volumes" is possible, but not necessary:
             'binds': {'/etc/nginx': ('config/nginx', 'ro')},
             'uses': 'app_server_socket',
             'attaches': 'web_log',
@@ -678,4 +685,3 @@ Furthermore, on calling::
 Both commands can be combined by simply running::
 
     map_client.startup('web_server')
-
