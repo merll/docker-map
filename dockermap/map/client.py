@@ -96,9 +96,9 @@ class MappingDockerClient(object):
     def run_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
         policy = self.get_policy()
         state_generator_cls, action_generator_cls = self.generators[action_name]
-        state_generator = state_generator_cls(policy)
-        action_generator = action_generator_cls(policy)
-        runner = self.runner_class(policy)
+        state_generator = state_generator_cls(policy, kwargs)
+        action_generator = action_generator_cls(policy, kwargs)
+        runner = self.runner_class(policy, kwargs)
         results = []
 
         for states in state_generator.get_states(map_name or self._default_map, config_name, instances=instances):
@@ -201,7 +201,7 @@ class MappingDockerClient(object):
         """
         return self.run_actions('remove', container, instances=instances, map_name=map_name, **kwargs)
 
-    def startup(self, container, instances=None, map_name=None):
+    def startup(self, container, instances=None, map_name=None, **kwargs):
         """
         Start up container instances from a container configuration. Typically this means creating and starting
         containers and their dependencies. Note that not all policy classes necessarily implement this method.
@@ -213,12 +213,13 @@ class MappingDockerClient(object):
         :type instances: iterable
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
+        :param kwargs: Additional kwargs. Only options controlling policy behavior are considered.
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.run_actions('startup', container, instances=instances, map_name=map_name)
+        return self.run_actions('startup', container, instances=instances, map_name=map_name, **kwargs)
 
-    def shutdown(self, container, instances=None, map_name=None):
+    def shutdown(self, container, instances=None, map_name=None, **kwargs):
         """
         Shut down container instances from a container configuration. Typically this means stopping and removing
         containers. Note that not all policy classes necessarily implement this method.
@@ -230,10 +231,11 @@ class MappingDockerClient(object):
         :type instances: iterable
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
+        :param kwargs: Additional kwargs. Only options controlling policy behavior are considered.
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """
-        return self.run_actions('shutdown', container, instances=instances, map_name=map_name)
+        return self.run_actions('shutdown', container, instances=instances, map_name=map_name, **kwargs)
 
     def update(self, container, instances=None, map_name=None, **kwargs):
         """
@@ -248,6 +250,7 @@ class MappingDockerClient(object):
         :type instances: iterable
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
+        :param kwargs: Additional kwargs. Only options controlling policy behavior are considered.
         :return: Return values of created main containers.
         :rtype: list[(unicode | str, dict)]
         """

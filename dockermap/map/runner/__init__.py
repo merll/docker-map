@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from six import with_metaclass
 
-from ..policy import PolicyUtil
+from ..policy import PolicyUtilMeta, PolicyUtil
 
 
-class RunnerMeta(type):
+class RunnerMeta(PolicyUtilMeta):
     def __init__(cls, name, bases, dct):
         cls._a_methods = attached_methods = []
         cls._i_methods = instance_methods = []

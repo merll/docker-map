@@ -16,6 +16,7 @@ class AttachedPreparationMixin(object):
         (UTIL_ACTION_PREPARE_CONTAINER, 'prepare_attached'),
     ]
     prepare_local = True
+    policy_options = ['prepare_local']
 
     def get_attached_preparation_create_kwargs(self, config, volume_container, kwargs=None):
         """

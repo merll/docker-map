@@ -19,6 +19,7 @@ class ScriptMixin(object):
         (UTIL_ACTION_SCRIPT, 'run_script'),
     ]
     remove_created_after = True
+    policy_options = ['remove_created_after']
 
     def run_script(self, client, config, c_name, script_path=None, entrypoint=None, command_format=None,
                    wait_timeout=None, container_script_dir='/tmp/script_run', timestamps=None, tail='all'):

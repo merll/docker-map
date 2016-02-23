@@ -218,9 +218,10 @@ class UpdateStateGenerator(DependencyStateGenerator):
     pull_insecure_registry = False
     update_persistent = False
     check_exec_commands = CMD_CHECK_FULL
+    policy_options = ['pull_latest', 'pull_insecure_registry', 'update_persistent', 'check_exec_commands']
 
-    def __init__(self, policy):
-        super(UpdateStateGenerator, self).__init__(policy)
+    def __init__(self, policy, kwargs):
+        super(UpdateStateGenerator, self).__init__(policy, kwargs)
         self._base_image_ids = {
             client_name: policy.images[client_name].ensure_image(
                 self.iname_tag(policy.base_image), pull_latest=self.pull_latest,

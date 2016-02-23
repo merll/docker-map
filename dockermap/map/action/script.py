@@ -14,6 +14,7 @@ class ScriptActionException(Exception):
 
 class ScriptActionGenerator(ResumeActionGenerator):
     remove_existing_before = False
+    policy_options = ['remove_existing_before']
 
     def get_state_actions(self, states):
         """

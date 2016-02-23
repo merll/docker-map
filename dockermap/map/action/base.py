@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 
 from six import with_metaclass
 
-from ..policy import PolicyUtil
+from ..policy import ABCPolicyUtilMeta, PolicyUtil
 
 
-class AbstractActionGenerator(with_metaclass(ABCMeta, PolicyUtil)):
+class AbstractActionGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
     """
     Abstract base class for action generators, which determine what actions are to be executed based on current
     container states.

@@ -8,7 +8,7 @@ import logging
 from six import with_metaclass
 
 from ..policy import (CONFIG_FLAG_DEPENDENT, CONFIG_FLAG_ATTACHED, CONFIG_FLAG_PERSISTENT,
-                      PolicyUtil, ForwardGeneratorMixin, ReverseGeneratorMixin)
+                      ABCPolicyUtilMeta, PolicyUtil, ForwardGeneratorMixin, ReverseGeneratorMixin)
 from . import (INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, STATE_FLAG_INITIAL,
                STATE_FLAG_RESTARTING, STATE_FLAG_NONRECOVERABLE, ContainerConfigStates, ContainerInstanceState)
 
@@ -16,11 +16,12 @@ from . import (INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, S
 log = logging.getLogger(__name__)
 
 
-class AbstractStateGenerator(with_metaclass(ABCMeta, PolicyUtil)):
+class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
     """
     Abstract base implementation for an state generator, which determines the current state of containers on the client.
     """
     nonrecoverable_exit_codes = (-127, -1)
+    policy_options = ['nonrecoverable_exit_codes']
 
     def get_container_state(self, map_name, container_map, config_name, container_config, client_name, client_config,
                             client, instance_alias, config_flags=0):
