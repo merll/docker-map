@@ -183,7 +183,7 @@ class SingleStateGenerator(AbstractStateGenerator):
                                            client_names=client_names)
 
 
-class AbstractDependencyStateGenerator(with_metaclass(ABCMeta, SingleStateGenerator)):
+class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, SingleStateGenerator)):
     @abstractmethod
     def get_dependency_path(self, map_name, config_name, client_names=None):
         """
