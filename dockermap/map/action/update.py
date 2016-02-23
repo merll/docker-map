@@ -4,12 +4,12 @@ from __future__ import unicode_literals
 import logging
 
 from ..input import EXEC_POLICY_INITIAL
+from ..policy import CONFIG_FLAG_PERSISTENT
 from ..state import (STATE_FLAG_NONRECOVERABLE, STATE_ABSENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_OUTDATED,
                      STATE_FLAG_RESTARTING)
 from .base import AbstractActionGenerator
 from . import (ACTION_START, UTIL_ACTION_EXEC_ALL, UTIL_ACTION_EXEC_COMMANDS, DERIVED_ACTION_RESET,
-               DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, UTIL_ACTION_PREPARE_CONTAINER, InstanceAction,
-               ACTION_STOP, UTIL_ACTION_SIGNAL_STOP)
+               DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, UTIL_ACTION_PREPARE_CONTAINER, InstanceAction)
 
 
 log = logging.getLogger(__name__)
@@ -56,8 +56,9 @@ class UpdateActionGenerator(AbstractActionGenerator):
             if instance_state.base_state == STATE_ABSENT:
                 log.debug("Not found - creating and starting instance container %s.", instance_name)
                 action_type = DERIVED_ACTION_STARTUP
-            elif ci_initial:
-                log.debug("Container found but initial, starting %s.", instance_name)
+            elif (instance_state.base_state != STATE_RUNNING and
+                  (ci_initial or not states.flags & CONFIG_FLAG_PERSISTENT)):
+                log.debug("Container found but not running, starting %s.", instance_name)
                 action_type = ACTION_START
             elif instance_state.flags & (STATE_FLAG_NONRECOVERABLE | STATE_FLAG_OUTDATED):
                 if instance_state.base_state == STATE_RUNNING or instance_state.flags & STATE_FLAG_RESTARTING:

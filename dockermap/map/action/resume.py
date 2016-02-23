@@ -55,12 +55,14 @@ class ResumeActionGenerator(AbstractActionGenerator):
             for instance_state in states.instances:
                 if instance_state.base_state == STATE_ABSENT:
                     action = DERIVED_ACTION_STARTUP
-                elif instance_state.base_state == STATE_PRESENT and (
-                            not states.flags & CONFIG_FLAG_PERSISTENT or
-                            instance_state.flags & (STATE_FLAG_INITIAL | STATE_FLAG_NONRECOVERABLE)):
-                    action = ACTION_START
                 else:
-                    continue
+                    if instance_state.flags & STATE_FLAG_NONRECOVERABLE:
+                        action = DERIVED_ACTION_RESET
+                    elif (instance_state.base_state != STATE_RUNNING and
+                          (instance_state.flags & STATE_FLAG_INITIAL or not states.flags & CONFIG_FLAG_PERSISTENT)):
+                        action = ACTION_START
+                    else:
+                        continue
                 instance_actions.append(new_action(instance_state.instance, action))
                 instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
 
