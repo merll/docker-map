@@ -98,8 +98,10 @@ class ScriptMixin(object):
                                        volumes=volumes, **create_extra_kwargs)
         if not created:
             raise ScriptRunException("No new containers were created.")
+        stopped = True
         try:
             self.start_instance(client, config, c_name, **start_extra_kwargs)
+            stopped = False
             timeout = wait_timeout or client_config.get('wait_timeout') or client_timeout
             container_id = created['Id']
             try:
@@ -107,12 +109,14 @@ class ScriptMixin(object):
             except Timeout:
                 result = {'id': container_id, 'error': "Timed out while waiting for the container to finish."}
             else:
+                stopped = True
                 c_info = client.inspect_container(container_id)
                 exit_code = c_info['State']['ExitCode']
                 log_str = client.logs(container_id, timestamps=timestamps, tail=tail)
                 result = {'id': container_id, 'log': log_str, 'exit_code': exit_code}
         finally:
             if self.remove_created_after:
-                self.stop_instance(client, config, c_name, timeout=1)
+                if not stopped:
+                    self.stop_instance(client, config, c_name, timeout=3)
                 self.remove_instance(client, config, c_name)
         return result
