@@ -3,9 +3,10 @@ from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
 
-from six import iteritems, text_type, with_metaclass
+from six import iteritems, text_type, with_metaclass, python_2_unicode_compatible
 
 
+@python_2_unicode_compatible
 class AbstractLazyObject(with_metaclass(ABCMeta, object)):
     """
     Abstract superclass class for lazily-resolved values. Runs function ``func`` with ``*args`` and ``**kwargs``, when
@@ -31,9 +32,6 @@ class AbstractLazyObject(with_metaclass(ABCMeta, object)):
         return self.get()
 
     def __str__(self):
-        return self.__unicode__()
-
-    def __unicode__(self):
         return text_type(self.get())
 
     def __eq__(self, other):

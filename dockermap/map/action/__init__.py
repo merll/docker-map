@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from six import string_types
+from six import string_types, python_2_unicode_compatible
 
 # Base actions provided by client.
 ACTION_CREATE = 'create'
@@ -39,6 +39,7 @@ def _action_type_list(value):
     return []
 
 
+@python_2_unicode_compatible
 class InstanceAction(object):
     def __init__(self, client_name, map_name, config_name, instance_name, action_types=None, extra_data=None, **kwargs):
         self._client = client_name
@@ -48,6 +49,12 @@ class InstanceAction(object):
         self._action_types = _action_type_list(action_types)
         self._extra_data = extra_data or {}
         self._extra_data.update(kwargs)
+
+    def __str__(self):
+        return ("InstanceAction(client={0._client!r}, map={0._map!r}, config={0._config!r}, instance={0._instance!r}, "
+                "action_types={0._action_types!r}, extra_data={0._extra_data!r})".format(self))
+
+    __repr__ = __str__
 
     @classmethod
     def config_partial(cls, client_name, map_name, config_name):

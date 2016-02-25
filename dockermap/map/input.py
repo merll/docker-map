@@ -20,6 +20,7 @@ EXEC_POLICY_INITIAL = 'initial'
 CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
 
 
+@six.python_2_unicode_compatible
 class _NotSet(object):
     def __nonzero__(self):
         return False
@@ -28,11 +29,8 @@ class _NotSet(object):
     def __repr__(self):
         return "<Value not set>"
 
-    def __unicode__(self):
-        return "Not set"
-
     def __str__(self):
-        return self.__unicode__()
+        return "Not set"
 
 
 NotSet = _NotSet()
