@@ -13,6 +13,7 @@ from ..input import NotSet
 from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes, get_host_binds, get_port_bindings
 from .attached import AttachedPreparationMixin
 from .cmd import ExecMixin
+from .script import ScriptMixin
 from .signal_stop import SignalMixin
 from . import AbstractRunner
 
@@ -100,11 +101,12 @@ class BaseRunnerMixin(object):
         return client.kill(c_name, **kwargs)
 
     def wait_instance(self, client, config, c_name, **kwargs):
-        c_kwargs = self.get_wait_kwargs(config, c_name, **kwargs)
+        c_kwargs = self.get_wait_kwargs(config, c_name, kwargs=kwargs)
         return client.wait(c_name, **c_kwargs)
 
 
-class DockerClientRunner(BaseRunnerMixin, AttachedPreparationMixin, ExecMixin, SignalMixin, AbstractRunner):
+class DockerClientRunner(BaseRunnerMixin, AttachedPreparationMixin, ExecMixin, SignalMixin, ScriptMixin,
+                         AbstractRunner):
     def get_hostname(self, config, container_name):
         """
         Generates a host name from the container name and the client configuration name.
@@ -302,10 +304,11 @@ class DockerClientRunner(BaseRunnerMixin, AttachedPreparationMixin, ExecMixin, S
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(container=container_name)
         timeout = config.client_config.get('wait_timeout')
         if timeout is not None:
-            c_kwargs['timeout'] = timeout
+            c_kwargs = {'timeout': timeout}
+        else:
+            c_kwargs = {}
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
@@ -414,15 +417,15 @@ class DockerClientRunner(BaseRunnerMixin, AttachedPreparationMixin, ExecMixin, S
         return client, ActionConfig(action.map_name, c_map, action.config_name, c_config, action.client_name,
                                     client_config, action.instance_name)
 
-    def run_actions(self, attached_actions, instance_actions, **kwargs):
+    def run_actions(self, attached_actions, instance_actions):
         """
 
         :param attached_actions:
         :type attached_actions: list[dockermap.map.action.InstanceAction]
         :param instance_actions:
         :type instance_actions: list[dockermap.map.action.InstanceAction]
-        :param kwargs:
         :return:
+        :rtype: __generator[dict]
         """
         aname = self._policy.aname
         for action in attached_actions:
@@ -432,7 +435,7 @@ class DockerClientRunner(BaseRunnerMixin, AttachedPreparationMixin, ExecMixin, S
             for action_type in action.action_types:
                 a_method = self.attached_methods.get(action_type)
                 if not a_method:
-                    raise ValueError("Invalid action for attached containers: {0}", action_type)
+                    raise ValueError("Invalid action for attached containers.", action_type)
                 res = a_method(client, action_config, container_name, **action.extra_data)
                 if action_type == ACTION_CREATE:
                     self._policy.container_names[action.client_name].add(container_name)
@@ -445,13 +448,11 @@ class DockerClientRunner(BaseRunnerMixin, AttachedPreparationMixin, ExecMixin, S
         for action in instance_actions:
             client, action_config = self.get_client_action_config(action)
             container_name = cname(action.map_name, action.config_name, action.instance_name)
-            c_kwargs = action.extra_data.copy()
-            c_kwargs.update(kwargs)
             for action_type in action.action_types:
                 c_method = self.instance_methods.get(action_type)
                 if not c_method:
-                    raise ValueError("Invalid action for instance containers: {0}", action_type)
-                res = c_method(client, action_config, container_name, **c_kwargs)
+                    raise ValueError("Invalid action for instance containers.", action_type)
+                res = c_method(client, action_config, container_name, **action.extra_data)
                 if action_type == ACTION_CREATE:
                     self._policy.container_names[action.client_name].add(container_name)
                 elif action_type == ACTION_REMOVE:

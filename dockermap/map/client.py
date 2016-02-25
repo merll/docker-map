@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import logging
+
 import docker
 
 from .action import simple, script, update
@@ -10,6 +12,9 @@ from .policy.base import BasePolicy
 from .runner.base import DockerClientRunner
 from .state.base import SingleStateGenerator, DependencyStateGenerator, DependentStateGenerator
 from .state.update import UpdateStateGenerator
+
+
+log = logging.getLogger(__name__)
 
 
 class MappingDockerClient(object):
@@ -99,11 +104,13 @@ class MappingDockerClient(object):
         state_generator = state_generator_cls(policy, kwargs)
         action_generator = action_generator_cls(policy, kwargs)
         runner = self.runner_class(policy, kwargs)
+        log.debug("Passing kwargs to client actions: {0}".format(kwargs))
         results = []
 
         for states in state_generator.get_states(map_name or self._default_map, config_name, instances=instances):
-            actions = action_generator.get_state_actions(states)
-            results.extend(runner.run_actions(*actions, **kwargs))
+            actions = action_generator.get_state_actions(states, **kwargs)
+            log.debug("Running actions: %s", actions)
+            results.extend(runner.run_actions(*actions))
 
         return results
 

@@ -10,11 +10,12 @@ from . import (InstanceAction, ACTION_CREATE, ACTION_START, UTIL_ACTION_PREPARE_
 
 
 class CreateActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states):
+    def get_state_actions(self, states, **kwargs):
         """
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
+        :param kwargs: Additional keyword arguments.
         :return: List of attached actions and list of instance actions.
         :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
         """
@@ -25,7 +26,7 @@ class CreateActionGenerator(AbstractActionGenerator):
             if attached_state.base_state == STATE_ABSENT
         ]
         instance_actions = [
-            new_action(instance_state.instance, ACTION_CREATE)
+            new_action(instance_state.instance, ACTION_CREATE, extra_data=kwargs)
             for instance_state in states.instances
             if instance_state.base_state == STATE_ABSENT
         ]
@@ -33,11 +34,12 @@ class CreateActionGenerator(AbstractActionGenerator):
 
 
 class StartActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states):
+    def get_state_actions(self, states, **kwargs):
         """
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
+        :param kwargs: Additional keyword arguments.
         :return: List of attached actions and list of instance actions.
         :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
         """
@@ -51,24 +53,25 @@ class StartActionGenerator(AbstractActionGenerator):
         instance_actions = []
         for instance_state in states.instances:
             if instance_state.base_state == STATE_PRESENT:
-                instance_actions.append(new_action(instance_state.instance, ACTION_START))
+                instance_actions.append(new_action(instance_state.instance, ACTION_START, extra_data=kwargs))
                 instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
 
         return attached_actions, instance_actions
 
 
 class RestartActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states):
+    def get_state_actions(self, states, **kwargs):
         """
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
+        :param kwargs: Additional keyword arguments.
         :return: List of attached actions and list of instance actions.
         :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
         """
         new_action = InstanceAction.config_partial(states.client, states.map, states.config)
         instance_actions = [
-            new_action(instance_state.instance, ACTION_RESTART)
+            new_action(instance_state.instance, ACTION_RESTART, extra_data=kwargs)
             for instance_state in states.instances
             if instance_state.base_state != STATE_ABSENT and not instance_state.flags & STATE_FLAG_INITIAL
         ]
@@ -76,17 +79,18 @@ class RestartActionGenerator(AbstractActionGenerator):
 
 
 class StopActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states):
+    def get_state_actions(self, states, **kwargs):
         """
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
+        :param kwargs: Additional keyword arguments.
         :return: List of attached actions and list of instance actions.
         :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
         """
         new_action = InstanceAction.config_partial(states.client, states.map, states.config)
         instance_actions = [
-            new_action(instance_state.instance, UTIL_ACTION_SIGNAL_STOP)
+            new_action(instance_state.instance, UTIL_ACTION_SIGNAL_STOP, extra_data=kwargs)
             for instance_state in states.instances
             if instance_state.base_state != STATE_ABSENT and not instance_state.flags & STATE_FLAG_INITIAL
         ]
@@ -97,11 +101,12 @@ class RemoveActionGenerator(AbstractActionGenerator):
     remove_persistent = True
     remove_attached = False
 
-    def get_state_actions(self, states):
+    def get_state_actions(self, states, **kwargs):
         """
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
+        :param kwargs: Additional keyword arguments.
         :return: List of attached actions and list of instance actions.
         :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
         """
@@ -117,13 +122,13 @@ class RemoveActionGenerator(AbstractActionGenerator):
 
         if self.remove_persistent:
             instance_actions = [
-                new_action(instance_state.instance, ACTION_REMOVE)
+                new_action(instance_state.instance, ACTION_REMOVE, extra_data=kwargs)
                 for instance_state in states.instances
                 if instance_state.base_state == STATE_PRESENT
             ]
         else:
             instance_actions = [
-                new_action(instance_state.instance, ACTION_REMOVE)
+                new_action(instance_state.instance, ACTION_REMOVE, extra_data=kwargs)
                 for instance_state in states.instances
                 if instance_state.base_state == STATE_PRESENT and not states.flags & CONFIG_FLAG_PERSISTENT
             ]
@@ -132,11 +137,12 @@ class RemoveActionGenerator(AbstractActionGenerator):
 
 
 class StartupActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states):
+    def get_state_actions(self, states, **kwargs):
         """
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
+        :param kwargs: Additional keyword arguments.
         :return: List of attached actions and list of instance actions.
         :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
         """
@@ -162,11 +168,12 @@ class StartupActionGenerator(AbstractActionGenerator):
 
 
 class ShutdownActionGenerator(RemoveActionGenerator):
-    def get_state_actions(self, states):
+    def get_state_actions(self, states, **kwargs):
         """
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
+        :param kwargs: Additional keyword arguments.
         :return: List of attached actions and list of instance actions.
         :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
         """

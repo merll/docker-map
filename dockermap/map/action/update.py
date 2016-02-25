@@ -16,11 +16,12 @@ log = logging.getLogger(__name__)
 
 
 class UpdateActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states):
+    def get_state_actions(self, states, **kwargs):
         """
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
+        :param kwargs: Additional keyword arguments.
         :return: List of attached actions and list of instance actions.
         :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
         """
