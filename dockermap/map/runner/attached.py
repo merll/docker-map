@@ -5,7 +5,8 @@ from docker.utils import create_host_config
 
 from ...functional import resolve_value
 from ..action import UTIL_ACTION_PREPARE_CONTAINER
-from ..policy.utils import update_kwargs, get_instance_volumes, get_preparation_cmd
+from ..policy.utils import update_kwargs, get_instance_volumes
+from .utils import get_preparation_cmd
 
 
 class AttachedPreparationMixin(object):

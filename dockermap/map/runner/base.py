@@ -9,11 +9,12 @@ from six import text_type
 from ...functional import resolve_value
 from ..action import (ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ACTION_KILL, ACTION_WAIT)
 from ..input import NotSet
-from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes, get_host_binds, get_port_bindings
+from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes
 from .attached import AttachedPreparationMixin
 from .cmd import ExecMixin
 from .script import ScriptMixin
 from .signal_stop import SignalMixin
+from .utils import get_host_binds, get_port_bindings
 from . import AbstractRunner
 
 
