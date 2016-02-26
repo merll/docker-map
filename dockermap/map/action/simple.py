@@ -100,6 +100,7 @@ class StopActionGenerator(AbstractActionGenerator):
 class RemoveActionGenerator(AbstractActionGenerator):
     remove_persistent = True
     remove_attached = False
+    policy_options = ['remove_persistent', 'remove_attached']
 
     def get_state_actions(self, states, **kwargs):
         """
