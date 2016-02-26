@@ -47,7 +47,7 @@ class InstanceAction(object):
         self._config = config_name
         self._instance = instance_name
         self._action_types = _action_type_list(action_types)
-        self._extra_data = extra_data or {}
+        self._extra_data = extra_data.copy() if extra_data else {}
         self._extra_data.update(kwargs)
 
     def __str__(self):
