@@ -12,6 +12,7 @@ from . import (InstanceAction, ACTION_CREATE, ACTION_START, UTIL_ACTION_PREPARE_
 class CreateActionGenerator(AbstractActionGenerator):
     def get_state_actions(self, states, **kwargs):
         """
+        Creates all missing containers.
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
@@ -36,6 +37,9 @@ class CreateActionGenerator(AbstractActionGenerator):
 class StartActionGenerator(AbstractActionGenerator):
     def get_state_actions(self, states, **kwargs):
         """
+        Generally starts containers that are not running. Attached containers are skipped unless they are initial.
+        Attached containers are also prepared with permissions. Where applicable, exec commands are run in started
+        instance containers.
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
@@ -62,6 +66,7 @@ class StartActionGenerator(AbstractActionGenerator):
 class RestartActionGenerator(AbstractActionGenerator):
     def get_state_actions(self, states, **kwargs):
         """
+        Restarts instance containers.
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
@@ -81,6 +86,8 @@ class RestartActionGenerator(AbstractActionGenerator):
 class StopActionGenerator(AbstractActionGenerator):
     def get_state_actions(self, states, **kwargs):
         """
+        Stops containers that are running. Does not check attached containers. Considers using the pre-configured
+        ``stop_signal``.
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
@@ -104,6 +111,8 @@ class RemoveActionGenerator(AbstractActionGenerator):
 
     def get_state_actions(self, states, **kwargs):
         """
+        Removes containers that are stopped. Optionally skips persistent containers. Attached containers are skipped
+        by default from removal but can optionally be included.
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
@@ -140,6 +149,8 @@ class RemoveActionGenerator(AbstractActionGenerator):
 class StartupActionGenerator(AbstractActionGenerator):
     def get_state_actions(self, states, **kwargs):
         """
+        A combination of CreateActionGenerator and StartActionGenerator - creates and starts containers where
+        appropriate.
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
@@ -171,6 +182,8 @@ class StartupActionGenerator(AbstractActionGenerator):
 class ShutdownActionGenerator(RemoveActionGenerator):
     def get_state_actions(self, states, **kwargs):
         """
+        A combination of StopActionGenerator and RemoveActionGenerator - stops and removes containers where
+        appropriate.
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates

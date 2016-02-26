@@ -11,6 +11,9 @@ from . import (InstanceAction, DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, 
 class ResumeActionGenerator(AbstractActionGenerator):
     def get_state_actions(self, states, **kwargs):
         """
+        Attached containers are created and prepared, if they are missing. They are re-created if they have terminated
+        with errors. Instance containers are created if missing, started if stopped, and re-created / started if an
+        attached container has been missing.
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates

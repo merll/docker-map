@@ -18,6 +18,12 @@ log = logging.getLogger(__name__)
 class UpdateActionGenerator(AbstractActionGenerator):
     def get_state_actions(self, states, **kwargs):
         """
+        For attached volumes, missing containers are created and initial containers are started and prepared with
+        permissions. Outdated containers or containers with errors are recreated. The latter also applies to instance
+        containers. Similarly, instance containers are created if missing and started unless not initial and marked as
+        persistent.
+        On running instance containers missing exec commands are run; if the container needs to be started, all exec
+        commands are launched.
 
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates

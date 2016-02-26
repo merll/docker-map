@@ -22,6 +22,10 @@ class ScriptActionGenerator(ResumeActionGenerator):
 
     def get_state_actions(self, states, **kwargs):
         """
+        For dependent containers, inherits the behavior from :class:`dockermap.map.action.resume.ResumeActionGenerator`.
+        For other the main container, checks if containers exist, and depending on the ``remove_existing_before``
+        option either fails or removes them. Otherwise runs the script.
+
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
         :param kwargs: Additional keyword arguments.

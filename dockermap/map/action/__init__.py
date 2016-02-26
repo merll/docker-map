@@ -41,6 +41,23 @@ def _action_type_list(value):
 
 @python_2_unicode_compatible
 class InstanceAction(object):
+    """
+    Utility class for storing container actions.
+
+    :param client_name: Client configuration name.
+    :type client_name: unicode | str
+    :param map_name: Container map name.
+    :type map_name: unicode | str
+    :param config_name: Container configuration name.
+    :type config_name: unicode | str
+    :param instance_name: Instance name.
+    :type instance_name: unicode | str
+    :param action_types: Action type name(s) to perform. Input is converted to a list.
+    :type action_types: unicode | str | list[unicode | str] | tuple[unicode | str]
+    :param extra_data: Extra data. Typically passed on as keyword arguments to the client function.
+    :type extra_data: dict
+    :param kwargs: Addtional keyword arguments; added to extra_data
+    """
     def __init__(self, client_name, map_name, config_name, instance_name, action_types=None, extra_data=None, **kwargs):
         self._client = client_name
         self._map = map_name
@@ -120,14 +137,32 @@ class InstanceAction(object):
 
     @property
     def config_tuple(self):
+        """
+        Tuple of client name, map name, and container configuration name.
+
+        :return: Tuple with aforementioned aliases.
+        :rtype: (unicode | str, unicode | str, unicode | str)
+        """
         return self._client, self._map, self._config
 
     @property
     def instance_tuple(self):
+        """
+        Tuple of client name, map name, container configuration name, and instance.
+
+        :return: Tuple with aforementioned aliases.
+        :rtype: (unicode | str, unicode | str, unicode | str, unicode | str)
+        """
         return self._client, self._map, self._config, self._instance
 
     @property
     def action_types(self):
+        """
+        Action type name(s) to perform. Input is converted to a list.
+
+        :return: Action type(s).
+        :rtype: list[unicode | str]
+        """
         return self._action_types
 
     @action_types.setter
@@ -136,6 +171,12 @@ class InstanceAction(object):
 
     @property
     def extra_data(self):
+        """
+        Extra data. Typically passed on as keyword arguments to the client function.
+
+        :return: Dictionary with extra data.
+        :rtype: dict
+        """
         return self._extra_data
 
     @extra_data.setter
