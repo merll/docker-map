@@ -2,7 +2,6 @@
 from __future__ import unicode_literals
 
 import logging
-from collections import namedtuple
 
 from docker.utils import create_host_config
 from six import text_type
@@ -17,8 +16,6 @@ from .script import ScriptMixin
 from .signal_stop import SignalMixin
 from . import AbstractRunner
 
-ActionConfig = namedtuple('ActionConfig', ['map_name', 'container_map', 'config_name', 'container_config',
-                                           'client_name', 'client_config', 'instance_name'])
 
 log = logging.getLogger(__name__)
 
@@ -401,61 +398,3 @@ class DockerClientRunner(BaseRunnerMixin, AttachedPreparationMixin, ExecMixin, S
         c_kwargs = dict(exec_id=exec_id)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
-
-    def get_client_action_config(self, action):
-        """
-
-        :param action:
-        :type action: dockermap.map.action.InstanceAction
-        :return:
-        :rtype: (docker.Client, ActionConfig)
-        """
-        client_config = self._policy.clients[action.client_name]
-        client = client_config.get_client()
-        c_map = self._policy.container_maps[action.map_name]
-        c_config = c_map.get_existing(action.config_name)
-        return client, ActionConfig(action.map_name, c_map, action.config_name, c_config, action.client_name,
-                                    client_config, action.instance_name)
-
-    def run_actions(self, attached_actions, instance_actions):
-        """
-
-        :param attached_actions:
-        :type attached_actions: list[dockermap.map.action.InstanceAction]
-        :param instance_actions:
-        :type instance_actions: list[dockermap.map.action.InstanceAction]
-        :return:
-        :rtype: __generator[dict]
-        """
-        aname = self._policy.aname
-        for action in attached_actions:
-            client, action_config = self.get_client_action_config(action)
-            a_parent_name = action.config_name if action_config.container_map.use_attached_parent_name else None
-            container_name = aname(action.map_name, action.instance_name, parent_name=a_parent_name)
-            for action_type in action.action_types:
-                a_method = self.attached_methods.get(action_type)
-                if not a_method:
-                    raise ValueError("Invalid action for attached containers.", action_type)
-                res = a_method(client, action_config, container_name, **action.extra_data)
-                if action_type == ACTION_CREATE:
-                    self._policy.container_names[action.client_name].add(container_name)
-                elif action_type == ACTION_REMOVE:
-                    self._policy.container_names[action.client_name].discard(container_name)
-                if res is not None:
-                    yield res
-
-        cname = self._policy.cname
-        for action in instance_actions:
-            client, action_config = self.get_client_action_config(action)
-            container_name = cname(action.map_name, action.config_name, action.instance_name)
-            for action_type in action.action_types:
-                c_method = self.instance_methods.get(action_type)
-                if not c_method:
-                    raise ValueError("Invalid action for instance containers.", action_type)
-                res = c_method(client, action_config, container_name, **action.extra_data)
-                if action_type == ACTION_CREATE:
-                    self._policy.container_names[action.client_name].add(container_name)
-                elif action_type == ACTION_REMOVE:
-                    self._policy.container_names[action.client_name].discard(container_name)
-                if res is not None:
-                    yield res
