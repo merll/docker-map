@@ -2,6 +2,11 @@
 
 Change History
 ==============
+0.7.0b1
+-------
+* Refactoring of policy framework. The monolithic client action functions have been divided into separate
+  modules for improving maintainability and testing. This also makes it easier to add more functionality.
+
 0.6.5
 -----
 * Better support for IPv6 addresses. Added ``ipv6`` flag to port bindings and ``interfaces_ipv6`` property to client

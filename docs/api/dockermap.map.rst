@@ -6,7 +6,10 @@ Subpackages
 
 .. toctree::
 
+    dockermap.map.action
     dockermap.map.policy
+    dockermap.map.runner
+    dockermap.map.state
 
 Submodules
 ----------

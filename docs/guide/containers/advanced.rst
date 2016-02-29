@@ -10,31 +10,10 @@ libraries. This section covers some areas that may be relevant when implementing
 
 Implementing policies
 ---------------------
-Policies are briefly mentioned in the section :ref:`applying_maps`. Generally, policies take available
-container configurations as input. They have direct access to the Docker client. They can therefore check the current
-state of containers and their running configuration against the container maps, as well as perform all other client
-actions.
+Before version 0.7.0, policies compared container maps to the current state on the Docker client, and performed changes
+directly. In later versions, implementations of :class:`~dockermap.map.policy.base.BasePolicy` only define a few
+guidelines, such as how containers are named, how image names are resolved, and which client objects to use:
 
-For example, :class:`~dockermap.map.policy.resume.ResumeUpdatePolicy` is the default built-in policy. Besides checking
-on the container state, it also checks if volumes shared by a container into the virtual filesystem are consistent
-with the volumes a dependent container is using. There is also a :class:`~dockermap.map.policy.simple.SimplePolicy`,
-which only considers dependencies of containers, but does not perform additional checks.
-
-If you feel like creating your own container handling logic, you do not have to start from scratch. First of all,
-built-in classes are based on :class:`~dockermap.map.policy.base.BasePolicy`, which provides many methods that are
-separate container actions:
-
-* :meth:`~dockermap.map.policy.base.BasePolicy.get_create_kwargs`,
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_host_config_kwargs`,
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_restart_kwargs`,
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_stop_kwargs`, and
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_remove_kwargs` generate keyword arguments from container
-  configurations, that can be used directly on the Docker client;
-* :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_create_kwargs`,
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_preparation_create_kwargs`,
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_host_config_kwargs`, and
-  :meth:`~dockermap.map.policy.base.BasePolicy.get_attached_preparation_host_config_kwargs` have similar functionality
-  for attached containers;
 * :meth:`~dockermap.map.policy.base.BasePolicy.get_clients` provides the clients, that a client configuration should be
   applied to;
 * :meth:`~dockermap.map.policy.base.BasePolicy.get_dependencies` and
@@ -48,39 +27,38 @@ separate container actions:
   :meth:`~dockermap.map.policy.base.BasePolicy.get_domainname` generate inputs for aforementioned functions. They can
   be overridden separately.
 
-A subclass of :class:`~dockermap.map.policy.base.BasePolicy` needs to implement the following abstract methods:
+Changing behavior
+-----------------
+Operations are performed by a set of three components:
 
-* :meth:`~dockermap.map.policy.base.BasePolicy.create_actions`
-* :meth:`~dockermap.map.policy.base.BasePolicy.start_actions`
-* :meth:`~dockermap.map.policy.base.BasePolicy.stop_actions`
-* :meth:`~dockermap.map.policy.base.BasePolicy.remove_actions`
+* So-called state generators, implementations of :class:`~dockermap.map.state.base.AbstractStateGenerator`, determine
+  the current status of a container. They also establish if and in which the dependency path is being followed.
+  Currently there are four implementations:
 
-The following methods are optional for implementation:
+  * :class:`~dockermap.map.state.base.SingleStateGenerator` detects the basic state of a single container configuration,
+    e.g. existence, running, exit code.
+  * :class:`~dockermap.map.state.base.DependencyStateGenerator` is an extension of the aforementioned and used for
+    forward-directed actions such as creating and starting containers, running scripts etc. It follows the dependency
+    path of a container configuration, i.e. detecting states of a dependency first.
+  * :class:`~dockermap.map.state.update.UpdateStateGenerator` is a more sophisticated implementation of
+    :class:`~dockermap.map.state.base.DependencyStateGenerator`. In addition to the basic state it also checks for
+    inconsistencies between virtual filesystems shared between containers and differences to the configuration.
+  * :class:`~dockermap.map.state.base.DependentStateGenerator` also detects the basic state of containers, but follows
+    the reverse dependency path and is therefore used for stopping and removing containers.
 
-* :meth:`~dockermap.map.policy.base.BasePolicy.startup_actions` (would be in most cases a combination of
-  :meth:`~dockermap.map.policy.base.BasePolicy.create_actions` and
-  :meth:`~dockermap.map.policy.base.BasePolicy.start_actions`)
-* :meth:`~dockermap.map.policy.base.BasePolicy.shutdown_actions` (could combine
-  :meth:`~dockermap.map.policy.base.BasePolicy.stop_actions` and
-  :meth:`~dockermap.map.policy.base.BasePolicy.remove_actions`)
-* :meth:`~dockermap.map.policy.base.BasePolicy.restart_actions`
-* :meth:`~dockermap.map.policy.base.BasePolicy.update_actions`
+* Action generators, implementations of :class:`~dockermap.map.action.base.AbstractActionGenerator`, transform these
+  states into planned client actions. There is one action generator implementation, e.g.
+  :class:`~dockermap.map.action.simple.CreateActionGenerator` aims to create all containers along the detected states
+  that do not exist.
+* The runners perform the planned actions the client. They are implementations of
+  :class:`~dockermap.map.runner.AbstractRunner` and decide how to direct the client to applying the container
+  configuration, i.e. which methods and arguments to use. Currently there is only one implementation:
+  :class:`~dockermap.map.runner.base.DockerClientRunner`.
 
-The built-in policies are composed by mixins which use an intermediate element - implementations of
-:class:`~dockermap.map.policy.base.AbstractActionGenerator`. The reason for this abstraction is the similarity between
-following dependencies. The only individual method to be implemented is
-:meth:`~dockermap.map.policy.base.AbstractActionGenerator.generate_item_actions`.
-For :meth:`~dockermap.map.policy.base.AbstractActionGenerator.get_dependency_path`, one of the mixins
-:class:`dockermap.map.policy.base.ForwardActionGeneratorMixin` or
-:class:`dockermap.map.policy.base.ReverseActionGeneratorMixin` can be re-used. You may also want to just override
-specific actions and for the rest re-use the built-in mixins.
-
-Additionally, the :class:`~dockermap.map.policy.base.AttachedPreparationMixin` provides the method
-:meth:`~dockermap.map.policy.base.AttachedPreparationMixin.prepare_container` for adjusting permissions on attached
-volumes.
-
-For an implementation example, have a look at :class:`~dockermap.map.policy.simple.SimpleCreateMixin`, or the full
-policy, :class:`~dockermap.map.policy.simple.SimplePolicy`.
+The instance of :class:`~dockermap.map.client.MappingDockerClient` decides which elements to use. For each action a
+pair of a state generator and action generator is configured in
+:attr:`dockermap.map.client.MappingDockerClient.generators`.
+:attr:`dockermap.map.client.MappingDockerClient.runner_class` defines which runner implementation to use.
 
 .. _container_lazy:
 
@@ -141,7 +119,7 @@ resolution::
     def my_ext_hook(ext_data):
         if ext_data.code == MY_EXT_TYPE_CODE:
             return my_info(ext_data.data)
-        raise ValueError("Unexpected ext type code {0}.".format(ext_data.code)
+        raise ValueError("Unexpected ext type code.", ext_data.code)
 
     register_type(ExtType, my_ext_hook)
 

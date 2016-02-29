@@ -4,14 +4,6 @@ dockermap.map.policy package
 Submodules
 ----------
 
-dockermap.map.policy.actions module
------------------------------------
-
-.. automodule:: dockermap.map.policy.actions
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 dockermap.map.policy.base module
 --------------------------------
 
@@ -32,30 +24,6 @@ dockermap.map.policy.dep module
 -------------------------------
 
 .. automodule:: dockermap.map.policy.dep
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-dockermap.map.policy.resume module
-----------------------------------
-
-.. automodule:: dockermap.map.policy.resume
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-dockermap.map.policy.simple module
-----------------------------------
-
-.. automodule:: dockermap.map.policy.simple
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-dockermap.map.policy.update module
-----------------------------------
-
-.. automodule:: dockermap.map.policy.update
     :members:
     :undoc-members:
     :show-inheritance:
