@@ -46,14 +46,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
         }
         return instance
 
-    def get_client_action_config(self, action):
-        """
-
-        :param action:
-        :type action: dockermap.map.action.InstanceAction
-        :return:
-        :rtype: (docker.Client, ActionConfig)
-        """
+    def _get_client_action_config(self, action):
         client_config = self._policy.clients[action.client_name]
         client = client_config.get_client()
         c_map = self._policy.container_maps[action.map_name]
@@ -73,7 +66,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
         """
         aname = self._policy.aname
         for action in attached_actions:
-            client, action_config = self.get_client_action_config(action)
+            client, action_config = self._get_client_action_config(action)
             a_parent_name = action.config_name if action_config.container_map.use_attached_parent_name else None
             container_name = aname(action.map_name, action.instance_name, parent_name=a_parent_name)
             for action_type in action.action_types:
@@ -90,7 +83,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
 
         cname = self._policy.cname
         for action in instance_actions:
-            client, action_config = self.get_client_action_config(action)
+            client, action_config = self._get_client_action_config(action)
             container_name = cname(action.map_name, action.config_name, action.instance_name)
             for action_type in action.action_types:
                 c_method = self.instance_methods.get(action_type)
