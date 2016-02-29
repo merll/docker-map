@@ -188,7 +188,7 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, SingleS
     def get_dependency_path(self, map_name, config_name, client_names=None):
         """
         To be implemented by subclasses (or using :class:`ForwardActionGeneratorMixin` or
-        class:`ReverseActionGeneratorMixin`). Should provide an iterable of objects to be handled before the explicitly
+        :class:`ReverseActionGeneratorMixin`). Should provide an iterable of objects to be handled before the explicitly
         selected container configuration.
 
         :param map_name: Container map name.

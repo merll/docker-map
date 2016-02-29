@@ -57,8 +57,8 @@ Operations are performed by a set of three components:
 
 The instance of :class:`~dockermap.map.client.MappingDockerClient` decides which elements to use. For each action a
 pair of a state generator and action generator is configured in
-:attr:`dockermap.map.client.MappingDockerClient.generators`.
-:attr:`dockermap.map.client.MappingDockerClient.runner_class` defines which runner implementation to use.
+:attr:`~dockermap.map.client.MappingDockerClient.generators`.
+:attr:`~dockermap.map.client.MappingDockerClient.runner_class` defines which runner implementation to use.
 
 .. _container_lazy:
 

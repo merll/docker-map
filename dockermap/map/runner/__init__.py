@@ -56,12 +56,14 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
 
     def run_actions(self, attached_actions, instance_actions):
         """
+        Runs the given lists of attached actions and instance actions on the client.
 
-        :param attached_actions:
+        :param attached_actions: List of actions to attached containers of a configuration.
         :type attached_actions: list[dockermap.map.action.InstanceAction]
-        :param instance_actions:
+        :param instance_actions: List of actions to instance containers of a configuration.
         :type instance_actions: list[dockermap.map.action.InstanceAction]
-        :return:
+        :return: Where the result is not ``None``, returns the output from the client. Note that this is a generator
+          and needs to be consumed in order for all actions to be performed.
         :rtype: __generator[dict]
         """
         aname = self._policy.aname
