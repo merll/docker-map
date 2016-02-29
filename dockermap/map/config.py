@@ -722,7 +722,7 @@ class ClientConfiguration(DictMap):
     @property
     def interfaces_ipv6(self):
         """
-        Same as :prop:`interfaces`, but for assigning IPv6 interface addresses.
+        Same as :attr:`ClientConfiguration.interfaces`, but for assigning IPv6 interface addresses.
 
         :return: Network interface configuration.
         :rtype: DictMap
