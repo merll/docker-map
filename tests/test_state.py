@@ -233,7 +233,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server'),
             ])
-            states = list(DependencyStateGenerator(self.policy).get_states(self.map_name, 'server'))
+            states = list(DependencyStateGenerator(self.policy, {}).get_states(self.map_name, 'server'))
             instance_base_states = [si.base_state
                                     for s in states
                                     for si in s.instances]
@@ -257,7 +257,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('worker', P_STATE_RESTARTING),
                 _container('worker_q2', P_STATE_INITIAL),
             ])
-            sg = SingleStateGenerator(self.policy)
+            sg = SingleStateGenerator(self.policy, {})
             cache_state = _get_single_state(sg, self.map_name, 'redis', 'cache')
             self.assertEqual(cache_state.base_state, STATE_PRESENT)
             queue_state = _get_single_state(sg, self.map_name, 'redis', 'queue')
@@ -281,7 +281,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('worker'),
                 _container('worker_q2'),
             ])
-            states = list(DependentStateGenerator(self.policy).get_states(self.map_name, 'redis'))
+            states = list(DependentStateGenerator(self.policy, {}).get_states(self.map_name, 'redis'))
             instance_base_states = [si.base_state
                                     for s in states
                                     for si in s.instances]
@@ -303,7 +303,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags, 0)
@@ -318,7 +318,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -333,7 +333,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, 0)
@@ -348,7 +348,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server', attached_volumes_valid=False),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -363,7 +363,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server', Image='invalid'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -375,7 +375,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server', NetworkSettings=dict(Ports={})),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -388,7 +388,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('server'),
             ])
             self.sample_map.containers['server'].create_options.update(environment=dict(Test='x'))
-            states = {s.config: s for s in UpdateStateGenerator(self.policy).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -401,7 +401,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('server'),
             ])
             self.sample_map.containers['server'].create_options.update(command='/bin/true')
-            states = {s.config: s for s in UpdateStateGenerator(self.policy).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -418,7 +418,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('server'),
             ])
             self.sample_map.containers['server'].exec_commands = [cmd1, cmd2, cmd3]
-            states = {s.config: s for s in UpdateStateGenerator(self.policy).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, 0)
