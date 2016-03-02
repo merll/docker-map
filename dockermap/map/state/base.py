@@ -48,7 +48,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         :param config_flags: Config flags on the container.
         :type config_flags: int
         :return: Tuple of container inspection detail, and the base state information derived from that.
-        :rtype: (unicode | str, dict | NoneType, unicode | str, int, dict)
+        :rtype: (dict | NoneType, unicode | str, int, dict)
         """
         if config_flags & CONFIG_FLAG_ATTACHED:
             if container_map.use_attached_parent_name:
@@ -62,7 +62,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             c_detail = client.inspect_container(container_name)
             c_status = c_detail['State']
             if c_status['Running']:
-                return container_name, c_detail, STATE_RUNNING, 0, {}
+                return c_detail, STATE_RUNNING, 0, {}
             if c_status['StartedAt'] == INITIAL_START_TIME:
                 state_flag = STATE_FLAG_INITIAL
             elif c_status['ExitCode'] in self.nonrecoverable_exit_codes:
@@ -71,8 +71,8 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                 state_flag = 0
             if c_status['Restarting']:
                 state_flag |= STATE_FLAG_RESTARTING
-            return container_name, c_detail, STATE_PRESENT, state_flag, {}
-        return container_name, None, STATE_ABSENT, 0, {}
+            return c_detail, STATE_PRESENT, state_flag, {}
+        return None, STATE_ABSENT, 0, {}
 
     def generate_config_states(self, map_name, c_map, config_name, c_config, instances, client_names=None,
                                is_dependency=False):
@@ -111,7 +111,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                     state = self.get_container_state(map_name, c_map, config_name, c_config, client_name, client_config,
                                                      client, item, c_flags)
                     # Extract base state, state flags, and extra info.
-                    yield ContainerInstanceState(item, state[2], state[3], state[4])
+                    yield ContainerInstanceState(item, state[1], state[2], state[3])
 
             client = client_config.get_client()
             attached_states = [a_state for a_state in _get_state(a_flags, c_config.attaches)]

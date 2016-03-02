@@ -314,19 +314,19 @@ class UpdateStateGenerator(DependencyStateGenerator):
         :param config_flags: Config flags on the container.
         :type config_flags: bool
         :return: Tuple of container inspection detail, and the base state information derived from that.
-        :rtype: (unicode | str, dict | NoneType, unicode | str, int, dict | NoneType)
+        :rtype: (dict | NoneType, unicode | str, int, dict | NoneType)
         """
-        container_name, detail, base_state, state_flags, extra = super(
+        detail, base_state, state_flags, extra = super(
             UpdateStateGenerator, self).get_container_state(map_name, container_map, config_name, container_config,
                                                             client_name, client_config, client, instance_alias,
                                                             config_flags=config_flags)
         if base_state == STATE_ABSENT:
-            return container_name, detail, base_state, state_flags, extra
+            return detail, base_state, state_flags, extra
 
         c_image_id = detail['Image']
         if config_flags & CONFIG_FLAG_ATTACHED:
             if self.update_persistent and c_image_id != self._base_image_ids[client_name]:
-                return container_name, detail, base_state, state_flags | STATE_FLAG_OUTDATED, extra
+                return detail, base_state, state_flags | STATE_FLAG_OUTDATED, extra
             volumes = get_instance_volumes(detail)
             if volumes:
                 mapped_path = resolve_value(container_map.volumes[instance_alias])
@@ -346,10 +346,10 @@ class UpdateStateGenerator(DependencyStateGenerator):
                     _check_environment(container_config, detail) and
                     _check_cmd(container_config, detail) and
                     _check_network(container_config, client_config, detail)):
-                return container_name, detail, base_state, state_flags | STATE_FLAG_OUTDATED, extra
+                return detail, base_state, state_flags | STATE_FLAG_OUTDATED, extra
             if (self.check_exec_commands and self.check_exec_commands != CMD_CHECK_NONE and
                     container_config.exec_commands):
                 exec_results = self._check_commands(container_config, client, detail['Id'])
                 if exec_results is not None:
                     extra.update(exec_commands=exec_results)
-        return container_name, detail, base_state, state_flags, extra
+        return detail, base_state, state_flags, extra
