@@ -347,7 +347,8 @@ class UpdateStateGenerator(DependencyStateGenerator):
                     _check_cmd(container_config, detail) and
                     _check_network(container_config, client_config, detail)):
                 return container_name, detail, base_state, state_flags | STATE_FLAG_OUTDATED, extra
-            if self._check_commands and self._check_commands != CMD_CHECK_NONE and container_config.exec_commands:
+            if (self.check_exec_commands and self.check_exec_commands != CMD_CHECK_NONE and
+                    container_config.exec_commands):
                 exec_results = self._check_commands(container_config, client, detail['Id'])
                 if exec_results is not None:
                     extra.update(exec_commands=exec_results)
