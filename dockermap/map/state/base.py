@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 import itertools
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 import logging
 
 from six import with_metaclass
