@@ -569,8 +569,8 @@ class HostVolumeConfiguration(DictMap):
     def root(self, value):
         self._root = value
 
-    def get(self, item, instance=None):
-        return get_host_path(self._root, super(HostVolumeConfiguration, self).get(item), instance)
+    def get_path(self, item, instance=None):
+        return get_host_path(self._root, self[item], instance)
 
 
 class ClientConfiguration(DictMap):

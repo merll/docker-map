@@ -103,7 +103,7 @@ def _get_container_mounts(container_map, c_config, config_name, instance_name, v
                 h_path = get_host_path(container_map.host.root, h_r_path, instance_name)
             else:
                 c_path = container_map.volumes[vol]
-                h_path = container_map.host.get(vol, instance_name)
+                h_path = container_map.host.get_path(vol, instance_name)
             yield {'Source': posixpath.join(path_prefix, h_path), 'Destination': c_path, 'RW': not ro}
         for s in c_config.shares:
             yield {'Source': posixpath.join(path_prefix, 'shared', s), 'Destination': s, 'RW': True}
