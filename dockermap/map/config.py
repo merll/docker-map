@@ -34,7 +34,10 @@ def get_host_path(root, path, instance=None):
     """
     r_val = resolve_value(path)
     if isinstance(r_val, dict):
-        r_path = resolve_value(r_val.get(instance or 'default'))
+        r_instance = instance or 'default'
+        r_path = resolve_value(r_val.get(r_instance))
+        if not r_path:
+            raise ValueError("No path defined for instance {0}.".format(r_instance))
     else:
         r_path = r_val
     r_root = resolve_value(root)
