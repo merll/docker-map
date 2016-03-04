@@ -7,6 +7,7 @@ import logging
 import six
 import docker
 from docker.errors import APIError
+from requests import Timeout
 
 from .dep import SingleDependencyResolver
 from ..build.context import DockerContext
@@ -406,7 +407,10 @@ class DockerClientWrapper(docker.Client):
                       for container in self.containers(all=True)]
         for c_id, stopped in containers:
             if not stopped:
-                self.stop(c_id, timeout=stop_timeout)
+                try:
+                    self.stop(c_id, timeout=stop_timeout)
+                except Timeout:
+                    log.warning("Container did not stop in time - sent SIGKILL.")
         for c_id, __ in containers:
             self.remove_container(c_id)
 
