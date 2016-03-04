@@ -164,6 +164,7 @@ class StartupActionGenerator(AbstractActionGenerator):
         for attached_state in states.attached:
             if attached_state.base_state == STATE_ABSENT:
                 attached_actions.append(new_action(attached_state.instance, DERIVED_ACTION_STARTUP))
+                attached_actions.append(new_action(attached_state.instance, UTIL_ACTION_PREPARE_CONTAINER))
             elif attached_state.base_state == STATE_PRESENT and attached_state.flags & STATE_FLAG_INITIAL:
                 attached_actions.append(new_action(attached_state.instance, ACTION_START))
                 attached_actions.append(new_action(attached_state.instance, UTIL_ACTION_PREPARE_CONTAINER))
@@ -172,6 +173,7 @@ class StartupActionGenerator(AbstractActionGenerator):
         for instance_state in states.instances:
             if instance_state.base_state == STATE_ABSENT:
                 instance_actions.append(new_action(instance_state.instance, DERIVED_ACTION_STARTUP))
+                instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
             elif instance_state.base_state == STATE_PRESENT:
                 instance_actions.append(new_action(instance_state.instance, ACTION_START))
                 instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
