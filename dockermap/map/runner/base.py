@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 import logging
 
 from docker.utils import create_host_config
+from requests import Timeout
 from six import text_type
 
 from ...functional import resolve_value
@@ -41,46 +42,50 @@ class DockerBaseRunnerMixin(object):
         (ACTION_WAIT, 'wait'),
     ]
 
-    def create_attached(self, client, config, a_name, **kwargs):
+    def create_attached(self, config, a_name, **kwargs):
         c_kwargs = self.get_attached_create_kwargs(config, a_name, kwargs=kwargs)
-        return client.create_container(**c_kwargs)
+        return config.client.create_container(**c_kwargs)
 
-    def start_attached(self, client, config, a_name, **kwargs):
+    def start_attached(self, config, a_name, **kwargs):
         if config.client_config.get('use_host_config'):
-            res = client.start(a_name)
+            res = config.client.start(a_name)
         else:
             c_kwargs = self.get_attached_host_config_kwargs(config, a_name, kwargs=kwargs)
-            res = client.start(**c_kwargs)
+            res = config.client.start(**c_kwargs)
         return res
 
-    def create_instance(self, client, config, c_name, **kwargs):
+    def create_instance(self, config, c_name, **kwargs):
         c_kwargs = self.get_create_kwargs(config, c_name, kwargs=kwargs)
-        return client.create_container(**c_kwargs)
+        return config.client.create_container(**c_kwargs)
 
-    def start_instance(self, client, config, c_name, **kwargs):
+    def start_instance(self, config, c_name, **kwargs):
         if config.client_config.get('use_host_config'):
-            return client.start(c_name)
+            return config.client.start(c_name)
         c_kwargs = self.get_host_config_kwargs(config, c_name, kwargs=kwargs)
-        return client.start(**c_kwargs)
+        return config.client.start(**c_kwargs)
 
-    def restart(self, client, config, c_name, **kwargs):
+    def restart(self, config, c_name, **kwargs):
         c_kwargs = self.get_restart_kwargs(config, c_name, kwargs=kwargs)
-        return client.restart(**c_kwargs)
+        return config.client.restart(**c_kwargs)
 
-    def stop(self, client, config, c_name, **kwargs):
+    def stop(self, config, c_name, **kwargs):
         c_kwargs = self.get_stop_kwargs(config, c_name, kwargs=kwargs)
-        return client.stop(**c_kwargs)
+        try:
+            return config.client.stop(**c_kwargs)
+        except Timeout:
+            log.warning("Container did not stop in time - sent SIGKILL.")
+        return None
 
-    def remove(self, client, config, c_name, **kwargs):
+    def remove(self, config, c_name, **kwargs):
         c_kwargs = self.get_remove_kwargs(config, c_name, kwargs=kwargs)
-        return client.remove_container(**c_kwargs)
+        return config.client.remove_container(**c_kwargs)
 
-    def kill(self, client, config, c_name, **kwargs):
-        return client.kill(c_name, **kwargs)
+    def kill(self, config, c_name, **kwargs):
+        return config.client.kill(c_name, **kwargs)
 
-    def wait(self, client, config, c_name, **kwargs):
+    def wait(self, config, c_name, **kwargs):
         c_kwargs = self.get_wait_kwargs(config, c_name, kwargs=kwargs)
-        return client.wait(c_name, **c_kwargs)
+        return config.client.wait(c_name, **c_kwargs)
 
 
 class DockerConfigMixin(object):

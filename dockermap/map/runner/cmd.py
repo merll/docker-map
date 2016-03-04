@@ -17,19 +17,18 @@ class ExecMixin(object):
         (UTIL_ACTION_EXEC_ALL, 'exec_container_commands'),
     ]
 
-    def exec_commands(self, client, config, c_name, run_cmds, **kwargs):
+    def exec_commands(self, config, c_name, run_cmds, **kwargs):
         """
         Runs a single command inside a container.
 
-        :param client: Docker client.
-        :type client: docker.Client
         :param config: Configuration.
-        :type config: ActionConfig
+        :type config: dockermap.map.runner.ActionConfig
         :param c_name: Container name.
         :type c_name: unicode | str
         :param run_cmds: Commands to run.
         :type run_cmds: list[dockermap.map.input.ExecCommand]
         """
+        client = config.client
         for run_cmd in run_cmds:
             cmd = run_cmd.cmd
             cmd_user = run_cmd.user
@@ -40,18 +39,16 @@ class ExecMixin(object):
             es_kwargs = self.get_exec_start_kwargs(config, c_name, e_id)
             client.exec_start(**es_kwargs)
 
-    def exec_container_commands(self, client, config, c_name, **kwargs):
+    def exec_container_commands(self, config, c_name, **kwargs):
         """
         Runs all configured commands of a container configuration inside the container instance.
 
-        :param client: Docker client.
-        :type client: docker.Client
         :param config: Configuration.
-        :type config: ActionConfig
+        :type config: dockermap.map.runner.ActionConfig
         :param c_name: Container name.
         :type c_name: unicode | str
         """
         config_cmds = config.container_config.exec_commands
         if not config_cmds:
             return
-        self.exec_commands(client, config, c_name, run_cmds=config_cmds)
+        self.exec_commands(config, c_name, run_cmds=config_cmds)

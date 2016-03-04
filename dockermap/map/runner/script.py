@@ -21,7 +21,7 @@ class ScriptMixin(object):
     remove_created_after = True
     policy_options = ['remove_created_after']
 
-    def run_script(self, client, config, c_name, script_path=None, entrypoint=None, command_format=None,
+    def run_script(self, config, c_name, script_path=None, entrypoint=None, command_format=None,
                    wait_timeout=None, container_script_dir='/tmp/script_run', timestamps=None, tail='all'):
         """
         Creates a container from its configuration to run a script or single command. The container is specifically
@@ -30,10 +30,8 @@ class ScriptMixin(object):
         mounting the directory containing the script to the new container. After the script run, the container is
         destroyed (excluding its dependencies), unless :attr:`remove_created_after` is set to ``False``.
 
-        :param client: Docker client.
-        :type client: docker.Client
         :param config: Configuration.
-        :type config: dockermap.map.runner.base.ActionConfig
+        :type config: dockermap.map.runner.ActionConfig
         :param c_name: Container name.
         :type c_name: unicode | str
         :param script_path: Path to the script on the Docker host. Note that this needs to have the executable bit
@@ -62,6 +60,7 @@ class ScriptMixin(object):
          a wait timeout occurred, instead of ``log`` and ``exit_code`` returns a key ``error``.
         :rtype: dict[unicode | str, dict]
         """
+        client = config.client
         client_config = config.client_config
         client_timeout = client_config.get('timeout')
         use_host_config = client_config.get('use_host_config')
@@ -94,18 +93,18 @@ class ScriptMixin(object):
         else:
             create_extra_kwargs = {}
             start_extra_kwargs = {'binds': binds}
-        created = self.create_instance(client, config, c_name, entrypoint=entrypoint, command=command,
+        created = self.create_instance(config, c_name, entrypoint=entrypoint, command=command,
                                        volumes=volumes, **create_extra_kwargs)
         if not created:
             raise ScriptRunException("No new containers were created.")
         stopped = True
         try:
-            self.start_instance(client, config, c_name, **start_extra_kwargs)
+            self.start_instance(config, c_name, **start_extra_kwargs)
             stopped = False
             timeout = wait_timeout or client_config.get('wait_timeout') or client_timeout
             container_id = created['Id']
             try:
-                self.wait_instance(client, config, c_name, timeout=timeout)
+                self.wait_instance(config, c_name, timeout=timeout)
             except Timeout:
                 result = {'id': container_id, 'error': "Timed out while waiting for the container to finish."}
             else:
@@ -117,6 +116,6 @@ class ScriptMixin(object):
         finally:
             if self.remove_created_after:
                 if not stopped:
-                    self.stop_instance(client, config, c_name, timeout=3)
-                self.remove_instance(client, config, c_name)
+                    self.stop_instance(config, c_name, timeout=3)
+                self.remove_instance(config, c_name)
         return result

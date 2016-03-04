@@ -8,7 +8,7 @@ from ..policy import PolicyUtilMeta, PolicyUtil
 
 
 ActionConfig = namedtuple('ActionConfig', ['map_name', 'container_map', 'config_name', 'container_config',
-                                           'client_name', 'client_config', 'instance_name'])
+                                           'client_name', 'client_config', 'client', 'instance_name'])
 
 
 class RunnerMeta(PolicyUtilMeta):
@@ -51,8 +51,8 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
         client = client_config.get_client()
         c_map = self._policy.container_maps[action.map_name]
         c_config = c_map.get_existing(action.config_name)
-        return client, ActionConfig(action.map_name, c_map, action.config_name, c_config, action.client_name,
-                                    client_config, action.instance_name)
+        return ActionConfig(action.map_name, c_map, action.config_name, c_config, action.client_name, client_config,
+                            client, action.instance_name)
 
     def run_actions(self, attached_actions, instance_actions):
         """
@@ -68,14 +68,14 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
         """
         aname = self._policy.aname
         for action in attached_actions:
-            client, action_config = self._get_client_action_config(action)
+            action_config = self._get_client_action_config(action)
             a_parent_name = action.config_name if action_config.container_map.use_attached_parent_name else None
             container_name = aname(action.map_name, action.instance_name, parent_name=a_parent_name)
             for action_type in action.action_types:
                 a_method = self.attached_methods.get(action_type)
                 if not a_method:
                     raise ValueError("Invalid action for attached containers.", action_type)
-                res = a_method(client, action_config, container_name, **action.extra_data)
+                res = a_method(action_config, container_name, **action.extra_data)
                 if action_type == ACTION_CREATE:
                     self._policy.container_names[action.client_name].add(container_name)
                 elif action_type == ACTION_REMOVE:
@@ -85,13 +85,13 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
 
         cname = self._policy.cname
         for action in instance_actions:
-            client, action_config = self._get_client_action_config(action)
+            action_config = self._get_client_action_config(action)
             container_name = cname(action.map_name, action.config_name, action.instance_name)
             for action_type in action.action_types:
                 c_method = self.instance_methods.get(action_type)
                 if not c_method:
                     raise ValueError("Invalid action for instance containers.", action_type)
-                res = c_method(client, action_config, container_name, **action.extra_data)
+                res = c_method(action_config, container_name, **action.extra_data)
                 if action_type == ACTION_CREATE:
                     self._policy.container_names[action.client_name].add(container_name)
                 elif action_type == ACTION_REMOVE:

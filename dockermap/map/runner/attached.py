@@ -16,7 +16,7 @@ class AttachedConfigMixin(object):
         permissions).
 
         :param config: Configuration.
-        :type config: dockermap.map.runner.base.ActionConfig
+        :type config: dockermap.map.runner.ActionConfig
         :param volume_container: Name of the container that shares the volume.
         :type volume_container: unicode | str
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
@@ -49,7 +49,7 @@ class AttachedConfigMixin(object):
         (i.e. adjust user and permissions) or start the preparation.
 
         :param config: Configuration.
-        :type config: ActionConfig
+        :type config: dockermap.map.runner.ActionConfig
         :param container_name: Container name or id. Set ``None`` when included in kwargs for ``create_container``.
         :type container_name: unicode | str | NoneType
         :param volume_container: Name of the container that shares the volume.
@@ -71,7 +71,7 @@ class AttachedConfigMixin(object):
         the container being prepared, or the id of the container calling preparation commands.
 
         :param config: Configuration.
-        :type config: ActionConfig
+        :type config: dockermap.map.runner.ActionConfig
         :param container_name: Container name or id. Set ``None`` when included in kwargs for ``create_container``.
         :type container_name: unicode | str | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
@@ -105,7 +105,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         :param client: Docker client.
         :type client: docker.Client
         :param config: Configuration.
-        :type config: ActionConfig
+        :type config: dockermap.map.runner.ActionConfig
         :param volume_container: Name of the container that shares the volume.
         :type volume_container: unicode | str
         """
@@ -129,17 +129,16 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         finally:
             client.remove_container(temp_id)
 
-    def prepare_attached(self, client, config, a_name, **kwargs):
+    def prepare_attached(self, config, a_name, **kwargs):
         """
         Prepares an attached volume for a container configuration.
 
-        :param client: Docker client.
-        :type client: docker.Client
         :param config: Configuration.
-        :type config: ActionConfig
+        :type config: dockermap.map.runner.ActionConfig
         :param a_name: The full name or id of the container sharing the volume.
         :type a_name: unicode | str
         """
+        client = config.client
         if not (self.prepare_local and hasattr(client, 'run_cmd')):
             return self._prepare_container(client, config, a_name)
         instance_detail = client.inspect_container(a_name)
