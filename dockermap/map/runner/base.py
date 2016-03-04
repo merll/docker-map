@@ -25,20 +25,20 @@ class DockerBaseRunnerMixin(object):
     attached_action_method_names = [
         (ACTION_CREATE, 'create_attached'),
         (ACTION_START, 'start_attached'),
-        (ACTION_RESTART, 'restart_attached'),
-        (ACTION_STOP, 'stop_attached'),
-        (ACTION_REMOVE, 'remove_attached'),
-        (ACTION_KILL, 'kill_attached'),
-        (ACTION_WAIT, 'wait_attached'),
+        (ACTION_RESTART, 'restart'),
+        (ACTION_STOP, 'stop'),
+        (ACTION_REMOVE, 'remove'),
+        (ACTION_KILL, 'kill'),
+        (ACTION_WAIT, 'wait'),
     ]
     instance_action_method_names = [
         (ACTION_CREATE, 'create_instance'),
         (ACTION_START, 'start_instance'),
-        (ACTION_RESTART, 'restart_instance'),
-        (ACTION_STOP, 'stop_instance'),
-        (ACTION_REMOVE, 'remove_instance'),
-        (ACTION_KILL, 'kill_instance'),
-        (ACTION_WAIT, 'wait_instance'),
+        (ACTION_RESTART, 'restart'),
+        (ACTION_STOP, 'stop'),
+        (ACTION_REMOVE, 'remove'),
+        (ACTION_KILL, 'kill'),
+        (ACTION_WAIT, 'wait'),
     ]
 
     def create_attached(self, client, config, a_name, **kwargs):
@@ -53,25 +53,6 @@ class DockerBaseRunnerMixin(object):
             res = client.start(**c_kwargs)
         return res
 
-    def restart_attached(self, client, config, a_name, **kwargs):
-        c_kwargs = self.get_restart_kwargs(config, a_name, kwargs=kwargs)
-        return client.restart(**c_kwargs)
-
-    def stop_attached(self, client, config, a_name, **kwargs):
-        c_kwargs = self.get_stop_kwargs(config, a_name, kwargs=kwargs)
-        return client.stop(**c_kwargs)
-
-    def remove_attached(self, client, config, a_name, **kwargs):
-        c_kwargs = self.get_remove_kwargs(config, a_name, kwargs=kwargs)
-        return client.remove_container(**c_kwargs)
-
-    def kill_attached(self, client, config, a_name, **kwargs):
-        return client.kill(a_name, **kwargs)
-
-    def wait_attached(self, client, config, a_name, **kwargs):
-        c_kwargs = self.get_wait_kwargs(config, a_name, **kwargs)
-        return client.wait(a_name, **c_kwargs)
-
     def create_instance(self, client, config, c_name, **kwargs):
         c_kwargs = self.get_create_kwargs(config, c_name, kwargs=kwargs)
         return client.create_container(**c_kwargs)
@@ -82,22 +63,22 @@ class DockerBaseRunnerMixin(object):
         c_kwargs = self.get_host_config_kwargs(config, c_name, kwargs=kwargs)
         return client.start(**c_kwargs)
 
-    def restart_instance(self, client, config, c_name, **kwargs):
+    def restart(self, client, config, c_name, **kwargs):
         c_kwargs = self.get_restart_kwargs(config, c_name, kwargs=kwargs)
         return client.restart(**c_kwargs)
 
-    def stop_instance(self, client, config, c_name, **kwargs):
+    def stop(self, client, config, c_name, **kwargs):
         c_kwargs = self.get_stop_kwargs(config, c_name, kwargs=kwargs)
         return client.stop(**c_kwargs)
 
-    def remove_instance(self, client, config, c_name, **kwargs):
+    def remove(self, client, config, c_name, **kwargs):
         c_kwargs = self.get_remove_kwargs(config, c_name, kwargs=kwargs)
         return client.remove_container(**c_kwargs)
 
-    def kill_instance(self, client, config, c_name, **kwargs):
+    def kill(self, client, config, c_name, **kwargs):
         return client.kill(c_name, **kwargs)
 
-    def wait_instance(self, client, config, c_name, **kwargs):
+    def wait(self, client, config, c_name, **kwargs):
         c_kwargs = self.get_wait_kwargs(config, c_name, kwargs=kwargs)
         return client.wait(c_name, **c_kwargs)
 
