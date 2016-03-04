@@ -21,7 +21,7 @@ from . import AbstractRunner
 log = logging.getLogger(__name__)
 
 
-class BaseRunnerMixin(object):
+class DockerBaseRunnerMixin(object):
     attached_action_method_names = [
         (ACTION_CREATE, 'create_attached'),
         (ACTION_START, 'start_attached'),
@@ -103,8 +103,7 @@ class BaseRunnerMixin(object):
         return client.wait(c_name, **c_kwargs)
 
 
-class DockerClientRunner(BaseRunnerMixin, AttachedPreparationMixin, ExecMixin, SignalMixin, ScriptMixin,
-                         AbstractRunner):
+class DockerConfigMixin(object):
     def get_hostname(self, config, container_name):
         """
         Generates a host name from the container name and the client configuration name.
@@ -399,3 +398,8 @@ class DockerClientRunner(BaseRunnerMixin, AttachedPreparationMixin, ExecMixin, S
         c_kwargs = dict(exec_id=exec_id)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
+
+
+class DockerClientRunner(DockerBaseRunnerMixin, DockerConfigMixin, AttachedPreparationMixin, ExecMixin, SignalMixin,
+                         ScriptMixin, AbstractRunner):
+    pass
