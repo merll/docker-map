@@ -54,4 +54,4 @@ class ExecMixin(object):
         config_cmds = config.container_config.exec_commands
         if not config_cmds:
             return
-        self.exec_single_command(client, config, c_name, run_cmds=config_cmds)
+        self.exec_commands(client, config, c_name, run_cmds=config_cmds)
