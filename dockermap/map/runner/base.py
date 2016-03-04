@@ -51,7 +51,6 @@ class DockerBaseRunnerMixin(object):
         else:
             c_kwargs = self.get_attached_host_config_kwargs(config, a_name, kwargs=kwargs)
             res = client.start(**c_kwargs)
-        self.prepare_attached(client, config, a_name)
         return res
 
     def restart_attached(self, client, config, a_name, **kwargs):
