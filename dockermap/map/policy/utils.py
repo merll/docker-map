@@ -48,12 +48,10 @@ def update_kwargs(kwargs, *updates):
     Lists/tuples and dictionaries are (shallow-)copied before adding and late resolving values are looked up.
     This function does not recurse.
 
-    :param kwargs: Base keyword arguments.
+    :param kwargs: Base keyword arguments. This is modified in-place.
     :type kwargs: dict
     :param updates: Dictionaries to update ``kwargs`` with.
     :type updates: tuple[dict]
-    :return: A merged dictionary of keyword arguments.
-    :rtype: dict
     """
     for update in updates:
         if not update:
