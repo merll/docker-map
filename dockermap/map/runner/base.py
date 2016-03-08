@@ -387,4 +387,7 @@ class DockerConfigMixin(object):
 
 class DockerClientRunner(DockerBaseRunnerMixin, DockerConfigMixin, AttachedPreparationMixin, ExecMixin, SignalMixin,
                          ScriptMixin, AbstractRunner):
+    """
+    Runs actions on a Docker client and returns results from the API.
+    """
     pass

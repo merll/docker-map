@@ -178,4 +178,7 @@ class DockerCommandExecMixin(ExecMixin):
 
 class DockerCommandOutputRunner(DockerCommandOutputBaseMixin, DockerConfigMixin, DockerCommandAttachedPreparationMixin,
                                 DockerCommandExecMixin, AbstractRunner):
+    """
+    Returns command line strings for performing configured actions. Does not actually run anything on Docker.
+    """
     pass
