@@ -596,7 +596,7 @@ class ClientConfiguration(DictMap):
     def __init__(self, base_url=None, version=None, timeout=None, *args, **kwargs):
         self._base_url = base_url
         self._version = version
-        self.use_host_config = None
+        self.use_host_config = kwargs.pop('use_host_config', False)
         self._timeout = timeout
         if 'interfaces' in kwargs:
             self._interfaces = DictMap(kwargs.pop('interfaces'))
@@ -749,3 +749,11 @@ class ClientConfiguration(DictMap):
     @client.setter
     def client(self, value):
         self._client = value
+
+
+class DockerDummyClientConfig(ClientConfiguration):
+    init_kwargs = []
+    client_constructor = None
+
+    def get_client(self):
+        return None
