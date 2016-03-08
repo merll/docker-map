@@ -33,6 +33,8 @@ class CachedImages(CachedItems, dict):
         """
         Fetches image and their ids from the client.
         """
+        if not self._client:
+            return
         current_images = self._client.images()
         self.clear()
         for image in current_images:
@@ -85,6 +87,8 @@ class CachedContainerNames(CachedItems, set):
         """
         Fetches all current container names from the client.
         """
+        if not self._client:
+            return
         current_containers = self._client.containers(all=True)
         self.clear()
         for container in current_containers:
