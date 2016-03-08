@@ -3,10 +3,9 @@ from __future__ import unicode_literals
 
 from six import iteritems
 
-from dockermap.map.config import ClientConfiguration
-from dockermap.map.runner.base import DockerConfigMixin
 from ..action import (ACTION_CREATE, ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ACTION_KILL, ACTION_START,
                       ACTION_WAIT, UTIL_ACTION_PREPARE_CONTAINER)
+from .base import DockerConfigMixin
 from .attached import AttachedConfigMixin
 from .cmd import ExecMixin
 from . import AbstractRunner
