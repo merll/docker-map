@@ -133,15 +133,17 @@ class DockerClientWrapper(docker.Client):
         """
         log.log(level, info, *args, **kwargs)
 
-    def build(self, tag, add_latest_tag=False, raise_on_error=False, **kwargs):
+    def build(self, tag, add_latest_tag=False, add_tags=None, raise_on_error=False, **kwargs):
         """
         Overrides the superclass `build()` and filters the output. Messages are deferred to `push_log`, whereas the
         final message is checked for a success message. If the latter is found, only the new image id is returned.
 
         :param tag: Tag of the new image to be built. Unlike in the superclass, this is obligatory.
         :type tag: unicode | str
-        :param add_latest_tag: In addition to the image `tag`, tag the image with `latest`.
+        :param add_latest_tag: In addition to the image ``tag``, tag the image with ``latest``.
         :type add_latest_tag: bool
+        :param add_tags: Additional tags. Can also be used as an alternative to ``add_latest_tag``.
+        :type add_tags: list[unicode | str]
         :param raise_on_error: Raises errors in the status output as a DockerStatusException. Otherwise only logs
          errors.
         :type raise_on_error: bool
@@ -152,17 +154,27 @@ class DockerClientWrapper(docker.Client):
         response = super(DockerClientWrapper, self).build(tag=tag, **kwargs)
         # It is not the kwargs alone that decide if we get a stream, so we have to check.
         if isinstance(response, tuple):
-            return response[0]
+            image_id = response[0]
+        else:
+            last_log = self._docker_log_stream(response, raise_on_error)
+            if last_log and last_log.startswith('Successfully built '):
+                image_id = last_log[19:]  # Remove prefix
+            else:
+                image_id = None
 
-        last_log = self._docker_log_stream(response, raise_on_error)
-        if last_log and last_log.startswith('Successfully built '):
-            image_id = last_log[19:]  # Remove prefix
-            if add_latest_tag:
-                repo, __, i_tag = tag.rpartition(':')
-                if repo and i_tag != 'latest':
-                    self.tag(image_id, repo, 'latest', force=True)
-            return image_id
-        return None
+        if not image_id:
+            return None
+
+        repo, __, i_tag = tag.rpartition(':')
+        tag_set = set(add_tags or ())
+        if add_latest_tag:
+            tag_set.add('latest')
+        tag_set.discard(i_tag)
+
+        if repo and tag_set:
+            for t in tag_set:
+                self.tag(image_id, repo, t, force=True)
+        return image_id
 
     def login(self, username, password=None, email=None, registry=None, reauth=False, **kwargs):
         """
