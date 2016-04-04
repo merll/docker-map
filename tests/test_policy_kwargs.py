@@ -26,7 +26,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                                               c_name, None, include_host_config=False, kwargs=dict(ports=[22]))
         self.assertDictEqual(kwargs, dict(
             name=c_name,
-            image='registry.example.com/nginx',
+            image='registry.example.com/nginx:latest',
             volumes=['/etc/nginx'],
             user=None,
             ports=[80, 443, 22],
@@ -66,7 +66,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                                               include_host_config=True, kwargs=dict(host_config=hc_kwargs))
         self.assertDictEqual(kwargs, dict(
             name=c_name,
-            image='registry.example.com/app',
+            image='registry.example.com/app:custom',
             volumes=[
                 '/var/lib/app/config',
                 '/var/lib/app/data'

@@ -3,9 +3,10 @@ from __future__ import unicode_literals
 
 MAP_DATA_1 = {
     'repository': 'registry.example.com',
+    'default_tag': 'custom',
     'host_root': '/var/lib/site',
     'web_server': { # Configure container creation and startup
-        'image': 'nginx',
+        'image': 'nginx:latest',
         # If volumes are not shared with any other container, assigning
         # an alias in "volumes" is possible, but not neccessary:
         'binds': {'/etc/nginx': ('config/nginx', 'ro')},

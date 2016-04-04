@@ -206,7 +206,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, SignalMixin,
         self.check_commands = policy.check_exec_commands
         self.base_image_ids = {
             client_name: policy.images[client_name].ensure_image(
-                self.iname_tag(policy.base_image), pull_latest=self.pull_latest,
+                policy.image_name(policy.base_image), pull=self.pull_before_update,
                 insecure_registry=self.pull_insecure_registry)
             for client_name in policy.clients.keys()
         }
@@ -271,12 +271,6 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, SignalMixin,
                 self.exec_single_command(container_map, config_name, container_config, client_name, client_config,
                                          client, container_name, instance_name, cmd, cmd_user)
 
-    def iname_tag(self, image, container_map=None):
-        i_name = '{0}:latest'.format(image) if ':' not in image else image
-        if container_map:
-            return self._policy.iname(container_map, i_name)
-        return i_name
-
     def generate_item_actions(self, map_name, c_map, config_name, c_config, instances, flags, *args, **kwargs):
         a_paths = {alias: resolve_value(c_map.volumes[alias]) for alias in c_config.attaches}
         for client_name, client, client_config in self._policy.get_clients(c_config, c_map):
@@ -326,8 +320,8 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, SignalMixin,
                     if volumes:
                         mapped_path = a_paths[a]
                         self._volume_checker.register_attached(mapped_path, volumes.get(mapped_path), a, a_parent)
-            image_name = self.iname_tag(c_config.image or config_name, container_map=c_map)
             image_id = images.ensure_image(image_name, pull_latest=self.pull_latest,
+            image_name = self._policy.image_name(c_config.image or config_name, c_map)
                                            insecure_registry=self.pull_insecure_registry)
             for ci in instances:
                 ci_name = self._policy.cname(map_name, config_name, ci)

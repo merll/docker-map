@@ -10,7 +10,7 @@ from .config import ContainerConfiguration, HostVolumeConfiguration
 from .input import get_list
 
 
-SINGLE_ATTRIBUTES = 'repository', 'default_domain', 'set_hostname', 'use_attached_parent_name'
+SINGLE_ATTRIBUTES = 'repository', 'default_domain', 'set_hostname', 'use_attached_parent_name', 'default_tag'
 DICT_ATTRIBUTES = 'volumes', 'host'
 LIST_ATTRIBUTES = 'clients',
 
@@ -51,6 +51,7 @@ class ContainerMap(object):
         self._default_domain = None
         self._set_hostname = True
         self._use_attached_parent_name = False
+        self._default_tag = 'latest'
         self._extended = False
         self.update(initial, **kwargs)
         if (initial or kwargs) and check_integrity:
@@ -263,6 +264,17 @@ class ContainerMap(object):
     @use_attached_parent_name.setter
     def use_attached_parent_name(self, value):
         self._use_attached_parent_name = value
+
+    @property
+    def default_tag(self):
+        """
+        Default tag to use for images where it is not specified. Default is ``latest``.
+        """
+        return self._default_tag
+
+    @default_tag.setter
+    def default_tag(self, value):
+        self._default_tag = value
 
     @property
     def dependency_items(self):
