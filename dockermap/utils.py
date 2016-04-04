@@ -44,13 +44,18 @@ def is_repo_image(image):
     return image['RepoTags'][0] != '<none>:<none>'
 
 
-def is_latest_image(image):
+def tag_check_function(tags):
     """
-    Checks whether the given image has any tag marked as `latest`.
+    Generates a function that checks whether the given image has any of the listed tags.
 
-    :param image: Image structure from the Docker Remote API.
-    :type image: dict
-    :return: ``True`` if any of the names of the current image includes the tag `latest`, ``False`` otherwise.
-    :rtype: bool
+    :param tags: Tags to check for.
+    :type tags: list[unicode | str] | set[unicode | str]
+    :return: Function that returns ``True`` if any of the given tags apply to the image, ``False`` otherwise.
+    :rtype: (unicode | str) -> bool
     """
-    return any(':latest' in tag for tag in image['RepoTags'])
+    suffixes = [':{0}'.format(t) for t in tags]
+
+    def _check_image(image):
+        return any(r_tag.endswith(s) for s in suffixes for r_tag in image['RepoTags'])
+
+    return _check_image

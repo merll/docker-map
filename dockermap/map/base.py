@@ -10,7 +10,7 @@ from docker.errors import APIError
 
 from .dep import SingleDependencyResolver
 from ..build.context import DockerContext
-from ..utils import is_latest_image, is_repo_image, parse_response
+from ..utils import tag_check_function, is_repo_image, parse_response
 
 log = logging.getLogger(__name__)
 
@@ -304,13 +304,15 @@ class DockerClientWrapper(docker.Client):
                     if raise_on_error:
                         six.reraise(*sys.exc_info())
 
-    def cleanup_images(self, remove_old=False, raise_on_error=False):
+    def cleanup_images(self, remove_old=False, keep_tags=None, raise_on_error=False):
         """
         Finds all images that are neither used by any container nor another image, and removes them; by default does not
         remove repository images.
 
         :param remove_old: Also removes images that have repository names, but no `latest` tag.
         :type remove_old: bool
+        :param keep_tags: List of tags to not remove.
+        :type keep_tags: list[unicode | str]
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
         """
@@ -318,10 +320,17 @@ class DockerClientWrapper(docker.Client):
                           for container in self.containers(all=True))
         image_dependencies = ((image['Id'], image['ParentId']) for image in self.images(all=True))
         resolver = ContainerImageResolver(used_images, image_dependencies)
-        tag_check = is_latest_image if remove_old else is_repo_image
+        if remove_old:
+            check_tags = {'latest'}
+            if keep_tags:
+                check_tags.update(keep_tags)
+            tag_check = tag_check_function(check_tags)
+        elif remove_old:
+            tag_check = tag_check_function(['latest'])
+        else:
+            tag_check = is_repo_image
         unused_images = set(image['Id'] for image in self.images()
                             if not tag_check(image) and not resolver.get_dependencies(image['Id']))
-
         for iid in unused_images:
             try:
                 self.remove_image(iid)
