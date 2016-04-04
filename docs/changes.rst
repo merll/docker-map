@@ -7,6 +7,7 @@ Change History
 * Added arguments to set additional image tags after build.
 * Added ``default_tag`` property to container maps.
 * Minor refactoring. Possibly breaks compatibility in custom policy implementations:
+
   * ``dockermap.map.policy.cache.CachedImages.reset_latest`` has been renamed to
     :meth:`~dockermap.map.policy.cache.CachedImages.reset_updated`.
   * :meth:``dockermap.map.policy.cache.CachedImages.ensure_image`` argument ``pull_latest`` has been renamed to
