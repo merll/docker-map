@@ -2,6 +2,20 @@
 
 Change History
 ==============
+0.6.6b1
+-------
+* Added arguments to set additional image tags after build.
+* Added ``default_tag`` property to container maps.
+* Minor refactoring. Possibly breaks compatibility in custom policy implementations:
+  * ``dockermap.map.policy.cache.CachedImages.reset_latest`` has been renamed to
+    :meth:`~dockermap.map.policy.cache.CachedImages.reset_updated`.
+  * :meth:``dockermap.map.policy.cache.CachedImages.ensure_image`` argument ``pull_latest`` has been renamed to
+    ``pull``.
+  * ``dockermap.map.policy.update.ContainerUpdateMixin.pull_latest`` has been renamed to
+    :attr:`~dockermap.map.policy.update.ContainerUpdateMixin.pull_before_update`.
+  * ``dockermap.map.policy.base.BasePolicy.iname`` has been renamed to
+    :meth:`~dockermap.map.policy.base.BasePolicy.image_name` and changed order of arguments for allowing defaults.
+
 0.6.5
 -----
 * Better support for IPv6 addresses. Added ``ipv6`` flag to port bindings and ``interfaces_ipv6`` property to client
