@@ -200,7 +200,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, SignalMixin,
     def __init__(self, policy, *args, **kwargs):
         super(ContainerUpdateGenerator, self).__init__(policy, *args, **kwargs)
         self.remove_status = policy.remove_status
-        self.pull_latest = policy.pull_latest
+        self.pull_before_update = policy.pull_before_update
         self.pull_insecure_registry = policy.pull_insecure_registry
         self.update_persistent = policy.update_persistent
         self.check_commands = policy.check_exec_commands
@@ -320,8 +320,8 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, SignalMixin,
                     if volumes:
                         mapped_path = a_paths[a]
                         self._volume_checker.register_attached(mapped_path, volumes.get(mapped_path), a, a_parent)
-            image_id = images.ensure_image(image_name, pull_latest=self.pull_latest,
             image_name = self._policy.image_name(c_config.image or config_name, c_map)
+            image_id = images.ensure_image(image_name, pull=self.pull_before_update,
                                            insecure_registry=self.pull_insecure_registry)
             for ci in instances:
                 ci_name = self._policy.cname(map_name, config_name, ci)
@@ -385,7 +385,7 @@ class ContainerUpdateGenerator(AttachedPreparationMixin, ExecMixin, SignalMixin,
 
 class ContainerUpdateMixin(object):
     remove_status = (-127, -1)
-    pull_latest = False
+    pull_before_update = False
     pull_insecure_registry = False
     update_persistent = False
     check_exec_commands = CMD_CHECK_FULL
@@ -395,8 +395,8 @@ class ContainerUpdateMixin(object):
         Generates actions for updating a configured container, including all of its dependencies. Updating in this case
         means that:
 
-        * For each image the latest version is pulled from the registry, but only if
-          :attr:`~ContainerUpdateMixin.pull_latest` is set to ``True``.
+        * For each image the default tag (e.g. ``latest``) is pulled from the registry, but only if
+          :attr:`~ContainerUpdateMixin.pull_before_update` is set to ``True``.
         * An attached container is removed and re-created if its image id does not correspond with the current base
           image, or the status indicates that the container cannot be restarted (-127 in this implementation).
           Attached and `persistent` images are not updated in case of image changes, unless
