@@ -81,6 +81,9 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
     def __init__(self, initial=None):
         self._deps = _dependency_dict(initial)
 
+    def __contains__(self, item):
+        return item in self._deps
+
     def merge_dependency(self, item, resolve_parent, parent):
         """
         Called by :meth:`~BaseDependencyResolver.get_dependencies` once on each node. The result is cached for
@@ -120,6 +123,19 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
             return e.dependencies
 
         return _get_sub_dependency(item)
+
+    def get(self, item, default=()):
+        """
+        Returns the direct dependencies or dependents of a single item. Does not follow the entire dependency path.
+
+        :param item: Node to return dependencies for.
+        :param default: Default value to return in case the item is not stored.
+        :return: Immediate dependencies or dependents.
+        """
+        e = self._deps.get(item)
+        if e is None:
+            return default
+        return e.parent
 
     def reset(self):
         """

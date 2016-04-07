@@ -118,7 +118,7 @@ class BasePolicy(object):
         return c_name, i_name or None
 
     @classmethod
-    def iname(cls, container_map, image):
+    def image_name(cls, image, container_map=None):
         """
         Generates the full image name that should be used when creating a new container.
 
@@ -128,26 +128,34 @@ class BasePolicy(object):
         * If ``/`` is found anywhere else in the image name, it is assumed to be a repository-prefixed image and
           returned as it is.
         * Otherwise, if the given container map has a repository prefix set, this is prepended to the image name.
-        * In any other case, the image name is returned unmodified.
+        * In any other case, the image name is not modified.
 
-        In any case this method is indifferent to whether a tag is appended or not. Docker by default uses the image
-        with the ``latest`` tag.
+        Where there is a tag included in the ``image`` name, it is not modified. If it is not, the default tag from the
+        container map, or ``latest`` is used.
 
-        :param container_map: Container map object.
-        :type container_map: dockermap.map.container.ContainerMap
         :param image: Image name.
-        :type image: unicode | str.
+        :type image: unicode | str
+        :param container_map: Container map object, defining a default tag and repository if not specified by the
+          ``image``.
+        :type container_map: dockermap.map.container.ContainerMap
         :return: Image name, where applicable prefixed with a repository.
         :rtype: unicode | str
         """
         if '/' in image:
             if image[0] == '/':
-                return image[1:]
-            return image
-        repository = resolve_value(container_map.repository)
-        if repository:
-            return '{0}/{1}'.format(repository, image)
-        return image
+                image_tag = image[1:]
+            else:
+                image_tag = image
+        else:
+            default_prefix = resolve_value(container_map.repository) if container_map else None
+            if default_prefix:
+                image_tag = '{0}/{1}'.format(default_prefix, image)
+            else:
+                image_tag = image
+        if ':' in image:
+            return image_tag
+        default_tag = resolve_value(container_map.default_tag) if container_map else None
+        return '{0}:{1}'.format(image_tag, default_tag or 'latest')
 
     def get_clients(self, c_config, c_map):
         """

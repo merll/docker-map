@@ -79,7 +79,7 @@ def _add_container_list(rsps, container_names):
 def _add_image_list(rsps, image_names):
     image_list = [
         {
-            'RepoTags': ['{0}:latest'.format(i_name), '{0}:1.0'.format(i_name)],
+            'RepoTags': ['{0}:latest'.format(i_name), '{0}:1.0'.format(i_name)] if ':' not in i_name else [i_name],
             'Id': '{0}'.format(i_id),
         }
         for i_id, i_name in image_names

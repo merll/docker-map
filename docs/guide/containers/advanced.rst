@@ -22,7 +22,7 @@ guidelines, such as how containers are named, how image names are resolved, and 
 * :meth:`~dockermap.map.policy.base.BasePolicy.get_default_client_name`,
   :meth:`~dockermap.map.policy.base.BasePolicy.cname`,
   :meth:`~dockermap.map.policy.base.BasePolicy.resolve_cname`,
-  :meth:`~dockermap.map.policy.base.BasePolicy.iname`,
+  :meth:`~dockermap.map.policy.base.BasePolicy.image_name`,
   :meth:`~dockermap.map.policy.base.BasePolicy.get_hostname`, and
   :meth:`~dockermap.map.policy.base.BasePolicy.get_domainname` generate inputs for aforementioned functions. They can
   be overridden separately.

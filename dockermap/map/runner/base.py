@@ -133,7 +133,7 @@ class DockerConfigMixin(object):
         container_config = config.container_config
         c_kwargs = dict(
             name=container_name,
-            image=self._policy.iname(container_map, container_config.image or config.config_name),
+            image=self._policy.image_name(container_config.image or config.config_name, container_map),
             volumes=get_volumes(container_map, container_config),
             user=extract_user(container_config.user),
             ports=[resolve_value(port_binding.exposed_port)

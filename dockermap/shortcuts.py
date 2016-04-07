@@ -36,16 +36,43 @@ chown = lambda user_group, path, recursive=True: _format_cmd('chown', get_user_g
                                                              _R=bool(recursive))
 chmod = lambda mode, path, recursive=True: _format_cmd('chmod', mode, path, _R=bool(recursive))
 
-addgroup = lambda groupname, gid, system=False: _format_cmd('addgroup', groupname, __system=bool(system), __gid=gid)
-adduser = lambda username, uid, system=False, no_login=True, no_password=False, group=False, gecos=None: _format_cmd(
-    'adduser', username, __system=bool(system), __uid=uid, __group=bool(group), __gid=uid,
-    no_login=(no_login, _NO_CREATE_HOME, _NO_LOGIN), __disabled_password=no_login or bool(no_password), __gecos=gecos)
+addgroup = lambda groupname, gid, system=False: _format_cmd('groupadd', groupname, __system=bool(system), __gid=gid)
 assignuser = lambda username, groupnames: _format_cmd('usermod', username, _aG=','.join(groupnames))
 
 curl = lambda url, filename=None: _format_cmd('curl', url, _o=filename)
 wget = lambda url, filename=None: _format_cmd('wget', url, _o=filename)
 targz = lambda filename, source: _format_cmd('tar', filename, source, _czf=True)
 untargz = lambda filename, target=None: _format_cmd('tar', filename, _xzf=True, _C=target)
+
+
+def adduser(username, uid=None, system=False, no_login=True, no_password=False, group=False, gecos=None, **kwargs):
+    """
+    Formats an ``adduser`` command.
+
+    :param username: User name.
+    :type username: unicode | str
+    :param uid: Optional user id to use.
+    :type uid: long | int
+    :param system: Create a system user account.
+    :type system: bool
+    :param no_login: Disable the login for this user. Not compatible with CentOS. Implies setting '--no-create-home',
+      and ``no_password``.
+    :type no_login: bool
+    :param no_password: Disable the password for this user. Not compatible with CentOS.
+    :type no_password: bool
+    :param group: Create a group along with the user. Not compatible with CentOS.
+    :type group: bool
+    :param gecos: Set GECOS information in order to suppress an interactive prompt. On CentOS, use ``__comment``
+      instead.
+    :type gecos: unicode | str
+    :param kwargs: Additional keyword arguments which are converted to the command line.
+    :return: A formatted ``adduser`` command with arguments.
+    :rtype: unicode | str
+    """
+    return _format_cmd('adduser', username, __system=bool(system), __uid=uid, __group=bool(group), __gid=uid,
+                       no_login=(no_login, _NO_CREATE_HOME, _NO_LOGIN),
+                       __disabled_password=no_login or bool(no_password),
+                       __gecos=gecos, **kwargs)
 
 
 def get_user_group(user_group):
@@ -67,7 +94,8 @@ def get_user_group(user_group):
     return user_group
 
 
-def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no_password=False, gecos=None, sudo=False):
+def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no_password=False, gecos=None, sudo=False,
+                 **kwargs):
     """
     Generates a unix command line for creating user and group with the same name, assigning the user to the group.
     Has the same effect as combining :func:`~addgroup`, :func:`~adduser`, and :func:`~assignuser`.
@@ -88,11 +116,12 @@ def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no
     :type gecos: unicode | str
     :param sudo: Prepend `sudo` to the command. Default is ``False``. When using Fabric, use its `sudo` command instead.
     :type sudo: bool
+    :param kwargs: Additional keyword arguments for command line arguments.
     :return: Unix shell command line.
     :rtype: unicode | str
     """
     group = addgroup(username, uid, system)
-    user = adduser(username, uid, system, no_login, no_password, False, gecos)
+    user = adduser(username, uid, system, no_login, no_password, False, gecos, **kwargs)
     prefix = 'sudo ' if sudo else ''
     if groupnames:
         usermod = assignuser(username, groupnames)

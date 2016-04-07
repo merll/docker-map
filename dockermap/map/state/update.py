@@ -198,7 +198,7 @@ class ContainerVolumeChecker(object):
 class UpdateStateGenerator(DependencyStateGenerator):
     """
     Generates states for updating configured containers. Before checking each configuration, for each image the latest
-    version is pulled from the registry, but only if :attr:`UpdateStateGenerator.pull_latest` is set to ``True``.
+    version is pulled from the registry, but only if :attr:`UpdateStateGenerator.pull_before_update` is set to ``True``.
 
     An attached container is considered outdated, if its image id does not correspond with the current base
     image, and :attr:`~ContainerUpdateMixin.update_persistent` is set to ``True``.
@@ -214,17 +214,17 @@ class UpdateStateGenerator(DependencyStateGenerator):
     In addition, the default state implementation applies, considering nonexistent containers or containers that
     cannot be restarted.
     """
-    pull_latest = False
+    pull_before_update = False
     pull_insecure_registry = False
     update_persistent = False
     check_exec_commands = CMD_CHECK_FULL
-    policy_options = ['pull_latest', 'pull_insecure_registry', 'update_persistent', 'check_exec_commands']
+    policy_options = ['pull_before_update', 'pull_insecure_registry', 'update_persistent', 'check_exec_commands']
 
     def __init__(self, policy, kwargs):
         super(UpdateStateGenerator, self).__init__(policy, kwargs)
         self._base_image_ids = {
             client_name: policy.images[client_name].ensure_image(
-                self.iname_tag(policy.base_image), pull_latest=self.pull_latest,
+                policy.image_name(policy.base_image), pull=self.pull_before_update,
                 insecure_registry=self.pull_insecure_registry)
             for client_name in policy.clients.keys()
         }
@@ -283,12 +283,6 @@ class UpdateStateGenerator(DependencyStateGenerator):
             return None
         return [(exec_cmd, _cmd_state(exec_cmd[0], exec_cmd[1])) for exec_cmd in container_config.exec_commands]
 
-    def iname_tag(self, image, container_map=None):
-        i_name = '{0}:latest'.format(image) if ':' not in image else image
-        if container_map:
-            return self._policy.iname(container_map, i_name)
-        return i_name
-
     def get_container_state(self, map_name, container_map, config_name, container_config, client_name, client_config,
                             client, instance_alias, config_flags=0):
         """
@@ -336,9 +330,9 @@ class UpdateStateGenerator(DependencyStateGenerator):
                 else:
                     self._volume_checker.register_attached(mapped_path, volumes.get(mapped_path), instance_alias)
         else:
-            image_name = self.iname_tag(container_config.image or config_name, container_map=container_map)
+            image_name = self._policy.image_name(container_config.image or config_name, container_map)
             images = self._policy.images[client_name]
-            ref_image_id = images.ensure_image(image_name, pull_latest=self.pull_latest,
+            ref_image_id = images.ensure_image(image_name, pull=self.pull_before_update,
                                                insecure_registry=self.pull_insecure_registry)
             if not (((container_config.persistent and not self.update_persistent) or c_image_id == ref_image_id) and
                     self._volume_checker.check(container_map, container_config, config_name, instance_alias, detail) and

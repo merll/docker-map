@@ -32,7 +32,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         kwargs = self.runner.get_create_kwargs(config, c_name, kwargs=dict(ports=[22]))
         self.assertDictEqual(kwargs, dict(
             name=c_name,
-            image='registry.example.com/nginx',
+            image='registry.example.com/nginx:latest',
             volumes=['/etc/nginx'],
             user=None,
             ports=[80, 443, 22],
@@ -74,7 +74,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         kwargs = self.runner.get_create_kwargs(config, c_name, kwargs=dict(host_config=hc_kwargs))
         self.assertDictEqual(kwargs, dict(
             name=c_name,
-            image='registry.example.com/app',
+            image='registry.example.com/app:custom',
             volumes=[
                 '/var/lib/app/config',
                 '/var/lib/app/data'

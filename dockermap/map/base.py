@@ -11,7 +11,7 @@ from requests import Timeout
 
 from .dep import SingleDependencyResolver
 from ..build.context import DockerContext
-from ..utils import is_latest_image, is_repo_image, parse_response
+from ..utils import tag_check_function, is_repo_image, parse_response
 
 log = logging.getLogger(__name__)
 
@@ -134,15 +134,17 @@ class DockerClientWrapper(docker.Client):
         """
         log.log(level, info, *args, **kwargs)
 
-    def build(self, tag, add_latest_tag=False, raise_on_error=False, **kwargs):
+    def build(self, tag, add_latest_tag=False, add_tags=None, raise_on_error=False, **kwargs):
         """
         Overrides the superclass `build()` and filters the output. Messages are deferred to `push_log`, whereas the
         final message is checked for a success message. If the latter is found, only the new image id is returned.
 
         :param tag: Tag of the new image to be built. Unlike in the superclass, this is obligatory.
         :type tag: unicode | str
-        :param add_latest_tag: In addition to the image `tag`, tag the image with `latest`.
+        :param add_latest_tag: In addition to the image ``tag``, tag the image with ``latest``.
         :type add_latest_tag: bool
+        :param add_tags: Additional tags. Can also be used as an alternative to ``add_latest_tag``.
+        :type add_tags: list[unicode | str]
         :param raise_on_error: Raises errors in the status output as a DockerStatusException. Otherwise only logs
          errors.
         :type raise_on_error: bool
@@ -153,17 +155,27 @@ class DockerClientWrapper(docker.Client):
         response = super(DockerClientWrapper, self).build(tag=tag, **kwargs)
         # It is not the kwargs alone that decide if we get a stream, so we have to check.
         if isinstance(response, tuple):
-            return response[0]
+            image_id = response[0]
+        else:
+            last_log = self._docker_log_stream(response, raise_on_error)
+            if last_log and last_log.startswith('Successfully built '):
+                image_id = last_log[19:]  # Remove prefix
+            else:
+                image_id = None
 
-        last_log = self._docker_log_stream(response, raise_on_error)
-        if last_log and last_log.startswith('Successfully built '):
-            image_id = last_log[19:]  # Remove prefix
-            if add_latest_tag:
-                repo, __, i_tag = tag.rpartition(':')
-                if repo and i_tag != 'latest':
-                    self.tag(image_id, repo, 'latest', force=True)
-            return image_id
-        return None
+        if not image_id:
+            return None
+
+        repo, __, i_tag = tag.rpartition(':')
+        tag_set = set(add_tags or ())
+        if add_latest_tag:
+            tag_set.add('latest')
+        tag_set.discard(i_tag)
+
+        if repo and tag_set:
+            for t in tag_set:
+                self.tag(image_id, repo, t, force=True)
+        return image_id
 
     def login(self, username, password=None, email=None, registry=None, reauth=False, **kwargs):
         """
@@ -293,13 +305,15 @@ class DockerClientWrapper(docker.Client):
                     if raise_on_error:
                         six.reraise(*sys.exc_info())
 
-    def cleanup_images(self, remove_old=False, raise_on_error=False):
+    def cleanup_images(self, remove_old=False, keep_tags=None, raise_on_error=False):
         """
         Finds all images that are neither used by any container nor another image, and removes them; by default does not
         remove repository images.
 
         :param remove_old: Also removes images that have repository names, but no `latest` tag.
         :type remove_old: bool
+        :param keep_tags: List of tags to not remove.
+        :type keep_tags: list[unicode | str]
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
         """
@@ -307,10 +321,17 @@ class DockerClientWrapper(docker.Client):
                           for container in self.containers(all=True))
         image_dependencies = ((image['Id'], image['ParentId']) for image in self.images(all=True))
         resolver = ContainerImageResolver(used_images, image_dependencies)
-        tag_check = is_latest_image if remove_old else is_repo_image
+        if remove_old:
+            check_tags = {'latest'}
+            if keep_tags:
+                check_tags.update(keep_tags)
+            tag_check = tag_check_function(check_tags)
+        elif remove_old:
+            tag_check = tag_check_function(['latest'])
+        else:
+            tag_check = is_repo_image
         unused_images = set(image['Id'] for image in self.images()
                             if not tag_check(image) and not resolver.get_dependencies(image['Id']))
-
         for iid in unused_images:
             try:
                 self.remove_image(iid)
