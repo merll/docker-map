@@ -320,10 +320,10 @@ class DockerClientWrapper(docker.Client):
                           for container in self.containers(all=True))
         image_dependencies = ((image['Id'], image['ParentId']) for image in self.images(all=True))
         resolver = ContainerImageResolver(used_images, image_dependencies)
-        if remove_old:
-            check_tags = {'latest'}
-            if keep_tags:
-                check_tags.update(keep_tags)
+        if keep_tags:
+            check_tags = set(keep_tags)
+            if remove_old:
+                check_tags.add('latest')
             tag_check = tag_check_function(check_tags)
         elif remove_old:
             tag_check = tag_check_function(['latest'])
