@@ -33,7 +33,7 @@ class ExecMixin(object):
             cmd = run_cmd.cmd
             cmd_user = run_cmd.user
             log.debug("Creating exec command in container %s with user %s: %s.", c_name, cmd_user, cmd)
-            ec_kwargs = self.get_exec_create_kwargs(config, c_name, cmd=cmd, cmd_user=cmd_user)
+            ec_kwargs = self.get_exec_create_kwargs(config, c_name, cmd, cmd_user)
             e_id = client.exec_create(**ec_kwargs)['Id']
             log.debug("Starting exec command with id %s.", e_id)
             es_kwargs = self.get_exec_start_kwargs(config, c_name, e_id)

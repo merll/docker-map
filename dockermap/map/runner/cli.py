@@ -171,7 +171,7 @@ class DockerCommandExecMixin(ExecMixin):
         :type run_cmds: list[dockermap.map.input.ExecCommand]
         """
         return ' && '.join(
-            _get_cmd('exec', self.get_exec_create_kwargs(config, c_name, cmd=run_cmd.cmd, cmd_user=run_cmd.user))
+            _get_cmd('exec', self.get_exec_create_kwargs(config, c_name, run_cmd.cmd, run_cmd.user))
             for run_cmd in run_cmds
         )
 
