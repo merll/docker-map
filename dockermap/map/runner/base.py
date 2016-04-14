@@ -359,7 +359,7 @@ class DockerConfigMixin(object):
             cmd=resolve_value(exec_cmd),
         )
         if exec_user is not None:
-            c_kwargs['user'] = resolve_value(exec_user)
+            c_kwargs['user'] = text_type(resolve_value(exec_user))
         elif config.container_config.user is not NotSet:
             c_kwargs['user'] = extract_user(config.container_config.user)
         update_kwargs(c_kwargs, kwargs)
