@@ -104,7 +104,7 @@ class ScriptMixin(object):
             timeout = wait_timeout or client_config.get('wait_timeout') or client_timeout
             container_id = created['Id']
             try:
-                self.wait_instance(config, c_name, timeout=timeout)
+                self.wait(config, c_name, timeout=timeout)
             except Timeout:
                 result = {'id': container_id, 'error': "Timed out while waiting for the container to finish."}
             else:
@@ -116,6 +116,6 @@ class ScriptMixin(object):
         finally:
             if self.remove_created_after:
                 if not stopped:
-                    self.stop_instance(config, c_name, timeout=3)
-                self.remove_instance(config, c_name)
+                    self.stop(config, c_name, timeout=3)
+                self.remove(config, c_name)
         return result
