@@ -33,7 +33,7 @@ class ScriptActionGenerator(ResumeActionGenerator):
         :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
         """
         if states.flags & CONFIG_FLAG_DEPENDENT:
-            return super(ScriptActionGenerator, self).get_state_actions(states, kwargs)
+            return super(ScriptActionGenerator, self).get_state_actions(states, **kwargs)
 
         log.debug("Determining script actions for: %s.%s", states.map, states.config)
         new_action = InstanceAction.config_partial(states.client, states.map, states.config)
