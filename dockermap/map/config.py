@@ -657,7 +657,9 @@ class ClientConfiguration(DictMap):
             client = self.client_constructor(**self.get_init_kwargs())
             self._client = client
             # Client might update the version number after construction.
-            self.update_version(client.api_version)
+            updated_version = getattr(client, 'api_version', None)
+            if updated_version:
+                self.update_version(updated_version)
         return client
 
     @property
