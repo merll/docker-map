@@ -5,9 +5,9 @@ from distutils.version import StrictVersion
 import posixpath
 import six
 
+from ..client.base import DockerClientWrapper
 from ..functional import resolve_value
 from . import DictMap
-from .base import DockerClientWrapper
 from .input import (get_list, get_shared_volumes, get_shared_host_volumes, get_container_links, get_network_mode,
                     get_port_bindings, get_exec_commands, NotSet)
 
@@ -751,11 +751,3 @@ class ClientConfiguration(DictMap):
     @client.setter
     def client(self, value):
         self._client = value
-
-
-class DockerDummyClientConfig(ClientConfiguration):
-    init_kwargs = []
-    client_constructor = None
-
-    def get_client(self):
-        return None

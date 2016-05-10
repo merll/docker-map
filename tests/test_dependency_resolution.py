@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import unittest
 import six
 
-from dockermap.map.base import ContainerImageResolver
+from dockermap.client.base import ContainerImageResolver
 from dockermap.map.container import ContainerMap
 from dockermap.map.policy.dep import ContainerDependencyResolver
 

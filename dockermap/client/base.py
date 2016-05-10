@@ -9,7 +9,7 @@ import docker
 from docker.errors import APIError
 from requests import Timeout
 
-from .dep import SingleDependencyResolver
+from ..dep import SingleDependencyResolver
 from ..build.context import DockerContext
 from ..utils import tag_check_function, is_repo_image, parse_response
 

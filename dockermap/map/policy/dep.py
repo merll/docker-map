@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 from six import iteritems
 
-from ..dep import MultiDependencyResolver, CircularDependency
+from ...dep import MultiDependencyResolver, CircularDependency
 
 
 class ContainerDependencyResolver(MultiDependencyResolver):
