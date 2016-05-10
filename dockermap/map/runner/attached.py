@@ -148,5 +148,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         if not local_path:
             raise ValueError("Could not locate local path of volume alias '{0}' / "
                              "path '{1}' in container {2}.".format(config.instance_name, path, a_name))
-        for cmd in get_preparation_cmd(config.container_config, local_path):
+        return [
             client.run_cmd(cmd)
+            for cmd in get_preparation_cmd(config.container_config, local_path)
+        ]
