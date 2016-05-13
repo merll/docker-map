@@ -45,6 +45,29 @@ def tag_check_function(tags):
     return _check_image
 
 
+def primary_container_name(names, default=None, strip_trailing_slash=True):
+    """
+    From the list of names, finds the primary name of the container. Returns the defined default value (e.g. the
+    container id or ``None``) in case it cannot find any.
+
+    :param names: List with name and aliases of the container.
+    :type names: list[unicode | str]
+    :param default: Default value.
+    :param strip_trailing_slash: As read directly from the Docker service, every container name includes a trailing
+     slash. Set this to ``False`` if it is already removed.
+    :type strip_trailing_slash: bool
+    :return: Primary name of the container.
+    :rtype: unicode | str
+    """
+    if strip_trailing_slash:
+        ex_names = [name[1:] for name in names if name.find('/', 2) == -1]
+    else:
+        ex_names = [name for name in names if name.find('/', 2) == -1]
+    if ex_names:
+        return ex_names[0]
+    return default
+
+
 class ContainerImageResolver(SingleDependencyResolver):
     """
     Finds dependencies of containers on images and images on one another, where each container depends on exactly one
@@ -135,12 +158,13 @@ class DockerUtilityMixin(object):
         def _stopped_containers():
             exclude_names = set(exclude or ())
             for container in self.containers(all=True):
-                c_names = [name[1:] for name in container['Names'] or ()]
+                c_names = [name[1:] for name in container['Names'] or () if name.find('/', 2)]
                 c_status = container['Status']
                 if (((include_initial and c_status == '') or c_status.startswith('Exited')) and
                         exclude_names.isdisjoint(c_names)):
                     c_id = container['Id']
-                    yield c_id, c_names[0] if c_names else c_id
+                    c_name = primary_container_name(c_names, default=c_id, strip_trailing_slash=False)
+                    yield c_id, c_name
 
         for cid, cn in _stopped_containers():
             try:
