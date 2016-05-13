@@ -110,11 +110,15 @@ class DockerStringBuffer(six.with_metaclass(ABCMeta, DockerBuffer)):
                 f.write(self.fileobj.getvalue().encode('utf-8'))
 
 
+def init_temp_file(obj):
+    return NamedTemporaryFile('wb+')
+
+
 class DockerTempFile(six.with_metaclass(ABCMeta, DockerBuffer)):
     """
     Partial implementation of :class:`~DockerBuffer`, backed by a :class:`~tempfile.NamedTemporaryFile`.
     """
-    init_fileobj = lambda self: NamedTemporaryFile('wb+')
+    init_fileobj = init_temp_file
 
     def save(self, name):
         """
