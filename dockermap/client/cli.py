@@ -20,7 +20,8 @@ KWARG_MAP = {
     'extra_hosts': 'add-host',
 }
 NONE_TAG = '<none>'
-CONTAINER_FORMAT_ARG = '--format="{{.ID}}|{{.Image}}|{{.CreatedAt}}|{{.Status}}|{{.Names}}|{{.Command}}|{{.Ports}}"'
+CONTAINER_FORMAT_ARG = ('--format='
+                        '"{{.ID}}||{{.Image}}||{{.CreatedAt}}||{{.Status}}||{{.Names}}||{{.Command}}||{{.Ports}}"')
 _arg_format = '--{0}={1}'.format
 _quoted_arg_format = '--{0}="{1}"'.format
 _mapping_format = '--{0}={1}:{2}'.format
@@ -60,14 +61,14 @@ def _port_info(ports):
 
 
 def _container_info(line):
-    items = line.split('|')
+    items = line.split('||')
     return {
         'Id': items[0],
         'Image': items[1],
         'Created': time.mktime(map(int, CREATED_AT_PATTERN.match(items[2]).groups()) + [0, 0, 0]),
         'Status': items[3],
         'Names': ['/{0}'.format(name) for name in items[4].split(',')],
-        'Command': items[5],
+        'Command': items[5].strip('"'),
         'Ports': list(_port_info(items[6])),
     }
 
