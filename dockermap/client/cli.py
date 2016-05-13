@@ -20,7 +20,7 @@ KWARG_MAP = {
     'extra_hosts': 'add-host',
 }
 NONE_TAG = '<none>'
-CONTAINER_FORMAT_ARG = '--format={{.ID}}|{{.Image}}|{{.CreatedAt}}|{{.Status}}|{{.Names}}|{{.Command}}|{{.Ports}}'
+CONTAINER_FORMAT_ARG = '--format="{{.ID}}|{{.Image}}|{{.CreatedAt}}|{{.Status}}|{{.Names}}|{{.Command}}|{{.Ports}}"'
 _arg_format = '--{0}={1}'.format
 _quoted_arg_format = '--{0}="{1}"'.format
 _mapping_format = '--{0}={1}:{2}'.format
@@ -99,7 +99,7 @@ def parse_inspect_output(out):
     parsed = json.loads(out, encoding='utf-8')
     if parsed:
         return parsed[0]
-    raise NotFound("Container not found.")
+    raise NotFound("Container not found.", None)
 
 
 def parse_images_output(out):
@@ -116,11 +116,12 @@ def parse_images_output(out):
 class DockerCommandLineOutput(object):
     cmd_map = {
         'create_container': 'create',
-        'remove': 'rm',
         'containers': 'ps',
-        'inspect_container': 'inspect',
         'exec_create': 'exec',
         'exec_start': None,
+        'inspect_container': 'inspect',
+        'remove_container': 'rm',
+        'remove_image': 'rmi',
     }
 
     def __init__(self, cmd_prefix=None, default_bin='docker', cmd_args=None):
