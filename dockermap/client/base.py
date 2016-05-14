@@ -236,7 +236,7 @@ class DockerClientWrapper(DockerUtilityMixin, docker.Client):
         """
         Removes a container. For convenience optionally ignores API errors.
 
-        :param container: Container name.
+        :param container: Container name or id.
         :type container: unicode | str
         :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
           affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
@@ -248,13 +248,32 @@ class DockerClientWrapper(DockerUtilityMixin, docker.Client):
             super(DockerClientWrapper, self).remove_container(container, **kwargs)
         except APIError as e:
             if e.response.status_code != 404:
-                self.push_log("Failed to stop container '%s': %s", logging.ERROR, container, e.explanation)
+                self.push_log("Failed to remove container '%s': %s", logging.ERROR, container, e.explanation)
+                if raise_on_error:
+                    six.reraise(*sys.exc_info())
+
+    def remove_image(self, image, raise_on_error=False, **kwargs):
+        """
+        Removes a container. For convenience optionally ignores API errors.
+
+        :param image: Image name or id.
+        :type image: unicode | str
+        :param raise_on_error: Errors on image removal may not further affect further actions. Such errors are always
+          logged, but do not raise an exception unless this is set to ``True``. Please note that 404 errors (on
+          non-existing images) are always ignored.
+        :param kwargs: Additional keyword args for :meth:`docker.client.Client.remove_image`.
+        """
+        try:
+            super(DockerClientWrapper, self).remove_image(image, **kwargs)
+        except APIError as e:
+            if e.response.status_code != 404:
+                self.push_log("Failed to remove image '%s': %s", logging.ERROR, image, e.explanation)
                 if raise_on_error:
                     six.reraise(*sys.exc_info())
 
     def stop(self, container, raise_on_error=False, **kwargs):
         """
-        Removes a container. For convenience optionally ignores API errors.
+        Stops a container. For convenience optionally ignores API errors.
 
         :param container: Container name.
         :type container: unicode | str
