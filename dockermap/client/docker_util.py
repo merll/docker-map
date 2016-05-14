@@ -2,10 +2,7 @@
 from __future__ import unicode_literals
 
 import logging
-import sys
 
-import six
-from docker.errors import APIError
 from requests import Timeout
 
 from ..build.context import DockerContext
@@ -167,13 +164,7 @@ class DockerUtilityMixin(object):
                     yield c_id, c_name
 
         for cid, cn in _stopped_containers():
-            try:
-                self.remove_container(cn)
-            except APIError as e:
-                if e.response.status_code != 404:
-                    self.push_log("Could not remove container '%s': %s", logging.ERROR, cn, e.explanation)
-                    if raise_on_error:
-                        six.reraise(*sys.exc_info())
+            self.remove_container(cn, raise_on_error=raise_on_error)
 
     def cleanup_images(self, remove_old=False, keep_tags=None, raise_on_error=False):
         """
@@ -203,13 +194,7 @@ class DockerUtilityMixin(object):
         unused_images = set(image['Id'] for image in self.images()
                             if not tag_check(image) and not resolver.get_dependencies(image['Id']))
         for iid in unused_images:
-            try:
-                self.remove_image(iid)
-            except APIError as e:
-                if e.response.status_code != 404:
-                    self.push_log("Could not remove image '%s': %s", logging.ERROR, iid, e.explanation)
-                    if raise_on_error:
-                        six.reraise(*sys.exc_info())
+            self.remove_image(iid, raise_on_error=raise_on_error)
 
     def remove_all_containers(self, stop_timeout=10):
         """
