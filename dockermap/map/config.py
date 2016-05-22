@@ -619,8 +619,13 @@ class ClientConfiguration(DictMap):
         :type client: docker.client.Client
         :return: ClientConfiguration
         """
-        return cls(base_url=client.base_url, version=client.api_version,
-                   timeout=client.timeout, client=client)
+        kwargs = {}
+        for attr in cls.init_kwargs:
+            if hasattr(client, attr):
+                kwargs[attr] = getattr(client, attr)
+        if hasattr(client, 'api_version'):
+            kwargs['version'] = client.api_version
+        return cls(**kwargs)
 
     def update_version(self, version):
         if version == 'auto' or not version:
