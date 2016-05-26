@@ -153,7 +153,7 @@ class DockerContext(DockerTempFile):
         if os.path.isdir(name):
             exclusions = get_exclusions(name)
             if exclusions:
-                target_prefix = os.path.abspath(os.path.dirname(arcname or name))
+                target_prefix = os.path.abspath(arcname or name)
                 kwargs.setdefault('filter', get_filter_func(exclusions, target_prefix))
         self.tarfile.add(name, arcname=arcname, **kwargs)
 
