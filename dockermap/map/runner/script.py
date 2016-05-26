@@ -55,9 +55,9 @@ class ScriptMixin(object):
         :type timestamps: bool
         :param tail:
         :type tail: unicode | str
-        :return: A dictionary with the client names as keys, and the results as values. The results are a nested
-         dictionary with the container ``id``, the stdout output ``log``, and the exit code ``exit_code``. In case
-         a wait timeout occurred, instead of ``log`` and ``exit_code`` returns a key ``error``.
+        :return: A dictionary with the container ``id``, the client alias ``client``, the stdout output ``log``, and
+         the exit code ``exit_code``. In case a wait timeout occurred, instead of ``log`` and ``exit_code`` returns a
+         key ``error``.
         :rtype: dict[unicode | str, dict]
         """
         client = config.client
@@ -97,6 +97,7 @@ class ScriptMixin(object):
                                        volumes=volumes, **create_extra_kwargs)
         if not created:
             raise ScriptRunException("No new containers were created.")
+        result = {'id': created['Id'], 'client': config.client_name}
         stopped = True
         try:
             self.start_instance(config, c_name, **start_extra_kwargs)
@@ -106,13 +107,12 @@ class ScriptMixin(object):
             try:
                 self.wait(config, c_name, timeout=timeout)
             except Timeout:
-                result = {'id': container_id, 'error': "Timed out while waiting for the container to finish."}
+                result['error'] = "Timed out while waiting for the container to finish."
             else:
                 stopped = True
                 c_info = client.inspect_container(container_id)
-                exit_code = c_info['State']['ExitCode']
-                log_str = client.logs(container_id, timestamps=timestamps, tail=tail)
-                result = {'id': container_id, 'log': log_str, 'exit_code': exit_code}
+                result['exit_code'] = c_info['State']['ExitCode']
+                result['log'] = client.logs(c_name, timestamps=timestamps, tail=tail)
         finally:
             if self.remove_created_after:
                 if not stopped:

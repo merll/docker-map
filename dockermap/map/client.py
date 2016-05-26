@@ -287,7 +287,7 @@ class MappingDockerClient(object):
         Runs a script or single command in the context of a container. By the default implementation this means creating
         the container along with all of its dependencies, mounting the script path, and running the script. The result
         is recorded in a dictionary per client, before the container is removed. Dependencies are not removed. For
-        details, see :meth:`dockermap.map.policy.script.ScriptMixin.run_script`.
+        details, see :meth:`dockermap.map.runner.script.ScriptMixin.run_script`.
 
         :param map_name: Container map name.
         :type map_name: unicode | str
@@ -297,7 +297,7 @@ class MappingDockerClient(object):
         :type container: unicode | str
         :param kwargs: Keyword arguments to the script runner function.
         :return: A dictionary of client names with their log output and exit codes.
-        :rtype: dict[unicode | str, dict]
+        :rtype: list[dict[unicode | str, unicode | str]]
         """
         return self.run_actions('script', container, instances=instance, map_name=map_name, **kwargs)
 
