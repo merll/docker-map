@@ -58,7 +58,7 @@ class ContainerMap(object):
         self._default_tag = 'latest'
         self._extended = False
         self.update(initial, **kwargs)
-        if (initial or kwargs) and check_integrity:
+        if self._containers and check_integrity:
             self.check_integrity(check_duplicates=check_duplicates)
 
     def __iter__(self):

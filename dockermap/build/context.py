@@ -3,8 +3,110 @@ from __future__ import unicode_literals
 
 import tarfile
 
+import fnmatch
+import os
+import re
+
 from .buffer import DockerTempFile
 from .dockerfile import DockerFile
+
+
+LITERAL_PATTERN = re.compile(r'\\(.)')
+
+
+def preprocess_matches(input_items):
+    """
+    Converts, as far as possible, Go filepath.Match patterns into Python regular expression patterns. Blank lines are
+    ignored.
+
+    This is a generator of two-element-tuples, with the first item as the compiled regular expression. Items prefixed
+    with an exclamation mark are considered negative exclusions, i.e. exemptions. These have the second tuple item set
+    to ``True``, others to ``False``.
+
+    :param input_items: Input patterns to convert.
+    :return: Generator of converted patterns.
+    :rtype: __generator[(__RegEx, bool)]
+    """
+    for i in input_items:
+        s = i.strip()
+        if not s:
+            continue
+        if s[0] == '!':
+            is_negative = True
+            match_str = s[1:]
+            if not match_str:
+                continue
+        else:
+            is_negative = False
+            match_str = s
+        yield re.compile(fnmatch.translate(LITERAL_PATTERN.sub(r'[\g<1>]', match_str))), is_negative
+
+
+def get_exclusions(path):
+    """
+    Generates exclusion patterns from a ``.dockerignore`` file located in the given path. Returns ``None`` if the
+    file does not exist.
+
+    :param path: Path to look up the ``.dockerignore`` in.
+    :type path: unicode | str
+    :return: List of patterns, that can be passed into :func:`get_filter_func`.
+    :rtype: list[(__RegEx, bool)]
+    """
+    if not os.path.isdir(path):
+        return None
+    dockerignore_file = os.path.join(path, '.dockerignore')
+    if not os.path.isfile(dockerignore_file):
+        return None
+    with open(dockerignore_file, 'rb') as dif:
+        return list(preprocess_matches(dif.readlines()))
+
+
+def get_filter_func(patterns, prefix):
+    """
+    Provides a filter function that can be used as filter argument on ``tarfile.add``. Generates the filter based on
+    the patterns and prefix provided. Patterns should be a list of tuples. Each tuple consists of a compiled RegEx
+    pattern and a boolean, indicating if it is an ignore entry or a negative exclusion (i.e. an exemption from
+    exclusions). The prefix is used to match relative paths inside the tar file, and is removed from every entry
+    passed into the functions.
+
+    Note that all names passed into the returned function must be paths under the provided prefix. This condition is
+    not checked!
+
+    :param patterns: List of patterns and negative indicator.
+    :type patterns: list[(__RegEx, bool)]
+    :param prefix: Prefix to strip from all file names passed in. Leading and trailing path separators are removed.
+    :type prefix: unicode | str
+    :return: tarinfo.TarInfo -> tarinfo.TarInfo | NoneType
+    """
+    prefix_len = len(prefix.strip(os.path.sep)) + 1
+    if any(i[1] for i in patterns):
+        def _exclusion_func(tarinfo):
+            name = tarinfo.name[prefix_len:]
+            exclude = False
+            for match_str, is_negative in patterns:
+                if is_negative:
+                    if not exclude:
+                        continue
+                    if match_str.match(name) is not None:
+                        exclude = False
+                elif exclude:
+                    continue
+                elif match_str.match(name) is not None:
+                    exclude = True
+            if exclude:
+                return None
+            return tarinfo
+    else:
+        # Optimized version: If there are no exemptions from matches, not all matches have to be processed.
+        exclusions = [i[0] for i in patterns]
+
+        def _exclusion_func(tarinfo):
+            name = tarinfo.name[prefix_len:]
+            if any(match_str.match(name) is not None for match_str in exclusions):
+                return None
+            return tarinfo
+
+    return _exclusion_func
 
 
 class DockerContext(DockerTempFile):
@@ -39,7 +141,7 @@ class DockerContext(DockerTempFile):
                 raise ValueError("Cannot finalize the docker context tarball without a dockerfile object.")
             self.finalize()
 
-    def add(self, name, *args, **kwargs):
+    def add(self, name, arcname=None, **kwargs):
         """
         Add a file or directory to the context tarball.
 
@@ -48,7 +150,12 @@ class DockerContext(DockerTempFile):
         :param args: Additional args for :meth:`tarfile.TarFile.add`.
         :param kwargs: Additional kwargs for :meth:`tarfile.TarFile.add`.
         """
-        self.tarfile.add(name, *args, **kwargs)
+        if os.path.isdir(name):
+            exclusions = get_exclusions(name)
+            if exclusions:
+                target_prefix = os.path.abspath(arcname or name)
+                kwargs.setdefault('filter', get_filter_func(exclusions, target_prefix))
+        self.tarfile.add(name, arcname=arcname, **kwargs)
 
     def addfile(self, *args, **kwargs):
         """
