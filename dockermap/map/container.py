@@ -155,6 +155,22 @@ class ContainerMap(object):
             else:
                 self._containers[container].update(config)
 
+    def get_persistent_items(self):
+        """
+        Returns attached container items and container configurations that are marked as persistent. Each returned
+        item is in the format ``(config name, instance/attached name)``, where the instance name can also be ``None``.
+
+        :return: Lists of attached items.
+        :rtype: (list[(unicode | str, unicode | str)], list[unicode | str, unicode | str | NoneType])
+        """
+        attached_items = [(container, ac)
+                          for container, config in self
+                          for ac in config.attaches]
+        persistent_containers = [(container, ci)
+                                 for container, config in self if config.persistent
+                                 for ci in config.instances or [None]]
+        return attached_items, persistent_containers
+
     @property
     def name(self):
         """
