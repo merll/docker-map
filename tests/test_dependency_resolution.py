@@ -4,8 +4,8 @@ from __future__ import unicode_literals
 import unittest
 import six
 
-from dockermap.client.base import ContainerImageResolver
-from dockermap.map.container import ContainerMap
+from dockermap.api import ContainerMap
+from dockermap.client.docker_util import ContainerImageResolver
 from dockermap.map.policy.dep import ContainerDependencyResolver
 
 
