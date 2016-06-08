@@ -69,7 +69,7 @@ class CachedImages(CachedItems, dict):
             tag = 'latest'
         if (pull and full_name not in self._updated) or full_name not in self:
             self._client.pull(repository=image, tag=tag, insecure_registry=insecure_registry)
-            images = self._client.images(name=image_name)
+            images = self._client.images(name=image)
             for new_image in images:
                 tags = new_image.get('RepoTags')
                 if tags:
@@ -78,7 +78,7 @@ class CachedImages(CachedItems, dict):
         try:
             return self[full_name]
         except KeyError:
-            raise KeyError("Image '{0}' not found.".format(full_name))
+            raise KeyError("Image not found.", full_name)
 
 
 class CachedContainerNames(CachedItems, set):
