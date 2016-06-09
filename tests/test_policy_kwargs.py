@@ -60,7 +60,6 @@ class TestPolicyClientKwargs(unittest.TestCase):
             },
             volumes_from=['main.app_server_socket', 'main.web_log'],
             port_bindings={80: [80], 443: [443]},
-            version=self.client_version,
         ))
 
     def test_create_kwargs_with_host_config(self):
@@ -121,7 +120,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         config = ActionConfig('main', self.sample_map, cfg_name, cfg, '__default__', self.sample_client_config, None,
                               alias)
         kwargs = self.runner.get_attached_host_config_kwargs(config, c_name)
-        self.assertDictEqual(kwargs, dict(container=c_name, version=self.client_version))
+        self.assertDictEqual(kwargs, dict(container=c_name))
 
     def test_attached_preparation_create_kwargs(self):
         cfg_name = 'app_server'
@@ -155,7 +154,6 @@ class TestPolicyClientKwargs(unittest.TestCase):
         self.assertDictEqual(kwargs, dict(
             container=c_name,
             volumes_from=[v_name],
-            version=self.client_version,
         ))
 
     def test_network_setting(self):
@@ -172,7 +170,6 @@ class TestPolicyClientKwargs(unittest.TestCase):
             network_mode='container:main.app_server.instance1',
             port_bindings={},
             volumes_from=[],
-            version=self.client_version,
         ))
 
     def test_restart_kwargs(self):

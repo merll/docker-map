@@ -9,6 +9,7 @@ from six import text_type
 
 from ...functional import resolve_value
 from ..action import (ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ACTION_KILL, ACTION_WAIT)
+from ..config import USE_HC_MERGE
 from ..input import NotSet
 from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes
 from .attached import AttachedPreparationMixin
@@ -144,10 +145,14 @@ class DockerConfigMixin(object):
         if container_config.network == 'disabled':
             c_kwargs['network_disabled'] = True
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        if client_config.get('use_host_config'):
+        use_host_config = client_config.get('use_host_config')
+        if use_host_config:
             hc_kwargs = self.get_host_config_kwargs(config, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:
-                c_kwargs['host_config'] = create_host_config(**hc_kwargs)
+                if use_host_config == USE_HC_MERGE:
+                    c_kwargs.update(hc_kwargs)
+                else:
+                    c_kwargs['host_config'] = create_host_config(version=client_config.version, **hc_kwargs)
         update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
         return c_kwargs
 
@@ -188,7 +193,6 @@ class DockerConfigMixin(object):
             binds=get_host_binds(container_map, container_config, config.instance_name),
             volumes_from=volumes_from,
             port_bindings=get_port_bindings(container_config, client_config),
-            version=client_config.version,
         )
         network_mode = container_config.network
         if isinstance(network_mode, tuple):
@@ -213,6 +217,7 @@ class DockerConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
+        client_config = config.client_config
         path = resolve_value(config.container_map.volumes[config.instance_name])
         user = extract_user(config.container_config.user)
         c_kwargs = dict(
@@ -223,10 +228,14 @@ class DockerConfigMixin(object):
             network_disabled=True,
         )
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        if config.client_config.get('use_host_config'):
+        use_host_config = client_config.get('use_host_config')
+        if use_host_config:
             hc_kwargs = self.get_attached_host_config_kwargs(config, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:
-                c_kwargs['host_config'] = create_host_config(**hc_kwargs)
+                if use_host_config == USE_HC_MERGE:
+                    c_kwargs.update(hc_kwargs)
+                else:
+                    c_kwargs['host_config'] = create_host_config(version=client_config.version, **hc_kwargs)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
@@ -243,9 +252,10 @@ class DockerConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(version=config.client_config.version)
         if container_name:
-            c_kwargs['container'] = container_name
+            c_kwargs = {'container': container_name}
+        else:
+            c_kwargs = {}
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 

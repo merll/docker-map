@@ -5,6 +5,7 @@ from docker.utils import create_host_config
 
 from ...functional import resolve_value
 from ..action import UTIL_ACTION_PREPARE_CONTAINER
+from ..config import USE_HC_MERGE
 from ..policy.utils import update_kwargs, get_instance_volumes
 from .utils import get_preparation_cmd
 
@@ -24,6 +25,7 @@ class AttachedConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
+        client_config = config.client_config
         path = resolve_value(config.container_map.volumes[config.instance_name])
         cmd = get_preparation_cmd(config.container_config, path)
         if not cmd:
@@ -35,11 +37,15 @@ class AttachedConfigMixin(object):
             network_disabled=True,
         )
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        if config.client_config.get('use_host_config'):
+        use_host_config = client_config.get('use_host_config')
+        if use_host_config:
             hc_kwargs = self.get_attached_preparation_host_config_kwargs(config, None, volume_container,
                                                                          kwargs=hc_extra_kwargs)
             if hc_kwargs:
-                c_kwargs['host_config'] = create_host_config(**hc_kwargs)
+                if use_host_config == USE_HC_MERGE:
+                    c_kwargs.update(hc_kwargs)
+                else:
+                    c_kwargs['host_config'] = create_host_config(version=client_config.version, **hc_kwargs)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
@@ -59,7 +65,7 @@ class AttachedConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(volumes_from=[volume_container], version=config.client_config.version)
+        c_kwargs = dict(volumes_from=[volume_container])
         if container_name:
             c_kwargs['container'] = container_name
         update_kwargs(c_kwargs, kwargs)

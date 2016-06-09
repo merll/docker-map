@@ -16,6 +16,7 @@ DICT_ATTRIBUTES = 'create_options', 'start_options', 'host_config'
 LIST_ATTRIBUTES = 'instances', 'shares', 'attaches', 'clients'
 
 HOST_CONFIG_VERSION = StrictVersion(str('1.15'))
+USE_HC_MERGE = 'merge'
 
 
 def get_host_path(root, path, instance=None):
