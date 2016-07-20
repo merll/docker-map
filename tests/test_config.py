@@ -154,10 +154,10 @@ class TestConfig(unittest.TestCase):
 
     def test_get_persistent(self):
         attached_items, persistent_items = self.ext_main.get_persistent_items()
-        self.assertItemsEqual(attached_items, [('main', 'worker', 'app_log'),
-                                               ('main', 'server', 'app_log'),
-                                               ('main', 'server', 'server_log'),
-                                               ('main', 'redis', 'redis_socket'),
-                                               ('main', 'redis', 'redis_log'),
-                                               ('main', 'worker_q2', 'app_log')])
-        self.assertItemsEqual(persistent_items, [('main', 'persistent_one', None)])
+        self.assertItemsEqual(attached_items, [('worker', 'app_log'),
+                                               ('server', 'app_log'),
+                                               ('server', 'server_log'),
+                                               ('redis', 'redis_socket'),
+                                               ('redis', 'redis_log'),
+                                               ('worker_q2', 'app_log')])
+        self.assertItemsEqual(persistent_items, [('persistent_one', None)])

@@ -19,6 +19,7 @@ dir3/a\\b*
 SAMPLE_IGNORE_WITH_NEGATIVES = r"""
 .*
 !.include
+!test/.root
 dir3/**
 !dir3
 */*/testfile
@@ -50,11 +51,11 @@ TEST_MATCH_FILES_MIXED = [
     'dir2',
     'dir3',
     'dir3/keep/testfile',
+    'test/.root',
 ]
 
 TEST_EXCLUDE_FILES_MIXED = [
     '.git',
-    '.include/1',
     'dir3/drop/testfile',
     'dir3/drop/this',
     'dir3/unrelated/file',
