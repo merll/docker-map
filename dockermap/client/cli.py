@@ -18,6 +18,7 @@ KWARG_MAP = {
     'timeout': 'time',
     'ports': 'expose',
     'extra_hosts': 'add-host',
+    'nocache': 'no-cache',
 }
 NONE_TAG = '<none>'
 CONTAINER_FORMAT_ARG = ('--format='
