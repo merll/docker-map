@@ -335,7 +335,7 @@ class MappingDockerClient(object):
 
     @default_map.setter
     def default_map(self, value):
-        if value in self._maps:
+        if value not in self._maps:
             raise ValueError("Default name must match an available map name.")
         self._default_map = value
 
