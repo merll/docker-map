@@ -97,6 +97,16 @@ class ContainerImageResolver(SingleDependencyResolver):
 
 
 class DockerUtilityMixin(object):
+    def add_extra_tags(self, image_id, main_tag, extra_tags, add_latest):
+        repo, __, i_tag = main_tag.rpartition(':')
+        tag_set = set(extra_tags or ())
+        if add_latest:
+            tag_set.add('latest')
+        tag_set.discard(i_tag)
+        if repo and tag_set:
+            for t in tag_set:
+                self.tag(image_id, repo, t, force=True)
+
     def push_log(self, info, level, *args, **kwargs):
         """
         Writes logs. To be fully implemented by subclasses.

@@ -139,15 +139,7 @@ class DockerClientWrapper(DockerUtilityMixin, docker.Client):
         if not image_id:
             return None
 
-        repo, __, i_tag = tag.rpartition(':')
-        tag_set = set(add_tags or ())
-        if add_latest_tag:
-            tag_set.add('latest')
-        tag_set.discard(i_tag)
-
-        if repo and tag_set:
-            for t in tag_set:
-                self.tag(image_id, repo, t, force=True)
+        self.add_extra_tags(image_id, tag, add_tags, add_latest_tag)
         return image_id
 
     def login(self, username, password=None, email=None, registry=None, reauth=False, **kwargs):
