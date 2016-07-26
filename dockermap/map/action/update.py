@@ -40,9 +40,6 @@ class UpdateActionGenerator(AbstractActionGenerator):
             if attached_state.base_state == STATE_ABSENT:
                 log.debug("Not found - creating and starting attached container %s.", attached_state.instance)
                 action_type = DERIVED_ACTION_STARTUP
-            elif attached_state.flags & STATE_FLAG_INITIAL:
-                log.debug("Container found but initial, starting %s.", attached_state.instance)
-                action_type = ACTION_START
             elif attached_state.flags & (STATE_FLAG_NONRECOVERABLE | STATE_FLAG_OUTDATED):
                 if attached_state.base_state == STATE_RUNNING:
                     log.debug("Found to be outdated or non-recoverable - resetting %s.", attached_state.instance)
@@ -50,6 +47,9 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 else:
                     log.debug("Found to be outdated or non-recoverable - relaunching %s.", attached_state.instance)
                     action_type = DERIVED_ACTION_RELAUNCH
+            elif attached_state.flags & STATE_FLAG_INITIAL:
+                log.debug("Container found but initial, starting %s.", attached_state.instance)
+                action_type = ACTION_START
             else:
                 continue
             attached_actions.append(new_action(attached_state.instance, action_type))
@@ -63,10 +63,6 @@ class UpdateActionGenerator(AbstractActionGenerator):
             if instance_state.base_state == STATE_ABSENT:
                 log.debug("Not found - creating and starting instance container %s.", instance_name)
                 action_type = DERIVED_ACTION_STARTUP
-            elif (instance_state.base_state != STATE_RUNNING and
-                  (ci_initial or not states.flags & CONFIG_FLAG_PERSISTENT)):
-                log.debug("Container found but not running, starting %s.", instance_name)
-                action_type = ACTION_START
             elif instance_state.flags & (STATE_FLAG_NONRECOVERABLE | STATE_FLAG_OUTDATED):
                 if instance_state.base_state == STATE_RUNNING or instance_state.flags & STATE_FLAG_RESTARTING:
                     log.debug("Found to be outdated or non-recoverable - resetting %s.", instance_name)
@@ -74,6 +70,10 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 else:
                     log.debug("Found to be outdated or non-recoverable - relaunching %s.", instance_name)
                     action_type = DERIVED_ACTION_RELAUNCH
+            elif (instance_state.base_state != STATE_RUNNING and
+                  (ci_initial or not states.flags & CONFIG_FLAG_PERSISTENT)):
+                log.debug("Container found but not running, starting %s.", instance_name)
+                action_type = ACTION_START
             else:
                 run_cmds = [
                     exec_cmd
