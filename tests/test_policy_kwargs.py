@@ -47,17 +47,17 @@ class TestPolicyClientKwargs(unittest.TestCase):
         config = ActionConfig('main', self.sample_map, cfg_name, cfg, '__default__', self.sample_client_config, None,
                               None)
         kwargs = self.runner.get_host_config_kwargs(config, c_name,
-                                                    kwargs=dict(binds={'/new_h': {'bind': '/new_c', 'ro': False}}))
+                                                    kwargs=dict(binds=['/new_h:/new_c:rw']))
         self.assertDictEqual(kwargs, dict(
             container=c_name,
             links=[
                 ('main.app_server.instance1', 'app_server.instance1'),
                 ('main.app_server.instance2', 'app_server.instance2'),
             ],
-            binds={
-                '/var/lib/site/config/nginx': {'bind': '/etc/nginx', 'ro': True},
-                '/new_h': {'bind': '/new_c', 'ro': False},
-            },
+            binds=[
+                '/var/lib/site/config/nginx:/etc/nginx:ro',
+                '/new_h:/new_c:rw',
+            ],
             volumes_from=['main.app_server_socket', 'main.web_log'],
             port_bindings={80: [80], 443: [443]},
         ))
@@ -69,7 +69,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         self.sample_client_config.use_host_config = True
         config = ActionConfig('main', self.sample_map, cfg_name, cfg, '__default__', self.sample_client_config, None,
                               'instance1')
-        hc_kwargs = dict(binds={'/new_h': {'bind': '/new_c', 'ro': False}})
+        hc_kwargs = dict(binds=['/new_h:/new_c:rw'])
         kwargs = self.runner.get_create_kwargs(config, c_name, kwargs=dict(host_config=hc_kwargs))
         self.assertDictEqual(kwargs, dict(
             name=c_name,
@@ -84,11 +84,11 @@ class TestPolicyClientKwargs(unittest.TestCase):
             ports=[8880],
             host_config=create_host_config(
                 links={},
-                binds={
-                    '/var/lib/site/config/app1': {'bind': '/var/lib/app/config', 'ro': True},
-                    '/var/lib/site/data/app1': {'bind': '/var/lib/app/data', 'ro': False},
-                    '/new_h': {'bind': '/new_c', 'ro': False},
-                },
+                binds=[
+                    '/var/lib/site/config/app1:/var/lib/app/config:ro',
+                    '/var/lib/site/data/app1:/var/lib/app/data:rw',
+                    '/new_h:/new_c:rw',
+                ],
                 volumes_from=['main.app_log', 'main.app_server_socket'],
                 port_bindings={},
                 version=self.client_version,
@@ -164,7 +164,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                               None)
         kwargs = self.runner.get_host_config_kwargs(config, c_name)
         self.assertDictEqual(kwargs, dict(
-            binds={},
+            binds=[],
             container=c_name,
             links=[],
             network_mode='container:main.app_server.instance1',

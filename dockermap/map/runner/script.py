@@ -81,7 +81,7 @@ class ScriptMixin(object):
             else:
                 command = None
             volumes = [container_script_dir]
-            binds = {script_dir: dict(bind=container_script_dir, ro=False)}
+            binds = ['{0}:{1}:rw'.format(script_dir, container_script_dir)]
         else:
             volumes = None
             binds = None

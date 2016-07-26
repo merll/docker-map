@@ -18,16 +18,12 @@ def get_host_binds(container_map, config, instance):
     :type config: dockermap.map.config.ContainerConfiguration
     :param instance: Instance name. Pass ``None`` if not applicable.
     :type instance: unicode | str
-    :return: Dictionary of shared volumes with host volumes and the read-only flag.
-    :rtype: dict[unicode | str, dict]
+    :return: List of shared volumes with host volumes and the read-only flag.
+    :rtype: list[unicode | str]
     """
-    host_binds = {}
-    for shared_volume in config.binds:
-        volume = shared_volume.volume
-        c_path, h_path = get_shared_volume_path(container_map, volume, instance)
-        host_binds[h_path] = dict(bind=c_path, ro=shared_volume.readonly)
-
-    return host_binds
+    return ['{0[1]}:{0[0]}:{1}'.format(get_shared_volume_path(container_map, shared_volume.volume, instance),
+                                       'ro' if shared_volume.readonly else 'rw')
+            for shared_volume in config.binds]
 
 
 def _get_ex_port(port_binding):
