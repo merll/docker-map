@@ -609,7 +609,6 @@ class ClientConfiguration(DictMap):
             self._interfaces_ipv6 = DictMap()
         self._client = kwargs.pop('client', None)
         super(ClientConfiguration, self).__init__(*args, **kwargs)
-        self.update_version(version)
 
     @classmethod
     def from_client(cls, client):
@@ -628,11 +627,10 @@ class ClientConfiguration(DictMap):
             kwargs['version'] = client.api_version
         return cls(**kwargs)
 
-    def update_version(self, version):
-        if version == 'auto' or not version:
-            return
-        self._version = version
-        self.use_host_config = str(version) >= HOST_CONFIG_VERSION
+    def update_settings(self, **kwargs):
+        version = kwargs.pop('version', None)
+        if version and version != 'auto':
+            self.use_host_config = str(version) >= HOST_CONFIG_VERSION
 
     def get_init_kwargs(self):
         """
@@ -660,12 +658,12 @@ class ClientConfiguration(DictMap):
         """
         client = self._client
         if not client:
-            client = self.client_constructor(**self.get_init_kwargs())
-            self._client = client
+            c_kwargs = self.get_init_kwargs()
+            self._client = client = self.client_constructor(**self.get_init_kwargs())
             # Client might update the version number after construction.
             updated_version = getattr(client, 'api_version', None)
             if updated_version:
-                self.update_version(updated_version)
+                self.version = updated_version
         return client
 
     @property
@@ -697,7 +695,8 @@ class ClientConfiguration(DictMap):
 
     @version.setter
     def version(self, value):
-        self.update_version(value)
+        self._version = value
+        self.update_settings(version=value)
 
     @property
     def timeout(self):
