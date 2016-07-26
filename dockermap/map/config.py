@@ -609,6 +609,7 @@ class ClientConfiguration(DictMap):
             self._interfaces_ipv6 = DictMap()
         self._client = kwargs.pop('client', None)
         super(ClientConfiguration, self).__init__(*args, **kwargs)
+        self.update_settings(version=version)
 
     @classmethod
     def from_client(cls, client):
