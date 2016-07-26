@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import six
 
 
@@ -14,9 +12,13 @@ def _update_instance(instance, obj_dict):
 
 class PropertyDictMeta(type):
     def __init__(cls, name, bases, dct):
-        cls.core_properties = [d_name for d_name, d_type in six.iteritems(dct) if isinstance(d_type, property)]
-        cls.core_properties.extend('_{0}'.format(d_name)
-                                   for d_name, d_type in six.iteritems(dct) if isinstance(d_type, property))
+        cls.core_properties = cp = [d_name for d_name, d_type in six.iteritems(dct) if isinstance(d_type, property)]
+        cp.extend('_{0}'.format(d_name) for d_name in cp[:])
+        cp_set = set(cp)
+        cp_add = cp_set.add
+        for base in bases:
+            if hasattr(base, 'core_properties'):
+                cp.extend(b_cp for b_cp in base.core_properties if b_cp not in cp_set and not cp_add(b_cp))
         super(PropertyDictMeta, cls).__init__(name, bases, dct)
 
 
