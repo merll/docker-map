@@ -8,26 +8,30 @@ from operator import itemgetter
 import re
 import time
 
-from six import iteritems
+from six import iteritems, text_type
 
 from docker.errors import NotFound
 
 
 KWARG_MAP = {
-    'network_mode': 'net',
     'timeout': 'time',
-    'ports': 'expose',
     'extra_hosts': 'add-host',
     'nocache': 'no-cache',
+    'volumes': 'volume',
 }
 NONE_TAG = '<none>'
-CONTAINER_FORMAT_ARG = ('--format='
-                        '"{{.ID}}||{{.Image}}||{{.CreatedAt}}||{{.Status}}||{{.Names}}||{{.Command}}||{{.Ports}}"')
 _arg_format = '--{0}={1}'.format
-_quoted_arg_format = '--{0}="{1}"'.format
 _mapping_format = '--{0}={1}:{2}'.format
 _format_tag = '{0[0]}:{0[1]}'.format
 _get_image_id = itemgetter(2)
+
+
+def _quoted_arg_format(key, value):
+    return '--{0}="{1}"'.format(key, text_type(value).replace('"', '\\"'))
+
+
+CONTAINER_FORMAT_ARG = _quoted_arg_format('format', '{{.ID}}||{{.Image}}||{{.CreatedAt}}||{{.Status}}||{{.Names}}||'
+                                                    '{{.Command}}||{{.Ports}}')
 
 
 def _summarize_tags(image_id, image_lines):
@@ -74,6 +78,14 @@ def _container_info(line):
     }
 
 
+def _first_key_value(d, *keys):
+    for k in keys:
+        v = d.get(k)
+        if v:
+            return k, v
+    return None, None
+
+
 def _transform_kwargs(ka):
     for key, value in iteritems(ka):
         cmd_arg = KWARG_MAP.get(key, key.replace('_', '-'))
@@ -89,6 +101,64 @@ def _transform_kwargs(ka):
             yield _arg_format(cmd_arg, 'true' if value else 'false')
         else:
             yield _quoted_arg_format(cmd_arg, value)
+
+
+def _transform_create_kwargs(ka):
+    network = ka.pop('network_mode', None)
+    network_disabled = ka.pop('network_disabled', False)
+    environment = ka.pop('environment', None)
+    binds = ka.pop('binds', None)
+    volumes = ka.pop('volumes', None) if binds else None
+    expose = ka.pop('ports', None)
+    port_bindings = ka.pop('port_bindings', None)
+
+    for arg in _transform_kwargs(ka):
+        yield arg
+
+    if environment:
+        if isinstance(environment, list):
+            for vi in environment:
+                yield _quoted_arg_format('env', vi)
+        elif isinstance(environment, dict):
+            for ki, vi in iteritems(environment):
+                yield _quoted_arg_format('env', '{0}={1}'.format(ki, vi))
+
+    if network_disabled:
+        yield _arg_format('net', 'none')
+    elif network:
+        yield _arg_format('net', network)
+
+    if volumes:
+        bind_keys = {}
+        for b in binds:
+            b_key = b.split(':')[1]
+            bind_keys[b_key] = b
+        for v in volumes:
+            v_bind = bind_keys.get(v)
+            if v_bind:
+                yield _quoted_arg_format('volume', v_bind)
+            else:
+                yield _quoted_arg_format('volume', v)
+
+    if expose and port_bindings:
+        for e in expose:
+            yield _arg_format('expose', e)
+            if isinstance(e, tuple):
+                port, proto = e
+            else:
+                port, proto = e, None
+            if proto:
+                pkey = '{0}/{1}'.format(port, proto)
+                pbind = port_bindings.get(pkey)
+            else:
+                pkey, pbind = _first_key_value(port_bindings, port, text_type(port), '{0}/tcp')
+            if pbind:
+                for pbi in pbind:
+                    if isinstance(pbi, tuple):
+                        b_ip, b_port = pbi
+                        yield _arg_format('publish', '{0}:{1}:{2}'.format(b_ip, b_port, pkey))
+                    else:
+                        yield _arg_format('publish', '{0}:{1}'.format(pbi, pkey))
 
 
 def parse_containers_output(out):
@@ -128,7 +198,6 @@ class DockerCommandLineOutput(object):
 
     def __init__(self, cmd_prefix=None, default_bin='docker', cmd_args=None):
         super(DockerCommandLineOutput, self).__init__()
-        self.api_version = '1.0'
         if cmd_prefix:
             cmd = '{0} {1}'.format(cmd_prefix, default_bin)
         else:
@@ -143,15 +212,33 @@ class DockerCommandLineOutput(object):
         if not cli_cmd:
             return None
         cmd_args = [cli_cmd]
-        container_name = kwargs.pop('container', None)
-        cmd_args.extend(_transform_kwargs(kwargs))
-        if cli_cmd == 'exec':
+        if cli_cmd == 'create':
+            p_arg = kwargs.pop('image')
+            exec_cmd = kwargs.pop('command', None)
+            cmd_args.extend(_transform_create_kwargs(kwargs))
+        elif cli_cmd == 'exec':
+            p_arg = kwargs.pop('container')
             cmd_args.append('--detach')
-        elif cli_cmd in ('images', 'ps'):
-            cmd_args.append('--no-trunc')
-            if cli_cmd == 'ps':
-                cmd_args.append(CONTAINER_FORMAT_ARG)
-        if container_name:
-            cmd_args.append(container_name)
+            exec_cmd = kwargs.pop('cmd')
+            cmd_args.extend(_transform_kwargs(kwargs))
+        else:
+            if cli_cmd in ('images', 'ps'):
+                cmd_args.append('--no-trunc')
+                if cli_cmd == 'ps':
+                    cmd_args.append(CONTAINER_FORMAT_ARG)
+                p_arg = None
+            else:
+                if cli_cmd == 'wait':
+                    kwargs.pop('timeout', None)  # Not supported
+                p_arg = kwargs.pop('container', None)
+            exec_cmd = None
+            cmd_args.extend(_transform_kwargs(kwargs))
+        if p_arg:
+            cmd_args.append(p_arg)
+        if exec_cmd:
+            if isinstance(exec_cmd, list):
+                cmd_args.extend(exec_cmd)
+            else:
+                cmd_args.append(exec_cmd)
         cmd_args.extend(args)
         return '{0} {1}'.format(self._cmd, ' '.join(cmd_args))
