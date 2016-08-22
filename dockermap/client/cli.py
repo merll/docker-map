@@ -211,6 +211,7 @@ class DockerCommandLineOutput(object):
         cli_cmd = self.cmd_map.get(cmd, cmd)
         if not cli_cmd:
             return None
+        cmd_prefix = None
         cmd_args = [cli_cmd]
         if cli_cmd == 'create':
             p_arg = kwargs.pop('image')
@@ -229,7 +230,9 @@ class DockerCommandLineOutput(object):
                 p_arg = None
             else:
                 if cli_cmd == 'wait':
-                    kwargs.pop('timeout', None)  # Not supported
+                    timeout = kwargs.pop('timeout', None)
+                    if timeout:
+                        cmd_prefix = 'timeout -s INT {0} '.format(timeout)
                 p_arg = kwargs.pop('container', None)
             exec_cmd = None
             cmd_args.extend(_transform_kwargs(kwargs))
@@ -241,4 +244,4 @@ class DockerCommandLineOutput(object):
             else:
                 cmd_args.append(exec_cmd)
         cmd_args.extend(args)
-        return '{0} {1}'.format(self._cmd, ' '.join(cmd_args))
+        return '{0}{1} {2}'.format(cmd_prefix or '', self._cmd, ' '.join(cmd_args))
