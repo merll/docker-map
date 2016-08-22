@@ -2,6 +2,11 @@
 
 Change History
 ==============
+0.6.6
+-----
+* Added evaluation of ``.dockerignore`` files.
+* Several bugfixes from `0.6.6b1`.
+
 0.6.6b1
 -------
 * Added arguments to set additional image tags after build.
