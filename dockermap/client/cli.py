@@ -163,7 +163,7 @@ def _transform_create_kwargs(ka):
 
 def parse_containers_output(out):
     return [
-        _container_info(line) for line in out.splitlines()
+        _container_info(line) for line in out.splitlines() or ()
     ]
 
 
