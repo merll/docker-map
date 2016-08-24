@@ -7,6 +7,11 @@ Change History
 * Refactoring of policy framework. The monolithic client action functions have been divided into separate
   modules for improving maintainability and testing. This also makes it easier to add more functionality.
 
+0.6.6
+-----
+* Added evaluation of ``.dockerignore`` files.
+* Several bugfixes from `0.6.6b1`.
+
 0.6.6b1
 -------
 * Added arguments to set additional image tags after build.

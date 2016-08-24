@@ -317,25 +317,25 @@ class MappingDockerClient(object):
         :return: List of container names.
         :rtype: list[unicode | str]
         """
-        def _container_names():
-            for c_map in maps:
-                for container, config in c_map:
-                    for ac in config.attaches:
-                        yield aname_func(c_map.name, ac, container)
-                    if config.persistent:
-                        if config.instances:
-                            for ci in config.instances:
-                                yield cname_func(c_map.name, container, ci)
-                        else:
-                            yield cname_func(c_map.name, container)
-
         if map_name:
             maps = [self._maps[map_name].get_extended_map()]
         else:
             maps = [m.get_extended_map() for m in self._maps.values()]
-        cname_func = self.policy_class.cname
-        aname_func = self.policy_class.aname
-        return list(_container_names())
+        cname_func = self._policy_class.cname
+        aname_func = self._policy_class.aname
+        c_names = []
+        for c_map in maps:
+            m_name = c_map.name
+            attached, persistent = c_map.get_persistent_items()
+            if c_map.use_attached_parent_name:
+                c_names.extend([aname_func(m_name, ca, c_name)
+                                for c_name, ca in attached])
+            else:
+                c_names.extend([aname_func(m_name, ca[1])
+                                for ca in attached])
+            c_names.extend([cname_func(m_name, c_name, ci)
+                            for c_name, ci in persistent])
+        return c_names
 
     @property
     def maps(self):
@@ -369,6 +369,6 @@ class MappingDockerClient(object):
 
     @default_map.setter
     def default_map(self, value):
-        if value in self._maps:
+        if value not in self._maps:
             raise ValueError("Default name must match an available map name.")
         self._default_map = value

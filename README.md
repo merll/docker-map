@@ -6,7 +6,7 @@ Managing Docker images, containers, and their dependencies in Python.
 
 Project: https://github.com/merll/docker-map
 
-Docs: https://docker-map.readthedocs.org/en/latest/
+Docs: https://docker-map.readthedocs.io/en/latest/
 
 
 Overview

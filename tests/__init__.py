@@ -142,6 +142,9 @@ MAP_DATA_2 = {
                 },
             },
         },
+        'persistent_one': {
+            'persistent': True,
+        },
     },
     'volumes': {
         'redis_socket': '/var/run/redis',
@@ -172,7 +175,7 @@ MAP_DATA_3 = {
         },
         'server': {
             'extends': 'abstract_config',
-        }
+        },
     },
     'volumes': {
         'web_log': '/var/lib/web/log',
