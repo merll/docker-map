@@ -98,6 +98,19 @@ class ContainerImageResolver(SingleDependencyResolver):
 
 class DockerUtilityMixin(object):
     def add_extra_tags(self, image_id, main_tag, extra_tags, add_latest):
+        """
+        Adds extra tags to an image after de-duplicating tag names.
+
+        :param image_id: Id of the image.
+        :type image_id: unicode | str
+        :param main_tag: Repo / tag specification that has been used to build the image. If present, the tag will be
+         removed from further arguments.
+        :type main_tag: unicode | str
+        :param extra_tags: Additional tags to add to the image.
+        :type extra_tags: list | tuple | set | NoneType
+        :param add_latest: Whether to add a ``latest`` tag to the image.
+        :type add_latest: bool
+        """
         repo, __, i_tag = main_tag.rpartition(':')
         tag_set = set(extra_tags or ())
         if add_latest:
