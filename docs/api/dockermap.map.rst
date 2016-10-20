@@ -14,14 +14,6 @@ Subpackages
 Submodules
 ----------
 
-dockermap.map.base module
--------------------------
-
-.. automodule:: dockermap.map.base
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 dockermap.map.client module
 ---------------------------
 
@@ -42,14 +34,6 @@ dockermap.map.container module
 ------------------------------
 
 .. automodule:: dockermap.map.container
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-dockermap.map.dep module
-------------------------
-
-.. automodule:: dockermap.map.dep
     :members:
     :undoc-members:
     :show-inheritance:

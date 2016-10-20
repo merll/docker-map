@@ -12,6 +12,14 @@ dockermap.map.state.base module
     :undoc-members:
     :show-inheritance:
 
+dockermap.map.state.initial module
+----------------------------------
+
+.. automodule:: dockermap.map.state.initial
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 dockermap.map.state.update module
 ---------------------------------
 

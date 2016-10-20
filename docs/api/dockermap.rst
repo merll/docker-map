@@ -7,6 +7,7 @@ Subpackages
 .. toctree::
 
     dockermap.build
+    dockermap.client
     dockermap.map
 
 Submodules
@@ -20,6 +21,13 @@ dockermap.api module
     :undoc-members:
     :show-inheritance:
 
+dockermap.dep module
+--------------------
+
+.. automodule:: dockermap.dep
+    :members:
+    :undoc-members:
+    :show-inheritance:
 
 dockermap.functional module
 ---------------------------
@@ -29,7 +37,6 @@ dockermap.functional module
     :undoc-members:
     :show-inheritance:
 
-
 dockermap.shortcuts module
 --------------------------
 
@@ -37,7 +44,6 @@ dockermap.shortcuts module
     :members:
     :undoc-members:
     :show-inheritance:
-
 
 dockermap.utils module
 ----------------------
