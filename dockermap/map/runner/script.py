@@ -62,7 +62,6 @@ class ScriptMixin(object):
         """
         client = config.client
         client_config = config.client_config
-        client_timeout = client_config.get('timeout')
         use_host_config = client_config.get('use_host_config')
         if script_path:
             if os.path.isdir(script_path):
@@ -102,7 +101,7 @@ class ScriptMixin(object):
         try:
             self.start_instance(config, c_name, **start_extra_kwargs)
             stopped = False
-            timeout = wait_timeout or client_config.get('wait_timeout') or client_timeout
+            timeout = wait_timeout or config.container_config.stop_timeout or client_config.get('timeout')
             container_id = created['Id']
             try:
                 self.wait(config, c_name, timeout=timeout)
