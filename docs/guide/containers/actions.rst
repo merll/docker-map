@@ -7,9 +7,9 @@ This section explains what actions are implemented for managing containers in ad
 
 Basic container commands
 ------------------------
-:class:`~dockermap.map.client.MappingDockerClient` uses a policy class, that transforms the container configurations
-and their current state into actions on the client, along with keyword arguments accepted by `docker-py`.
-The default, :class:`~dockermap.map.policy.resume.ResumeUpdatePolicy` supports the following methods.
+:class:`~dockermap.map.client.MappingDockerClient` provides as set of configurable commands, that transform the
+container configurations and their current state into actions on the client, along with keyword arguments accepted by
+`docker-py`. By default it supports the following methods:
 
 * :meth:`~dockermap.map.client.MappingDockerClient.create` resolves all dependency containers to be created prior to
   the current one. First, `attached` volumes are created (see :ref:`attached-volumes`) of the dependency containers.
@@ -28,6 +28,8 @@ The default, :class:`~dockermap.map.policy.resume.ResumeUpdatePolicy` supports t
   * and starts non-running containers (like `start`).
 * :meth:`~dockermap.map.client.MappingDockerClient.shutdown` simply combines
   :meth:`~dockermap.map.client.MappingDockerClient.stop` and :meth:`~dockermap.map.client.MappingDockerClient.remove`.
+* :meth:`~dockermap.map.client.MappingDockerClient.update` and
+  :meth:`~dockermap.map.client.MappingDockerClient.run_script` are discussed in more detail below.
 
 Updating containers
 -------------------
@@ -82,12 +84,11 @@ have to implement a policy class with a method ``custom_action`` with the first 
 
 Running scripts
 ---------------
-:class:`~dockermap.map.policy.resume.ResumeUpdatePolicy` also implements a
-:meth:`~dockermap.map.client.MappingDockerClient.run_script` action. Its purpose is to run a script or single command
-inside a container and automatically perform the necessary creation, start, and cleanup, along with dependencies. Its
-usage is slightly different from the other actions: Container configuration name and map name are the first two
-arguments, as usual, but the third is only one optional instance name. Additionally, it supports the following
-optional arguments:
+The default client also implements a :meth:`~dockermap.map.client.MappingDockerClient.run_script` action. Its purpose is
+to run a script or single command inside a container and automatically perform the necessary creation, start, and
+cleanup, along with dependencies. Usage is slightly different from the other actions: Container configuration name and
+map name are the first two arguments -- as usual -- but the third is only one optional instance name. Additionally, the
+method supports the following optional arguments:
 
 * ``script_path``: This may either be a file or a directory on the Docker host. If it points to a file, this will be
   assumed to be the script to run via the command. The parent directory will be available to the container, i.e. all
@@ -101,10 +102,17 @@ optional arguments:
   specified in ``container_script_dir``). If it points to a directory, simply ``container_script_dir`` will be used
   in place of script path.
 * ``wait_timeout``: Maximum time to wait before logging and returning the container output. By default the waiting
-  time set up for the client is used.
+  time set up for the container :attr:`~dockermap.map.config.ContainerConfiguration.stop_timeout` or for the client
+  :attr:`~dockermap.map.config.ClientConfiguration.timeout` is used.
 * ``container_script_dir``: Path to run the script from inside the container. The default is ``/tmp/script_run``.
-* ``timestamps`` and ``tail`` are simply passed through to the ``logs`` command of  `docker-py` client. They can be
+* ``timestamps`` and ``tail`` are simply passed through to the ``logs`` command of the `docker-py` client. They can be
   used to control the output of the script command.
+* ``remove_existing_before``: Whether to remove containers with an identical name if they exist prior to running this
+  command. By default, an existing container raises an exception. Setting this to ``True`` can be a simple way to
+  recovering repeatable commands that have run into a timeout error.
+* ``remove_created_after``: Whether to remove the container instance after a successful run (i.e. not running into a
+  timeout), provided that it has been created by this command. This is the default behavior, so set this to ``False``
+  if you intend to keep the stopped container around.
 
 The :meth:`~dockermap.map.client.MappingDockerClient.run_script` method returns a dictionary with the client names
 as keys, where the script was run. Values are nested dictionaries with keys ``log`` (the `stdout` of each container)
@@ -113,8 +121,9 @@ the ``exit_code`` that the container returned, and the temporary container id th
 contains the ``id`` of the container (which still exists) and a message in ``error``.
 
 Containers that were created in the course of running the script are also stopped and removed again, unless waiting
-timed out. If the container of the configuration exists prior to the setup attempt, the script will not be run. In that
-case a :class:`~dockermap.map.policy.script.ScriptRunException` is thrown.
+timed out or ``remove_created_after`` was set to ``False``. If the container of the configuration exists prior to the
+setup attempt and ``remove_existing_before`` is not set to ``True``, the script will not be run. In that case a
+:class:`~dockermap.map.action.script.ScriptActionException` is thrown. In order to
 
 Script examples
 ^^^^^^^^^^^^^^^

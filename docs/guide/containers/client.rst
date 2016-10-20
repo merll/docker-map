@@ -20,10 +20,11 @@ In a few methods, the original arguments and behavior of `docker-py` has been mo
 Building images
 ^^^^^^^^^^^^^^^
 On the build method :meth:`~dockermap.map.base.DockerClientWrapper.build`, it is mandatory to give the new image a
-name (short example in :ref:`build_image_run`). Optionally ``add_latest_tag`` can be set to ``True`` for tagging the
-image additionally with `latest`. Whereas `docker-py` returns a stream, the wrapped method sends that stream to a log
-(see :ref:`client-logging`) and returns the new image id, if the build has been
-successful. Unsuccessful builds return ``None``.
+name (short example in :ref:`build_image_run`). If needed, add more tags by specifying ``add_tags``. Optionally
+``add_latest_tag`` can be set to ``True`` for tagging the image additionally with `latest`.
+
+Whereas `docker-py` returns a stream, the wrapped method sends that stream to a log (see :ref:`client-logging`) and
+returns the new image id, if the build has been successful. Unsuccessful builds return ``None``.
 
 Registry access
 ^^^^^^^^^^^^^^^

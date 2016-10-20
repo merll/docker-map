@@ -131,8 +131,14 @@ the following properties:
 Image
 """""
 The :attr:`~dockermap.map.config.ContainerConfiguration.image` simply sets the image to instantiate the container(s)
-from. If :attr:`~dockermap.map.container.ContainerMap.repository` is set on the parent
-:class:`~dockermap.map.container.ContainerMap`, it will be used as a prefix to the image name.
+from. As usual, new containers are used from the image with the ``latest`` tag, unless explicitly specified using a
+colon after ithe image name, e.g. ``ubuntu:16.10``. Using the :attr:`~dockermap.map.container.ContainerMap.default_tag`
+property on the parent map, this becomes the new default tag. For example, if you usually tag all `development` images
+as ``devel`` and set :attr:`~dockermap.map.container.ContainerMap.default_tag` accordingly, setting
+:attr:`~dockermap.map.config.ContainerConfiguration.image` to ``image1`` results in using the image ``image1:devel``.
+
+If :attr:`~dockermap.map.container.ContainerMap.repository` is set on the parent
+:class:`~dockermap.map.container.ContainerMap`, it will be used as a prefix to image names.
 
 For example, if you have a local registry under `registry.example.com`, you likely do not want to name each of your
 images separately as ``registry.example.com/image1``, ``registry.example.com/image2``, and so on. Instead, just set
@@ -140,10 +146,39 @@ the :attr:`~dockermap.map.config.ContainerConfiguration.repository` to ``registr
 ``image1``, ``image2`` etc.
 
 As an exception, any image with ``/`` in its name will not be prefixed. In order to configure the `ubuntu` image,
-set :attr:`~dockermap.map.config.ContainerConfiguration.image` to ``/ubuntu``.
+set :attr:`~dockermap.map.config.ContainerConfiguration.image` to ``/ubuntu`` or ``/ubuntu:16.10``.
 
 If the image is not set at all, by default an image with the same name as the container will be attempted to use. Where
-applicable, it is prefixed with the :attr:`~dockermap.map.container.ContainerMap.repository`.
+applicable, it is prefixed with the :attr:`~dockermap.map.container.ContainerMap.repository` or enhanced with
+:attr:`~dockermap.map.container.ContainerMap.default_tag`.
+
+Examples, assuming the configuration name is ``app-server``:
+
++---------------+----------------------+-----------------+----------------------------------------+
+| ``image``     | ``repository``       | ``default_tag`` | Expanded image name                    |
++===============+======================+=================+========================================+
+| --            | --                   | --              | app-server:latest                      |
++---------------+                      |                 +----------------------------------------+
+| image1        |                      |                 | image1:latest                          |
++---------------+----------------------+                 +----------------------------------------+
+| --            | registry.example.com |                 | registry.example.com/app-server:latest |
++---------------+                      |                 +----------------------------------------+
+| image1        |                      |                 | registry.example.com/image1:latest     |
++---------------+----------------------+-----------------+----------------------------------------+
+| --            | --                   | devel           | app-server:devel                       |
++---------------+                      |                 +----------------------------------------+
+| image1        |                      |                 | image1:devel                           |
++---------------+----------------------+                 +----------------------------------------+
+| --            | registry.example.com |                 | registry.example.com/app-server:devel  |
++---------------+                      |                 +----------------------------------------+
+| image1        |                      |                 | registry.example.com/image1:devel      |
++---------------+                      |                 +----------------------------------------+
+| /image1       |                      |                 | image1:devel                           |
++---------------+                      |                 +----------------------------------------+
+| image1:one    |                      |                 | registry.example.com/image1:one        |
++---------------+                      |                 +----------------------------------------+
+| /image1:two   |                      |                 | image1:two                             |
++---------------+----------------------+-----------------+----------------------------------------+
 
 .. _instances:
 
@@ -592,10 +627,6 @@ of :class:`~dockermap.map.base.DockerClientWrapper` is recommended. Details of t
 
 Example
 ^^^^^^^
-.. NOTE::
-   The following example assumes that actions on containers are determined using the default policy class
-   :class:`~dockermap.map.policy.resume.ResumeUpdatePolicy`.
-
 This is a brief example, given a web server that communicates with two app instances of the same image over unix domain
 sockets::
 
