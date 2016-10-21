@@ -2,8 +2,8 @@
 
 Change History
 ==============
-0.7.0b1
--------
+0.7.0
+-----
 * Refactoring of policy framework. The monolithic client action functions have been divided into separate
   modules for improving maintainability and testing. This also makes it easier to add more functionality.
   A few minor issues with updating containers and executing commands were resolved during this change.
