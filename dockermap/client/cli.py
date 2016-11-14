@@ -30,8 +30,9 @@ def _quoted_arg_format(key, value):
     return '--{0}="{1}"'.format(key, text_type(value).replace('"', '\\"'))
 
 
-CONTAINER_FORMAT_ARG = _quoted_arg_format('format', '{{.ID}}||{{.Image}}||{{.CreatedAt}}||{{.Status}}||{{.Names}}||'
-                                                    '{{.Command}}||{{.Ports}}')
+_CONTAINER_FIELDS = ['ID', 'Image', 'CreatedAt', 'Status', 'Names', 'Command', 'Ports']
+CONTAINER_FORMAT_ARG = _quoted_arg_format('format', '||'.join('{{{{.{0}}}}}'.format(f) for f in _CONTAINER_FIELDS))
+VERSION_FORMAT_ARG = _quoted_arg_format('format', '{{json .}}')
 
 
 def _summarize_tags(image_id, image_lines):
@@ -185,6 +186,13 @@ def parse_images_output(out):
     ]
 
 
+def parse_version_output(out):
+    parsed = json.loads(out, encoding='utf-8')
+    if parsed:
+        return parsed.get('Client', {})
+    return {}
+
+
 class DockerCommandLineOutput(object):
     cmd_map = {
         'create_container': 'create',
@@ -227,6 +235,9 @@ class DockerCommandLineOutput(object):
                 cmd_args.append('--no-trunc')
                 if cli_cmd == 'ps':
                     cmd_args.append(CONTAINER_FORMAT_ARG)
+                p_arg = None
+            elif cli_cmd == 'version':
+                cmd_args.append(VERSION_FORMAT_ARG)
                 p_arg = None
             else:
                 if cli_cmd == 'wait':
