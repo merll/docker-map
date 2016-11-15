@@ -659,7 +659,6 @@ class ClientConfiguration(DictMap):
         """
         client = self._client
         if not client:
-            c_kwargs = self.get_init_kwargs()
             self._client = client = self.client_constructor(**self.get_init_kwargs())
             # Client might update the version number after construction.
             updated_version = getattr(client, 'api_version', None)
