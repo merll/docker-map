@@ -41,7 +41,7 @@ adds utility functions. For example, you can remove all stopped containers from 
 
 Configuring containers
 ----------------------
-A :class:`~dockermap.map.container.ContainerMap` provides a structure for mapping out container instances along with
+A :class:`~dockermap.map.config.main.ContainerMap` provides a structure for mapping out container instances along with
 their dependencies.
 
 A simple example could be a web server an an application server, where the web server uses Unix sockets for
@@ -131,7 +131,7 @@ Along the aforementioned dependency path, every container is stopped, removed, r
   container updates along the dependency path),
 * :ref:`port assignments <exposed-ports>` have changed, or
 * ``environment``, ``command``, or ``entrypoint`` have been modified in the
-  :attr:`~dockermap.map.config.ContainerConfiguration.create_options` since the current container was created.
+  :attr:`~dockermap.map.config.container.ContainerConfiguration.create_options` since the current container was created.
 
 Non-running containers are simply started during this process, if their configuration corresponds with their current
 state.

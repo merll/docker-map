@@ -18,9 +18,9 @@ class BasePolicy(object):
     Abstract base class providing the basic infrastructure for generating actions based on container state.
 
     :param container_maps: Container maps.
-    :type container_maps: dict[unicode | str, dockermap.map.container.ContainerMap]
+    :type container_maps: dict[unicode | str, dockermap.map.config.main.ContainerMap]
     :param clients: Dictionary of clients.
-    :type clients: dict[unicode | str, dockermap.map.config.ClientConfiguration]
+    :type clients: dict[unicode | str, dockermap.map.config.client.ClientConfiguration]
     """
     core_image = DEFAULT_COREIMAGE
     base_image = DEFAULT_BASEIMAGE
@@ -137,7 +137,7 @@ class BasePolicy(object):
         :type image: unicode | str
         :param container_map: Container map object, defining a default tag and repository if not specified by the
           ``image``.
-        :type container_map: dockermap.map.container.ContainerMap
+        :type container_map: dockermap.map.config.main.ContainerMap
         :return: Image name, where applicable prefixed with a repository.
         :rtype: unicode | str
         """
@@ -164,11 +164,11 @@ class BasePolicy(object):
         either, the default client is returned.
 
         :param c_config: Container configuration object.
-        :type c_config: dockermap.map.config.ContainerConfiguration
+        :type c_config: dockermap.map.config.container.ContainerConfiguration
         :param c_map: Container map instance.
-        :type c_map: dockermap.map.container.ContainerMap
+        :type c_map: dockermap.map.config.main.ContainerMap
         :return: Docker client objects.
-        :rtype: list[(unicode | str, dockermap.map.config.ClientConfiguration)]
+        :rtype: list[(unicode | str, dockermap.map.config.client.ClientConfiguration)]
         """
         if c_config.clients:
             return [(client_name, self._clients[client_name]) for client_name in c_config.clients]
@@ -226,7 +226,7 @@ class BasePolicy(object):
         Container maps with container configurations to base actions on.
 
         :return: Dictionary of container maps.
-        :rtype: dict[unicode | str, dockermap.map.container.ContainerMap]
+        :rtype: dict[unicode | str, dockermap.map.config.main.ContainerMap]
         """
         return self._maps
 
@@ -236,7 +236,7 @@ class BasePolicy(object):
         Docker client objects and configurations.
 
         :return: Dictionary of Docker client objects.
-        :rtype: dict[unicode | str, dockermap.map.config.ClientConfiguration]
+        :rtype: dict[unicode | str, dockermap.map.config.client.ClientConfiguration]
         """
         return self._clients
 

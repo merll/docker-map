@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 
 class MappingDockerClient(object):
     """
-    Reflects a :class:`~dockermap.map.container.ContainerMap` instance on a Docker client
+    Reflects a :class:`~dockermap.map.config.main.ContainerMap` instance on a Docker client
     (:class:`~docker.client.Client` or a subclass, e.g. :class:`~dockermap.map.base.DockerClientWrapper`).
     The ``policy_class`` determines if and how dependencies are being considered during creation, starting, stopping,
     and removal of containers.
@@ -31,14 +31,14 @@ class MappingDockerClient(object):
     Image names, container status, and dependencies are cached. In order to force a refresh, use :meth:`refresh_names`.
     It is also cleared on every change of ``policy_class``.
 
-    :param container_maps: :class:`~dockermap.map.container.ContainerMap` instance or a tuple or list of such instances
-      along with an associated instance.
-    :type container_maps: dockermap.map.container.ContainerMap or
-      list[dockermap.map.container.ContainerMap] | dict[unicode | str, dockermap.map.container.ContainerMap]
+    :param container_maps: :class:`~dockermap.map.config.main.ContainerMap` instance or a tuple or list of such
+      instances along with an associated instance.
+    :type container_maps: dockermap.map.config.main.ContainerMap or
+      list[dockermap.map.config.main.ContainerMap] | dict[unicode | str, dockermap.map.config.main.ContainerMap]
     :param docker_client: Default :class:`~docker.client.Client` instance or configuration.
-    :type docker_client: dockermap.map.config.ClientConfiguration or docker.client.Client
+    :type docker_client: dockermap.map.config.client.ClientConfiguration or docker.client.Client
     :param clients: Dictionary of client configurations
-    :type clients: dict[unicode | str, dockermap.map.config.ClientConfiguration]
+    :type clients: dict[unicode | str, dockermap.map.config.client.ClientConfiguration]
     """
     configuration_class = ClientConfiguration
     policy_class = BasePolicy
@@ -343,7 +343,7 @@ class MappingDockerClient(object):
         Container maps.
 
         :return: A dictionary with container map names as keys, and the container maps values.
-        :rtype: dict[unicode | str, dockermap.map.container.ContainerMap]
+        :rtype: dict[unicode | str, dockermap.map.config.main.ContainerMap]
         """
         return self._maps
 
@@ -353,7 +353,7 @@ class MappingDockerClient(object):
         Clients and their configuration objects.
 
         :return: Dictionary of client names, with their client instance and a configuration object as values.
-        :rtype: dict[unicode | str, dockermap.map.config.ClientConfiguration]
+        :rtype: dict[unicode | str, dockermap.map.config.client.ClientConfiguration]
         """
         return self._clients
 

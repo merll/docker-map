@@ -10,8 +10,8 @@ from ...dep import MultiDependencyResolver, CircularDependency
 
 class ContainerDependencyResolver(MultiDependencyResolver):
     """
-    Resolves dependencies between :class:`~dockermap.map.config.ContainerConfiguration` instances, based on shared and
-    used volumes.
+    Resolves dependencies between :class:`~dockermap.map.config.container.ContainerConfiguration` instances, based on
+    shared and used volumes.
     """
     def merge_dependency(self, item, resolve_parent, parents):
         """

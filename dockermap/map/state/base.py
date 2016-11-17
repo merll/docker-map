@@ -32,15 +32,15 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         :param map_name: Container map name.
         :type map_name: unicode | str
         :param container_map: Container map instance.
-        :type container_map: dockermap.map.container.ContainerMap
+        :type container_map: dockermap.map.config.main.ContainerMap
         :param config_name: Container configuration name.
         :type config_name: unicode | str
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.config.ContainerConfiguration
+        :type container_config: dockermap.map.config.container.ContainerConfiguration
         :param client_name: Client name.
         :type client_name: unicode | str
         :param client_config: Client configuration object.
-        :type client_config: dockermap.map.config.ClientConfiguration
+        :type client_config: dockermap.map.config.client.ClientConfiguration
         :param client: Docker client.
         :type client: docker.client.Client
         :param instance_alias: Container instance name or attached alias.
@@ -83,11 +83,11 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         :param map_name: Container map name.
         :type map_name: unicode | str
         :param c_map: Container map instance.
-        :type c_map: dockermap.map.container.ContainerMap
+        :type c_map: dockermap.map.config.main.ContainerMap
         :param config_name: Container configuration name.
         :type config_name: unicode | str
         :param c_config: Container configuration object.
-        :type c_config: dockermap.map.config.ContainerConfiguration
+        :type c_config: dockermap.map.config.container.ContainerConfiguration
         :param instances: Instance names as a list. Can be ``[None]``
         :type instances: list[unicode | str]
         :param client_names: Optional client list. By default uses the client list from the map or configuration.

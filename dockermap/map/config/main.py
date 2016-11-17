@@ -206,7 +206,7 @@ class ContainerMap(object):
         Container configurations of the map.
 
         :return: Container configurations.
-        :rtype: dict[unicode | str, dockermap.map.config.ContainerConfiguration]
+        :rtype: dict[unicode | str, dockermap.map.config.container.ContainerConfiguration]
         """
         return self._containers
 
@@ -226,7 +226,7 @@ class ContainerMap(object):
         Host volume configuration of the map.
 
         :return: Host volume configuration.
-        :rtype: HostVolumeConfiguration
+        :rtype: dockermap.map.config.host_volume.HostVolumeConfiguration
         """
         return self._host
 
@@ -436,8 +436,8 @@ class ContainerMap(object):
         """
         Updates the container map with a dictionary or another instance. In case of a dictionary, the keys need to be
         container names, the values should be a dictionary structure of
-        :class:`dockermap.map.config.ContainerConfiguration` properties. ``host``, ``host_root``, and ``volumes`` can
-        also be included.
+        :class:`dockermap.map.config.container.ContainerConfiguration` properties. ``host``, ``host_root``, and
+        ``volumes`` can also be included.
 
         :item other: Dictionary or ContainerMap to update the map with.
         :type other: ContainerMap or dict

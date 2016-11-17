@@ -13,9 +13,9 @@ def get_host_binds(container_map, config, instance):
     Generates the dictionary entries of host volumes of a container configuration.
 
     :param container_map: Container map.
-    :type container_map: dockermap.map.container.ContainerMap
+    :type container_map: dockermap.map.config.main.ContainerMap
     :param config: Container configuration.
-    :type config: dockermap.map.config.ContainerConfiguration
+    :type config: dockermap.map.config.container.ContainerConfiguration
     :param instance: Instance name. Pass ``None`` if not applicable.
     :type instance: unicode | str
     :return: List of shared volumes with host volumes and the read-only flag.
@@ -52,9 +52,9 @@ def get_port_bindings(container_config, client_config):
     Generates the input dictionary contents for the ``port_bindings`` argument.
 
     :param container_config: Container configuration.
-    :type container_config: dockermap.map.config.ContainerConfiguration
+    :type container_config: dockermap.map.config.container.ContainerConfiguration
     :param client_config: Client configuration.
-    :type client_config: dockermap.map.config.ClientConfiguration
+    :type client_config: dockermap.map.config.client.ClientConfiguration
     :return: Dictionary of ports with mapped port, and if applicable, with bind address
     :rtype: dict[unicode | str, list[unicode | str | int | tuple]]
     """
@@ -75,7 +75,7 @@ def get_preparation_cmd(container_config, path):
     is nothing to adjust.
 
     :param container_config: Container configuration.
-    :type container_config: dockermap.map.config.ContainerConfiguration
+    :type container_config: dockermap.map.config.container.ContainerConfiguration
     :param path: Path to adjust permissions on.
     :type path: unicode | str
     :return: Resulting command strings.

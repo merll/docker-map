@@ -15,15 +15,15 @@ class InitialStateGenerator(DependencyStateGenerator):
         :param map_name: Container map name.
         :type map_name: unicode | str
         :param container_map: Container map instance.
-        :type container_map: dockermap.map.container.ContainerMap
+        :type container_map: dockermap.map.config.main.ContainerMap
         :param config_name: Container configuration name.
         :type config_name: unicode | str
         :param container_config: Container configuration object.
-        :type container_config: dockermap.map.config.ContainerConfiguration
+        :type container_config: dockermap.map.config.container.ContainerConfiguration
         :param client_name: Client name.
         :type client_name: unicode | str
         :param client_config: Client configuration object.
-        :type client_config: dockermap.map.config.ClientConfiguration
+        :type client_config: dockermap.map.config.client.ClientConfiguration
         :param client: Docker client.
         :type client: docker.client.Client
         :param instance_alias: Container instance name or attached alias.

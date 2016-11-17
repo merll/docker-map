@@ -125,7 +125,7 @@ A configuration of clients, such as briefly described in :ref:`map_clients`, wou
 
 Importing YAML maps
 -------------------
-The easiest way to generate a :class:`~dockermap.map.container.ContainerMap` from a YAML file is
+The easiest way to generate a :class:`~dockermap.map.config.main.ContainerMap` from a YAML file is
 :func:`~dockermap.map.yaml.load_map_file`::
 
     from dockermap.map import yaml
@@ -160,7 +160,7 @@ choose to store client configurations in a YAML file. It can be imported using::
 
 If you implement your own client configuration (especially useful if you implement a custom client), you can pass
 the class as second argument. By default, a dictionary of client names with associated
-:class:`~dockermap.map.config.ClientConfiguration` objects is returned.
+:class:`~dockermap.map.config.client.ClientConfiguration` objects is returned.
 
 
 User and environment variables

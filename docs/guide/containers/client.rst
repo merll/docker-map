@@ -5,7 +5,7 @@ Enhanced client functionality
 The library comes with an enhanced client for some added functionality. Docker-Map is relying on that for managing
 container creation and startup. One part of the client is :class:`~dockermap.map.base.DockerClientWrapper`, a wrapper
 around `docker-py`'s client; another is the application of container maps in form of
-:class:`~dockermap.map.container.ContainerMap` instances to this client, which is handled by
+:class:`~dockermap.map.config.main.ContainerMap` instances to this client, which is handled by
 :class:`~dockermap.map.client.MappingDockerClient`.
 
 Since version 0.2.0 it is possible to use :class:`~dockermap.map.client.MappingDockerClient` without
@@ -93,7 +93,7 @@ This section provides some background information of the client functionality. T
 further described in :ref:`container_maps`.
 
 Instances of :class:`~dockermap.map.client.MappingDockerClient` are usually created with a map and a client.
-The former is an instance of :class:`~dockermap.map.container.ContainerMap`, the latter is
+The former is an instance of :class:`~dockermap.map.config.main.ContainerMap`, the latter is
 a :class:`~docker.client.Client` object. Both initializing arguments are however optional and may be
 changed any time later using the properties :attr:`~dockermap.map.client.MappingDockerClient.maps`::
 
@@ -106,7 +106,7 @@ default map. That one is always used when not specified otherwise in a command (
 be a default client, which is used whenever a container map or container configuration does not explicitly state a
 different set of clients.
 
-Clients are configured with :class:`~dockermap.map.config.ClientConfiguration` objects, which are passed to the
+Clients are configured with :class:`~dockermap.map.config.client.ClientConfiguration` objects, which are passed to the
 :class:`~dockermap.map.client.MappingDockerClient` constructor::
 
     from dockermap.api import ClientConfiguration, MappingDockerClient

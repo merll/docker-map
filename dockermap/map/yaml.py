@@ -87,7 +87,7 @@ def load_clients(stream, configuration_class=ClientConfiguration):
     :param configuration_class: Class of the configuration object to create.
     :type configuration_class: class
     :return: A dictionary of client configuration objects.
-    :rtype: dict[unicode | str, dockermap.map.config.ClientConfiguration]
+    :rtype: dict[unicode | str, dockermap.map.config.client.ClientConfiguration]
     """
     client_dict = yaml.safe_load(stream)
     if isinstance(client_dict, dict):
@@ -128,7 +128,7 @@ def load_clients_file(filename, configuration_class=ClientConfiguration):
     :param configuration_class: Class of the configuration object to create.
     :type configuration_class: class
     :return: A dictionary of client configuration objects.
-    :rtype: dict[unicode | str, dockermap.map.config.ClientConfiguration]
+    :rtype: dict[unicode | str, dockermap.map.config.client.ClientConfiguration]
     """
     with open(filename, 'r') as f:
         return load_clients(f, configuration_class=configuration_class)

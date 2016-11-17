@@ -106,7 +106,7 @@ def get_shared_volume_path(container_map, volume, instance=None):
     Resolves a volume alias of a container configuration or a tuple of two paths to the host and container paths.
 
     :param container_map: Container map.
-    :type container_map: dockermap.map.container.ContainerMap
+    :type container_map: dockermap.map.config.main.ContainerMap
     :param volume: Volume alias or tuple of paths.
     :type volume: unicode | str | AbstractLazyObject | tuple[unicode | str] | tuple[AbstractLazyObject]
     :param instance: Optional instance name.
@@ -134,9 +134,9 @@ def get_volumes(container_map, config):
     Generates volume paths for the ``volumes`` argument during container creation.
 
     :param container_map: Container map.
-    :type container_map: dockermap.map.container.ContainerMap
+    :type container_map: dockermap.map.config.main.ContainerMap
     :param config: Container configuration.
-    :type config: dockermap.map.config.ContainerConfiguration
+    :type config: dockermap.map.config.container.ContainerConfiguration
     :return: List of shared volume mount points.
     :rtype: list[unicode | str]
     """
@@ -167,4 +167,3 @@ def get_instance_volumes(instance_detail):
         return {m['Destination']: m['Source']
                 for m in instance_detail['Mounts']}
     return instance_detail.get('Volumes') or {}
-

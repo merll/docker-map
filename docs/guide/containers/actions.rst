@@ -44,12 +44,12 @@ applies:
   * The virtual filesystem path of attached containers and other shared volumes is compared to dependent
     containers' paths. In case of a mismatch, the latter is updated.
   * The environment variables, command, and entrypoint of the container are compared to variables set in
-    :attr:`~dockermap.map.config.ContainerConfiguration.create_options`. If any of them are missing or not matching,
+    :attr:`~dockermap.map.config.container.ContainerConfiguration.create_options`. If any of them are missing or not matching,
     the container is considered outdated.
-  * Exposed ports of the container are checked against :attr:`~dockermap.map.config.ContainerConfiguration.exposes`.
+  * Exposed ports of the container are checked against :attr:`~dockermap.map.config.container.ContainerConfiguration.exposes`.
     If any ports are missing or configured differently, this also causes a container update.
 
-Post-start commands in :attr:`~dockermap.map.config.ContainerConfiguration.exec_commands` are checked if they can
+Post-start commands in :attr:`~dockermap.map.config.container.ContainerConfiguration.exec_commands` are checked if they can
 be found on a running container, matching command line and user. If not, the configured command is executed, unless
 :const:`dockermap.map.input.EXEC_POLICY_INITIAL` has been set for the command. By default
 the entire command line is matched. For considering partial matches (i.e. if the command in the process overview gets
@@ -61,7 +61,7 @@ For ensuring the integrity, all missing containers are created and started along
 In order to see what defines a dependency, see :ref:`shared-volumes-containers` and :ref:`linked-containers`.
 
 Additional keyword arguments to the ``start`` and ``create`` methods of the client are passed through; the order of
-precedence towards the :class:`~dockermap.map.config.ContainerConfiguration` is further detailed in
+precedence towards the :class:`~dockermap.map.config.container.ContainerConfiguration` is further detailed in
 :ref:`additional-options`. Example::
 
     map_client.start('web_server', restart_policy={'MaximumRetryCount': 0, 'Name': 'always'})
@@ -102,8 +102,8 @@ method supports the following optional arguments:
   specified in ``container_script_dir``). If it points to a directory, simply ``container_script_dir`` will be used
   in place of script path.
 * ``wait_timeout``: Maximum time to wait before logging and returning the container output. By default the waiting
-  time set up for the container :attr:`~dockermap.map.config.ContainerConfiguration.stop_timeout` or for the client
-  :attr:`~dockermap.map.config.ClientConfiguration.timeout` is used.
+  time set up for the container :attr:`~dockermap.map.config.container.ContainerConfiguration.stop_timeout` or for the client
+  :attr:`~dockermap.map.config.client.ClientConfiguration.timeout` is used.
 * ``container_script_dir``: Path to run the script from inside the container. The default is ``/tmp/script_run``.
 * ``timestamps`` and ``tail`` are simply passed through to the ``logs`` command of the `docker-py` client. They can be
   used to control the output of the script command.

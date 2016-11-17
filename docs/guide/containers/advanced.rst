@@ -149,21 +149,21 @@ Lazy value resolution is available at the following points:
 
 * On container maps:
 
-  * the main :attr:`~dockermap.map.container.ContainerMap.repository` prefix;
-  * paths for all :attr:`~dockermap.map.container.ContainerMap.volumes` aliases;
+  * the main :attr:`~dockermap.map.config.main.ContainerMap.repository` prefix;
+  * paths for all :attr:`~dockermap.map.config.main.ContainerMap.volumes` aliases;
   * the host volume :attr:`~dockermap.map.config.HostVolumeConfiguration.root` path;
-  * and all :attr:`~dockermap.map.container.ContainerMap.host` volume paths.
+  * and all :attr:`~dockermap.map.config.main.ContainerMap.host` volume paths.
 * Within container configurations:
 
-  * the :attr:`~dockermap.map.config.ContainerConfiguration.user` property;
-  * host ports provided in the :attr:`~dockermap.map.config.ContainerConfiguration.exposes`, but not for the exposed
+  * the :attr:`~dockermap.map.config.container.ContainerConfiguration.user` property;
+  * host ports provided in the :attr:`~dockermap.map.config.container.ContainerConfiguration.exposes`, but not for the exposed
     port of the container (i.e. the first item of the tuple);
-  * elements of :attr:`~dockermap.map.config.ContainerConfiguration.create_options` and
-    :attr:`~dockermap.map.config.ContainerConfiguration.start_options`;
-  * items of :attr:`~dockermap.map.config.ContainerConfiguration.binds`, if they are not volume aliases, i.e. they
+  * elements of :attr:`~dockermap.map.config.container.ContainerConfiguration.create_options` and
+    :attr:`~dockermap.map.config.container.ContainerConfiguration.start_options`;
+  * items of :attr:`~dockermap.map.config.container.ContainerConfiguration.binds`, if they are not volume aliases, i.e. they
     directly describe container volume and host path.
-  * command line and user defined in each element of :attr:`~dockermap.map.config.ContainerConfiguration.exec_commands`;
-  * and elements listed in :attr:`~dockermap.map.config.ContainerConfiguration.shares`.
-* On client configuration: For addresses in :attr:`~dockermap.map.config.ClientConfiguration.interfaces`.
+  * command line and user defined in each element of :attr:`~dockermap.map.config.container.ContainerConfiguration.exec_commands`;
+  * and elements listed in :attr:`~dockermap.map.config.container.ContainerConfiguration.shares`.
+* On client configuration: For addresses in :attr:`~dockermap.map.config.client.ClientConfiguration.interfaces`.
 
 .. _Docker-Fabric: https://pypi.python.org/pypi/docker-fabric
