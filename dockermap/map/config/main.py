@@ -7,9 +7,10 @@ from operator import itemgetter
 
 import six
 
-from . import DictMap
-from .config import ContainerConfiguration, HostVolumeConfiguration
-from .input import get_list
+from .. import DictMap
+from ..input import get_list
+from .container import ContainerConfiguration
+from .host_volume import HostVolumeConfiguration
 
 
 SINGLE_ATTRIBUTES = 'repository', 'default_domain', 'set_hostname', 'use_attached_parent_name', 'default_tag'
@@ -32,7 +33,7 @@ class MapIntegrityError(Exception):
 
 class ContainerMap(object):
     """
-    Class for merging container configurations, host shared volumes and volume alias names.
+    Class for merging container configurations, host shared volumes, and volume alias names.
 
     :param name: Name for this container map.
     :type name: unicode | str

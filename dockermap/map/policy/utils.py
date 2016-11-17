@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import six
 
-from ..config import get_host_path
+from ..config.host_volume import get_host_path
 from ..input import is_path
 from ...functional import resolve_value
 

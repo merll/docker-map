@@ -5,5 +5,7 @@ from .build.context import DockerContext
 from .build.dockerfile import DockerFile
 from .client.base import DockerClientWrapper
 from .map.client import MappingDockerClient
-from .map.config import ContainerConfiguration, ClientConfiguration, USE_HC_MERGE
-from .map.container import ContainerMap
+from .map.config.client import ClientConfiguration, USE_HC_MERGE
+from .map.config.host_volume import HostVolumeConfiguration
+from .map.config.container import ContainerConfiguration
+from .map.config.main import ContainerMap

@@ -6,8 +6,8 @@ import logging
 import docker
 
 from .action import simple, script, update
-from .config import ClientConfiguration
-from .container import ContainerMap
+from .config.client import ClientConfiguration
+from .config.main import ContainerMap
 from .policy.base import BasePolicy
 from .runner.base import DockerClientRunner
 from .state.base import SingleStateGenerator, DependencyStateGenerator, DependentStateGenerator

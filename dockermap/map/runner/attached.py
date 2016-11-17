@@ -5,7 +5,7 @@ from docker.utils import create_host_config
 
 from ...functional import resolve_value
 from ..action import UTIL_ACTION_PREPARE_CONTAINER
-from ..config import USE_HC_MERGE
+from ..config.client import USE_HC_MERGE
 from ..policy.utils import update_kwargs, get_instance_volumes
 from .utils import get_preparation_cmd
 

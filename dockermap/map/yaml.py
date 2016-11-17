@@ -6,8 +6,8 @@ import six
 import yaml
 
 from ..utils import expand_path, expand_path_lazy
-from .config import ClientConfiguration
-from .container import ContainerMap
+from .config.client import ClientConfiguration
+from .config.main import ContainerMap
 
 
 def expand_node(loader, node, expand_method):
