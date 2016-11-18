@@ -431,7 +431,7 @@ class ContainerConfiguration(object):
                 if hasattr(self, key):
                     setattr(self, key, value)
         else:
-            raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values)))
+            raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values).__name__))
 
     def merge(self, values, lists_only=False):
         """
@@ -493,7 +493,7 @@ class ContainerConfiguration(object):
             update_cmds = values._exec
             merge_list_func = _merge_list
         else:
-            raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values)))
+            raise ValueError("ContainerConfiguration or dictionary expected; found '{0}'.".format(type(values).__name__))
 
         for key in LIST_ATTRIBUTES:
             _update_attr(key, merge_list_func)

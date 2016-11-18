@@ -67,7 +67,7 @@ class MappingDockerClient(object):
                 self._default_map = None
                 self._maps = container_maps
             else:
-                raise ValueError("Unexpected type of 'container_maps' argument: {0}".format(type(container_maps)))
+                raise ValueError("Unexpected type of 'container_maps' argument: {0}".format(type(container_maps).__name__))
         else:
             self._default_map = None
             self._maps = {}
@@ -82,7 +82,7 @@ class MappingDockerClient(object):
             elif isinstance(docker_client, ClientConfiguration):
                 default_client = docker_client
             else:
-                raise ValueError("Unexpected type of 'docker_client' argument: {0}".format(type(docker_client)))
+                raise ValueError("Unexpected type of 'docker_client' argument: {0}".format(type(docker_client).__name__))
             default_name = self.policy_class.get_default_client_name()
             self._clients[default_name] = default_client
         self._policy = None

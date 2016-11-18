@@ -447,7 +447,7 @@ class ContainerMap(object):
             elif isinstance(other, dict):
                 self._update_from_dict(other)
             else:
-                raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(other)))
+                raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(other).__name__))
         self._update_from_dict(kwargs)
 
     def merge(self, c_map, lists_only=False):
@@ -464,7 +464,7 @@ class ContainerMap(object):
         elif isinstance(c_map, dict):
             self._merge_from_dict(c_map, lists_only)
         else:
-            raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(c_map)))
+            raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(c_map).__name__))
 
     def check_integrity(self, check_duplicates=True):
         """
