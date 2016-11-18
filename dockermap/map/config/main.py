@@ -8,7 +8,7 @@ from operator import itemgetter
 import six
 
 from .. import DictMap
-from ..input import get_list
+from ..input import get_list, merge_list
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
 
@@ -114,8 +114,7 @@ class ContainerMap(object):
                     setattr(self, key, value)
             elif key in LIST_ATTRIBUTES:
                 current_list = getattr(self, key)
-                updated_list = get_list(value)
-                current_list.extend(u for u in updated_list if u not in current_list)
+                merge_list(get_list(value), current_list)
             elif key in DICT_ATTRIBUTES:
                 current_dict = getattr(self, key)
                 current_dict.update(value)
@@ -145,9 +144,8 @@ class ContainerMap(object):
         :type lists_only: bool
         """
         for attr in LIST_ATTRIBUTES:
-            update_list = getattr(items, attr)
             current_list = getattr(self, attr)
-            current_list.extend(c for c in update_list if c not in current_list)
+            merge_list(getattr(items, attr), current_list)
         for attr in DICT_ATTRIBUTES:
             current_dict = getattr(self, attr)
             current_dict.update(getattr(items, attr))

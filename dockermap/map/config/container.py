@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import six
 
 from ..input import (get_list, get_shared_volumes, get_shared_host_volumes, get_container_links, get_network_mode,
-                     get_port_bindings, get_exec_commands, NotSet)
+                     get_port_bindings, get_exec_commands, merge_list, NotSet)
 
 SINGLE_ATTRIBUTES = 'image', 'user', 'permissions', 'persistent', 'stop_timeout', 'stop_signal', 'network'
 DICT_ATTRIBUTES = 'create_options', 'start_options', 'host_config'
@@ -463,13 +463,11 @@ class ContainerConfiguration(object):
 
         def _merge_converted_list(attr, updates):
             current = getattr(self, attr)
-            update_list = get_list(updates)
-            current.extend(u for u in update_list if u not in current)
+            merge_list(get_list(updates), current)
 
         def _merge_list(attr, update_list):
             current = getattr(self, attr)
-            if update_list:
-                current.extend(u for u in update_list if u not in current)
+            merge_list(update_list, current)
 
         def _update_dict(attr, new_val):
             current_dict = getattr(self, attr)

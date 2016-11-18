@@ -9,7 +9,8 @@ from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume
                                  get_shared_host_volume, get_shared_host_volumes, SharedVolume,
                                  get_container_link, get_container_links, ContainerLink,
                                  get_port_binding, get_port_bindings, PortBinding,
-                                 get_exec_command, get_exec_commands, ExecCommand, EXEC_POLICY_RESTART, EXEC_POLICY_INITIAL)
+                                 get_exec_command, get_exec_commands, ExecCommand, EXEC_POLICY_RESTART,
+                                 EXEC_POLICY_INITIAL, merge_list)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -185,3 +186,10 @@ class InputConversionTest(unittest.TestCase):
         assert_b([(['a', 'b', 'c'], None),
                   ExecCommand('a b c', 'user', EXEC_POLICY_RESTART),
                   [['a', 'b', 'c'], 'root', EXEC_POLICY_INITIAL]])
+
+    def test_merge_list(self):
+        list1 = ['a', 'b', 'c']
+        merge_list(['d'], list1)
+        self.assertListEqual(list1, ['a', 'b', 'c', 'd'])
+        merge_list(['c', 'c'], list1)
+        self.assertListEqual(list1, ['a', 'b', 'c', 'd'])

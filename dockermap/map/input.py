@@ -365,3 +365,25 @@ def get_port_bindings(value):
     :rtype: list[PortBinding]
     """
     return _get_listed_tuples(value, PortBinding, get_port_binding)
+
+
+def merge_list(items, merged_list):
+    """
+    Merges items into a list, appends ignoring duplicates but retaining the original order. This modifies the list and
+    does not return anything.
+
+    :param items: Items to merge into the list.
+    :type items: list | tuple
+    :param merged_list: List to append de-duplicated items to.
+    :type merged_list: list
+    """
+    if not items:
+        return
+    if not merged_list:
+        merged_list.extend(items)
+        return
+    merged_set = set(merged_list)
+    merged_add = merged_set.add
+    merged_list.extend(item
+                       for item in items
+                       if item not in merged_set or merged_add(item))
