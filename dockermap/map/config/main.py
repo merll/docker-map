@@ -14,7 +14,7 @@ from .host_volume import HostVolumeConfiguration
 
 
 SINGLE_ATTRIBUTES = 'repository', 'default_domain', 'set_hostname', 'use_attached_parent_name', 'default_tag'
-DICT_ATTRIBUTES = 'volumes', 'host'
+DICT_ATTRIBUTES = 'volumes', 'host', 'groups'
 LIST_ATTRIBUTES = 'clients',
 
 get_map_config = itemgetter(0, 1)
@@ -53,6 +53,7 @@ class ContainerMap(object):
         self._volumes = DictMap()
         self._containers = defaultdict(ContainerConfiguration)
         self._clients = []
+        self._groups = DictMap()
         self._default_domain = None
         self._set_hostname = True
         self._use_attached_parent_name = False
@@ -227,6 +228,16 @@ class ContainerMap(object):
         :rtype: dockermap.map.config.host_volume.HostVolumeConfiguration
         """
         return self._host
+
+    @property
+    def groups(self):
+        """
+        Groups of configured containers.
+
+        :return: Container configuration groups.
+        :rtype: DictMap
+        """
+        return self._groups
 
     @property
     def repository(self):
@@ -486,6 +497,9 @@ class ContainerMap(object):
 
         def _get_container_items(c_name, c_config):
             instance_names = _get_instance_names(c_name, c_config.instances)
+            group_ref_names = instance_names[:]
+            if c_config.instances:
+                group_ref_names.append(c_name)
             shared = instance_names[:] if c_config.shares or c_config.binds or c_config.uses else []
             bind = [b.volume for b in c_config.binds if not isinstance(b.volume, tuple)]
             link = [l.container for l in c_config.links]
@@ -501,9 +515,9 @@ class ContainerMap(object):
                 attaches = [(c_name, a) for a in c_config.attaches]
             else:
                 attaches = c_config.attaches
-            return instance_names, uses, attaches, shared, bind, link, network
+            return instance_names, group_ref_names, uses, attaches, shared, bind, link, network
 
-        all_instances, all_used, all_attached, all_shared, all_binds, all_links, all_networks = zip(*[
+        all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links, all_networks = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
         ])
         if self._use_attached_parent_name:
@@ -511,6 +525,20 @@ class ContainerMap(object):
                                        for c_name, a in itertools.chain.from_iterable(all_attached))
         else:
             all_attached_names = tuple(itertools.chain.from_iterable(all_attached))
+
+        ref_set = set(itertools.chain.from_iterable(all_grouprefs))
+        group_set = set(self._groups.keys())
+        ambiguous_names = group_set & ref_set
+        if ambiguous_names:
+            ambiguous_str = ', '.join(ambiguous_names)
+            raise MapIntegrityError("Names are used both for container configurations (or instances) and for container "
+                                    "groups: {0}.".format(ambiguous_str))
+        group_referenced = set(itertools.chain.from_iterable(self._groups.values()))
+        missing_refs = group_referenced - ref_set
+        if missing_refs:
+            missing_ref_str = ', '.join(missing_refs)
+            raise MapIntegrityError("Container configurations or certain instances are referenced by groups, but are "
+                                    "not defined: {0}.".format(missing_ref_str))
         volume_shared = tuple(itertools.chain.from_iterable(all_shared)) + all_attached_names
         if check_duplicates:
             duplicated = [name for name, count in six.iteritems(Counter(volume_shared)) if count > 1]

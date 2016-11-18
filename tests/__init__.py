@@ -158,6 +158,9 @@ MAP_DATA_2 = {
         'app_data': 'app/data',
         'app_config': 'app/config',
     },
+    'groups': {
+        'group1': ['server', 'worker', 'worker_q2'],
+    }
 }
 
 MAP_DATA_3 = {
