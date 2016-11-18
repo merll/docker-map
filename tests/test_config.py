@@ -3,7 +3,7 @@ from __future__ import absolute_import, unicode_literals
 
 import unittest
 
-from dockermap.map.container import ContainerMap
+from dockermap.map.config.main import ContainerMap
 from dockermap.map.input import SharedVolume, PortBinding, NotSet, ContainerLink
 from tests import MAP_DATA_2, MAP_DATA_3
 

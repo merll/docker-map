@@ -8,8 +8,9 @@ import unittest
 import responses
 
 from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
-from dockermap.map.config import ClientConfiguration, get_host_path
-from dockermap.map.container import ContainerMap
+from dockermap.map.config.client import ClientConfiguration
+from dockermap.map.config.host_volume import get_host_path
+from dockermap.map.config.main import ContainerMap
 from dockermap.map.input import ExecCommand, EXEC_POLICY_INITIAL, EXEC_POLICY_RESTART
 from dockermap.map.policy import CONFIG_FLAG_DEPENDENT
 from dockermap.map.policy.base import BasePolicy
