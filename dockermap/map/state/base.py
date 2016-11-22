@@ -116,16 +116,12 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             yield states
 
     @abstractmethod
-    def get_states(self, map_name, config_name, instances=None):
+    def get_states(self, config_id):
         """
         To be implemented by subclasses. Generates state information for the selected container(s).
 
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param config_name: Main container configuration name.
-        :type config_name: unicode | str
-        :param instances: Instance names.
-        :type instances: list or tuple
+        :param config_id: MapConfigId tuple.
+        :type config_id: dockermap.map.input.MapConfigId
         :return: Return values of created main containers.
         :rtype: __generator[dockermap.map.state.ContainerConfigStates]
         """
@@ -147,30 +143,21 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
 
 
 class SingleStateGenerator(AbstractStateGenerator):
-    def get_states(self, map_name, config_name, instances=None):
+    def get_states(self, config_id):
         """
         Generates state information for the selected container.
 
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param config_name: Main container configuration name.
-        :type config_name: unicode | str
-        :param instances: Optional instance names. By default follows the instances from the configuration.
-        :type instances: list[unicode | str]
+        :param config_id: MapConfigId tuple.
+        :type config_id: dockermap.map.input.MapConfigId
         :return: Return values of created main containers.
         :rtype: __generator[dockermap.map.state.ContainerConfigStates]
         """
+        map_name, config_name, instances = config_id
         c_map = self._policy.container_maps[map_name]
         c_config = c_map.get_existing(config_name)
         if not c_config:
-            raise KeyError("Container configuration '{0}' not found on map '{1}'.".format(
-                config_name, map_name))
-        if not instances:
-            c_instances = c_config.instances or [None]
-        elif isinstance(instances, (tuple, list)):
-            c_instances = instances
-        else:
-            c_instances = [instances]
+            raise KeyError("Container configuration '{0}' not found on map '{1}'.".format(config_name, map_name))
+        c_instances = instances or c_config.instances or [None]
         return self.generate_config_states(map_name, c_map, config_name, c_config, c_instances)
 
 
@@ -208,22 +195,19 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, SingleS
                                                      is_dependency=True):
                 yield state
 
-    def get_states(self, map_name, config_name, instances=None):
+    def get_states(self, config_id):
         """
         Generates state information for the selected container and its dependencies / dependents.
 
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param config_name: Main container configuration name.
-        :type config_name: unicode | str
-        :param instances: Instance names.
-        :type instances: list or tuple
+        :param config_id: MapConfigId tuple.
+        :type config_id: dockermap.map.input.MapConfigId
         :return: Return values of created main containers.
         :rtype: itertools.chain[dockermap.map.state.ContainerConfigStates]
         """
+        map_name, config_name, instances = config_id
         return itertools.chain(
             self.get_dependency_states(map_name, config_name),
-            super(AbstractDependencyStateGenerator, self).get_states(map_name, config_name, instances=instances)
+            super(AbstractDependencyStateGenerator, self).get_states(config_id)
         )
 
 
