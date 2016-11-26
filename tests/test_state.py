@@ -183,9 +183,9 @@ def _add_inspect(rsps, container_map, map_name, c_config, config_name, instance_
     return container_id, container_name
 
 
-def _get_single_state(sg, config_id):
+def _get_single_state(sg, config_ids):
     states = [si
-              for s in sg.get_states(config_id)
+              for s in sg.get_states(config_ids)
               for si in s.instances]
     return states[0]
 

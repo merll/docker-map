@@ -177,21 +177,6 @@ class BasePolicy(object):
         default_name = self.get_default_client_name()
         return [(default_name, self._clients[default_name])]
 
-    def _get_dependency_config(self, map_name, config_name, instances):
-        c_map = self._maps[map_name]
-        c_config = c_map.get_existing(config_name)
-        if not c_config:
-            raise KeyError("Container configuration '{0}' not found on map '{1}'."
-                           "".format(config_name, map_name))
-        if c_config.instances:
-            if instances == [None]:
-                instance_list = c_config.instances
-            else:
-                instance_list = instances
-        else:
-            instance_list = [None]
-        return map_name, c_map, config_name, c_config, instance_list
-
     def get_dependencies(self, map_name, container):
         """
         Generates the list of dependency containers, in reverse order (i.e. the last dependency coming first).
@@ -201,10 +186,9 @@ class BasePolicy(object):
         :param container: Container configuration name.
         :type container: unicode | str
         :return: Dependency container map names, container configuration names, and instances.
-        :rtype: iterator[(unicode | str, unicode | str, unicode | str)]
+        :rtype: iterator[(unicode | str, unicode | str, list[unicode | str | NoneType])]
         """
-        return [self._get_dependency_config(*dep)
-                for dep in reversed(self._f_resolver.get_dependencies((map_name, container)))]
+        return reversed(self._f_resolver.get_dependencies((map_name, container)))
 
     def get_dependents(self, map_name, container):
         """
@@ -215,10 +199,9 @@ class BasePolicy(object):
         :param container: Container configuration name.
         :type container: unicode | str
         :return: Dependent container map names, container configuration names, and instances.
-        :rtype: iterator[(unicode | str, unicode | str, unicode | str)]
+        :rtype: iterator[(unicode | str, unicode | str, list[unicode | str | NoneType])]
         """
-        return [self._get_dependency_config(*dep)
-                for dep in reversed(self._r_resolver.get_dependencies((map_name, container)))]
+        return reversed(self._r_resolver.get_dependencies((map_name, container)))
 
     @property
     def container_maps(self):
