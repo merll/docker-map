@@ -59,6 +59,8 @@ MAP_DATA_2 = {
     'containers': {
         'svc': {
         },
+        'svc2': {
+        },
         'abstract_config': {
             'abstract': True,
             'image': 'server',
@@ -92,6 +94,10 @@ MAP_DATA_2 = {
                     'Name': 'always',
                 },
             },
+        },
+        'server2': {
+            'extends': 'server',
+            'links': ['svc2']
         },
         'abstract_worker': {
             'abstract': True,

@@ -279,6 +279,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self._setup_containers(rsps, [
                 _container('redis'),
                 _container('server'),
+                _container('server2'),
                 _container('worker'),
                 _container('worker_q2'),
             ])
