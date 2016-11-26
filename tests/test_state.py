@@ -19,6 +19,7 @@ from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESEN
                                  STATE_FLAG_OUTDATED)
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
+from dockermap.map.state.utils import merge_dependency_paths
 
 from tests import MAP_DATA_2, CLIENT_DATA_1
 
@@ -429,3 +430,96 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 (cmd2, False),
                 (cmd3, False),
             ]})
+
+
+class TestPolicyStateUtils(unittest.TestCase):
+    def setUp(self):
+        self.map_name = map_name = 'main'
+        self.sample_map = sample_map = ContainerMap('main', MAP_DATA_2,
+                                                    use_attached_parent_name=True).get_extended_map()
+        # self.sample_map.repository = None
+        self.sample_client_config = client_config = ClientConfiguration(**CLIENT_DATA_1)
+        self.policy = policy = BasePolicy({map_name: sample_map}, {'__default__': client_config})
+        self.state_gen = DependencyStateGenerator(policy, {})
+        self.server_dependencies = [
+            (map_name, 'svc', (None,)),
+            (map_name, 'redis', (None, )),
+        ]
+
+    def test_merge_two_common(self):
+        server_config = self.map_name, 'server', (None, )
+        worker_config = self.map_name, 'worker', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [server_config, worker_config]
+        ])
+        self.assertEqual(len(merged_paths), 1)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+
+    def test_merge_three_common(self):
+        server_config = self.map_name, 'server', (None, )
+        worker_config = self.map_name, 'worker', (None, )
+        worker_q2_config = self.map_name, 'worker_q2', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [server_config, worker_config, worker_q2_config]
+        ])
+        self.assertEqual(len(merged_paths), 1)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+
+    def test_merge_three_common_with_extension(self):
+        worker_config = self.map_name, 'worker', (None, )
+        server2_config = self.map_name, 'server2', (None, )
+        worker_q2_config = self.map_name, 'worker_q2', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [worker_config, server2_config, worker_q2_config]
+        ])
+        self.assertEqual(len(merged_paths), 2)
+        self.assertEqual(merged_paths[0][0], worker_config)
+        self.assertEqual(merged_paths[1][0], server2_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+        self.assertItemsEqual([
+            (self.map_name, 'svc2', (None,)),
+        ], merged_paths[1][1])
+
+    def test_merge_included_first(self):
+        redis_config = self.map_name, 'redis', ('cache', )
+        server_config = self.map_name, 'server', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [redis_config, server_config]
+        ])
+        self.assertEqual(len(merged_paths), 1)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+
+    def test_merge_included_second(self):
+        server_config = self.map_name, 'server', (None, )
+        redis_config = self.map_name, 'redis', ('cache', )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [server_config, redis_config]
+        ])
+        self.assertEqual(len(merged_paths), 1)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+
+    def test_merge_included_multiple(self):
+        svc_config = self.map_name, 'svc', (None, )
+        server_config = self.map_name, 'server', (None, )
+        redis_config = self.map_name, 'redis', ('queue', )
+        server2_config = self.map_name, 'server2', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [svc_config, server_config, redis_config, server2_config]
+        ])
+        self.assertEqual(len(merged_paths), 2)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertEqual(merged_paths[1][0], server2_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+        self.assertItemsEqual([
+            (self.map_name, 'svc2', (None,)),
+        ], merged_paths[1][1])
