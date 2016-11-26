@@ -205,7 +205,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
         self.images = list(enumerate(all_images))
 
     def _config_id(self, config_name, instance=None):
-        return MapConfigId(self.map_name, config_name, [instance] if instance else None)
+        return [MapConfigId(self.map_name, config_name, (instance, ) if instance else None)]
 
     def _setup_containers(self, rsps, containers_states):
         container_names = []

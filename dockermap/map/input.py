@@ -301,7 +301,7 @@ def get_map_config_id(value, map_name=None, instances=None):
     :param map_name: Map name; provides the default map name unless otherwise specified in ``value``.
     :type map_name: unicode | str
     :param instances: Instance names; instances to set if not otherwise specified in ``value``.
-    :type instances: unicode | str | list[unicode | str | NoneType] | tuple[unicode | str | NoneType]
+    :type instances: unicode | str | tuple[unicode | str | NoneType]
     :return: MapConfigId tuple.
     :rtype: MapConfigId
     """
@@ -312,7 +312,7 @@ def get_map_config_id(value, map_name=None, instances=None):
         if s_config_name:
             config_name, __, s_instance = s_config_name.partition('.')
             if s_instance:
-                s_instances = [s_instance]
+                s_instances = s_instance,
             else:
                 s_instances = None
         else:
@@ -326,12 +326,12 @@ def get_map_config_id(value, map_name=None, instances=None):
             v_instances = value[2]
             if not v_instances:
                 return MapConfigId(value[0], value[1], None)
-            if isinstance(v_instances, list):
+            if isinstance(v_instances, tuple):
                 return MapConfigId(*value)
-            elif isinstance(v_instances, tuple):
-                return MapConfigId(value[0], value[1], list(v_instances))
+            elif isinstance(v_instances, list):
+                return MapConfigId(value[0], value[1], tuple(v_instances))
             elif isinstance(v_instances, six.string_types):
-                return MapConfigId(value[0], value[1], [v_instances])
+                return MapConfigId(value[0], value[1], (v_instances, ))
             raise ValueError("Invalid type of instance specification in '{0}'; expected a list, tuple, or string type, "
                              "found {1}.".format(value, type(v_instances).__name__))
         elif v_len == 2:
@@ -438,12 +438,12 @@ def get_map_config_ids(value, map_name=None, instances=None):
     """
     if not instances:
         default_instances = None
-    elif isinstance(instances, list):
-        default_instances = instances
     elif isinstance(instances, tuple):
-        default_instances = list(instances)
+        default_instances = instances
+    elif isinstance(instances, list):
+        default_instances = tuple(instances)
     elif isinstance(instances, six.string_types):
-        default_instances = [instances]
+        default_instances = (instances, )
     else:
         raise ValueError("Invalid instances specification; expected string, list, or tuple, found "
                          "{0}.".format(type(instances).__name__))
