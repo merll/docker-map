@@ -9,13 +9,15 @@ from ..functional import lazy_type, uses_type_registry
 
 
 SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
+SharedVolume.__new__.__defaults__ = False,
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface', 'ipv6'))
-ExecCommand = namedtuple('ExecCommand', ('cmd', 'user', 'policy'))
-
-
+PortBinding.__new__.__defaults__ = None, None, False
 EXEC_POLICY_RESTART = 'restart'
 EXEC_POLICY_INITIAL = 'initial'
+ExecCommand = namedtuple('ExecCommand', ('cmd', 'user', 'policy'))
+ExecCommand.__new__.__defaults__ = None, EXEC_POLICY_RESTART
+
 
 CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
 
@@ -110,13 +112,13 @@ def get_shared_volume(value):
     if isinstance(value, SharedVolume):
         return value
     elif isinstance(value, six.string_types):
-        return SharedVolume(value, False)
+        return SharedVolume(value)
     elif isinstance(value, (list, tuple)):
         v_len = len(value)
         if v_len == 2:
             return SharedVolume(value[0], read_only(value[1]))
         elif v_len == 1:
-            return SharedVolume(value[0], False)
+            return SharedVolume(value[0])
         raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
                          "SharedVolume tuple; found length {0}.".format(v_len))
     elif isinstance(value, dict):
@@ -143,14 +145,14 @@ def _shared_host_volume_from_tuple(*values):
             elif sv_len == 1:
                 if isinstance(v1_0, bool) or v1_0 in ('ro', 'rw'):
                     return SharedVolume(v0, read_only(v1_0))
-                return SharedVolume((v0, v1_0), False)
+                return SharedVolume((v0, v1_0))
             raise ValueError("Nested list in {0} must have exactly one or two entries; found "
                              "{1}.".format(values, sv_len))
         elif isinstance(v1, bool) or v1 in ('ro', 'rw'):
             return SharedVolume(v0, read_only(v1))
-        return SharedVolume(values, False)
+        return SharedVolume(values)
     elif v_len == 1:
-        return SharedVolume(values[0], False)
+        return SharedVolume(values[0])
     raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
                      "SharedVolume tuple. Found length {0}.".format(v_len))
 
@@ -227,32 +229,28 @@ def get_port_binding(value):
     if isinstance(value, PortBinding):
         return value
     elif isinstance(value, sub_types):  # Port only
-        return PortBinding(value, None, None, False)
+        return PortBinding(value)
     elif isinstance(value, (list, tuple)):  # Exposed port, host port, and possibly interface
         v_len = len(value)
         if v_len == 1 and isinstance(value[0], sub_types):
-            return PortBinding(value[0], None, None, False)
+            return PortBinding(value[0])
         if v_len == 2:
             ex_port, host_bind = value
             if isinstance(host_bind, sub_types + (lazy_type, )) or host_bind is None or uses_type_registry(host_bind):
                 # Port, host port
-                return PortBinding(ex_port, host_bind, None, False)
+                return PortBinding(ex_port, host_bind)
             elif isinstance(host_bind, (list, tuple)):
                 s_len = len(host_bind)
                 if s_len == 2:  # Port, (host port, interface)
                     host_port, interface = host_bind
-                    return PortBinding(ex_port, host_port, interface, False)
+                    return PortBinding(ex_port, host_port, interface)
                 elif s_len == 3:  # Port, (host port, interface, ipv6)
                     host_port, interface, ipv6 = host_bind
                     return PortBinding(ex_port, host_port, interface, ipv6)
             raise ValueError("Invalid sub-element type or length. Needs to be a port number or a tuple / list: "
                              "(port, interface) or (port, interface, ipv6).")
-        elif v_len == 3:
-            ex_port, host_port, interface = value
-            return PortBinding(ex_port, host_port, interface, False)
-        elif v_len == 4:
-            ex_port, host_port, interface, ipv6 = value
-            return PortBinding(ex_port, host_port, interface, ipv6)
+        elif v_len in (3, 4):
+            return PortBinding(*value)
         raise ValueError("Invalid element length; only tuples and lists of length 2 to 4 can be converted to a "
                          "PortBinding tuple.")
     raise ValueError("Invalid type; expected a list, tuple, int or string type, found "
@@ -272,15 +270,11 @@ def get_exec_command(value):
     if isinstance(value, ExecCommand):
         return value
     elif isinstance(value, six.string_types + (lazy_type, )):
-        return ExecCommand(value, None, EXEC_POLICY_RESTART)
+        return ExecCommand(value)
     elif isinstance(value, (list, tuple)):
         v_len = len(value)
-        if v_len == 3:
+        if 1 <= v_len <= 3:
             return ExecCommand(*value)
-        elif v_len == 2:
-            return ExecCommand(value[0], value[1], EXEC_POLICY_RESTART)
-        elif v_len == 1:
-            return ExecCommand(value[0], None, EXEC_POLICY_RESTART)
         raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
                          "ExecCommand tuple. Found length {0}.".format(v_len))
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
