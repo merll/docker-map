@@ -108,7 +108,9 @@ class MappingDockerClient(object):
         log.debug("Passing kwargs to client actions: {0}".format(kwargs))
         results = []
 
-        config_ids = get_map_config_ids(config_name, map_name=map_name or self._default_map, instances=instances)
+        groups = {m.name: m.groups for m in self._maps.values()}
+        config_ids = get_map_config_ids(config_name, map_name=map_name or self._default_map, instances=instances,
+                                        groups=groups)
         for states in state_generator.get_states(config_ids):
             actions = action_generator.get_state_actions(states, **kwargs)
             log.debug("Running actions: %s", actions)
