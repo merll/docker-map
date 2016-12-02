@@ -215,7 +215,7 @@ class ContainerMap(object):
         Volume alias assignments of the map.
 
         :return: Volume alias assignments.
-        :rtype: DictMap
+        :rtype: dockermap.map.DictMap
         """
         return self._volumes
 
@@ -235,7 +235,7 @@ class ContainerMap(object):
         Groups of configured containers.
 
         :return: Container configuration groups.
-        :rtype: DictMap
+        :rtype: dockermap.map.DictMap
         """
         return self._groups
 
