@@ -7,7 +7,7 @@ import docker
 
 from .action import simple, script, update
 from .config.client import ClientConfiguration
-from .config.main import ContainerMap
+from .config.main import ContainerMap, expand_groups, group_instances
 from .input import get_map_config_ids
 from .policy.base import BasePolicy
 from .runner.base import DockerClientRunner
@@ -101,6 +101,7 @@ class MappingDockerClient(object):
 
     def run_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
         policy = self.get_policy()
+        groups = {m.name: m.groups for m in self._maps.values()}
         state_generator_cls, action_generator_cls = self.generators[action_name]
         state_generator = state_generator_cls(policy, kwargs)
         action_generator = action_generator_cls(policy, kwargs)
@@ -108,9 +109,8 @@ class MappingDockerClient(object):
         log.debug("Passing kwargs to client actions: {0}".format(kwargs))
         results = []
 
-        groups = {m.name: m.groups for m in self._maps.values()}
-        config_ids = get_map_config_ids(config_name, map_name=map_name or self._default_map, instances=instances,
-                                        groups=groups)
+        input_ids = get_map_config_ids(config_name, map_name=map_name or self._default_map, instances=instances)
+        config_ids = list(group_instances(expand_groups(input_ids, groups), ext_maps=policy.container_maps))
         for states in state_generator.get_states(config_ids):
             actions = action_generator.get_state_actions(states, **kwargs)
             log.debug("Running actions: %s", actions)

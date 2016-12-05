@@ -424,18 +424,7 @@ def get_port_bindings(value):
     return _get_listed_tuples(value, PortBinding, get_port_binding)
 
 
-def _expand_groups(config_ids, groups):
-    for config_id in config_ids:
-        group = groups[config_id.map_name].get(config_id.config_name)
-        if group is not None:
-            for group_item in group:
-                config_name, __, instances = group_item.partition('.')
-                yield MapConfigId(config_id.map_name, config_name, (instances, ) if instances else config_id.instances)
-        else:
-            yield config_id
-
-
-def get_map_config_ids(value, map_name=None, instances=None, groups=None):
+def get_map_config_ids(value, map_name=None, instances=None):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of MapConfigId tuples.
 
@@ -444,8 +433,6 @@ def get_map_config_ids(value, map_name=None, instances=None, groups=None):
     :type map_name: unicode | str
     :param instances: Instance names; instances to set if not otherwise specified in ``value``.
     :type instances: unicode | str | list[unicode | str] | tuple[unicode | str]
-    :param groups: Dictionary of container configuration groups per map.
-    :type groups: dict[unicode | str, dockermap.map.DictMap]
     :return: List of MapConfigId tuples.
     :rtype: list[MapConfigId]
     """
@@ -460,11 +447,7 @@ def get_map_config_ids(value, map_name=None, instances=None, groups=None):
     else:
         raise ValueError("Invalid instances specification; expected string, list, or tuple, found "
                          "{0}.".format(type(instances).__name__))
-    config_ids = _get_listed_tuples(value, MapConfigId, get_map_config_id,
-                                    map_name=map_name, instances=default_instances)
-    if not groups:
-        return config_ids
-    return list(_expand_groups(config_ids, groups))
+    return _get_listed_tuples(value, MapConfigId, get_map_config_id, map_name=map_name, instances=default_instances)
 
 
 def merge_list(items, merged_list):

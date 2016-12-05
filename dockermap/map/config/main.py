@@ -8,7 +8,7 @@ from operator import itemgetter
 import six
 
 from .. import DictMap
-from ..input import get_list, merge_list
+from ..input import get_list, merge_list, MapConfigId
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
 
@@ -18,6 +18,94 @@ DICT_ATTRIBUTES = 'volumes', 'host', 'groups'
 LIST_ATTRIBUTES = 'clients',
 
 get_map_config = itemgetter(0, 1)
+
+
+def expand_groups(config_ids, groups):
+    """
+    Iterates over a list of container configuration ids, expanding groups of container configurations.
+
+    :param config_ids: List of container configuration ids.
+    :type config_ids: list[dockermap.map.input.MapConfigId]
+    :param groups: Dictionary of container configuration groups per map.
+    :type groups: dict[unicode | str, dockermap.map.DictMap]
+    :return: Expanded MapConfigId tuples.
+    :rtype: __generator[dockermap.map.input.MapConfigId]
+    """
+    for config_id in config_ids:
+        group = groups[config_id.map_name].get(config_id.config_name)
+        if group is not None:
+            for group_item in group:
+                if isinstance(group_item, MapConfigId):
+                    yield group_item
+                elif isinstance(group_item, six.string_types):
+                    config_name, __, instance = group_item.partition('.')
+                    yield MapConfigId(config_id.map_name, config_name, (instance, ) if instance else config_id.instances)
+                else:
+                    raise ValueError("Invalid group item. Must be string or MapConfigId tuple; found {0}.".format(
+                        type(group_item).__name__))
+        else:
+            yield config_id
+
+
+def group_instances(config_ids, ext_map=None, ext_maps=None):
+    """
+    Iterates over a list of container configuration ids, grouping instances together. A tuple of instances that matches
+    the list of instances in a configuration is replaced with a tuple only containing ``None``.
+
+    :param config_ids: List of container configuration ids.
+    :type config_ids: list[dockermap.map.input.MapConfigId]
+    :param ext_map: Extended ContainerMap instance for looking up container configurations. Use this only if all
+     elements of ``config_ids`` are from the same map.
+    :type ext_map: ContainerMap
+    :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
+    :type ext_maps: dict[unicode | str, ContainerMap]
+    :return: MapConfigId tuples.
+    :rtype: __generator[dockermap.map.input.MapConfigId]
+    """
+    if not (ext_map or ext_maps):
+        raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
+    for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
+        map_name, config_name = map_config
+        instances = tuple(di[2] for di in items)
+        c_map = ext_map or ext_maps[map_name]
+        config = c_map.get_existing(config_name)
+        if not config:
+            raise KeyError((map_name, config_name))
+        if config.instances and (None in instances or len(instances) == len(config.instances)):
+            yield MapConfigId(map_name, config_name, (None, ))
+        else:
+            yield MapConfigId(map_name, config_name, instances)
+
+
+def expand_instances(config_ids, ext_map=None, ext_maps=None):
+    """
+    Iterates over a list of container configuration ids, expanding configured instances if ``None`` is specified.
+
+    :param config_ids: List of container configuration ids.
+    :type config_ids: list[dockermap.map.input.MapConfigId]
+    :param ext_map: Extended ContainerMap instance for looking up container configurations. Use this only if all
+     elements of ``config_ids`` are from the same map.
+    :type ext_map: ContainerMap
+    :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
+    :type ext_maps: dict[unicode | str, ContainerMap]
+    :return: Tuples of map name, container configuration name, and a single instance name (or ``None``).
+    :rtype: __generator[tuple[unicode | str, unicode | str, unicode | str]]
+    """
+    if not (ext_map or ext_maps):
+        raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
+    for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
+        map_name, config_name = map_config
+        instances = tuple(di[2] for di in items)
+        c_map = ext_map or ext_maps[map_name]
+        config = c_map.get_existing(config_name)
+        if not config:
+            raise KeyError(map_name, config_name)
+        if config.instances and None in instances:
+            for i in config.instances:
+                yield map_name, config_name, i
+        else:
+            for i in instances:
+                yield map_name, config_name, i
 
 
 class MapIntegrityError(Exception):
@@ -358,16 +446,6 @@ class ContainerMap(object):
                 d_set.add((self._name, ) + nw)
             return d_set
 
-        def _get_grouped_instances(d_map_config, d_instances):
-            d_map_name, d_config_name = d_map_config
-            d_config = ext_map.get_existing(d_config_name)
-            if not d_config:
-                raise KeyError("Dependency {0}.{1} for {2}.{3} not found.".format(
-                               d_map_name, d_config_name, self._name, c_name))
-            if d_config.instances and (None in d_instances or len(d_instances) == len(d_config.instances)):
-                return d_map_name, d_config_name, (None, )
-            return d_map_name, d_config_name, d_instances
-
         if reverse:
             # Consolidate dependents.
             for c_name, c_config in ext_map:
@@ -377,9 +455,10 @@ class ContainerMap(object):
             # Group instances, or replace with None where all of them are used.
             for c_name, c_config in ext_map:
                 dep_set = _get_dep_set(c_config)
-                instance_set = set(_get_grouped_instances(map_config, tuple(di[2] for di in items))
-                                   for map_config, items in itertools.groupby(sorted(dep_set, key=get_map_config),
-                                                                              get_map_config))
+                try:
+                    instance_set = set(group_instances(dep_set, ext_map=ext_map))
+                except KeyError as e:
+                    raise KeyError("Dependency {0[0]}.{0[1]} for {1}.{2} not found.".format(e.args[0], self._name, c_name))
                 yield (self._name, c_name), instance_set
 
     def get(self, item):

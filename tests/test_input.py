@@ -6,6 +6,7 @@ import six
 
 from dockermap.functional import lazy_once
 from dockermap.map import DictMap
+from dockermap.map.config.main import expand_groups
 from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume, get_shared_volumes,
                                  get_shared_host_volume, get_shared_host_volumes, SharedVolume,
                                  get_container_link, get_container_links, ContainerLink,
@@ -223,11 +224,19 @@ class InputConversionTest(unittest.TestCase):
         groups = {'m': DictMap(default=['c.i', 'd.i']), 'n': DictMap(default=['e'])}
         assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_ids(v, map_name=m, instances=i),
                                                               [MapConfigId('m', 'c')])
-        assert_b = lambda v, m=None, i=None: six.assertCountEqual(self, get_map_config_ids(v, map_name=m, instances=i,
-                                                                                           groups=groups),
+        assert_b = lambda v, m=None, i=None: six.assertCountEqual(self, get_map_config_ids(v, map_name=m, instances=i),
                                                                   [MapConfigId('m', 'c', ('i', )),
                                                                    MapConfigId('m', 'd', ('i', )),
                                                                    MapConfigId('n', 'e', ('i', 'j'))])
+        assert_c = lambda v, m=None, i=None: six.assertCountEqual(self,
+                                                                  expand_groups(
+                                                                      get_map_config_ids(v, map_name=m, instances=i),
+                                                                      groups
+                                                                  ),
+                                                                  [MapConfigId('m', 'c', ('i', )),
+                                                                   MapConfigId('m', 'd', ('i', )),
+                                                                   MapConfigId('n', 'e', ('i', )),
+                                                                   MapConfigId('n', 'e', ('j', ))])
         assert_a('m.c')
         assert_a('c', 'm')
         assert_a('c', 'm', [])
@@ -238,7 +247,7 @@ class InputConversionTest(unittest.TestCase):
         assert_b([[None, 'c'],
                   ('d', ),
                   ['n', 'e', ('i', 'j')]], 'm', ('i',))
-        assert_b(['m.default', 'n.default'], None, ('i', 'j'))
+        assert_c(['m.default', 'n.default', 'n.e.j'], None, ('i', ))
 
     def test_merge_list(self):
         list1 = ['a', 'b', 'c']
