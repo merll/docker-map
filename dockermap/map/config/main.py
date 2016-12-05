@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from collections import Counter, defaultdict
+from collections import Counter
 import itertools
 from operator import itemgetter
 
 import six
 
-from .. import DictMap
+from .. import DictMap, DefaultDictMap
 from ..input import get_list, merge_list
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
@@ -51,7 +51,7 @@ class ContainerMap(object):
         self._repository = None
         self._host = HostVolumeConfiguration()
         self._volumes = DictMap()
-        self._containers = defaultdict(ContainerConfiguration)
+        self._containers = DefaultDictMap(ContainerConfiguration)
         self._clients = []
         self._default_domain = None
         self._set_hostname = True

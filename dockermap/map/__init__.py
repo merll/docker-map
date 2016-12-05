@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import defaultdict
 import six
 
 
@@ -22,14 +23,14 @@ class PropertyDictMeta(type):
         super(PropertyDictMeta, cls).__init__(name, bases, dct)
 
 
-class DictMap(six.with_metaclass(PropertyDictMeta, dict)):
+class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
     """
     Utility class which allows access to a dictionary by attributes and keys. Also overrides the default iteration to
     return keys and values.
     """
     def __init__(self, *args, **kwargs):
         _update_instance(self, kwargs)
-        super(DictMap, self).__init__(*args, **kwargs)
+        super(AttributeMixin, self).__init__(*args, **kwargs)
 
     def __getattr__(self, item):
         return self[item]
@@ -42,7 +43,7 @@ class DictMap(six.with_metaclass(PropertyDictMeta, dict)):
 
     def __delattr__(self, item):
         if hasattr(self, item):
-            super(DictMap, self).__delattr__(item)
+            object.__delattr__(item)
         else:
             self.pop(item)
 
@@ -60,4 +61,12 @@ class DictMap(six.with_metaclass(PropertyDictMeta, dict)):
             else:
                 raise ValueError("Expected {0} or dictionary; found '{1}'".format(type(self).__name__, type(other).__name__))
         _update_instance(self, kwargs)
-        super(DictMap, self).update(other, **kwargs)
+        super(AttributeMixin, self).update(other, **kwargs)
+
+
+class DictMap(AttributeMixin, dict):
+    pass
+
+
+class DefaultDictMap(AttributeMixin, defaultdict):
+    pass
