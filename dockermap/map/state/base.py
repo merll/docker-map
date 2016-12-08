@@ -10,7 +10,8 @@ from six import with_metaclass
 from ..policy import (CONFIG_FLAG_DEPENDENT, CONFIG_FLAG_ATTACHED, CONFIG_FLAG_PERSISTENT,
                       ABCPolicyUtilMeta, PolicyUtil)
 from . import (INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, STATE_FLAG_INITIAL,
-               STATE_FLAG_RESTARTING, STATE_FLAG_NONRECOVERABLE, ContainerConfigStates, ContainerInstanceState)
+               STATE_FLAG_RESTARTING, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_OUTDATED,
+               ContainerConfigStates, ContainerInstanceState)
 from .utils import merge_dependency_paths
 
 
@@ -22,7 +23,8 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
     Abstract base implementation for an state generator, which determines the current state of containers on the client.
     """
     nonrecoverable_exit_codes = (-127, -1)
-    policy_options = ['nonrecoverable_exit_codes']
+    force_update = None
+    policy_options = ['nonrecoverable_exit_codes', 'force_update']
 
     def get_container_state(self, map_name, container_map, config_name, container_config, client_name, client_config,
                             client, instance_alias, config_flags=0):
@@ -51,19 +53,22 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         :return: Tuple of container inspection detail, and the base state information derived from that.
         :rtype: (dict | NoneType, unicode | str, int, dict)
         """
+        policy = self._policy
         if config_flags & CONFIG_FLAG_ATTACHED:
             if container_map.use_attached_parent_name:
-                container_name = self._policy.aname(map_name, instance_alias, config_name)
+                container_name = policy.aname(map_name, instance_alias, config_name)
             else:
-                container_name = self._policy.aname(map_name, instance_alias)
+                container_name = policy.aname(map_name, instance_alias)
         else:
-            container_name = self._policy.cname(map_name, config_name, instance_alias)
+            container_name = policy.cname(map_name, config_name, instance_alias)
 
-        if container_name in self._policy.container_names[client_name]:
+        if container_name in policy.container_names[client_name]:
             c_detail = client.inspect_container(container_name)
             c_status = c_detail['State']
             if c_status['Running']:
-                return c_detail, STATE_RUNNING, 0, {}
+                base_state = STATE_RUNNING
+            else:
+                base_state = STATE_PRESENT
             if c_status['StartedAt'] == INITIAL_START_TIME:
                 state_flag = STATE_FLAG_INITIAL
             elif c_status['ExitCode'] in self.nonrecoverable_exit_codes:
@@ -72,7 +77,9 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                 state_flag = 0
             if c_status['Restarting']:
                 state_flag |= STATE_FLAG_RESTARTING
-            return c_detail, STATE_PRESENT, state_flag, {}
+            if self.force_update and (map_name, config_name, instance_alias) in self.force_update:
+                state_flag |= STATE_FLAG_OUTDATED
+            return c_detail, base_state, state_flag, {}
         return None, STATE_ABSENT, 0, {}
 
     def generate_config_states(self, map_name, config_name, instances, is_dependency=False):
