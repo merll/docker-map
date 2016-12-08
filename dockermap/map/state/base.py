@@ -66,7 +66,9 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             c_detail = client.inspect_container(container_name)
             c_status = c_detail['State']
             if c_status['Running']:
-                return c_detail, STATE_RUNNING, 0, {}
+                base_state = STATE_RUNNING
+            else:
+                base_state = STATE_PRESENT
             if c_status['StartedAt'] == INITIAL_START_TIME:
                 state_flag = STATE_FLAG_INITIAL
             elif c_status['ExitCode'] in self.nonrecoverable_exit_codes:
@@ -77,7 +79,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                 state_flag |= STATE_FLAG_RESTARTING
             if self.force_update and (map_name, config_name, instance_alias) in self.force_update:
                 state_flag |= STATE_FLAG_OUTDATED
-            return c_detail, STATE_PRESENT, state_flag, {}
+            return c_detail, base_state, state_flag, {}
         return None, STATE_ABSENT, 0, {}
 
     def generate_config_states(self, map_name, config_name, instances, is_dependency=False):
