@@ -10,7 +10,7 @@ import responses
 from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from dockermap.map.config.client import ClientConfiguration
 from dockermap.map.config.host_volume import get_host_path
-from dockermap.map.config.main import ContainerMap
+from dockermap.map.config.main import ContainerMap, expand_instances
 from dockermap.map.input import ExecCommand, EXEC_POLICY_INITIAL, EXEC_POLICY_RESTART, MapConfigId
 from dockermap.map.policy import CONFIG_FLAG_DEPENDENT
 from dockermap.map.policy.base import BasePolicy
@@ -275,20 +275,31 @@ class TestPolicyStateGenerators(unittest.TestCase):
             server_states = _get_single_state(sg, self.server_config_id)
             self.assertEqual(server_states.base_state, STATE_ABSENT)
 
-    def test_single_states_forced(self):
+    def test_single_states_forced_config(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
-                _container('redis', P_STATE_EXITED_0, instances=['cache']),
-                _container('redis', instances=['queue']),
+                _container('redis', instances=['cache', 'queue']),
             ])
-            force_update = set(self._config_id('redis', 'cache'))
+            force_update = set(expand_instances(self._config_id('redis'), single_instances=False,
+                                                ext_map=self.sample_map))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
-            self.assertEqual(cache_state.base_state, STATE_PRESENT)
             self.assertEqual(cache_state.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
             queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
-            self.assertEqual(queue_state.base_state, STATE_RUNNING)
             self.assertEqual(queue_state.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+
+    def test_single_states_forced_instance(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_containers(rsps, [
+                _container('redis', instances=['cache', 'queue']),
+            ])
+            force_update = set(expand_instances(self._config_id('redis', 'cache'), single_instances=False,
+                                                ext_map=self.sample_map))
+            sg = SingleStateGenerator(self.policy, {'force_update': force_update})
+            cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
+            self.assertEqual(cache_state.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
+            self.assertEqual(queue_state.flags & STATE_FLAG_OUTDATED, 0)
 
     def test_dependent_states(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
