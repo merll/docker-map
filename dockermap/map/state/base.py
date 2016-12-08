@@ -67,16 +67,17 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             c_status = c_detail['State']
             if c_status['Running']:
                 base_state = STATE_RUNNING
+                state_flag = 0
             else:
                 base_state = STATE_PRESENT
-            if c_status['StartedAt'] == INITIAL_START_TIME:
-                state_flag = STATE_FLAG_INITIAL
-            elif c_status['ExitCode'] in self.nonrecoverable_exit_codes:
-                state_flag = STATE_FLAG_NONRECOVERABLE
-            else:
-                state_flag = 0
-            if c_status['Restarting']:
-                state_flag |= STATE_FLAG_RESTARTING
+                if c_status['StartedAt'] == INITIAL_START_TIME:
+                    state_flag = STATE_FLAG_INITIAL
+                elif c_status['ExitCode'] in self.nonrecoverable_exit_codes:
+                    state_flag = STATE_FLAG_NONRECOVERABLE
+                else:
+                    state_flag = 0
+                if c_status['Restarting']:
+                    state_flag |= STATE_FLAG_RESTARTING
             if self.force_update and (map_name, config_name, instance_alias) in self.force_update:
                 state_flag |= STATE_FLAG_OUTDATED
             return c_detail, base_state, state_flag, {}
