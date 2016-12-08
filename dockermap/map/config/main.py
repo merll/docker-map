@@ -20,6 +20,19 @@ LIST_ATTRIBUTES = 'clients',
 get_map_config = itemgetter(0, 1)
 
 
+def _get_single_instances(group_items):
+    return tuple(di[2] for di in group_items)
+
+
+def _get_nested_instances(group_items):
+    instance_set = set()
+    instance_add = instance_set.add
+    return tuple(ni
+                 for di in group_items
+                 for ni in di[2] or (None, )
+                 if ni not in instance_set or instance_add(ni))
+
+
 def expand_groups(config_ids, groups):
     """
     Iterates over a list of container configuration ids, expanding groups of container configurations.
@@ -47,26 +60,31 @@ def expand_groups(config_ids, groups):
             yield config_id
 
 
-def group_instances(config_ids, ext_map=None, ext_maps=None):
+def group_instances(config_ids, single_instances=True, ext_map=None, ext_maps=None):
     """
     Iterates over a list of container configuration ids, grouping instances together. A tuple of instances that matches
     the list of instances in a configuration is replaced with a tuple only containing ``None``.
 
-    :param config_ids: List of container configuration ids.
-    :type config_ids: list[dockermap.map.input.MapConfigId]
+    :param config_ids: Iterable of container configuration ids or (map, config, instance) tuples.
+    :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId] |
+      collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
+    :param single_instances: Whether the instances are a passed as a tuple or as a single string.
+    :type single_instances: bool
     :param ext_map: Extended ContainerMap instance for looking up container configurations. Use this only if all
      elements of ``config_ids`` are from the same map.
     :type ext_map: ContainerMap
     :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
     :type ext_maps: dict[unicode | str, ContainerMap]
     :return: MapConfigId tuples.
-    :rtype: __generator[dockermap.map.input.MapConfigId]
+    :rtype: collections.Iterable[dockermap.map.input.MapConfigId]
     """
     if not (ext_map or ext_maps):
         raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
+    _get_instances = _get_single_instances if single_instances else _get_nested_instances
+
     for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
         map_name, config_name = map_config
-        instances = tuple(di[2] for di in items)
+        instances = _get_instances(items)
         c_map = ext_map or ext_maps[map_name]
         config = c_map.get_existing(config_name)
         if not config:
@@ -77,25 +95,30 @@ def group_instances(config_ids, ext_map=None, ext_maps=None):
             yield MapConfigId(map_name, config_name, instances)
 
 
-def expand_instances(config_ids, ext_map=None, ext_maps=None):
+def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=None):
     """
     Iterates over a list of container configuration ids, expanding configured instances if ``None`` is specified.
 
-    :param config_ids: List of container configuration ids.
-    :type config_ids: list[dockermap.map.input.MapConfigId]
+    :param config_ids: Iterable of container configuration ids or (map, config, instance) tuples.
+    :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId] |
+      collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
+    :param single_instances: Whether the instances are a passed as a tuple or as a single string.
+    :type single_instances: bool
     :param ext_map: Extended ContainerMap instance for looking up container configurations. Use this only if all
      elements of ``config_ids`` are from the same map.
     :type ext_map: ContainerMap
     :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
     :type ext_maps: dict[unicode | str, ContainerMap]
     :return: Tuples of map name, container configuration name, and a single instance name (or ``None``).
-    :rtype: __generator[tuple[unicode | str, unicode | str, unicode | str]]
+    :rtype: collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
     """
     if not (ext_map or ext_maps):
         raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
+    _get_instances = _get_single_instances if single_instances else _get_nested_instances
+
     for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
         map_name, config_name = map_config
-        instances = tuple(di[2] for di in items)
+        instances = _get_instances(items)
         c_map = ext_map or ext_maps[map_name]
         config = c_map.get_existing(config_name)
         if not config:
