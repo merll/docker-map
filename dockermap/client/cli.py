@@ -112,6 +112,7 @@ def _transform_create_kwargs(ka):
     volumes = ka.pop('volumes', None) if binds else None
     expose = ka.pop('ports', None)
     port_bindings = ka.pop('port_bindings', None)
+    links = ka.pop('links', None)
 
     for arg in _transform_kwargs(ka):
         yield arg
@@ -160,6 +161,10 @@ def _transform_create_kwargs(ka):
                         yield _arg_format('publish', '{0}:{1}:{2}'.format(b_ip, b_port, pkey))
                     else:
                         yield _arg_format('publish', '{0}:{1}'.format(pbi, pkey))
+
+    if links:
+        for l in links:
+            yield _mapping_format('link', *l)
 
 
 def parse_containers_output(out):
