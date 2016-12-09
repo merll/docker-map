@@ -77,12 +77,10 @@ class MappingDockerClient(object):
             self._clients = clients or {}
 
         if docker_client:
-            if isinstance(docker_client, docker.Client):
-                default_client = self.configuration_class.from_client(docker_client)
-            elif isinstance(docker_client, ClientConfiguration):
+            if isinstance(docker_client, ClientConfiguration):
                 default_client = docker_client
             else:
-                raise ValueError("Unexpected type of 'docker_client' argument: {0}".format(type(docker_client).__name__))
+                default_client = self.configuration_class.from_client(docker_client)
             default_name = self.policy_class.get_default_client_name()
             self._clients[default_name] = default_client
         self._policy = None
