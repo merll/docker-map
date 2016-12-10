@@ -57,7 +57,7 @@ class ScriptActionGenerator(ResumeActionGenerator):
             else:
                 instance_state = existing[0]
                 c_name = self._policy.cname(states.map, states.config, instance_state.instance)
-                if states.client == self._policy.get_default_client_name():
+                if states.client == self._policy.default_client_name:
                     error_msg = "Container {0} existed prior to running the script.".format(c_name)
                 else:
                     error_msg = ("Container {0} existed on client {1} prior to running the "

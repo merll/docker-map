@@ -11,7 +11,7 @@ from ...functional import resolve_value
 from ..action import (ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ACTION_KILL, ACTION_WAIT)
 from ..config.client import USE_HC_MERGE
 from ..input import NotSet
-from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes
+from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes, get_valid_hostname
 from . import AbstractRunner
 from .attached import AttachedPreparationMixin
 from .cmd import ExecMixin
@@ -90,32 +90,6 @@ class DockerBaseRunnerMixin(object):
 
 
 class DockerConfigMixin(object):
-    def get_hostname(self, config, container_name):
-        """
-        Generates a host name from the container name and the client configuration name.
-
-        :param config: Configuration.
-        :type config: ActionConfig
-        :param container_name: Container name.
-        :type container_name: unicode | str
-        :return: Container host name.
-        :rtype: unicode | str
-        """
-        if config.client_name == self._policy.get_default_client_name():
-            return container_name
-        return '{0}-{1}'.format(container_name, config.client_name)
-
-    def get_domainname(self, config):
-        """
-        Provides a domain name for the container, either from the client configuration or the container map default.
-
-        :param config: Configuration.
-        :type config: ActionConfig
-        :return: Container domain name.
-        :rtype: unicode | str
-        """
-        return resolve_value(config.client_config.get('domainname', config.container_map.default_domain))
-
     def get_create_kwargs(self, config, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to create a container.
@@ -129,18 +103,19 @@ class DockerConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
+        policy = self._policy
         client_config = config.client_config
         container_map = config.container_map
         container_config = config.container_config
         c_kwargs = dict(
             name=container_name,
-            image=self._policy.image_name(container_config.image or config.config_name, container_map),
+            image=policy.image_name(container_config.image or config.config_name, container_map),
             volumes=get_volumes(container_map, container_config),
             user=extract_user(container_config.user),
             ports=[resolve_value(port_binding.exposed_port)
                    for port_binding in container_config.exposes if port_binding.exposed_port],
-            hostname=self.get_hostname(config, container_name) if container_map.set_hostname else None,
-            domainname=self.get_domainname(config),
+            hostname=policy.get_hostname(container_name, config.client_name) if container_map.set_hostname else None,
+            domainname=resolve_value(client_config.get('domainname', container_map.default_domain)),
         )
         if container_config.network == 'disabled':
             c_kwargs['network_disabled'] = True
@@ -189,7 +164,7 @@ class DockerConfigMixin(object):
             volumes_from.extend([aname(map_name, attached)
                                  for attached in container_config.attaches])
         c_kwargs = dict(
-            links=[(cname(map_name, l_name), alias) for l_name, alias in container_config.links],
+            links=[(cname(map_name, l_name), get_valid_hostname(alias)) for l_name, alias in container_config.links],
             binds=get_host_binds(container_map, container_config, config.instance_name),
             volumes_from=volumes_from,
             port_bindings=get_port_bindings(container_config, client_config),

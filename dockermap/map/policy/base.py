@@ -9,6 +9,7 @@ from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from ...functional import resolve_value
 from .cache import ContainerCache, ImageCache
 from .dep import ContainerDependencyResolver
+from .utils import get_valid_hostname
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class BasePolicy(object):
     """
     core_image = DEFAULT_COREIMAGE
     base_image = DEFAULT_BASEIMAGE
+    default_client_name = '__default__'
 
     def __init__(self, container_maps, clients):
         self._maps = {
@@ -38,15 +40,6 @@ class BasePolicy(object):
         for m in self._maps.values():
             self._f_resolver.update(m.dependency_items())
             self._r_resolver.update_backward(m.dependency_items(reverse=True))
-
-    @classmethod
-    def get_default_client_name(cls):
-        """
-        Determines a default client name.
-
-        :return: Default client name.
-        """
-        return '__default__'
 
     @classmethod
     def cname(cls, map_name, container, instance=None):
@@ -157,6 +150,25 @@ class BasePolicy(object):
         default_tag = resolve_value(container_map.default_tag) if container_map else None
         return '{0}:{1}'.format(image_tag, default_tag or 'latest')
 
+    @classmethod
+    def get_hostname(cls, container_name, client_name):
+        """
+        Determines the host name of a container. In this implementation, replaces all dots and underscores of a
+        container name with a dash; then attaches another dash with the client name, unless there is just one default
+        client.
+
+        :param container_name: Name of the container.
+        :type container_name: unicode | str
+        :param client_name: Name of the client configuration.
+        :type client_name: unicode | str
+        :return: Host name.
+        :rtype: unicode | str
+        """
+        base_name = get_valid_hostname(container_name)
+        if client_name == cls.default_client_name:
+            return base_name
+        return '{0}-{1}'.format(base_name, get_valid_hostname(client_name))
+
     def get_clients(self, c_config, c_map):
         """
         Returns the Docker client objects for a given container configuration or map. If there are no clients specified
@@ -174,7 +186,7 @@ class BasePolicy(object):
             return [(client_name, self._clients[client_name]) for client_name in c_config.clients]
         if c_map.clients:
             return [(client_name, self._clients[client_name]) for client_name in c_map.clients]
-        default_name = self.get_default_client_name()
+        default_name = self.default_client_name
         return [(default_name, self._clients[default_name])]
 
     def _get_dependency_config(self, map_name, config_name, instances):

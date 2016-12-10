@@ -36,7 +36,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             volumes=['/etc/nginx'],
             user=None,
             ports=[80, 443, 22],
-            hostname='main.web_server',
+            hostname='main-web-server',
             domainname=None,
         ))
 
@@ -51,8 +51,8 @@ class TestPolicyClientKwargs(unittest.TestCase):
         self.assertDictEqual(kwargs, dict(
             container=c_name,
             links=[
-                ('main.app_server.instance1', 'app_server.instance1'),
-                ('main.app_server.instance2', 'app_server.instance2'),
+                ('main.app_server.instance1', 'app-server-instance1'),
+                ('main.app_server.instance2', 'app-server-instance2'),
             ],
             binds=[
                 '/var/lib/site/config/nginx:/etc/nginx:ro',
@@ -79,7 +79,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                 '/var/lib/app/data'
             ],
             user='2000',
-            hostname='main.app_server',
+            hostname='main-app-server',
             domainname=None,
             ports=[8880],
             host_config=create_host_config(

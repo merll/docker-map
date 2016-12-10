@@ -81,8 +81,7 @@ class MappingDockerClient(object):
                 default_client = docker_client
             else:
                 default_client = self.configuration_class.from_client(docker_client)
-            default_name = self.policy_class.get_default_client_name()
-            self._clients[default_name] = default_client
+            self._clients[self.policy_class.default_client_name] = default_client
         self._policy = None
 
     def get_policy(self):
