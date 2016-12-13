@@ -5,11 +5,10 @@ import logging
 
 from six import iteritems
 
-from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
+from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT
 from ...functional import resolve_value
 from .cache import ContainerCache, ImageCache
 from .dep import ContainerDependencyResolver
-from .utils import get_valid_hostname
 
 log = logging.getLogger(__name__)
 
@@ -26,6 +25,7 @@ class BasePolicy(object):
     core_image = DEFAULT_COREIMAGE
     base_image = DEFAULT_BASEIMAGE
     default_client_name = '__default__'
+    hostname_replace = DEFAULT_HOSTNAME_REPLACEMENT
 
     def __init__(self, container_maps, clients):
         self._maps = {
@@ -151,7 +151,7 @@ class BasePolicy(object):
         return '{0}:{1}'.format(image_tag, default_tag or 'latest')
 
     @classmethod
-    def get_hostname(cls, container_name, client_name):
+    def get_hostname(cls, container_name, client_name=None):
         """
         Determines the host name of a container. In this implementation, replaces all dots and underscores of a
         container name with a dash; then attaches another dash with the client name, unless there is just one default
@@ -159,15 +159,20 @@ class BasePolicy(object):
 
         :param container_name: Name of the container.
         :type container_name: unicode | str
-        :param client_name: Name of the client configuration.
+        :param client_name: Name of the client configuration, where applicable.
         :type client_name: unicode | str
         :return: Host name.
         :rtype: unicode | str
         """
-        base_name = get_valid_hostname(container_name)
-        if client_name == cls.default_client_name:
+        base_name = container_name
+        for old, new in cls.hostname_replace:
+            base_name = base_name.replace(old, new)
+        if not client_name or client_name == cls.default_client_name:
             return base_name
-        return '{0}-{1}'.format(base_name, get_valid_hostname(client_name))
+        client_suffix = client_name
+        for old, new in cls.hostname_replace:
+            client_suffix = client_suffix.replace(old, new)
+        return '{0}-{1}'.format(base_name, client_suffix)
 
     def get_clients(self, c_config, c_map):
         """

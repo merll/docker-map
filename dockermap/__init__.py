@@ -6,3 +6,7 @@ __version__ = '0.7.1.dev0'
 
 DEFAULT_BASEIMAGE = 'tianon/true:latest'
 DEFAULT_COREIMAGE = 'busybox:latest'
+DEFAULT_HOSTNAME_REPLACEMENT = [
+    ('_', '-'),
+    ('.', '-'),
+]

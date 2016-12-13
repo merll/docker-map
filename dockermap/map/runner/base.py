@@ -11,7 +11,7 @@ from ...functional import resolve_value
 from ..action import (ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ACTION_KILL, ACTION_WAIT)
 from ..config.client import USE_HC_MERGE
 from ..input import NotSet
-from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes, get_valid_hostname
+from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes
 from . import AbstractRunner
 from .attached import AttachedPreparationMixin
 from .cmd import ExecMixin
@@ -154,8 +154,9 @@ class DockerConfigMixin(object):
         container_config = config.container_config
         client_config = config.client_config
         map_name = container_map.name
-        aname = self._policy.aname
-        cname = self._policy.cname
+        policy = self._policy
+        aname = policy.aname
+        cname = policy.cname
         volumes_from = list(map(volume_str, config.container_config.uses))
         if container_map.use_attached_parent_name:
             volumes_from.extend([aname(map_name, attached, config.config_name)
@@ -164,7 +165,7 @@ class DockerConfigMixin(object):
             volumes_from.extend([aname(map_name, attached)
                                  for attached in container_config.attaches])
         c_kwargs = dict(
-            links=[(cname(map_name, l_name), get_valid_hostname(alias)) for l_name, alias in container_config.links],
+            links=[(cname(map_name, l_name), policy.get_hostname(alias)) for l_name, alias in container_config.links],
             binds=get_host_binds(container_map, container_config, config.instance_name),
             volumes_from=volumes_from,
             port_bindings=get_port_bindings(container_config, client_config),

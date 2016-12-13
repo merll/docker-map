@@ -167,16 +167,3 @@ def get_instance_volumes(instance_detail):
         return {m['Destination']: m['Source']
                 for m in instance_detail['Mounts']}
     return instance_detail.get('Volumes') or {}
-
-
-def get_valid_hostname(value):
-    """
-    Replaces dot and underscore characters that might occur in container configurations in order to create a valid
-    host name for a container.
-
-    :param value: Container name or client name.
-    :type value: unicode | str
-    :return: Host name.
-    :rtype: unicode | str
-    """
-    return value.replace('_', '-').replace('.', '-')
