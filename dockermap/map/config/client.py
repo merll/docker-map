@@ -47,12 +47,15 @@ class ClientConfiguration(DictMap):
     @classmethod
     def from_client(cls, client):
         """
-        Constructs a configuration object from an existing client instance.
+        Constructs a configuration object from an existing client instance. If the client has already been created with
+        a configuration object, returns that instance.
 
         :param client: Client object to derive the configuration from.
         :type client: docker.client.Client
         :return: ClientConfiguration
         """
+        if hasattr(client, 'client_configuration'):
+            return client.client_configuration
         kwargs = {}
         for attr in cls.init_kwargs:
             if hasattr(client, attr):
@@ -85,7 +88,8 @@ class ClientConfiguration(DictMap):
     def get_client(self):
         """
         Retrieves or creates a client instance from this configuration object. If instantiated from this configuration,
-        the resulting object is also cached in the property ``client``.
+        the resulting object is also cached in the property ``client`` and a reference to this configuration is stored
+        on the client object.
 
         :return: Client object instance.
         :rtype: docker.client.Client
@@ -93,6 +97,7 @@ class ClientConfiguration(DictMap):
         client = self._client
         if not client:
             self._client = client = self.client_constructor(**self.get_init_kwargs())
+            client.client_configuration = self
             # Client might update the version number after construction.
             updated_version = getattr(client, 'api_version', None)
             if updated_version:
