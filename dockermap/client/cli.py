@@ -49,7 +49,7 @@ def _summarize_tags(image_id, image_lines):
     }
 
 
-CREATED_AT_PATTERN = re.compile(r'(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) \+\d{4} \w+')
+CREATED_AT_PATTERN = re.compile(r'(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) [+-]\d{4} \w+')
 PRIVATE_PORT_PATTERN = re.compile('(?P<PrivatePort>\d+(-\d+)?)\/(?P<Type>\w+)')
 PUBLIC_PORT_PATTERN = re.compile(r'(?P<IP>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(?P<PublicPort>\d+(-\d+)?)->'
                                  r'(?P<PrivatePort>\d+(-\d+)?)\/(?P<Type>\w+)')
