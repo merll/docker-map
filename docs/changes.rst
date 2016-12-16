@@ -2,6 +2,19 @@
 
 Change History
 ==============
+0.7.1
+-----
+* Added ``version`` method to command line generator.
+* Internal refactoring: Moved configuration elements to individual modules. If you get any import errors from this
+  update, please check if you are using convenience imports such as ``from dockermap.api import ContainerMap`` instead
+  of the modules where the classes are implemented.
+* Fixed ``ContainerMap.containers`` attribute access to work as documented.
+* Fixes for use of alternative client implementations (e.g. CLI,
+  `Issue #12 <https://github.com/merll/docker-map/issues/12>`_).
+* Fixed ``link`` argument for command line generator (`Issue #13 <https://github.com/merll/docker-map/issues/13>`_).
+* Added replacement for invalid characters in generated host names
+  (`Issue #15 <https://github.com/merll/docker-map/issues/15>`_).
+
 0.7.0
 -----
 * Refactoring of policy framework. The monolithic client action functions have been divided into separate
