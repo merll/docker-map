@@ -97,24 +97,24 @@ class InputConversionTest(unittest.TestCase):
         assert_b({'a': False, 'b': 'ro', 'c': 'ch', 'd': ('dh', True)})
 
     def test_get_container_link(self):
-        assert_a = lambda a: self.assertEqual(get_container_link(a), ContainerLink('a', 'a'))
+        assert_a = lambda a: self.assertEqual(get_container_link(a), ContainerLink('a', None))
         assert_b = lambda b: self.assertEqual(get_container_link(b), ContainerLink('b', 'b_'))
 
         assert_a('a')
         assert_a(('a', ))
-        assert_a(['a', 'a'])
+        assert_a(['a', None])
         assert_b(('b', 'b_'))
 
     def test_get_container_links(self):
-        assert_a = lambda a: self.assertEqual(get_container_links(a), [ContainerLink('a', 'a')])
-        assert_b = lambda b: six.assertCountEqual(self, get_container_links(b), [ContainerLink('a', 'a'),
+        assert_a = lambda a: self.assertEqual(get_container_links(a), [ContainerLink('a', None)])
+        assert_b = lambda b: six.assertCountEqual(self, get_container_links(b), [ContainerLink('a', None),
                                                                                  ContainerLink('b', 'b_')])
 
         assert_a('a')
-        assert_a((ContainerLink('a', 'a'), ))
+        assert_a((ContainerLink('a'), ))
         assert_a([('a', )])
         assert_b(('a', ('b', 'b_')))
-        assert_b({'a': 'a', 'b': 'b_'})
+        assert_b({'a': None, 'b': 'b_'})
 
     def test_get_port_binding(self):
         assert_a = lambda a: self.assertEqual(get_port_binding(a), PortBinding('1234', None, None, False))

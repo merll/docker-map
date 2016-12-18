@@ -11,6 +11,7 @@ from ..functional import lazy_type, uses_type_registry
 SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
 SharedVolume.__new__.__defaults__ = False,
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
+ContainerLink.__new__.__defaults__ = None,
 PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface', 'ipv6'))
 PortBinding.__new__.__defaults__ = None, None, False
 EXEC_POLICY_RESTART = 'restart'
@@ -203,13 +204,11 @@ def get_container_link(value):
     if isinstance(value, ContainerLink):
         return value
     elif isinstance(value, six.string_types):
-        return ContainerLink(value, value)
+        return ContainerLink(value, None)
     elif isinstance(value, (list, tuple)):
         v_len = len(value)
-        if v_len == 2:
+        if 1 <= v_len <= 2:
             return ContainerLink(*value)
-        elif v_len == 1:
-            return ContainerLink(value[0], value[0])
         raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
                          "ContainerLink tuple. Found length {0}.".format(v_len))
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
