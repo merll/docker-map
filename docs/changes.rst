@@ -9,6 +9,11 @@ Change History
   update, please check if you are using convenience imports such as ``from dockermap.api import ContainerMap`` instead
   of the modules where the classes are implemented.
 * Fixed ``ContainerMap.containers`` attribute access to work as documented.
+
+  .. note::
+    The default iteration behavior has also changed. Similar to ``ContainerMap.host`` and ``ContainerMap.volumes``, it
+    generates items. Before iteration was returning keys, as usual for dictionaries.
+
 * Fixes for use of alternative client implementations (e.g. CLI,
   `Issue #12 <https://github.com/merll/docker-map/issues/12>`_).
 * Fixed ``link`` argument for command line generator (`Issue #13 <https://github.com/merll/docker-map/issues/13>`_).
@@ -35,7 +40,7 @@ Change History
 
   * ``dockermap.map.policy.cache.CachedImages.reset_latest`` has been renamed to
     :meth:`~dockermap.map.policy.cache.CachedImages.reset_updated`.
-  * :meth:``dockermap.map.policy.cache.CachedImages.ensure_image`` argument ``pull_latest`` has been renamed to
+  * :meth:`~dockermap.map.policy.cache.CachedImages.ensure_image` argument ``pull_latest`` has been renamed to
     ``pull``.
   * ``dockermap.map.policy.update.ContainerUpdateMixin.pull_latest`` has been renamed to
     :attr:`~dockermap.map.policy.update.ContainerUpdateMixin.pull_before_update`.
