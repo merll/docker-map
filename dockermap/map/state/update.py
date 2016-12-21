@@ -238,10 +238,11 @@ class UpdateStateGenerator(DependencyStateGenerator):
             link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
         for link in c_config.links:
             instance_aliases = link_dict.get(self._policy.cname(map_name, link.container))
-            if not instance_aliases or link.alias not in instance_aliases:
-                log.debug("Checked link %s - could not find alias %s", link.container, link.alias)
+            config_alias = link.alias or link.container
+            if not instance_aliases or config_alias not in instance_aliases:
+                log.debug("Checked link %s - could not find alias %s", link.container, config_alias)
                 return False
-            log.debug("Checked link %s - found alias %s", link.container, link.alias)
+            log.debug("Checked link %s - found alias %s", link.container, config_alias)
         return True
 
     def _check_commands(self, container_config, client, container_name):

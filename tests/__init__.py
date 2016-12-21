@@ -63,7 +63,7 @@ MAP_DATA_2 = {
         'svc': {
         },
         'sub_svc': {
-            'links': [('sub_sub_svc', 'sub_sub_svc')],
+            'links': 'sub_sub_svc',
         },
         'sub_sub_svc': {
         },
@@ -140,7 +140,7 @@ MAP_DATA_2 = {
                 '/etc/redis': ('redis/config', 'ro'),
                 '/var/lib/redis': 'redis/data',
             },
-            'links': [('sub_svc', 'sub_svc')],
+            'links': 'sub_svc',
             'attaches': ['redis_socket', 'redis_log'],
             'user': 'redis',
             'permissions': 'u=rwX,g=rX,o=',
