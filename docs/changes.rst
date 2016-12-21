@@ -2,6 +2,11 @@
 
 Change History
 ==============
+0.7.2
+-----
+* Fixed recursive dependency resolution order.
+* Setting an alias name is always optional for container links, even if ``ContainerLinks`` tuple is used directly.
+
 0.7.1
 -----
 * Added ``version`` method to command line generator.
