@@ -23,7 +23,7 @@ class ContainerDependencyResolver(MultiDependencyResolver):
         :type item: tuple[unicode | str]
         :param resolve_parent: Function to resolve parent dependencies.
         :type resolve_parent: function
-        :type parents: iterable
+        :type parents: collections.Iterable[unicode | str]
         :return: List of recursively resolved dependencies of this container.
         :rtype: list
         :raise CircularDependency: If the current element depends on one found deeper in the hierarchy.

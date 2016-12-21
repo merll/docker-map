@@ -74,7 +74,7 @@ class ContainerImageResolver(SingleDependencyResolver):
     :param container_images: Set of image ids currently used by containers.
     :type container_images: set[unicode | str]
     :param images: Iterable or dictionary of images in the format `(image, parent_image)`.
-    :type images: iterable
+    :type images: collections.Iterable
     """
 
     def __init__(self, container_images=None, images=None):
@@ -171,7 +171,7 @@ class DockerUtilityMixin(object):
         :param include_initial: Consider containers that have never been started.
         :type include_initial: bool
         :param exclude: Container names to exclude from the cleanup process.
-        :type exclude: iterable
+        :type exclude: collections.Iterable[unicode | str]
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
         """

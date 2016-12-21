@@ -105,7 +105,7 @@ def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no
     :param uid: User id to use.
     :type uid: int
     :param groupnames: Iterable with additional group names to assign the user to.
-    :type groupnames: iterable
+    :type groupnames: collections.Iterable[unicode | str]
     :param system: Create a system user and group. Default is ``False``.
     :type system: bool
     :param no_login: Disallow login of this user and group, and skip creating the home directory. Default is ``True``.
@@ -158,7 +158,7 @@ def mkdir_chown(paths, user_group=None, permissions='ug=rwX,o=rX', create_parent
     `user_group` and `permissions` are still be applied.
 
     :param paths: Can be a single path string, or a list or tuple of path strings.
-    :type paths: unicode | str | iterable
+    :type paths: unicode | str | tuple[unicode | str] | list[unicode | str]
     :param: Optional owner of the directory. For notation, see :func:`~get_user_group`.
     :type user_group: unicode | str | int | tuple
     :param permissions: Optional permission mode, in any notation accepted by the unix `chmod` command.

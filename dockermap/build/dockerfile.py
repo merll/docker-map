@@ -154,7 +154,7 @@ class DockerFile(DockerStringBuffer):
         :param prefix: Dockerfile command to use, e.g. ``ENV`` or ``RUN``.
         :type prefix: unicode | str
         :param lines: Lines with arguments to be prefixed.
-        :type lines: iterable
+        :type lines: collections.Iterable[unicode | str]
         """
         for line in lines:
             if isinstance(line, (tuple, list)):
@@ -177,7 +177,7 @@ class DockerFile(DockerStringBuffer):
         Insert a series of commands in a Dockerfile, all prefixed with ``RUN``.
 
         :param lines: Command lines to be inserted.
-        :type: iterable
+        :type: collections.Iterable[unicode | str]
         """
         self.prefix_all('RUN', *lines)
 
@@ -306,7 +306,7 @@ class DockerFile(DockerStringBuffer):
         Adds a sequence of content to the Dockerfile.
 
         :param sequence: Content sequence.
-        :type sequence: iterable
+        :type sequence: collections.Iterable[unicode | str]
         """
         for s in sequence:
             self.writeline(s)

@@ -183,7 +183,7 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
 
         :param map_name: Container map name.
         :param config_name: Container configuration name.
-        :return: Iterable of dependency objects in tuples of map name, container (config) name, instances.
+        :return: List of dependency objects in tuples of map name, container (config) name, instances.
         :rtype: list[tuple]
         """
         pass

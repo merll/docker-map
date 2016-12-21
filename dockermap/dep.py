@@ -76,7 +76,7 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
     parent dependencies can be merged with the current node.
 
     :param initial: Optional: Iterable or dictionary in the format `(dependent_item, dependence)`.
-    :type initial: iterable
+    :type initial: collections.Iterable
     """
     def __init__(self, initial=None):
         self._deps = _dependency_dict(initial)
@@ -150,7 +150,7 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         nodes.
 
         :param items: Iterable or dictionary in the format `(dependent_item, dependence)`.
-        :type items: iterable
+        :type items: collections.Iterable
         """
         self._deps.update(_dependency_dict(items))
 
@@ -167,7 +167,7 @@ class SingleDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         node has also exactly one dependent. For other cases, :class:`~MultiDependencyResolver` should be used.
 
         :param items: Iterable or dictionary in the format `(item, dependent_items)`.
-        :type items: iterable
+        :type items: collections.Iterable
         """
         for parent, sub_items in items:
             for si in sub_items:
@@ -191,7 +191,7 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         :param resolve_parent: Function to check on dependencies deeper in the hierarchy.
         :type resolve_parent: function
         :param parents: Parent nodes.
-        :type parents: iterable
+        :type parents: collections.Iterable
         :return: Result of the dependency merge. May be boolean, a set, or anything else that represents all
          dependencies.
         :rtype: bool
@@ -204,7 +204,7 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         nodes.
 
         :param items: Iterable or dictionary in the format `(dependent_item, dependencies)`.
-        :type items: iterable
+        :type items: collections.Iterable
         """
         for item, parents in _iterate_dependencies(items):
             dep = self._deps[item]
@@ -216,7 +216,7 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         as `(item, dependent_items)`. The parent element `item` may occur multiple times.
 
         :param items: Iterable or dictionary in the format `(item, dependent_items)`.
-        :type items: iterable
+        :type items: collections.Iterable
         """
         for parent, sub_items in _iterate_dependencies(items):
             for si in sub_items:

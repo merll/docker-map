@@ -159,7 +159,7 @@ class MappingDockerClient(object):
          configuration (or just one default instance).
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
-        :type instances: iterable
+        :type instances: collections.Iterable[unicode | str | NoneType]
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container start.
         :return: Return values of created main containers.
@@ -175,7 +175,7 @@ class MappingDockerClient(object):
         :type container: unicode | str
         :param instances: Instance names to stop. If not specified, will restart all instances as specified in the
          configuration (or just one default instance).
-        :type instances: iterable
+        :type instances: collections.Iterable[unicode | str | NoneType]
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
@@ -193,7 +193,7 @@ class MappingDockerClient(object):
         :type container: unicode | str
         :param instances: Instance names to stop. If not specified, will stop all instances as specified in the
          configuration (or just one default instance).
-        :type instances: iterable
+        :type instances: collections.Iterable[unicode | str | NoneType]
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
@@ -215,7 +215,7 @@ class MappingDockerClient(object):
         :type container: unicode | str
         :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
          configuration (or just one default instance).
-        :type instances: iterable
+        :type instances: collections.Iterable[unicode | str | NoneType]
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
@@ -234,7 +234,7 @@ class MappingDockerClient(object):
         :type container: unicode | str
         :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
          configuration (or just one default instance).
-        :type instances: iterable
+        :type instances: collections.Iterable[unicode | str | NoneType]
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. Only options controlling policy behavior are considered.
@@ -252,7 +252,7 @@ class MappingDockerClient(object):
         :type container: unicode | str
         :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
          configuration (or just one default instance).
-        :type instances: iterable
+        :type instances: collections.Iterable[unicode | str | NoneType]
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. Only options controlling policy behavior are considered.
@@ -271,7 +271,7 @@ class MappingDockerClient(object):
         :type container: unicode | str
         :param instances: Instance names to remove. If not specified, will remove all instances as specified in the
          configuration (or just one default instance).
-        :type instances: iterable
+        :type instances: collections.Iterable[unicode | str | NoneType]
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. Only options controlling policy behavior are considered.
@@ -290,7 +290,7 @@ class MappingDockerClient(object):
         :type container: unicode | str
         :param instances: Instance names to remove. If not specified, runs on all instances as specified in the
          configuration (or just one default instance).
-        :type instances: iterable
+        :type instances: collections.Iterable[unicode | str | NoneType]
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs for the policy method.
