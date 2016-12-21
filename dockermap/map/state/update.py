@@ -315,7 +315,7 @@ class UpdateStateGenerator(DependencyStateGenerator):
             UpdateStateGenerator, self).get_container_state(map_name, container_map, config_name, container_config,
                                                             client_name, client_config, client, instance_alias,
                                                             config_flags=config_flags)
-        if base_state == STATE_ABSENT:
+        if base_state == STATE_ABSENT or state_flags & STATE_FLAG_OUTDATED:
             return detail, base_state, state_flags, extra
 
         c_image_id = detail['Image']

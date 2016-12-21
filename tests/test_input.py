@@ -5,12 +5,15 @@ import unittest
 import six
 
 from dockermap.functional import lazy_once
+from dockermap.map import DictMap
+from dockermap.map.config.main import expand_groups
 from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume, get_shared_volumes,
                                  get_shared_host_volume, get_shared_host_volumes, SharedVolume,
                                  get_container_link, get_container_links, ContainerLink,
                                  get_port_binding, get_port_bindings, PortBinding,
                                  get_exec_command, get_exec_commands, ExecCommand, EXEC_POLICY_RESTART,
-                                 EXEC_POLICY_INITIAL, merge_list)
+                                 EXEC_POLICY_INITIAL, get_map_config_id, get_map_config_ids, MapConfigId,
+                                 merge_list)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -186,6 +189,65 @@ class InputConversionTest(unittest.TestCase):
         assert_b([(['a', 'b', 'c'], None),
                   ExecCommand('a b c', 'user', EXEC_POLICY_RESTART),
                   [['a', 'b', 'c'], 'root', EXEC_POLICY_INITIAL]])
+
+    def test_get_map_config_id(self):
+        assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
+                                                              MapConfigId('m', 'c'))
+        assert_b = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
+                                                              MapConfigId('m', 'c', ('i', )))
+        assert_c = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
+                                                              MapConfigId('m', 'c', ('i', 'j')))
+        assert_a('m.c')
+        assert_a('m.c', 'x')
+        assert_a('m.c.')
+        assert_a(('m', 'c', None))
+        assert_a(['m', 'c'])
+        assert_a(['m', 'c', []], 'x')
+        assert_a('c', 'm')
+        assert_a(['c'], 'm')
+        assert_b('m.c.i')
+        assert_b('m.c.i', 'x', 'j')
+        assert_b(('m', 'c', 'i'))
+        assert_b(['m', 'c', 'i'])
+        assert_b(['m', 'c', ('i', )])
+        assert_b(('m', 'c', ('i', )))
+        assert_b(('m', 'c'), i=('i', ))
+        assert_b('c', 'm', ('i', ))
+        assert_b(('c', ), 'm', ('i', ))
+        assert_c(['m', 'c', ('i', 'j')])
+        assert_c(('m', 'c', ['i', 'j']))
+        assert_c(('m', 'c'), i=('i', 'j'))
+        assert_c('c', 'm', ('i', 'j'))
+        assert_c(('c', ), 'm', ('i', 'j'))
+
+    def test_get_map_config_ids(self):
+        groups = {'m': DictMap(default=['c.i', 'd.i']), 'n': DictMap(default=['e'])}
+        assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_ids(v, map_name=m, instances=i),
+                                                              [MapConfigId('m', 'c')])
+        assert_b = lambda v, m=None, i=None: six.assertCountEqual(self, get_map_config_ids(v, map_name=m, instances=i),
+                                                                  [MapConfigId('m', 'c', ('i', )),
+                                                                   MapConfigId('m', 'd', ('i', )),
+                                                                   MapConfigId('n', 'e', ('i', 'j'))])
+        assert_c = lambda v, m=None, i=None: six.assertCountEqual(self,
+                                                                  expand_groups(
+                                                                      get_map_config_ids(v, map_name=m, instances=i),
+                                                                      groups
+                                                                  ),
+                                                                  [MapConfigId('m', 'c', ('i', )),
+                                                                   MapConfigId('m', 'd', ('i', )),
+                                                                   MapConfigId('n', 'e', ('i', )),
+                                                                   MapConfigId('n', 'e', ('j', ))])
+        assert_a('m.c')
+        assert_a('c', 'm')
+        assert_a('c', 'm', [])
+        assert_a([['m', 'c']])
+        assert_b(['m.c.',
+                  'd',
+                  ('n', 'e', ['i', 'j'])], 'm', 'i')
+        assert_b([[None, 'c'],
+                  ('d', ),
+                  ['n', 'e', ('i', 'j')]], 'm', ('i',))
+        assert_c(['m.default', 'n.default', 'n.e.j'], None, ('i', ))
 
     def test_merge_list(self):
         list1 = ['a', 'b', 'c']

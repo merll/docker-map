@@ -10,8 +10,8 @@ import responses
 from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from dockermap.map.config.client import ClientConfiguration
 from dockermap.map.config.host_volume import get_host_path
-from dockermap.map.config.main import ContainerMap
-from dockermap.map.input import ExecCommand, EXEC_POLICY_INITIAL, EXEC_POLICY_RESTART
+from dockermap.map.config.main import ContainerMap, expand_instances
+from dockermap.map.input import ExecCommand, EXEC_POLICY_INITIAL, EXEC_POLICY_RESTART, MapConfigId
 from dockermap.map.policy import CONFIG_FLAG_DEPENDENT
 from dockermap.map.policy.base import BasePolicy
 from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESENT, STATE_ABSENT,
@@ -19,6 +19,7 @@ from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESEN
                                  STATE_FLAG_OUTDATED)
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
+from dockermap.map.state.utils import merge_dependency_paths
 
 from tests import MAP_DATA_2, CLIENT_DATA_1
 
@@ -183,13 +184,9 @@ def _add_inspect(rsps, container_map, map_name, c_config, config_name, instance_
     return container_id, container_name
 
 
-def _get_single_state(sg, map_name, config_name, instance=None):
-    if instance:
-        instances = [instance]
-    else:
-        instances = None
+def _get_single_state(sg, config_ids):
     states = [si
-              for s in sg.get_states(map_name, config_name, instances)
+              for s in sg.get_states(config_ids)
               for si in s.instances]
     return states[0]
 
@@ -202,10 +199,14 @@ class TestPolicyStateGenerators(unittest.TestCase):
         self.sample_map.repository = None
         self.sample_client_config = client_config = ClientConfiguration(**CLIENT_DATA_1)
         self.policy = BasePolicy({map_name: sample_map}, {'__default__': client_config})
+        self.server_config_id = self._config_id('server')
         all_images = set(c_config.image or c_name for c_name, c_config in sample_map)
         all_images.add(DEFAULT_COREIMAGE)
         all_images.add(DEFAULT_BASEIMAGE)
         self.images = list(enumerate(all_images))
+
+    def _config_id(self, config_name, instance=None):
+        return [MapConfigId(self.map_name, config_name, (instance, ) if instance else None)]
 
     def _setup_containers(self, rsps, containers_states):
         container_names = []
@@ -239,7 +240,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
     def test_dependency_states_running(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_default_containers(rsps)
-            states = list(DependencyStateGenerator(self.policy, {}).get_states(self.map_name, 'server'))
+            states = list(DependencyStateGenerator(self.policy, {}).get_states(self.server_config_id))
             instance_base_states = [si.base_state
                                     for s in states
                                     for si in s.instances]
@@ -264,30 +265,60 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('worker_q2', P_STATE_INITIAL),
             ])
             sg = SingleStateGenerator(self.policy, {})
-            cache_state = _get_single_state(sg, self.map_name, 'redis', 'cache')
+            cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
             self.assertEqual(cache_state.base_state, STATE_PRESENT)
-            queue_state = _get_single_state(sg, self.map_name, 'redis', 'queue')
+            queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
             self.assertEqual(queue_state.base_state, STATE_RUNNING)
-            svc_state = _get_single_state(sg, self.map_name, 'svc')
+            svc_state = _get_single_state(sg, self._config_id('svc'))
             self.assertEqual(svc_state.base_state, STATE_PRESENT)
             self.assertEqual(svc_state.flags & STATE_FLAG_NONRECOVERABLE, STATE_FLAG_NONRECOVERABLE)
-            worker_state = _get_single_state(sg, self.map_name, 'worker')
+            worker_state = _get_single_state(sg, self._config_id('worker'))
             self.assertEqual(worker_state.flags & STATE_FLAG_RESTARTING, STATE_FLAG_RESTARTING)
-            worker2_state = _get_single_state(sg, self.map_name, 'worker_q2')
+            worker2_state = _get_single_state(sg, self._config_id('worker_q2'))
             self.assertEqual(worker2_state.base_state, STATE_PRESENT)
             self.assertEqual(worker2_state.flags & STATE_FLAG_INITIAL, STATE_FLAG_INITIAL)
-            server_states = _get_single_state(sg, self.map_name, 'server')
+            server_states = _get_single_state(sg, self.server_config_id)
             self.assertEqual(server_states.base_state, STATE_ABSENT)
+
+    def test_single_states_forced_config(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_containers(rsps, [
+                _container('redis', instances=['cache', 'queue']),
+            ])
+            force_update = set(expand_instances(self._config_id('redis'), single_instances=False,
+                                                ext_map=self.sample_map))
+            sg = SingleStateGenerator(self.policy, {'force_update': force_update})
+            cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
+            self.assertEqual(cache_state.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
+            self.assertEqual(queue_state.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+
+    def test_single_states_forced_instance(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_containers(rsps, [
+                _container('redis', instances=['cache', 'queue']),
+            ])
+            force_update = set(expand_instances(self._config_id('redis', 'cache'), single_instances=False,
+                                                ext_map=self.sample_map))
+            sg = SingleStateGenerator(self.policy, {'force_update': force_update})
+            cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
+            self.assertEqual(cache_state.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
+            self.assertEqual(queue_state.flags & STATE_FLAG_OUTDATED, 0)
 
     def test_dependent_states(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
+                _container('sub_sub_svc'),
+                _container('sub_svc'),
                 _container('redis'),
+                _container('svc'),
                 _container('server'),
+                _container('server2'),
                 _container('worker'),
                 _container('worker_q2'),
             ])
-            states = list(DependentStateGenerator(self.policy, {}).get_states(self.map_name, 'redis'))
+            states = list(DependentStateGenerator(self.policy, {}).get_states(self._config_id('redis')))
             instance_base_states = [si.base_state
                                     for s in states
                                     for si in s.instances]
@@ -305,7 +336,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
     def test_update_states_clean(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_default_containers(rsps)
-            states = list(UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server'))
+            states = list(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             valid_order = ['sub_sub_svc', 'sub_svc', 'redis', 'server']
             for c_states in states:
                 config_name = c_states.config
@@ -325,7 +356,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -342,7 +373,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, 0)
@@ -359,7 +390,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server', attached_volumes_valid=False),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -376,7 +407,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server', Image='invalid'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -390,7 +421,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server', NetworkSettings=dict(Ports={})),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -399,7 +430,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_default_containers(rsps)
             self.sample_map.containers['server'].create_options.update(environment=dict(Test='x'))
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -408,7 +439,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_default_containers(rsps)
             self.sample_map.containers['server'].create_options.update(command='/bin/true')
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
@@ -421,7 +452,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.sample_map.containers['server'].exec_commands = [cmd1]
             self._setup_default_containers(rsps)
             self.sample_map.containers['server'].exec_commands = [cmd1, cmd2, cmd3]
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
+            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
             server_states = states['server'].instances[0]
             self.assertEqual(server_states.base_state, STATE_RUNNING)
             self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, 0)
@@ -430,3 +461,100 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 (cmd2, False),
                 (cmd3, False),
             ]})
+
+
+class TestPolicyStateUtils(unittest.TestCase):
+    def setUp(self):
+        self.map_name = map_name = 'main'
+        self.sample_map = sample_map = ContainerMap('main', MAP_DATA_2,
+                                                    use_attached_parent_name=True).get_extended_map()
+        # self.sample_map.repository = None
+        self.sample_client_config = client_config = ClientConfiguration(**CLIENT_DATA_1)
+        self.policy = policy = BasePolicy({map_name: sample_map}, {'__default__': client_config})
+        self.state_gen = DependencyStateGenerator(policy, {})
+        self.server_dependencies = [
+            (map_name, 'sub_sub_svc', (None,)),
+            (map_name, 'sub_svc', (None,)),
+            (map_name, 'svc', (None,)),
+            (map_name, 'redis', (None, )),
+        ]
+
+    def test_merge_two_common(self):
+        server_config = self.map_name, 'server', (None, )
+        worker_config = self.map_name, 'worker', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [server_config, worker_config]
+        ])
+        self.assertEqual(len(merged_paths), 1)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+
+    def test_merge_three_common(self):
+        server_config = self.map_name, 'server', (None, )
+        worker_config = self.map_name, 'worker', (None, )
+        worker_q2_config = self.map_name, 'worker_q2', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [server_config, worker_config, worker_q2_config]
+        ])
+        self.assertEqual(len(merged_paths), 1)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+
+    def test_merge_three_common_with_extension(self):
+        worker_config = self.map_name, 'worker', (None, )
+        server2_config = self.map_name, 'server2', (None, )
+        worker_q2_config = self.map_name, 'worker_q2', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [worker_config, server2_config, worker_q2_config]
+        ])
+        self.assertEqual(len(merged_paths), 2)
+        self.assertEqual(merged_paths[0][0], worker_config)
+        self.assertEqual(merged_paths[1][0], server2_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+        self.assertItemsEqual([
+            (self.map_name, 'svc2', (None,)),
+        ], merged_paths[1][1])
+
+    def test_merge_included_first(self):
+        redis_config = self.map_name, 'redis', ('cache', )
+        server_config = self.map_name, 'server', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [redis_config, server_config]
+        ])
+        self.assertEqual(len(merged_paths), 1)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+
+    def test_merge_included_second(self):
+        server_config = self.map_name, 'server', (None, )
+        redis_config = self.map_name, 'redis', ('cache', )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [server_config, redis_config]
+        ])
+        self.assertEqual(len(merged_paths), 1)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+
+    def test_merge_included_multiple(self):
+        sub_svc_config = self.map_name, 'sub_svc', (None, )
+        sub_sub_svc_config = self.map_name, 'sub_sub_svc', (None, )
+        svc_config = self.map_name, 'svc', (None, )
+        server_config = self.map_name, 'server', (None, )
+        redis_config = self.map_name, 'redis', ('queue', )
+        server2_config = self.map_name, 'server2', (None, )
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(*c[:2]))
+            for c in [sub_sub_svc_config, sub_svc_config, svc_config, server_config, redis_config, server2_config]
+        ])
+        self.assertEqual(len(merged_paths), 2)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertEqual(merged_paths[1][0], server2_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+        self.assertItemsEqual([
+            (self.map_name, 'svc2', (None,)),
+        ], merged_paths[1][1])

@@ -18,6 +18,8 @@ EXEC_POLICY_RESTART = 'restart'
 EXEC_POLICY_INITIAL = 'initial'
 ExecCommand = namedtuple('ExecCommand', ('cmd', 'user', 'policy'))
 ExecCommand.__new__.__defaults__ = None, EXEC_POLICY_RESTART
+MapConfigId = namedtuple('MapConfigId', ('map_name', 'config_name', 'instances'))
+MapConfigId.__new__.__defaults__ = None,
 
 
 CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
@@ -39,17 +41,17 @@ class _NotSet(object):
 NotSet = _NotSet()
 
 
-def _get_listed_tuples(value, element_type, conversion_func):
+def _get_listed_tuples(value, element_type, conversion_func, **kwargs):
     if value is None:
         return []
     elif isinstance(value, element_type) or uses_type_registry(value):
         return [value]
     elif isinstance(value, six.string_types):
-        return [conversion_func(value)]
+        return [conversion_func(value, **kwargs)]
     elif isinstance(value, (list, tuple)):
-        return [conversion_func(e) for e in value]
+        return [conversion_func(e, **kwargs) for e in value]
     elif isinstance(value, dict):
-        return [conversion_func(e) for e in six.iteritems(value)]
+        return [conversion_func(e, **kwargs) for e in six.iteritems(value)]
     raise ValueError("Invalid type; expected {0}, list, tuple, or dict; found {1}.".format(
         element_type.__name__, type(value).__name__))
 
@@ -279,6 +281,61 @@ def get_exec_command(value):
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
+def get_map_config_id(value, map_name=None, instances=None):
+    """
+    Converts the input to a MapConfigId tuple. It can be from a single string, list, or tuple. Single values
+    (also single-element lists or tuples) are considered to be a container configuration on the default map. A string
+    with two elements separated by a dot or two-element lists / tuples are considered to be referring to a specific
+    map and configuration. Three strings concatenated with a dot or three-element lists / tuples are considered to be
+    referring to a map, configuration, and instances. Multiple instances can be specified in the third element by
+    passing a tuple or list.
+
+    :param value: Input value for conversion.
+    :param map_name: Map name; provides the default map name unless otherwise specified in ``value``.
+    :type map_name: unicode | str
+    :param instances: Instance names; instances to set if not otherwise specified in ``value``.
+    :type instances: unicode | str | tuple[unicode | str | NoneType]
+    :return: MapConfigId tuple.
+    :rtype: MapConfigId
+    """
+    if isinstance(value, MapConfigId):
+        return value
+    elif isinstance(value, six.string_types):
+        s_map_name, __, s_config_name = value.partition('.')
+        if s_config_name:
+            config_name, __, s_instance = s_config_name.partition('.')
+            if s_instance:
+                s_instances = s_instance,
+            else:
+                s_instances = None
+        else:
+            config_name = s_map_name
+            s_map_name = map_name
+            s_instances = None
+        return MapConfigId(s_map_name, config_name, s_instances or instances)
+    if isinstance(value, (tuple, list)):
+        v_len = len(value)
+        if v_len == 3:
+            v_instances = value[2]
+            if not v_instances:
+                return MapConfigId(value[0], value[1], None)
+            if isinstance(v_instances, tuple):
+                return MapConfigId(*value)
+            elif isinstance(v_instances, list):
+                return MapConfigId(value[0], value[1], tuple(v_instances))
+            elif isinstance(v_instances, six.string_types):
+                return MapConfigId(value[0], value[1], (v_instances, ))
+            raise ValueError("Invalid type of instance specification in '{0}'; expected a list, tuple, or string type, "
+                             "found {1}.".format(value, type(v_instances).__name__))
+        elif v_len == 2:
+            return MapConfigId(value[0] or map_name, value[1], instances)
+        elif v_len == 1:
+            return MapConfigId(map_name, value[0], instances)
+        raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
+                         "MapConfigId tuple. Found length {0}.".format(v_len))
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+
+
 def get_shared_volumes(value):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume tuples.
@@ -358,6 +415,32 @@ def get_port_bindings(value):
     :rtype: list[PortBinding]
     """
     return _get_listed_tuples(value, PortBinding, get_port_binding)
+
+
+def get_map_config_ids(value, map_name=None, instances=None):
+    """
+    Converts a single value, a list or tuple, or a dictionary into a list of MapConfigId tuples.
+
+    :param value: Input value to convert.
+    :param map_name: Map name; provides the default map name unless otherwise specified in ``value``.
+    :type map_name: unicode | str
+    :param instances: Instance names; instances to set if not otherwise specified in ``value``.
+    :type instances: unicode | str | list[unicode | str] | tuple[unicode | str]
+    :return: List of MapConfigId tuples.
+    :rtype: list[MapConfigId]
+    """
+    if not instances:
+        default_instances = None
+    elif isinstance(instances, tuple):
+        default_instances = instances
+    elif isinstance(instances, list):
+        default_instances = tuple(instances)
+    elif isinstance(instances, six.string_types):
+        default_instances = (instances, )
+    else:
+        raise ValueError("Invalid instances specification; expected string, list, or tuple, found "
+                         "{0}.".format(type(instances).__name__))
+    return _get_listed_tuples(value, MapConfigId, get_map_config_id, map_name=map_name, instances=default_instances)
 
 
 def merge_list(items, merged_list):

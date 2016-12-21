@@ -8,16 +8,127 @@ from operator import itemgetter
 import six
 
 from .. import DictMap, DefaultDictMap
-from ..input import get_list, merge_list
+from ..input import get_list, merge_list, MapConfigId
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
 
 
 SINGLE_ATTRIBUTES = 'repository', 'default_domain', 'set_hostname', 'use_attached_parent_name', 'default_tag'
-DICT_ATTRIBUTES = 'volumes', 'host'
+DICT_ATTRIBUTES = 'volumes', 'host', 'groups'
 LIST_ATTRIBUTES = 'clients',
 
 get_map_config = itemgetter(0, 1)
+
+
+def _get_single_instances(group_items):
+    return tuple(di[2] for di in group_items)
+
+
+def _get_nested_instances(group_items):
+    instance_set = set()
+    instance_add = instance_set.add
+    return tuple(ni
+                 for di in group_items
+                 for ni in di[2] or (None, )
+                 if ni not in instance_set or instance_add(ni))
+
+
+def expand_groups(config_ids, groups):
+    """
+    Iterates over a list of container configuration ids, expanding groups of container configurations.
+
+    :param config_ids: List of container configuration ids.
+    :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId]
+    :param groups: Dictionary of container configuration groups per map.
+    :type groups: dict[unicode | str, dockermap.map.DictMap]
+    :return: Expanded MapConfigId tuples.
+    :rtype: collections.Iterable[dockermap.map.input.MapConfigId]
+    """
+    for config_id in config_ids:
+        group = groups[config_id.map_name].get(config_id.config_name)
+        if group is not None:
+            for group_item in group:
+                if isinstance(group_item, MapConfigId):
+                    yield group_item
+                elif isinstance(group_item, six.string_types):
+                    config_name, __, instance = group_item.partition('.')
+                    yield MapConfigId(config_id.map_name, config_name, (instance, ) if instance else config_id.instances)
+                else:
+                    raise ValueError("Invalid group item. Must be string or MapConfigId tuple; found {0}.".format(
+                        type(group_item).__name__))
+        else:
+            yield config_id
+
+
+def group_instances(config_ids, single_instances=True, ext_map=None, ext_maps=None):
+    """
+    Iterates over a list of container configuration ids, grouping instances together. A tuple of instances that matches
+    the list of instances in a configuration is replaced with a tuple only containing ``None``.
+
+    :param config_ids: Iterable of container configuration ids or (map, config, instance) tuples.
+    :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId] |
+      collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
+    :param single_instances: Whether the instances are a passed as a tuple or as a single string.
+    :type single_instances: bool
+    :param ext_map: Extended ContainerMap instance for looking up container configurations. Use this only if all
+     elements of ``config_ids`` are from the same map.
+    :type ext_map: ContainerMap
+    :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
+    :type ext_maps: dict[unicode | str, ContainerMap]
+    :return: MapConfigId tuples.
+    :rtype: collections.Iterable[dockermap.map.input.MapConfigId]
+    """
+    if not (ext_map or ext_maps):
+        raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
+    _get_instances = _get_single_instances if single_instances else _get_nested_instances
+
+    for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
+        map_name, config_name = map_config
+        instances = _get_instances(items)
+        c_map = ext_map or ext_maps[map_name]
+        config = c_map.get_existing(config_name)
+        if not config:
+            raise KeyError((map_name, config_name))
+        if config.instances and (None in instances or len(instances) == len(config.instances)):
+            yield MapConfigId(map_name, config_name, (None, ))
+        else:
+            yield MapConfigId(map_name, config_name, instances)
+
+
+def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=None):
+    """
+    Iterates over a list of container configuration ids, expanding configured instances if ``None`` is specified.
+
+    :param config_ids: Iterable of container configuration ids or (map, config, instance) tuples.
+    :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId] |
+      collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
+    :param single_instances: Whether the instances are a passed as a tuple or as a single string.
+    :type single_instances: bool
+    :param ext_map: Extended ContainerMap instance for looking up container configurations. Use this only if all
+     elements of ``config_ids`` are from the same map.
+    :type ext_map: ContainerMap
+    :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
+    :type ext_maps: dict[unicode | str, ContainerMap]
+    :return: Tuples of map name, container configuration name, and a single instance name (or ``None``).
+    :rtype: collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
+    """
+    if not (ext_map or ext_maps):
+        raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
+    _get_instances = _get_single_instances if single_instances else _get_nested_instances
+
+    for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
+        map_name, config_name = map_config
+        instances = _get_instances(items)
+        c_map = ext_map or ext_maps[map_name]
+        config = c_map.get_existing(config_name)
+        if not config:
+            raise KeyError(map_name, config_name)
+        if config.instances and None in instances:
+            for i in config.instances:
+                yield map_name, config_name, i
+        else:
+            for i in instances:
+                yield map_name, config_name, i
 
 
 class MapIntegrityError(Exception):
@@ -53,6 +164,7 @@ class ContainerMap(object):
         self._volumes = DictMap()
         self._containers = DefaultDictMap(ContainerConfiguration)
         self._clients = []
+        self._groups = DictMap()
         self._default_domain = None
         self._set_hostname = True
         self._use_attached_parent_name = False
@@ -214,7 +326,7 @@ class ContainerMap(object):
         Volume alias assignments of the map.
 
         :return: Volume alias assignments.
-        :rtype: DictMap
+        :rtype: dockermap.map.DictMap
         """
         return self._volumes
 
@@ -227,6 +339,16 @@ class ContainerMap(object):
         :rtype: dockermap.map.config.host_volume.HostVolumeConfiguration
         """
         return self._host
+
+    @property
+    def groups(self):
+        """
+        Groups of configured containers.
+
+        :return: Container configuration groups.
+        :rtype: dockermap.map.DictMap
+        """
+        return self._groups
 
     @property
     def repository(self):
@@ -347,16 +469,6 @@ class ContainerMap(object):
                 d_set.add((self._name, ) + nw)
             return d_set
 
-        def _get_grouped_instances(d_map_config, d_instances):
-            d_map_name, d_config_name = d_map_config
-            d_config = ext_map.get_existing(d_config_name)
-            if not d_config:
-                raise KeyError("Dependency {0}.{1} for {2}.{3} not found.".format(
-                               d_map_name, d_config_name, self._name, c_name))
-            if d_config.instances and (None in d_instances or len(d_instances) == len(d_config.instances)):
-                return d_map_name, d_config_name, (None, )
-            return d_map_name, d_config_name, d_instances
-
         if reverse:
             # Consolidate dependents.
             for c_name, c_config in ext_map:
@@ -366,9 +478,10 @@ class ContainerMap(object):
             # Group instances, or replace with None where all of them are used.
             for c_name, c_config in ext_map:
                 dep_set = _get_dep_set(c_config)
-                instance_set = set(_get_grouped_instances(map_config, tuple(di[2] for di in items))
-                                   for map_config, items in itertools.groupby(sorted(dep_set, key=get_map_config),
-                                                                              get_map_config))
+                try:
+                    instance_set = set(group_instances(dep_set, ext_map=ext_map))
+                except KeyError as e:
+                    raise KeyError("Dependency {0[0]}.{0[1]} for {1}.{2} not found.".format(e.args[0], self._name, c_name))
                 yield (self._name, c_name), instance_set
 
     def get(self, item):
@@ -486,6 +599,9 @@ class ContainerMap(object):
 
         def _get_container_items(c_name, c_config):
             instance_names = _get_instance_names(c_name, c_config.instances)
+            group_ref_names = instance_names[:]
+            if c_config.instances:
+                group_ref_names.append(c_name)
             shared = instance_names[:] if c_config.shares or c_config.binds or c_config.uses else []
             bind = [b.volume for b in c_config.binds if not isinstance(b.volume, tuple)]
             link = [l.container for l in c_config.links]
@@ -501,9 +617,9 @@ class ContainerMap(object):
                 attaches = [(c_name, a) for a in c_config.attaches]
             else:
                 attaches = c_config.attaches
-            return instance_names, uses, attaches, shared, bind, link, network
+            return instance_names, group_ref_names, uses, attaches, shared, bind, link, network
 
-        all_instances, all_used, all_attached, all_shared, all_binds, all_links, all_networks = zip(*[
+        all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links, all_networks = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
         ])
         if self._use_attached_parent_name:
@@ -511,6 +627,20 @@ class ContainerMap(object):
                                        for c_name, a in itertools.chain.from_iterable(all_attached))
         else:
             all_attached_names = tuple(itertools.chain.from_iterable(all_attached))
+
+        ref_set = set(itertools.chain.from_iterable(all_grouprefs))
+        group_set = set(self._groups.keys())
+        ambiguous_names = group_set & ref_set
+        if ambiguous_names:
+            ambiguous_str = ', '.join(ambiguous_names)
+            raise MapIntegrityError("Names are used both for container configurations (or instances) and for container "
+                                    "groups: {0}.".format(ambiguous_str))
+        group_referenced = set(itertools.chain.from_iterable(self._groups.values()))
+        missing_refs = group_referenced - ref_set
+        if missing_refs:
+            missing_ref_str = ', '.join(missing_refs)
+            raise MapIntegrityError("Container configurations or certain instances are referenced by groups, but are "
+                                    "not defined: {0}.".format(missing_ref_str))
         volume_shared = tuple(itertools.chain.from_iterable(all_shared)) + all_attached_names
         if check_duplicates:
             duplicated = [name for name, count in six.iteritems(Counter(volume_shared)) if count > 1]

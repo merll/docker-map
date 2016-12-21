@@ -7,7 +7,8 @@ import docker
 
 from .action import simple, script, update
 from .config.client import ClientConfiguration
-from .config.main import ContainerMap
+from .config.main import ContainerMap, expand_instances, expand_groups, group_instances
+from .input import get_map_config_ids
 from .policy.base import BasePolicy
 from .runner.base import DockerClientRunner
 from .state.base import SingleStateGenerator, DependencyStateGenerator, DependentStateGenerator
@@ -15,6 +16,21 @@ from .state.update import UpdateStateGenerator
 
 
 log = logging.getLogger(__name__)
+
+
+def _set_forced_update_ids(kwargs, maps, groups, default_map_name, default_instances):
+    value = kwargs.pop('force_update', None)
+    if not value:
+        return
+    input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
+    if input_ids:
+        kwargs['force_update'] = set(expand_instances(expand_groups(input_ids, groups), single_instances=False,
+                                                      ext_maps=maps))
+
+
+def _get_config_ids(value, maps, groups, default_map_name, default_instances):
+    input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
+    return list(group_instances(expand_groups(input_ids, groups), single_instances=False, ext_maps=maps))
 
 
 class MappingDockerClient(object):
@@ -97,14 +113,18 @@ class MappingDockerClient(object):
 
     def run_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
         policy = self.get_policy()
+        groups = {m.name: m.groups for m in self._maps.values()}
         state_generator_cls, action_generator_cls = self.generators[action_name]
+        _set_forced_update_ids(kwargs, policy.container_maps, groups, map_name or self._default_map, instances)
         state_generator = state_generator_cls(policy, kwargs)
         action_generator = action_generator_cls(policy, kwargs)
         runner = self.runner_class(policy, kwargs)
         log.debug("Passing kwargs to client actions: {0}".format(kwargs))
         results = []
 
-        for states in state_generator.get_states(map_name or self._default_map, config_name, instances=instances):
+        config_ids = _get_config_ids(config_name, policy.container_maps, groups, map_name or self._default_map,
+                                     instances)
+        for states in state_generator.get_states(config_ids):
             actions = action_generator.get_state_actions(states, **kwargs)
             log.debug("Running actions: %s", actions)
             results.extend(runner.run_actions(*actions))

@@ -62,6 +62,8 @@ MAP_DATA_2 = {
     'containers': {
         'svc': {
         },
+        'svc2': {
+        },
         'sub_svc': {
             'links': 'sub_sub_svc',
         },
@@ -100,6 +102,10 @@ MAP_DATA_2 = {
                     'Name': 'always',
                 },
             },
+        },
+        'server2': {
+            'extends': 'server',
+            'links': ['svc2']
         },
         'abstract_worker': {
             'abstract': True,
@@ -167,6 +173,9 @@ MAP_DATA_2 = {
         'app_data': 'app/data',
         'app_config': 'app/config',
     },
+    'groups': {
+        'group1': ['server', 'worker', 'worker_q2'],
+    }
 }
 
 MAP_DATA_3 = {

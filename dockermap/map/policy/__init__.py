@@ -38,19 +38,3 @@ class PolicyUtil(with_metaclass(PolicyUtilMeta)):
             if option_name in kwargs:
                 setattr(self, option_name, kwargs.pop(option_name))
         self._policy = policy
-
-
-class ForwardGeneratorMixin(object):
-    """
-    Defines the dependency path as dependencies of a container configuration.
-    """
-    def get_dependency_path(self, map_name, config_name):
-        return self._policy.get_dependencies(map_name, config_name)
-
-
-class ReverseGeneratorMixin(object):
-    """
-    Defines the dependency path as dependents of a container configuration.
-    """
-    def get_dependency_path(self, map_name, config_name):
-        return self._policy.get_dependents(map_name, config_name)

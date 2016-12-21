@@ -86,31 +86,6 @@ class BasePolicy(object):
         return '{0}.{1}'.format(map_name, attached_name)
 
     @classmethod
-    def resolve_cname(cls, container_name, includes_map=True):
-        """
-        The reverse function of :meth:`cname` for resolving a container name into map name, container configuration,
-        and instance name. The instance name may be ``None`` if not present. In case the map name is not present
-        in the container name, ``includes_map`` should be set to ``False`` for only resolving configuration name and map
-        name.
-
-        :param container_name: Container name.
-        :type container_name: unicode | str
-        :param includes_map: Whether the name includes a map name (e.g. for running containers) or not (e.g. for
-         references within the same map).
-        :return: Tuple of container map name (optional), container configuration name, and instance.
-        :rtype: tuple[unicode | str]
-        """
-        if includes_map:
-            map_name, __, ci_name = container_name.partition('.')
-            if not ci_name:
-                raise ValueError("Invalid container name: {0}".format(container_name))
-            c_name, __, i_name = ci_name.partition('.')
-            return map_name, c_name, i_name or None
-
-        c_name, __, i_name = container_name.partition('.')
-        return c_name, i_name or None
-
-    @classmethod
     def image_name(cls, image, container_map=None):
         """
         Generates the full image name that should be used when creating a new container.
@@ -194,21 +169,6 @@ class BasePolicy(object):
         default_name = self.default_client_name
         return [(default_name, self._clients[default_name])]
 
-    def _get_dependency_config(self, map_name, config_name, instances):
-        c_map = self._maps[map_name]
-        c_config = c_map.get_existing(config_name)
-        if not c_config:
-            raise KeyError("Container configuration '{0}' not found on map '{1}'."
-                           "".format(config_name, map_name))
-        if c_config.instances:
-            if instances == [None]:
-                instance_list = c_config.instances
-            else:
-                instance_list = instances
-        else:
-            instance_list = [None]
-        return map_name, c_map, config_name, c_config, instance_list
-
     def get_dependencies(self, map_name, container):
         """
         Generates the list of dependency containers, in reverse order (i.e. the last dependency coming first).
@@ -218,10 +178,9 @@ class BasePolicy(object):
         :param container: Container configuration name.
         :type container: unicode | str
         :return: Dependency container map names, container configuration names, and instances.
-        :rtype: iterator[(unicode | str, unicode | str, unicode | str)]
+        :rtype: iterator[(unicode | str, unicode | str, list[unicode | str | NoneType])]
         """
-        return [self._get_dependency_config(*dep)
-                for dep in self._f_resolver.get_dependencies((map_name, container))]
+        return self._f_resolver.get_dependencies((map_name, container))
 
     def get_dependents(self, map_name, container):
         """
@@ -232,10 +191,9 @@ class BasePolicy(object):
         :param container: Container configuration name.
         :type container: unicode | str
         :return: Dependent container map names, container configuration names, and instances.
-        :rtype: iterator[(unicode | str, unicode | str, unicode | str)]
+        :rtype: iterator[(unicode | str, unicode | str, list[unicode | str | NoneType])]
         """
-        return [self._get_dependency_config(*dep)
-                for dep in self._r_resolver.get_dependencies((map_name, container))]
+        return self._r_resolver.get_dependencies((map_name, container))
 
     @property
     def container_maps(self):

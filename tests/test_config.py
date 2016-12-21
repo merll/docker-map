@@ -157,6 +157,8 @@ class TestConfig(unittest.TestCase):
         self.assertItemsEqual(attached_items, [('worker', 'app_log'),
                                                ('server', 'app_log'),
                                                ('server', 'server_log'),
+                                               ('server2', 'app_log'),
+                                               ('server2', 'server_log'),
                                                ('redis', 'redis_socket'),
                                                ('redis', 'redis_log'),
                                                ('worker_q2', 'app_log')])

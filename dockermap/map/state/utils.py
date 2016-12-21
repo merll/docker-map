@@ -9,7 +9,7 @@ def merge_dependency_paths(item_paths):
     by these dependencies. Paths that are contained in another entirely are discarded.
 
     :param item_paths: List or tuple of items along with their dependency path.
-    :type item_paths: list[(Any, list[Any])]
+    :type item_paths: list[(Any, list[Any])] | __generator[(Any, list[Any])]
     :return: List of merged or independent paths.
     :rtype: list[(Any, list[Any])]
     """
