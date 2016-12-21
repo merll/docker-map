@@ -227,13 +227,18 @@ class TestPolicyStateGenerators(unittest.TestCase):
                                                     state, instances_valid, container_id, image_id, False, **kwargs))
         _add_container_list(rsps, container_names)
 
+    def _setup_default_containers(self, rsps):
+        self._setup_containers(rsps, [
+            _container('sub_sub_svc'),
+            _container('sub_svc'),
+            _container('redis'),
+            _container('svc'),
+            _container('server'),
+        ])
+
     def test_dependency_states_running(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-            self._setup_containers(rsps, [
-                _container('redis'),
-                _container('svc'),
-                _container('server'),
-            ])
+            self._setup_default_containers(rsps)
             states = list(DependencyStateGenerator(self.policy, {}).get_states(self.map_name, 'server'))
             instance_base_states = [si.base_state
                                     for s in states
@@ -299,22 +304,23 @@ class TestPolicyStateGenerators(unittest.TestCase):
 
     def test_update_states_clean(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-            self._setup_containers(rsps, [
-                _container('redis'),
-                _container('svc'),
-                _container('server'),
-            ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
-            server_states = states['server'].instances[0]
-            self.assertEqual(server_states.base_state, STATE_RUNNING)
-            self.assertEqual(server_states.flags, 0)
-            redis_states = states['redis'].instances[0]
-            self.assertEqual(redis_states.base_state, STATE_RUNNING)
-            self.assertEqual(redis_states.flags, 0)
+            self._setup_default_containers(rsps)
+            states = list(UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server'))
+            valid_order = ['sub_sub_svc', 'sub_svc', 'redis', 'server']
+            for c_states in states:
+                config_name = c_states.config
+                if config_name in valid_order:
+                    self.assertEqual(valid_order[0], config_name)
+                    valid_order.pop(0)
+                    i_states = c_states.instances[0]
+                    self.assertEqual(i_states.base_state, STATE_RUNNING)
+                    self.assertEqual(i_states.flags, 0)
 
     def test_update_states_invalid_attached(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
+                _container('sub_sub_svc'),
+                _container('sub_svc'),
                 _container('redis', attached_volumes_valid=False),
                 _container('svc'),
                 _container('server'),
@@ -330,6 +336,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
     def test_update_states_invalid_dependent_instance(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
+                _container('sub_sub_svc'),
+                _container('sub_svc'),
                 _container('redis', instance_volumes_valid=False),
                 _container('svc'),
                 _container('server'),
@@ -345,6 +353,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
     def test_update_states_invalid_dependent_instance_attached(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
+                _container('sub_sub_svc'),
+                _container('sub_svc'),
                 _container('redis'),
                 _container('svc'),
                 _container('server', attached_volumes_valid=False),
@@ -360,6 +370,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
     def test_update_states_invalid_image(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
+                _container('sub_sub_svc'),
+                _container('sub_svc'),
                 _container('redis'),
                 _container('svc'),
                 _container('server', Image='invalid'),
@@ -372,6 +384,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
     def test_update_states_invalid_network(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
+                _container('sub_sub_svc'),
+                _container('sub_svc'),
                 _container('redis'),
                 _container('svc'),
                 _container('server', NetworkSettings=dict(Ports={})),
@@ -383,11 +397,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
 
     def test_update_states_updated_environment(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-            self._setup_containers(rsps, [
-                _container('redis'),
-                _container('svc'),
-                _container('server'),
-            ])
+            self._setup_default_containers(rsps)
             self.sample_map.containers['server'].create_options.update(environment=dict(Test='x'))
             states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
@@ -396,11 +406,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
 
     def test_update_states_updated_command(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-            self._setup_containers(rsps, [
-                _container('redis'),
-                _container('svc'),
-                _container('server'),
-            ])
+            self._setup_default_containers(rsps)
             self.sample_map.containers['server'].create_options.update(command='/bin/true')
             states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]
@@ -413,11 +419,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             cmd2 = ExecCommand(3, '/bin/true', EXEC_POLICY_INITIAL)
             cmd3 = ExecCommand(4, '/bin/true', EXEC_POLICY_RESTART)
             self.sample_map.containers['server'].exec_commands = [cmd1]
-            self._setup_containers(rsps, [
-                _container('redis'),
-                _container('svc'),
-                _container('server'),
-            ])
+            self._setup_default_containers(rsps)
             self.sample_map.containers['server'].exec_commands = [cmd1, cmd2, cmd3]
             states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.map_name, 'server')}
             server_states = states['server'].instances[0]

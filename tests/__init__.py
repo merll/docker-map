@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals
 
+import six
+
+
 MAP_DATA_1 = {
     'repository': 'registry.example.com',
     'default_tag': 'custom',
@@ -58,6 +61,11 @@ MAP_DATA_2 = {
     'host_root': '/var/lib/site',
     'containers': {
         'svc': {
+        },
+        'sub_svc': {
+            'links': [('sub_sub_svc', 'sub_sub_svc')],
+        },
+        'sub_sub_svc': {
         },
         'abstract_config': {
             'abstract': True,
@@ -132,6 +140,7 @@ MAP_DATA_2 = {
                 '/etc/redis': ('redis/config', 'ro'),
                 '/var/lib/redis': 'redis/data',
             },
+            'links': [('sub_svc', 'sub_svc')],
             'attaches': ['redis_socket', 'redis_log'],
             'user': 'redis',
             'permissions': 'u=rwX,g=rX,o=',

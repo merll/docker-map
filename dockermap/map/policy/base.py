@@ -221,7 +221,7 @@ class BasePolicy(object):
         :rtype: iterator[(unicode | str, unicode | str, unicode | str)]
         """
         return [self._get_dependency_config(*dep)
-                for dep in reversed(self._f_resolver.get_dependencies((map_name, container)))]
+                for dep in self._f_resolver.get_dependencies((map_name, container))]
 
     def get_dependents(self, map_name, container):
         """
@@ -235,7 +235,7 @@ class BasePolicy(object):
         :rtype: iterator[(unicode | str, unicode | str, unicode | str)]
         """
         return [self._get_dependency_config(*dep)
-                for dep in reversed(self._r_resolver.get_dependencies((map_name, container)))]
+                for dep in self._r_resolver.get_dependencies((map_name, container))]
 
     @property
     def container_maps(self):
