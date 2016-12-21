@@ -525,9 +525,10 @@ class TestPolicyStateUtils(unittest.TestCase):
             (c, self.state_gen.get_dependency_path(*c[:2]))
             for c in [redis_config, server_config]
         ])
-        self.assertEqual(len(merged_paths), 1)
-        self.assertEqual(merged_paths[0][0], server_config)
-        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+        # We'll end up with two paths, as the second might cover more instances than the first.
+        self.assertEqual(len(merged_paths), 2)
+        self.assertEqual(merged_paths[1][0], server_config)
+        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1] + merged_paths[1][1])
 
     def test_merge_included_second(self):
         server_config = self.map_name, 'server', (None, )
