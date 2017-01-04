@@ -115,7 +115,7 @@ class DockerConfigMixin(object):
             ports=[resolve_value(port_binding.exposed_port)
                    for port_binding in container_config.exposes if port_binding.exposed_port],
             hostname=policy.get_hostname(container_name, config.client_name) if container_map.set_hostname else None,
-            domainname=resolve_value(client_config.get('domainname', container_map.default_domain)),
+            domainname=resolve_value(client_config.get('domainname', container_map.default_domain)) or None,
         )
         if container_config.network == 'disabled':
             c_kwargs['network_disabled'] = True
