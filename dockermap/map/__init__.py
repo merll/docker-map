@@ -43,7 +43,7 @@ class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
 
     def __delattr__(self, item):
         if hasattr(self, item):
-            object.__delattr__(item)
+            object.__delattr__(self, item)
         else:
             self.pop(item)
 
