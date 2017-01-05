@@ -26,7 +26,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.permissions, 'u=rwX,g=rX,o=')
 
     def test_merge_with_dict(self):
-        cfg = self.sample_map.get_existing('abstract_config')
+        cfg = self.sample_map.get_existing('abstract_config').copy()
         merge_dict = MAP_DATA_2['containers']['server']
         cfg.merge(merge_dict)
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
@@ -47,7 +47,7 @@ class TestConfig(unittest.TestCase):
         })
 
     def test_merge_with_dict_lists_only(self):
-        cfg = self.sample_map.get_existing('abstract_config')
+        cfg = self.sample_map.get_existing('abstract_config').copy()
         merge_dict = MAP_DATA_2['containers']['server']
         cfg.merge(merge_dict, lists_only=True)
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
@@ -60,7 +60,7 @@ class TestConfig(unittest.TestCase):
         self.assertIs(cfg.host_config, NotSet)
 
     def test_merge_with_config(self):
-        cfg = self.sample_map.get_existing('abstract_config')
+        cfg = self.sample_map.get_existing('abstract_config').copy()
         merge_cfg = self.sample_map.get_existing('server')
         cfg.merge(merge_cfg)
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
@@ -81,7 +81,7 @@ class TestConfig(unittest.TestCase):
         })
 
     def test_merge_with_config_lists_only(self):
-        cfg = self.sample_map.get_existing('abstract_config')
+        cfg = self.sample_map.get_existing('abstract_config').copy()
         merge_cfg = self.sample_map.get_existing('server')
         cfg.merge(merge_cfg, lists_only=True)
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
