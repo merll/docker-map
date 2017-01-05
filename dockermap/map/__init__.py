@@ -29,6 +29,7 @@ class PropertyDictMeta(type):
         merge_list(cp, itertools.chain.from_iterable(base.core_properties for base in cp_bases))
         merge_list(ce, itertools.chain.from_iterable(base.external_properties for base in cp_bases))
         merge_list(ci, itertools.chain.from_iterable(base.internal_properties for base in cp_bases))
+        cls.core_property_set = set(cp)
         super(PropertyDictMeta, cls).__init__(name, bases, dct)
 
 
@@ -45,7 +46,7 @@ class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
         return self[item]
 
     def __setattr__(self, key, value):
-        if key in self.__class__.core_properties:
+        if key in self.__class__.core_property_set:
             object.__setattr__(self, key, value)
         else:
             self[key] = value
@@ -59,6 +60,15 @@ class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
     def __iter__(self):
         return six.iteritems(self)
 
+    def __nonzero__(self):
+        return len(self) > 0 and any(getattr(self, p) for p in self.__class__.internal_properties)
+
+    __bool__ = __nonzero__
+
+    def __eq__(self, other):
+        return super(AttributeMixin, self).__eq__(other) and all(getattr(self, p) == getattr(other, p)
+                                                                 for p in self.__class__.internal_properties)
+
     def update(self, other=None, **kwargs):
         if other is not None:
             if isinstance(other, self.__class__):
@@ -67,7 +77,7 @@ class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
                 other = other.copy()
                 _update_instance_from_dict(self, other)
             else:
-                raise ValueError("Expected {0} or dictionary; found '{1}'".format(type(self).__name__, type(other).__name__))
+                raise TypeError("Expected {0} or dictionary; found '{1}'".format(type(self).__name__, type(other).__name__))
         _update_instance_from_dict(self, kwargs)
         super(AttributeMixin, self).update(other, **kwargs)
 
