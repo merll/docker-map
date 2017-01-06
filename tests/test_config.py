@@ -56,8 +56,8 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.user, 'app_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
-        self.assertIs(cfg.create_options, NotSet)
-        self.assertIs(cfg.host_config, NotSet)
+        self.assertDictEqual(cfg.create_options, {})
+        self.assertDictEqual(cfg.host_config, {})
 
     def test_merge_with_config(self):
         cfg = self.sample_map.get_existing('abstract_config').copy()
@@ -90,8 +90,8 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.user, 'app_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
-        self.assertIs(cfg.create_options, NotSet)
-        self.assertIs(cfg.host_config, NotSet)
+        self.assertDictEqual(cfg.create_options, {})
+        self.assertDictEqual(cfg.host_config, {})
 
     def test_extended_config(self):
         cfg = self.ext_main.get_existing('server')

@@ -5,6 +5,7 @@ import unittest
 import six
 
 from dockermap.functional import lazy_once
+from dockermap.utils import merge_list
 from dockermap.map import DictMap
 from dockermap.map.config.main import expand_groups
 from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume, get_shared_volumes,
@@ -12,8 +13,7 @@ from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume
                                  get_container_link, get_container_links, ContainerLink,
                                  get_port_binding, get_port_bindings, PortBinding,
                                  get_exec_command, get_exec_commands, ExecCommand, EXEC_POLICY_RESTART,
-                                 EXEC_POLICY_INITIAL, get_map_config_id, get_map_config_ids, MapConfigId,
-                                 merge_list)
+                                 EXEC_POLICY_INITIAL, get_map_config_id, get_map_config_ids, MapConfigId)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -251,7 +251,7 @@ class InputConversionTest(unittest.TestCase):
 
     def test_merge_list(self):
         list1 = ['a', 'b', 'c']
-        merge_list(['d'], list1)
+        merge_list(list1, ['d'])
         self.assertListEqual(list1, ['a', 'b', 'c', 'd'])
-        merge_list(['c', 'c'], list1)
+        merge_list(list1, ['c', 'c'])
         self.assertListEqual(list1, ['a', 'b', 'c', 'd'])

@@ -7,15 +7,12 @@ from operator import itemgetter
 
 import six
 
+from . import ConfigurationObject, CP
 from .. import DictMap, DefaultDictMap
-from ..input import get_list, merge_list, MapConfigId
+from ..input import bool_if_set, MapConfigId
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
 
-
-SINGLE_ATTRIBUTES = 'repository', 'default_domain', 'set_hostname', 'use_attached_parent_name', 'default_tag'
-DICT_ATTRIBUTES = 'volumes', 'host', 'groups'
-LIST_ATTRIBUTES = 'clients',
 
 get_map_config = itemgetter(0, 1)
 
@@ -142,7 +139,7 @@ class MapIntegrityError(Exception):
         return None
 
 
-class ContainerMap(object):
+class ContainerMap(ConfigurationObject):
     """
     Class for merging container configurations, host shared volumes, and volume alias names.
 
@@ -157,118 +154,90 @@ class ContainerMap(object):
     :type check_duplicates: bool
     :param kwargs: Kwargs with initial container configurations, host shares, and volumes.
     """
+    repository = CP()
+    host = CP(dict, default=HostVolumeConfiguration, input_func=HostVolumeConfiguration, update=False)
+    volumes = CP(dict, default=DictMap, input_func=DictMap)
+    clients = CP(list)
+    groups = CP(dict, default=DictMap, input_func=DictMap)
+    default_domain = CP()
+    set_hostname = CP(default=True, input_func=bool_if_set)
+    use_attached_parent_name = CP(default=False, input_func=bool_if_set)
+    default_tag = CP(default='latest')
+
+    DOCSTRINGS = {
+        'repository': "Repository prefix for images. This is prepended to image names used by container "
+                      "configurations.",
+        'host': "Volume alias assignments of the map.",
+        'volumes': "Volume alias assignments of the map.",
+        'clients': "Alias names of clients associated with this container map.",
+        'groups': "Groups of configured containers.",
+        'default_domain': "Value to use as domain name for new containers, unless the client specifies otherwise.",
+        'set_hostname': "Whether to set the hostname for new containers. When set to ``False``, uses Docker's default"
+                        "autogeneration of hostnames instead.",
+        'use_attached_parent_name': "Whether to include the parent name of an attached volume in the attached "
+                                    "container name for disambiguation.",
+        'default_tag': "Default tag to use for images where it is not specified. Default is ``latest``.",
+    }
+
     def __init__(self, name, initial=None, check_integrity=True, check_duplicates=True, **kwargs):
         self._name = name
-        self._repository = None
-        self._host = HostVolumeConfiguration()
-        self._volumes = DictMap()
-        self._containers = DefaultDictMap(ContainerConfiguration)
-        self._clients = []
-        self._groups = DictMap()
-        self._default_domain = None
-        self._set_hostname = True
-        self._use_attached_parent_name = False
-        self._default_tag = 'latest'
         self._extended = False
-        self.update(initial, **kwargs)
+        self._containers = DefaultDictMap(ContainerConfiguration)
+        super(ContainerMap, self).__init__(initial, **kwargs)
         if self._containers and check_integrity:
             self.check_integrity(check_duplicates=check_duplicates)
 
     def __iter__(self):
         return ((c_name, c_config) for c_name, c_config in six.iteritems(self._containers) if not c_config.abstract)
 
-    @classmethod
-    def _copy_base(cls, from_obj, to_obj):
-        """
-        :type from_obj: ContainerMap
-        :type to_obj: ContainerMap
-        """
-        for attr in SINGLE_ATTRIBUTES:
-            setattr(to_obj, attr, getattr(from_obj, attr))
-        for attr in DICT_ATTRIBUTES:
-            getattr(to_obj, attr).update(getattr(from_obj, attr))
-        for attr in LIST_ATTRIBUTES:
-            setattr(to_obj, attr, getattr(from_obj, attr)[:])
+    def update_default_from_dict(self, key, value):
+        if key == 'host_root':
+            self.host.root = value
+        elif key == 'containers':
+            for c_name, c_value in six.iteritems(value):
+                self._containers[c_name].update_from_dict(c_value)
+        else:
+            self._containers[key].update_from_dict(value)
 
-    def _update_from_dict(self, items):
-        """
-        :type items: dict
-        """
-        for key, value in six.iteritems(items):
-            if key == 'host_root':
-                self._host.root = value
-            elif key in SINGLE_ATTRIBUTES:
-                setattr(self, key, value)
-            elif key in LIST_ATTRIBUTES:
-                setattr(self, key, get_list(value))
-            elif key in DICT_ATTRIBUTES:
-                getattr(self, key).update(value)
-            else:
-                if key == 'containers':
-                    for container, config in six.iteritems(value):
-                        self._containers[container].update(config)
+    def merge_default_from_dict(self, key, value, lists_only=False):
+        if key == 'host_root':
+            if not lists_only:
+                self.host.root = value
+        elif key == 'containers':
+            for c_name, c_value in six.iteritems(value):
+                if c_name in self._containers:
+                    self._containers[c_name].merge_from_dict(c_value, lists_only=lists_only)
                 else:
-                    self._containers[key].update(value)
+                    self._containers[c_name].update_from_dict(c_value)
+        elif key in self._containers:
+            self._containers[key].merge_from_dict(value, lists_only=lists_only)
+        else:
+            self._containers[key].update_from_dict(value)
 
-    def _merge_from_dict(self, items, lists_only):
-        """
-        :type items: dict
-        :type lists_only: bool
-        """
-        for key, value in six.iteritems(items):
-            if not value:
-                continue
-            if key == 'host_root':
-                if not lists_only:
-                    self._host.root = value
-            elif key in SINGLE_ATTRIBUTES:
-                if not lists_only:
-                    setattr(self, key, value)
-            elif key in LIST_ATTRIBUTES:
-                current_list = getattr(self, key)
-                merge_list(get_list(value), current_list)
-            elif key in DICT_ATTRIBUTES:
-                current_dict = getattr(self, key)
-                current_dict.update(value)
-            elif key == 'containers':
-                for container, config in six.iteritems(value):
-                    if container in self._containers:
-                        self._containers[container].merge(config, lists_only)
-                    else:
-                        self._containers[container].update(config)
+    def update_from_dict(self, dct):
+        host = dct.get('host')
+        if host:
+            self._config['host'] = HostVolumeConfiguration(host)
+        containers = dct.get('containers')
+        if containers:
+            self._config['containers'] = containers = DefaultDictMap(ContainerConfiguration)
+            containers.update(containers)
+        super(ContainerMap, self).update_from_dict(dct)
+
+    def update_from_obj(self, obj, copy=False, update_containers=True):
+        self._config['host'] = obj.host.copy() if copy else obj.host
+        if update_containers:
+            for key, value in obj.containers:
+                self._containers[key].update_from_obj(value, copy=copy)
+        super(ContainerMap, self).update_from_obj(obj, copy=copy)
+
+    def merge_from_obj(self, obj, lists_only=False):
+        for key, value in obj.containers:
+            if key in self._containers:
+                self._containers[key].merge_from_obj(value, lists_only=lists_only)
             else:
-                if key in self._containers:
-                    self._containers[key].merge(value, lists_only)
-                else:
-                    self._containers[key].update(value)
-
-    def _update_from_obj(self, items):
-        """
-        :type items: ContainerMap
-        """
-        self.__class__._copy_base(items, self)
-        for container, config in six.iteritems(items._containers):
-            self._containers[container].update(config)
-
-    def _merge_from_obj(self, items, lists_only):
-        """
-        :type items: ContainerMap
-        :type lists_only: bool
-        """
-        for attr in LIST_ATTRIBUTES:
-            current_list = getattr(self, attr)
-            merge_list(getattr(items, attr), current_list)
-        for attr in DICT_ATTRIBUTES:
-            current_dict = getattr(self, attr)
-            current_dict.update(getattr(items, attr))
-        if not lists_only:
-            for attr in SINGLE_ATTRIBUTES:
-                setattr(self, attr, getattr(items, attr))
-        for container, config in six.iteritems(items._containers):
-            if container in self._containers:
-                self._containers[container].merge(config, lists_only)
-            else:
-                self._containers[container].update(config)
+                self._containers[key].update_from_obj(value)
+        super(ContainerMap, self).merge_from_obj(obj, lists_only=lists_only)
 
     def get_persistent_items(self):
         """
@@ -297,20 +266,6 @@ class ContainerMap(object):
         return self._name
 
     @property
-    def clients(self):
-        """
-        Alias names of clients associated with this container map.
-
-        :return: Client names.
-        :rtype: list[unicode | str]
-        """
-        return self._clients
-
-    @clients.setter
-    def clients(self, value):
-        self._clients = list(value)
-
-    @property
     def containers(self):
         """
         Container configurations of the map.
@@ -320,102 +275,13 @@ class ContainerMap(object):
         """
         return self._containers
 
-    @property
-    def volumes(self):
-        """
-        Volume alias assignments of the map.
-
-        :return: Volume alias assignments.
-        :rtype: dockermap.map.DictMap
-        """
-        return self._volumes
-
-    @property
-    def host(self):
-        """
-        Host volume configuration of the map.
-
-        :return: Host volume configuration.
-        :rtype: dockermap.map.config.host_volume.HostVolumeConfiguration
-        """
-        return self._host
-
-    @property
-    def groups(self):
-        """
-        Groups of configured containers.
-
-        :return: Container configuration groups.
-        :rtype: dockermap.map.DictMap
-        """
-        return self._groups
-
-    @property
-    def repository(self):
-        """
-        Repository prefix for images. This is prepended to image names used by container configurations.
-
-        :return: Repository prefix.
-        :rtype: unicode | str
-        """
-        return self._repository
-
-    @repository.setter
-    def repository(self, value):
-        self._repository = value
-
-    @property
-    def default_domain(self):
-        """
-        Value to use as domain name for new containers, unless the client specifies otherwise.
-
-        :return: Default domain name.
-        :rtype: unicode | str
-        """
-        return self._default_domain
-
-    @default_domain.setter
-    def default_domain(self, value):
-        self._default_domain = value
-
-    @property
-    def set_hostname(self):
-        """
-        Whether to set the hostname for new containers.
-
-        :return: When set to ``False``, uses Docker's default autogeneration of hostnames instead.
-        :rtype: bool
-        """
-        return self._set_hostname
-
-    @set_hostname.setter
-    def set_hostname(self, value):
-        self._set_hostname = value
-
-    @property
-    def use_attached_parent_name(self):
-        """
-        Whether to include the parent name of an attached volume in the attached container name for disambiguation.
-
-        :return: When set to ``True``, prefixes each attached volume with the parent name.
-        :rtype: bool
-        """
-        return self._use_attached_parent_name
-
-    @use_attached_parent_name.setter
-    def use_attached_parent_name(self, value):
-        self._use_attached_parent_name = value
-
-    @property
-    def default_tag(self):
-        """
-        Default tag to use for images where it is not specified. Default is ``latest``.
-        """
-        return self._default_tag
-
-    @default_tag.setter
-    def default_tag(self, value):
-        self._default_tag = value
+    @containers.setter
+    def containers(self, value):
+        if isinstance(value, DefaultDictMap) and value.default_factory is ContainerConfiguration:
+            self._containers = value
+        else:
+            self._containers.clear()
+            self._containers.update(value)
 
     def dependency_items(self, reverse=False):
         """
@@ -452,7 +318,7 @@ class ContainerMap(object):
         else:
             ext_map = self.get_extended_map()
 
-        if not self._use_attached_parent_name:
+        if not self.use_attached_parent_name:
             attached = {attaches: c_name
                         for c_name, c_config in ext_map
                         for attaches in c_config.attaches}
@@ -525,8 +391,8 @@ class ContainerMap(object):
             if not ext_cfg_base:
                 raise KeyError(ext_name)
             ext_cfg = self.get_extended(ext_cfg_base)
-            extended_config.merge(ext_cfg)
-        extended_config.merge(config)
+            extended_config.merge_from_obj(ext_cfg)
+        extended_config.merge_from_obj(config)
         return extended_config
 
     def get_extended_map(self):
@@ -537,47 +403,11 @@ class ContainerMap(object):
         :rtype: ContainerMap
         """
         map_copy = self.__class__(self.name)
-        self.__class__._copy_base(self, map_copy)
+        map_copy.update_from_obj(self, copy=True, update_containers=False)
         for c_name, c_config in self:
-            map_copy.containers[c_name] = self.get_extended(c_config)
+            map_copy._containers[c_name] = self.get_extended(c_config)
         map_copy._extended = True
         return map_copy
-
-    def update(self, other=None, **kwargs):
-        """
-        Updates the container map with a dictionary or another instance. In case of a dictionary, the keys need to be
-        container names, the values should be a dictionary structure of
-        :class:`dockermap.map.config.container.ContainerConfiguration` properties. ``host``, ``host_root``, and
-        ``volumes`` can also be included.
-
-        :item other: Dictionary or ContainerMap to update the map with.
-        :type other: ContainerMap or dict
-        :param kwargs: Kwargs to update the map with
-        """
-        if other:
-            if isinstance(other, ContainerMap):
-                self._update_from_obj(other)
-            elif isinstance(other, dict):
-                self._update_from_dict(other)
-            else:
-                raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(other).__name__))
-        self._update_from_dict(kwargs)
-
-    def merge(self, c_map, lists_only=False):
-        """
-        Merges a container map and its items into the current one.
-
-        :param c_map: Merging dictionary or ContainerMap
-        :type c_map: ContainerMap or dict
-        :param lists_only: Restrict merge to list-based fields of container configurations. In the default  ``True``
-         setting, overwrites existing single-values and updates dictionary attributes.
-        """
-        if isinstance(c_map, ContainerMap):
-            self._merge_from_obj(c_map, lists_only)
-        elif isinstance(c_map, dict):
-            self._merge_from_dict(c_map, lists_only)
-        else:
-            raise ValueError("Expected ContainerMap or dictionary; found '{0}'".format(type(c_map).__name__))
 
     def check_integrity(self, check_duplicates=True):
         """
@@ -613,7 +443,7 @@ class ContainerMap(object):
                     network = c_config.network[0]
             else:
                 network = None
-            if self._use_attached_parent_name:
+            if self.use_attached_parent_name:
                 attaches = [(c_name, a) for a in c_config.attaches]
             else:
                 attaches = c_config.attaches
@@ -622,20 +452,20 @@ class ContainerMap(object):
         all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links, all_networks = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
         ])
-        if self._use_attached_parent_name:
+        if self.use_attached_parent_name:
             all_attached_names = tuple('{0}.{1}'.format(c_name, a)
                                        for c_name, a in itertools.chain.from_iterable(all_attached))
         else:
             all_attached_names = tuple(itertools.chain.from_iterable(all_attached))
 
         ref_set = set(itertools.chain.from_iterable(all_grouprefs))
-        group_set = set(self._groups.keys())
+        group_set = set(self.groups.keys())
         ambiguous_names = group_set & ref_set
         if ambiguous_names:
             ambiguous_str = ', '.join(ambiguous_names)
             raise MapIntegrityError("Names are used both for container configurations (or instances) and for container "
                                     "groups: {0}.".format(ambiguous_str))
-        group_referenced = set(itertools.chain.from_iterable(self._groups.values()))
+        group_referenced = set(itertools.chain.from_iterable(self.groups.values()))
         missing_refs = group_referenced - ref_set
         if missing_refs:
             missing_ref_str = ', '.join(missing_refs)
@@ -654,16 +484,16 @@ class ContainerMap(object):
             missing_share_str = ', '.join(missing_shares)
             raise MapIntegrityError("No shared or attached volumes found for used volume(s): {0}.".format(missing_share_str))
         binds_set = set(itertools.chain.from_iterable(all_binds))
-        host_set = set(self._host.keys())
+        host_set = set(self.host.keys())
         missing_binds = binds_set - host_set
         if missing_binds:
             missing_mapped_str = ', '.join(missing_binds)
             raise MapIntegrityError("No host share found for mapped volume(s): {0}.".format(missing_mapped_str))
-        if self._use_attached_parent_name:
+        if self.use_attached_parent_name:
             volume_set = binds_set.union(a[1] for a in itertools.chain.from_iterable(all_attached))
         else:
             volume_set = binds_set.union(all_attached_names)
-        named_set = set(self._volumes.keys())
+        named_set = set(self.volumes.keys())
         missing_names = volume_set - named_set
         if missing_names:
             missing_names_str = ', '.join(missing_names)

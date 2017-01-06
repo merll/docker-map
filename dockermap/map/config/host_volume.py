@@ -5,6 +5,7 @@ import posixpath
 
 from ...functional import resolve_value
 from .. import DictMap
+from ..input import NotSet
 
 
 def get_host_path(root, path, instance=None):
@@ -42,8 +43,8 @@ class HostVolumeConfiguration(DictMap):
     :param root: Optional root directory for host volumes.
     :type root: unicode | str
     """
-    def __init__(self, root=None, *args, **kwargs):
-        self._root = root
+    def __init__(self, *args, **kwargs):
+        self._root = NotSet
         super(HostVolumeConfiguration, self).__init__(*args, **kwargs)
 
     @property

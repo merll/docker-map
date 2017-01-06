@@ -80,6 +80,19 @@ def read_only(value):
     return value and value != 'rw'
 
 
+def bool_if_set(value):
+    """
+    Converts the value to a boolean, unless it is `NotSet`.
+
+    :param value: Value to convert.
+    :return: Boolean
+    :rtype: bool | _NotSet
+    """
+    if value is not NotSet:
+        return bool(value)
+    return value
+
+
 def get_list(value):
     """
     Wraps the given value in a list. ``None`` returns an empty list. Lists and tuples are returned as lists. Single
@@ -441,25 +454,3 @@ def get_map_config_ids(value, map_name=None, instances=None):
         raise ValueError("Invalid instances specification; expected string, list, or tuple, found "
                          "{0}.".format(type(instances).__name__))
     return _get_listed_tuples(value, MapConfigId, get_map_config_id, map_name=map_name, instances=default_instances)
-
-
-def merge_list(items, merged_list):
-    """
-    Merges items into a list, appends ignoring duplicates but retaining the original order. This modifies the list and
-    does not return anything.
-
-    :param items: Items to merge into the list.
-    :type items: list | tuple
-    :param merged_list: List to append de-duplicated items to.
-    :type merged_list: list
-    """
-    if not items:
-        return
-    if not merged_list:
-        merged_list.extend(items)
-        return
-    merged_set = set(merged_list)
-    merged_add = merged_set.add
-    merged_list.extend(item
-                       for item in items
-                       if item not in merged_set or merged_add(item))
