@@ -2,6 +2,11 @@
 
 Change History
 ==============
+0.7.3
+-----
+* Fixed command line generator for case where ``cmd`` is used as a keyword argument
+  (`Issue #16 <https://github.com/merll/docker-map/issues/16>`_).
+
 0.7.2
 -----
 * Fixed recursive dependency resolution order.

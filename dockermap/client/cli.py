@@ -220,8 +220,8 @@ class DockerCommandLineOutput(object):
         else:
             self._cmd = cmd
 
-    def get_cmd(self, cmd, *args, **kwargs):
-        cli_cmd = self.cmd_map.get(cmd, cmd)
+    def get_cmd(self, c_cmd, *args, **kwargs):
+        cli_cmd = self.cmd_map.get(c_cmd, c_cmd)
         if not cli_cmd:
             return None
         cmd_prefix = None
