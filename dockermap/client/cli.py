@@ -168,12 +168,30 @@ def _transform_create_kwargs(ka):
 
 
 def parse_containers_output(out):
+    """
+    Parses the output of the Docker CLI 'docker ps --format="{{ID}}||{{Image}}||..."' and returns it in the format
+    similar to the Docker API.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: list[dict]
+    """
     return [
         _container_info(line) for line in out.splitlines() or ()
     ]
 
 
 def parse_inspect_output(out):
+    """
+    Parses the output of the Docker CLI 'docker inspect <container>'. Essentially just returns the parsed JSON string,
+    like the Docker API does.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: dict
+    """
     parsed = json.loads(out, encoding='utf-8')
     if parsed:
         return parsed[0]
@@ -181,6 +199,16 @@ def parse_inspect_output(out):
 
 
 def parse_images_output(out):
+    """
+    Parses the output of the Docker CLI 'docker images'. Note this is currently incomplete and only returns the ids and
+    tags of images, as the Docker CLI heavily modifies the output for human readability. The parent image id is also
+    not available on the CLI, so a full API compatibility is not possible.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: list[dict]
+    """
     lines = out.splitlines()
     line_iter = iter(lines)
     next(line_iter)  # Skip header
@@ -192,6 +220,15 @@ def parse_images_output(out):
 
 
 def parse_version_output(out):
+    """
+    Parses the output of 'docker version --format="{{json .}}"'. Essentially just returns the parsed JSON string,
+    like the Docker API does. Fields are slightly different however.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: dict
+    """
     parsed = json.loads(out, encoding='utf-8')
     if parsed:
         return parsed.get('Client', {})
