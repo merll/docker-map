@@ -235,6 +235,29 @@ def parse_version_output(out):
     return {}
 
 
+def parse_top_output(out):
+    """
+    Parses the output of the Docker CLI 'docker top <container>'. Note that if 'ps' output columns are modified and
+    'args' (for the command) is anywhere but in the last column, this will not parse correctly. However, the Docker API
+    produces wrong output in this case as well.
+    Returns a dictionary with entries 'Titles' and 'Processes' just like the Docker API would.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: dict
+    """
+    lines = out.splitlines()
+    line_iter = iter(lines)
+    header_line = next(line_iter)
+    titles = header_line.split()
+    max_split = len(titles) - 1
+    return {
+        'Titles': titles,
+        'Processes': [line.split(None, max_split) for line in line_iter],
+    }
+
+
 class DockerCommandLineOutput(object):
     cmd_map = {
         'create_container': 'create',
