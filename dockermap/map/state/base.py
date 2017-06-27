@@ -97,7 +97,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         :param is_dependency: Whether the state check is on a dependency or dependent container.
         :type is_dependency: bool
         :return: Generator for container state information.
-        :rtype: __generator[dockermap.map.state.ContainerConfigStates]
+        :rtype: collections.Iterable[dockermap.map.state.ContainerConfigStates]
         """
         c_map = self._policy.container_maps[map_name]
         c_config = c_map.get_existing(config_name)
@@ -139,8 +139,8 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
 
         :param config_ids: MapConfigId tuple.
         :type config_ids: list[dockermap.map.input.MapConfigId]
-        :return: Return values of created main containers.
-        :rtype: __generator[dockermap.map.state.ContainerConfigStates]
+        :return: Iterator over container configuration states.
+        :rtype: collections.Iterable[dockermap.map.state.ContainerConfigStates]
         """
         pass
 
@@ -167,7 +167,7 @@ class SingleStateGenerator(AbstractStateGenerator):
         :param config_ids: List of MapConfigId tuples.
         :type config_ids: list[dockermap.map.input.MapConfigId]
         :return: Return values of created main containers.
-        :rtype: __generator[dockermap.map.state.ContainerConfigStates]
+        :rtype: collections.Iterable[dockermap.map.state.ContainerConfigStates]
         """
         return itertools.chain.from_iterable(self.generate_config_states(*config_id)
                                              for config_id in config_ids)

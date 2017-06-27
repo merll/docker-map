@@ -25,7 +25,7 @@ def preprocess_matches(input_items):
 
     :param input_items: Input patterns to convert.
     :return: Generator of converted patterns.
-    :rtype: __generator[(__RegEx, bool)]
+    :rtype: collections.Iterable[(__RegEx, bool)]
     """
     for i in input_items:
         s = i.strip()

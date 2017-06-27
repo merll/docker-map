@@ -64,7 +64,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
         :type instance_actions: list[dockermap.map.action.InstanceAction]
         :return: Where the result is not ``None``, returns the output from the client. Note that this is a generator
           and needs to be consumed in order for all actions to be performed.
-        :rtype: __generator[dict]
+        :rtype: collections.Iterable[dict]
         """
         aname = self._policy.aname
         for action in attached_actions:
