@@ -47,10 +47,7 @@ def _get_property(prop_name, config_property, doc=None):
     def del_item(self):
         del self._config[prop_name]
 
-    if doc:
-        get_item.__doc__ = doc
-
-    return property(get_item, set_item, del_item)
+    return property(get_item, set_item, del_item, doc)
 
 
 class ConfigurationMeta(type):
