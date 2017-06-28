@@ -7,7 +7,7 @@ from six import iteritems
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT
 from ...functional import resolve_value
-from .cache import ContainerCache, ImageCache
+from .cache import ContainerCache, ImageCache, NetworkCache
 from .dep import ContainerDependencyResolver
 
 log = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ class BasePolicy(object):
         }
         self._clients = clients
         self._container_names = ContainerCache(clients)
+        self._network_names = NetworkCache(clients)
         self._images = ImageCache(clients)
         self._f_resolver = ContainerDependencyResolver()
         self._r_resolver = ContainerDependencyResolver()
@@ -47,7 +48,7 @@ class BasePolicy(object):
         Generates a container name that should be used for creating new containers and checking the status of existing
         containers.
 
-        In this implementation, the format will be ``<map name>.<container name>.<instance>`` name. If no instance is
+        In this implementation, the format will be ``<map name>.<container name>.<instance>``. If no instance is
         provided, it is just ``<map name>.<container name>``.
 
         :param map_name: Container map name.
@@ -84,6 +85,23 @@ class BasePolicy(object):
         if parent_name:
             return '{0}.{1}.{2}'.format(map_name, parent_name, attached_name)
         return '{0}.{1}'.format(map_name, attached_name)
+
+    @classmethod
+    def nname(cls, map_name, network_name):
+        """
+        Generates a network name that should be used for creating new networks and checking the status of existing
+        networks on the client.
+
+        In this implementation, the format will be ``<map name>.<network name>``.
+
+        :param map_name: Container map name.
+        :type map_name: unicode | str
+        :param network_name: Network configuration name.
+        :type network_name: unicode | str
+        :return: Network name.
+        :rtype: unicode | str
+        """
+        return '{0}.{1}'.format(map_name, network_name)
 
     @classmethod
     def image_name(cls, image, container_map=None):
@@ -218,7 +236,7 @@ class BasePolicy(object):
     @property
     def container_names(self):
         """
-        Names of existing containers on each map.
+        Names of existing containers on each client.
 
         :return: Dictionary of container names.
         :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedContainerNames]
@@ -228,9 +246,19 @@ class BasePolicy(object):
     @property
     def images(self):
         """
-        Image information functions.
+        Names of images on each client.
 
         :return: Dictionary of image names per client.
         :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedImages]
         """
         return self._images
+
+    @property
+    def network_names(self):
+        """
+        Name of existing networks on each client.
+
+        :return: Dictionary of network names.
+        :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedNetworkNames]
+        """
+        return self._network_names

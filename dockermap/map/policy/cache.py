@@ -98,6 +98,21 @@ class CachedContainerNames(CachedItems, set):
                 self.update(name[1:] for name in container_names)
 
 
+class CachedNetworkNames(CachedItems, set):
+    def refresh(self):
+        """
+        Fetches all current network names from the client.
+        """
+        if not self._client:
+            return
+        current_networks = self._client.networks()
+        self.clear()
+        self.update(net['Name']
+                    for net in current_networks)
+        for default_name in ('bridge', 'local', 'default'):
+            self.discard(default_name)
+
+
 class DockerHostItemCache(dict):
     """
     Abstract class for implementing caches of items (containers, images) present on the Docker client, so that
@@ -134,8 +149,7 @@ class DockerHostItemCache(dict):
         :rtype: DockerHostItemCache.item_class
         """
         client = self._clients[item].get_client()
-        val = self.item_class(client)
-        self[item] = val
+        self[item] = val = self.item_class(client)
         return val
 
 
@@ -151,3 +165,10 @@ class ContainerCache(DockerHostItemCache):
     Fetches and caches container names from a Docker host.
     """
     item_class = CachedContainerNames
+
+
+class NetworkCache(DockerHostItemCache):
+    """
+    Fetches and caches network names from a Docker host.
+    """
+    item_class = CachedNetworkNames
