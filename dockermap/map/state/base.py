@@ -18,70 +18,175 @@ from .utils import merge_dependency_paths
 log = logging.getLogger(__name__)
 
 
-class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
-    """
-    Abstract base implementation for an state generator, which determines the current state of containers on the client.
-    """
-    nonrecoverable_exit_codes = (-127, -1)
-    force_update = None
-    policy_options = ['nonrecoverable_exit_codes', 'force_update']
+class _ObjectNotFound(object):
+    pass
 
-    def get_container_state(self, map_name, container_map, config_name, container_config, client_name, client_config,
-                            client, instance_alias, config_flags=0):
+
+NOT_FOUND = _ObjectNotFound()
+
+
+class AbstractState(object):
+    """
+    Abstract base implementation for determining the current state of a single object on the client.
+
+    :param policy: Policy object.
+    :type policy: dockermap.map.policy.base.BasePolicy
+    :param options: Dictionary of options passed to the state generator.
+    :type options: dict
+    :param map_name: Container map name.
+    :type map_name: unicode | str
+    :param container_map: Container map instance.
+    :type container_map: dockermap.map.config.main.ContainerMap
+    :param client_name: Client name.
+    :type client_name: unicode | str
+    :param client_config: Client configuration object.
+    :type client_config: dockermap.map.config.client.ClientConfiguration
+    :param client: Docker client.
+    :type client: docker.client.Client
+    """
+    def __init__(self, policy, options, map_name, container_map, client_name, client_config,
+                 client, config_name, config, *args, **kwargs):
+        self.policy = policy
+        self.options = options
+        self.map_name = map_name
+        self.container_map = container_map
+        self.client_name = client_name
+        self.client_config = client_config
+        self.client = client
+        self.config_name = config_name
+        self.config = config
+        self.detail = None
+
+    def set_defaults(self, *args, **kwargs):
         """
-        Fetches information about the container from the client and determines a base state. To be extended by
-        subclasses as necessary.
+        Resets the state, so that with adjustments of input parameters the object can be reused without side-effects
+        to other objects on the client.
+        """
+        self.detail = None
 
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param container_map: Container map instance.
-        :type container_map: dockermap.map.config.main.ContainerMap
-        :param config_name: Container configuration name.
-        :type config_name: unicode | str
-        :param container_config: Container configuration object.
-        :type container_config: dockermap.map.config.container.ContainerConfiguration
-        :param client_name: Client name.
-        :type client_name: unicode | str
-        :param client_config: Client configuration object.
-        :type client_config: dockermap.map.config.client.ClientConfiguration
-        :param client: Docker client.
-        :type client: docker.client.Client
+    def inspect(self, *args, **kwargs):
+        """
+        Inspects the object on the client, i.e. makes actual calls to the client to check on the object.
+        """
+        pass
+
+    def get_state(self):
+        """
+        Determines and returns the state information.
+
+        :return: State information.
+        :type: tuple
+        """
+        pass
+
+
+class ContainerBaseState(AbstractState):
+    """
+    Abstract base implementation for determining the current state of a single container on the client.
+    """
+    def __init__(self, *args, **kwargs):
+        super(ContainerBaseState, self).__init__(*args, **kwargs)
+        self.instance_alias = None
+        self.config_flags = None
+        self.container_name = None
+
+    def set_defaults(self, *args, **kwargs):
+        super(ContainerBaseState, self).set_defaults(*args, **kwargs)
+        self.instance_alias = None
+        self.config_flags = None
+        self.container_name = None
+
+    def inspect(self, instance_alias, config_flags=0):
+        """
+        Fetches information about the container from the client.
+
         :param instance_alias: Container instance name or attached alias.
         :type instance_alias: unicode | str
         :param config_flags: Config flags on the container.
         :type config_flags: int
-        :return: Tuple of container inspection detail, and the base state information derived from that.
-        :rtype: (dict | NoneType, unicode | str, int, dict)
         """
-        policy = self._policy
-        if config_flags & CONFIG_FLAG_ATTACHED:
-            if container_map.use_attached_parent_name:
-                container_name = policy.aname(map_name, instance_alias, config_name)
-            else:
-                container_name = policy.aname(map_name, instance_alias)
-        else:
-            container_name = policy.cname(map_name, config_name, instance_alias)
+        self.instance_alias = instance_alias
+        self.config_flags = config_flags
 
-        if container_name in policy.container_names[client_name]:
-            c_detail = client.inspect_container(container_name)
-            c_status = c_detail['State']
-            if c_status['Running']:
-                base_state = STATE_RUNNING
-                state_flag = 0
+        policy = self.policy
+        if config_flags & CONFIG_FLAG_ATTACHED:
+            if self.container_map.use_attached_parent_name:
+                container_name = policy.aname(self.map_name, instance_alias, self.config_name)
             else:
-                base_state = STATE_PRESENT
-                if c_status['StartedAt'] == INITIAL_START_TIME:
-                    state_flag = STATE_FLAG_INITIAL
-                elif c_status['ExitCode'] in self.nonrecoverable_exit_codes:
-                    state_flag = STATE_FLAG_NONRECOVERABLE
-                else:
-                    state_flag = 0
-                if c_status['Restarting']:
-                    state_flag |= STATE_FLAG_RESTARTING
-            if self.force_update and (map_name, config_name, instance_alias) in self.force_update:
-                state_flag |= STATE_FLAG_OUTDATED
-            return c_detail, base_state, state_flag, {}
-        return None, STATE_ABSENT, 0, {}
+                container_name = policy.aname(self.map_name, instance_alias)
+        else:
+            container_name = policy.cname(self.map_name, self.config_name, instance_alias)
+
+        self.container_name = container_name
+        if container_name in policy.container_names[self.client_name]:
+            self.detail = self.client.inspect_container(container_name)
+        else:
+            self.detail = NOT_FOUND
+
+    def get_state(self):
+        c_detail = self.detail
+        if c_detail is NOT_FOUND:
+            return STATE_ABSENT, 0, {}
+
+        c_status = c_detail['State']
+        if c_status['Running']:
+            base_state = STATE_RUNNING
+            state_flag = 0
+        else:
+            base_state = STATE_PRESENT
+            if c_status['StartedAt'] == INITIAL_START_TIME:
+                state_flag = STATE_FLAG_INITIAL
+            elif c_status['ExitCode'] in self.options['nonrecoverable_exit_codes']:
+                state_flag = STATE_FLAG_NONRECOVERABLE
+            else:
+                state_flag = 0
+            if c_status['Restarting']:
+                state_flag |= STATE_FLAG_RESTARTING
+        force_update = self.options['force_update']
+        if force_update and (self.map_name, self.config_name, self.instance_alias) in force_update:
+            state_flag |= STATE_FLAG_OUTDATED
+        return base_state, state_flag, {}
+
+
+class NetworkBaseState(AbstractState):
+    def __init__(self, *args, **kwargs):
+        super(NetworkBaseState, self).__init__(*args, **kwargs)
+        self.network_name = None
+
+    def set_defaults(self, *args, **kwargs):
+        self.network_name = None
+
+    def inspect(self):
+        network_name = self.network_name = self.policy.nname(self.map_name, self.config_name)
+        if network_name in self.policy.network_names[self.client_name]:
+            self.detail = self.client.inspect_network(network_name)
+        else:
+            self.detail = NOT_FOUND
+
+    def get_state(self):
+        if self.detail is NOT_FOUND:
+            return STATE_ABSENT, 0, {}
+        return STATE_PRESENT, 0, {}
+
+
+class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
+    """
+    Abstract base implementation for an state generator, which determines the current state of containers on the client.
+    """
+    container_state_class = ContainerBaseState
+    network_state_class = NetworkBaseState
+
+    nonrecoverable_exit_codes = (-127, -1)
+    force_update = None
+    policy_options = ['nonrecoverable_exit_codes', 'force_update']
+
+    def get_container_state(self, map_name, c_map, client_name, client_config, client, config_name, c_config):
+        return self.container_state_class(self._policy, self.get_options(), map_name, c_map, client_name,
+                                          client_config, client, config_name, c_config)
+
+    def get_network_state(self, map_name, c_map, client_name, client_config, client, config_name, c_config):
+        return self.network_state_class(self._policy, self.get_options(), map_name, c_map, client_name,
+                                        client_config, client, config_name, c_config)
 
     def generate_config_states(self, map_name, config_name, instances, is_dependency=False):
         """
@@ -119,12 +224,14 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         for client_name, client_config in clients:
             def _get_state(c_flags, items):
                 for item in items:
-                    state = self.get_container_state(map_name, c_map, config_name, c_config, client_name, client_config,
-                                                     client, item, c_flags)
+                    c_state.set_defaults()
+                    c_state.inspect(item, c_flags)
                     # Extract base state, state flags, and extra info.
-                    yield ContainerInstanceState(item, state[1], state[2], state[3])
+                    yield ContainerInstanceState(item, *c_state.get_state())
 
             client = client_config.get_client()
+            c_state = self.get_container_state(map_name, c_map, client_name, client_config, client, config_name,
+                                               c_config)
             attached_states = [a_state for a_state in _get_state(a_flags, c_config.attaches)]
             instance_states = [i_state for i_state in _get_state(config_flags, c_instances)]
             states = ContainerConfigStates(client_name, map_name, config_name, config_flags, instance_states,

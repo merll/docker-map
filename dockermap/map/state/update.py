@@ -6,10 +6,10 @@ import logging
 import shlex
 import six
 
-from dockermap.map.policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
-from .base import DependencyStateGenerator
+from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
 from ...functional import resolve_value
 from ..policy import CONFIG_FLAG_ATTACHED
+from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
 from . import STATE_FLAG_OUTDATED, STATE_ABSENT
 
 log = logging.getLogger(__name__)
@@ -180,7 +180,7 @@ class ContainerVolumeChecker(object):
         alias = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
         self._vfs_paths[alias, None, mapped_path] = path
 
-    def check(self, container_map, container_config, config_name, instance_name, instance_detail):
+    def check(self, container_map, config_name, container_config, instance_name, instance_detail):
         instance_volumes = get_instance_volumes(instance_detail)
         vfs = SingleContainerVfsCheck(self._vfs_paths, container_map, container_config, instance_name, instance_volumes)
         for share in container_config.shares:
@@ -193,6 +193,128 @@ class ContainerVolumeChecker(object):
         if not vfs.check_used(container_config):
             return False
         return True
+
+
+class UpdateContainerState(ContainerBaseState):
+    """
+    Extends the base state by checking the current instance detail against the container configuration and volumes
+    other containers. Also checks if the container image matches the configured image's id.
+    """
+    def __init__(self, *args, **kwargs):
+        super(UpdateContainerState, self).__init__(*args, **kwargs)
+        self.base_image_id = None
+        self.volume_checker = None
+        self.current_commands = None
+
+    def _check_links(self):
+        instance_links = self.detail['HostConfig']['Links'] or []
+        link_dict = defaultdict(set)
+        for host_link in instance_links:
+            link_name, __, link_alias = host_link.partition(':')
+            link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
+        for link in self.config.links:
+            instance_aliases = link_dict.get(self.policy.cname(self.map_name, link.container))
+            config_alias = link.alias or link.container
+            if not instance_aliases or config_alias not in instance_aliases:
+                log.debug("Checked link %s - could not find alias %s", link.container, config_alias)
+                return False
+            log.debug("Checked link %s - found alias %s", link.container, config_alias)
+        return True
+
+    def _check_commands(self, check_option):
+        def _find_full_command(f_cmd, f_user):
+            for __, c_user, c_cmd in self.current_commands:
+                if c_user == f_user and c_cmd == f_cmd:
+                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
+                    return True
+            return False
+
+        def _find_partial_command(f_cmd, f_user):
+            for __, c_user, c_cmd in self.current_commands:
+                if c_user == f_user and f_cmd in c_cmd:
+                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
+                    return True
+            return False
+
+        def _cmd_state(cmd, cmd_user):
+            res_cmd = resolve_value(cmd)
+            if isinstance(res_cmd, (list, tuple)):
+                res_cmd = ' '.join(res_cmd)
+            if cmd_user is not None:
+                res_user = resolve_value(cmd_user)
+            else:
+                res_user = extract_user(self.config.user)
+            if res_user is None:
+                res_user = 'root'
+            log.debug("Looking up %s command for user %s: %s", check_option, res_user, res_cmd)
+            return cmd_exists(res_cmd, res_user)
+
+        log.debug("Checking commands for container %s.", self.container_name)
+        if check_option == CMD_CHECK_FULL:
+            cmd_exists = _find_full_command
+        elif check_option == CMD_CHECK_PARTIAL:
+            cmd_exists = _find_partial_command
+        else:
+            log.debug("Invalid check mode %s - skipping.", check_option)
+            return None
+        return [(exec_cmd, _cmd_state(exec_cmd[0], exec_cmd[1])) for exec_cmd in self.config.exec_commands]
+
+    def _check_volumes(self):
+        return self.volume_checker.check(self.container_map, self.config_name, self.config, self.instance_alias,
+                                         self.detail)
+
+    def set_defaults(self):
+        super(UpdateContainerState, self).set_defaults()
+        self.current_commands = None
+
+    def inspect(self, instance_alias, config_flags=0):
+        super(UpdateContainerState, self).inspect(instance_alias, config_flags=config_flags)
+        if not config_flags & CONFIG_FLAG_ATTACHED:
+            check_exec_option = self.options['check_exec_commands']
+            if check_exec_option and check_exec_option != CMD_CHECK_NONE and self.config.exec_commands:
+                self.current_commands = self.client.top(self.detail['Id'], ps_args='-eo pid,user,args')['Processes']
+            else:
+                self.options['check_exec_commands'] = None
+
+    def get_state(self):
+        base_state, state_flags, extra = super(UpdateContainerState, self).get_state()
+        if base_state == STATE_ABSENT or state_flags & STATE_FLAG_OUTDATED:
+            return base_state, state_flags, extra
+
+        c_image_id = self.detail['Image']
+        if self.config_flags & CONFIG_FLAG_ATTACHED:
+            if self.options['update_persistent'] and c_image_id != self.base_image_id:
+                return base_state, state_flags | STATE_FLAG_OUTDATED, extra
+            volumes = get_instance_volumes(self.detail)
+            if volumes:
+                mapped_path = resolve_value(self.container_map.volumes[self.instance_alias])
+                if self.container_map.use_attached_parent_name:
+                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), self.instance_alias,
+                                                          self.config_name)
+                else:
+                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), self.instance_alias)
+        else:
+            image_name = self.policy.image_name(self.config.image or self.config_name, self.container_map)
+            images = self.policy.images[self.client_name]
+            ref_image_id = images.ensure_image(image_name, pull=self.options['pull_before_update'],
+                                               insecure_registry=self.options['pull_insecure_registry'])
+            if not (((self.config.persistent and not self.options['update_persistent']) or c_image_id == ref_image_id) and
+                    self._check_volumes() and
+                    self._check_links() and
+                    _check_environment(self.config, self.detail) and
+                    _check_cmd(self.config, self.detail) and
+                    _check_network(self.config, self.client_config, self.detail)):
+                return base_state, state_flags | STATE_FLAG_OUTDATED, extra
+            check_exec_option = self.options['check_exec_commands']
+            if check_exec_option:
+                exec_results = self._check_commands(check_exec_option)
+                if exec_results is not None:
+                    extra.update(exec_commands=exec_results)
+        return base_state, state_flags, extra
+
+
+class UpdateNetworkState(NetworkBaseState):
+    pass
 
 
 class UpdateStateGenerator(DependencyStateGenerator):
@@ -214,6 +336,9 @@ class UpdateStateGenerator(DependencyStateGenerator):
     In addition, the default state implementation applies, considering nonexistent containers or containers that
     cannot be restarted.
     """
+    container_state_class = UpdateContainerState
+    network_state_class = UpdateNetworkState
+
     pull_before_update = False
     pull_insecure_registry = False
     update_persistent = False
@@ -228,123 +353,14 @@ class UpdateStateGenerator(DependencyStateGenerator):
                 insecure_registry=self.pull_insecure_registry)
             for client_name in policy.clients.keys()
         }
-        self._volume_checker = ContainerVolumeChecker()
+        self._volume_checkers = {
+            client_name: ContainerVolumeChecker()
+            for client_name in policy.clients.keys()
+        }
 
-    def _check_links(self, map_name, c_config, instance_detail):
-        instance_links = instance_detail['HostConfig']['Links'] or []
-        link_dict = defaultdict(set)
-        for host_link in instance_links:
-            link_name, __, link_alias = host_link.partition(':')
-            link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
-        for link in c_config.links:
-            instance_aliases = link_dict.get(self._policy.cname(map_name, link.container))
-            config_alias = link.alias or link.container
-            if not instance_aliases or config_alias not in instance_aliases:
-                log.debug("Checked link %s - could not find alias %s", link.container, config_alias)
-                return False
-            log.debug("Checked link %s - found alias %s", link.container, config_alias)
-        return True
-
-    def _check_commands(self, container_config, client, container_name):
-        def _find_full_command(f_cmd, f_user):
-            for __, c_user, c_cmd in current_commands:
-                if c_user == f_user and c_cmd == f_cmd:
-                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
-                    return True
-            return False
-
-        def _find_partial_command(f_cmd, f_user):
-            for __, c_user, c_cmd in current_commands:
-                if c_user == f_user and f_cmd in c_cmd:
-                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
-                    return True
-            return False
-
-        def _cmd_state(cmd, cmd_user):
-            res_cmd = resolve_value(cmd)
-            if isinstance(res_cmd, (list, tuple)):
-                res_cmd = ' '.join(res_cmd)
-            if cmd_user is not None:
-                res_user = resolve_value(cmd_user)
-            else:
-                res_user = extract_user(container_config.user)
-            if res_user is None:
-                res_user = 'root'
-            log.debug("Looking up %s command for user %s: %s", self.check_exec_commands, res_user, res_cmd)
-            return cmd_exists(res_cmd, res_user)
-
-        log.debug("Checking commands for container %s.", container_name)
-        current_commands = client.top(container_name, ps_args='-eo pid,user,args')['Processes']
-        if self.check_exec_commands == CMD_CHECK_FULL:
-            cmd_exists = _find_full_command
-        elif self.check_exec_commands == CMD_CHECK_PARTIAL:
-            cmd_exists = _find_partial_command
-        else:
-            log.debug("Invalid check mode %s - skipping.", self.check_exec_commands)
-            return None
-        return [(exec_cmd, _cmd_state(exec_cmd[0], exec_cmd[1])) for exec_cmd in container_config.exec_commands]
-
-    def get_container_state(self, map_name, container_map, config_name, container_config, client_name, client_config,
-                            client, instance_alias, config_flags=0):
-        """
-        Extends the base state by checking the current instance detail against the container configuration and volumes
-        other containers. Also checks if the container image matches the configured image's id.
-
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param container_map: Container map instance.
-        :type container_map: dockermap.map.config.main.ContainerMap
-        :param config_name: Container configuration name.
-        :type config_name: unicode | str
-        :param container_config: Container configuration object.
-        :type container_config: dockermap.map.config.container.ContainerConfiguration
-        :param client_name: Client name.
-        :type client_name: unicode | str
-        :param client_config: Client configuration object.
-        :type client_config: dockermap.map.config.client.ClientConfiguration
-        :param client: Docker client.
-        :type client: docker.client.Client
-        :param instance_alias: Container instance name or attached alias.
-        :type instance_alias: unicode | str
-        :param config_flags: Config flags on the container.
-        :type config_flags: bool
-        :return: Tuple of container inspection detail, and the base state information derived from that.
-        :rtype: (dict | NoneType, unicode | str, int, dict | NoneType)
-        """
-        detail, base_state, state_flags, extra = super(
-            UpdateStateGenerator, self).get_container_state(map_name, container_map, config_name, container_config,
-                                                            client_name, client_config, client, instance_alias,
-                                                            config_flags=config_flags)
-        if base_state == STATE_ABSENT or state_flags & STATE_FLAG_OUTDATED:
-            return detail, base_state, state_flags, extra
-
-        c_image_id = detail['Image']
-        if config_flags & CONFIG_FLAG_ATTACHED:
-            if self.update_persistent and c_image_id != self._base_image_ids[client_name]:
-                return detail, base_state, state_flags | STATE_FLAG_OUTDATED, extra
-            volumes = get_instance_volumes(detail)
-            if volumes:
-                mapped_path = resolve_value(container_map.volumes[instance_alias])
-                if container_map.use_attached_parent_name:
-                    self._volume_checker.register_attached(mapped_path, volumes.get(mapped_path), instance_alias,
-                                                           config_name)
-                else:
-                    self._volume_checker.register_attached(mapped_path, volumes.get(mapped_path), instance_alias)
-        else:
-            image_name = self._policy.image_name(container_config.image or config_name, container_map)
-            images = self._policy.images[client_name]
-            ref_image_id = images.ensure_image(image_name, pull=self.pull_before_update,
-                                               insecure_registry=self.pull_insecure_registry)
-            if not (((container_config.persistent and not self.update_persistent) or c_image_id == ref_image_id) and
-                    self._volume_checker.check(container_map, container_config, config_name, instance_alias, detail) and
-                    self._check_links(map_name, container_config, detail) and
-                    _check_environment(container_config, detail) and
-                    _check_cmd(container_config, detail) and
-                    _check_network(container_config, client_config, detail)):
-                return detail, base_state, state_flags | STATE_FLAG_OUTDATED, extra
-            if (self.check_exec_commands and self.check_exec_commands != CMD_CHECK_NONE and
-                    container_config.exec_commands):
-                exec_results = self._check_commands(container_config, client, detail['Id'])
-                if exec_results is not None:
-                    extra.update(exec_commands=exec_results)
-        return detail, base_state, state_flags, extra
+    def get_container_state(self, map_name, c_map, client_name, client_config, client, config_name, c_config):
+        c_state = super(UpdateStateGenerator, self).get_container_state(map_name, c_map, client_name, client_config,
+                                                                        client, config_name, c_config)
+        c_state.base_image_ids = self._base_image_ids[client_name]
+        c_state.volume_checker = self._volume_checkers[client_name]
+        return c_state

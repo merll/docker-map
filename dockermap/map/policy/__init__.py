@@ -38,3 +38,9 @@ class PolicyUtil(with_metaclass(PolicyUtilMeta)):
             if option_name in kwargs:
                 setattr(self, option_name, kwargs.pop(option_name))
         self._policy = policy
+
+    def get_options(self):
+        return {
+            option_name: getattr(self, option_name)
+            for option_name in self.__class__.policy_options
+        }
