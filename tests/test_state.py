@@ -187,8 +187,26 @@ def _add_inspect(rsps, container_map, map_name, c_config, config_name, instance_
 def _get_single_state(sg, config_ids):
     states = [si
               for s in sg.get_states(config_ids)
-              for si in s.instances]
+              for si in s.containers]
     return states[0]
+
+
+def _get_states_dict(sl):
+    cd = {}
+    nd = {}
+    vd = {}
+    for s in sl:
+        for n in s.networks:
+            nd[n.config] = n
+        for v in s.volumes:
+            vd[(v.config, v.instance)] = v
+        for c in s.containers:
+            cd[(c.config, c.instance)] = c
+    return {
+        'containers': cd,
+        'volumes': vd,
+        'networks': nd,
+    }
 
 
 class TestPolicyStateGenerators(unittest.TestCase):
@@ -243,17 +261,17 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = list(DependencyStateGenerator(self.policy, {}).get_states(self.server_config_id))
             instance_base_states = [si.base_state
                                     for s in states
-                                    for si in s.instances]
+                                    for si in s.containers]
             attached_base_states = [si.base_state
                                     for s in states
-                                    for si in s.attached]
+                                    for si in s.volumes]
             self.assertTrue(all(si == STATE_RUNNING
                                 for si in instance_base_states))
             self.assertTrue(all(si == STATE_PRESENT
                                 for si in attached_base_states))
             self.assertTrue(all(s.flags == CONFIG_FLAG_DEPENDENT
                                 for s in states
-                                if s.config != 'server'))
+                                if s.containers[0].config != 'server'))
 
     def test_single_states_mixed(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -271,12 +289,12 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.assertEqual(queue_state.base_state, STATE_RUNNING)
             svc_state = _get_single_state(sg, self._config_id('svc'))
             self.assertEqual(svc_state.base_state, STATE_PRESENT)
-            self.assertEqual(svc_state.flags & STATE_FLAG_NONRECOVERABLE, STATE_FLAG_NONRECOVERABLE)
+            self.assertEqual(svc_state.state_flags & STATE_FLAG_NONRECOVERABLE, STATE_FLAG_NONRECOVERABLE)
             worker_state = _get_single_state(sg, self._config_id('worker'))
-            self.assertEqual(worker_state.flags & STATE_FLAG_RESTARTING, STATE_FLAG_RESTARTING)
+            self.assertEqual(worker_state.state_flags & STATE_FLAG_RESTARTING, STATE_FLAG_RESTARTING)
             worker2_state = _get_single_state(sg, self._config_id('worker_q2'))
             self.assertEqual(worker2_state.base_state, STATE_PRESENT)
-            self.assertEqual(worker2_state.flags & STATE_FLAG_INITIAL, STATE_FLAG_INITIAL)
+            self.assertEqual(worker2_state.state_flags & STATE_FLAG_INITIAL, STATE_FLAG_INITIAL)
             server_states = _get_single_state(sg, self.server_config_id)
             self.assertEqual(server_states.base_state, STATE_ABSENT)
 
@@ -289,9 +307,9 @@ class TestPolicyStateGenerators(unittest.TestCase):
                                                 ext_map=self.sample_map))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
-            self.assertEqual(cache_state.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            self.assertEqual(cache_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
             queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
-            self.assertEqual(queue_state.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            self.assertEqual(queue_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
 
     def test_single_states_forced_instance(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -302,9 +320,9 @@ class TestPolicyStateGenerators(unittest.TestCase):
                                                 ext_map=self.sample_map))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
-            self.assertEqual(cache_state.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            self.assertEqual(cache_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
             queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
-            self.assertEqual(queue_state.flags & STATE_FLAG_OUTDATED, 0)
+            self.assertEqual(queue_state.state_flags & STATE_FLAG_OUTDATED, 0)
 
     def test_dependent_states(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -321,17 +339,17 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = list(DependentStateGenerator(self.policy, {}).get_states(self._config_id('redis')))
             instance_base_states = [si.base_state
                                     for s in states
-                                    for si in s.instances]
-            attached_base_states = [si.base_state
+                                    for si in s.containers]
+            volume_base_states = [si.base_state
                                     for s in states
-                                    for si in s.attached]
+                                    for si in s.volumes]
             self.assertTrue(all(si == STATE_RUNNING
                                 for si in instance_base_states))
             self.assertTrue(all(si == STATE_PRESENT
-                                for si in attached_base_states))
+                                for si in volume_base_states))
             self.assertTrue(all(s.flags == CONFIG_FLAG_DEPENDENT
                                 for s in states
-                                if s.config != 'redis'))
+                                if s.containers[0].config != 'redis'))
 
     def test_update_states_clean(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -339,13 +357,13 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = list(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             valid_order = ['sub_sub_svc', 'sub_svc', 'redis', 'server']
             for c_states in states:
-                config_name = c_states.config
+                i_state = c_states.containers[0]
+                config_name = i_state.config
                 if config_name in valid_order:
                     self.assertEqual(valid_order[0], config_name)
                     valid_order.pop(0)
-                    i_states = c_states.instances[0]
-                    self.assertEqual(i_states.base_state, STATE_RUNNING)
-                    self.assertEqual(i_states.flags, 0)
+                    self.assertEqual(i_state.base_state, STATE_RUNNING)
+                    self.assertEqual(i_state.state_flags, 0)
 
     def test_update_states_invalid_attached(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -356,13 +374,14 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
-            server_states = states['server'].instances[0]
-            self.assertEqual(server_states.base_state, STATE_RUNNING)
-            self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
-            redis_states = states['redis'].instances[0]
-            self.assertEqual(redis_states.base_state, STATE_RUNNING)
-            self.assertEqual(redis_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            server_state = states['containers'][('server', None)]
+            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            for ri in ('cache', 'queue'):
+                redis_state = states['containers'][('redis', ri)]
+                self.assertEqual(redis_state.base_state, STATE_RUNNING)
+                self.assertEqual(redis_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
 
     def test_update_states_invalid_dependent_instance(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -373,13 +392,14 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
-            server_states = states['server'].instances[0]
-            self.assertEqual(server_states.base_state, STATE_RUNNING)
-            self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, 0)
-            redis_states = states['redis'].instances[0]
-            self.assertEqual(redis_states.base_state, STATE_RUNNING)
-            self.assertEqual(redis_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            server_state = states['containers'][('server', None)]
+            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.state_flags & STATE_FLAG_OUTDATED, 0)
+            for ri in ('cache', 'queue'):
+                redis_state = states['containers'][('redis', ri)]
+                self.assertEqual(redis_state.base_state, STATE_RUNNING)
+                self.assertEqual(redis_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
 
     def test_update_states_invalid_dependent_instance_attached(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -390,13 +410,14 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server', attached_volumes_valid=False),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
-            server_states = states['server'].instances[0]
-            self.assertEqual(server_states.base_state, STATE_RUNNING)
-            self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
-            redis_states = states['redis'].instances[0]
-            self.assertEqual(redis_states.base_state, STATE_RUNNING)
-            self.assertEqual(redis_states.flags & STATE_FLAG_OUTDATED, 0)
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            server_state = states['containers'][('server', None)]
+            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            for ri in ('cache', 'queue'):
+                redis_state = states['containers'][('redis', ri)]
+                self.assertEqual(redis_state.base_state, STATE_RUNNING)
+                self.assertEqual(redis_state.state_flags & STATE_FLAG_OUTDATED, 0)
 
     def test_update_states_invalid_image(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -407,10 +428,10 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server', Image='invalid'),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
-            server_states = states['server'].instances[0]
-            self.assertEqual(server_states.base_state, STATE_RUNNING)
-            self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            server_state = states['containers'][('server', None)]
+            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
 
     def test_update_states_invalid_network(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -421,28 +442,28 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server', NetworkSettings=dict(Ports={})),
             ])
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
-            server_states = states['server'].instances[0]
-            self.assertEqual(server_states.base_state, STATE_RUNNING)
-            self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            server_state = states['containers'][('server', None)]
+            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
 
     def test_update_states_updated_environment(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_default_containers(rsps)
             self.sample_map.containers['server'].create_options.update(environment=dict(Test='x'))
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
-            server_states = states['server'].instances[0]
-            self.assertEqual(server_states.base_state, STATE_RUNNING)
-            self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            server_state = states['containers'][('server', None)]
+            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
 
     def test_update_states_updated_command(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_default_containers(rsps)
             self.sample_map.containers['server'].create_options.update(command='/bin/true')
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
-            server_states = states['server'].instances[0]
-            self.assertEqual(server_states.base_state, STATE_RUNNING)
-            self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            server_state = states['containers'][('server', None)]
+            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.state_flags & STATE_FLAG_OUTDATED, STATE_FLAG_OUTDATED)
 
     def test_update_states_updated_exec(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -452,11 +473,11 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.sample_map.containers['server'].exec_commands = [cmd1]
             self._setup_default_containers(rsps)
             self.sample_map.containers['server'].exec_commands = [cmd1, cmd2, cmd3]
-            states = {s.config: s for s in UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id)}
-            server_states = states['server'].instances[0]
-            self.assertEqual(server_states.base_state, STATE_RUNNING)
-            self.assertEqual(server_states.flags & STATE_FLAG_OUTDATED, 0)
-            self.assertDictEqual(server_states.extra_data, {'exec_commands': [
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            server_state = states['containers'][('server', None)]
+            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.state_flags & STATE_FLAG_OUTDATED, 0)
+            self.assertDictEqual(server_state.extra_data, {'exec_commands': [
                 (cmd1, True),
                 (cmd2, False),
                 (cmd3, False),

@@ -7,11 +7,11 @@ import logging
 
 from six import with_metaclass
 
-from ..policy import (CONFIG_FLAG_DEPENDENT, CONFIG_FLAG_ATTACHED, CONFIG_FLAG_PERSISTENT,
+from ..policy import (CONFIG_FLAG_DEPENDENT, CONTAINER_CONFIG_FLAG_ATTACHED, CONTAINER_CONFIG_FLAG_PERSISTENT,
                       ABCPolicyUtilMeta, PolicyUtil)
 from . import (INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, STATE_FLAG_INITIAL,
                STATE_FLAG_RESTARTING, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_OUTDATED,
-               ContainerConfigStates, ContainerInstanceState)
+               ConfigState, ClientMapConfigStates)
 from .utils import merge_dependency_paths
 
 
@@ -109,7 +109,7 @@ class ContainerBaseState(AbstractState):
         self.config_flags = config_flags
 
         policy = self.policy
-        if config_flags & CONFIG_FLAG_ATTACHED:
+        if config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
             if self.container_map.use_attached_parent_name:
                 container_name = policy.aname(self.map_name, instance_alias, self.config_name)
             else:
@@ -216,10 +216,6 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         else:
             c_instances = instances or c_config.instances or [None]
 
-        config_flags = CONFIG_FLAG_DEPENDENT if is_dependency else 0
-        a_flags = config_flags | CONFIG_FLAG_ATTACHED
-        if c_config.persistent:
-            config_flags |= CONFIG_FLAG_PERSISTENT
         clients = self._policy.get_clients(c_config, c_map)
         for client_name, client_config in clients:
             def _get_state(c_flags, items):
@@ -227,16 +223,17 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                     c_state.set_defaults()
                     c_state.inspect(item, c_flags)
                     # Extract base state, state flags, and extra info.
-                    yield ContainerInstanceState(item, *c_state.get_state())
+                    yield ConfigState(config_name, item, c_flags, *c_state.get_state())
 
             client = client_config.get_client()
             c_state = self.get_container_state(map_name, c_map, client_name, client_config, client, config_name,
                                                c_config)
-            attached_states = [a_state for a_state in _get_state(a_flags, c_config.attaches)]
-            instance_states = [i_state for i_state in _get_state(config_flags, c_instances)]
-            states = ContainerConfigStates(client_name, map_name, config_name, config_flags, instance_states,
-                                           attached_states)
-            log.debug("Container state information: %s", states)
+            v_states = [v_state for v_state in _get_state(CONTAINER_CONFIG_FLAG_ATTACHED, c_config.attaches)]
+            c_states = [i_state for i_state in _get_state(CONTAINER_CONFIG_FLAG_PERSISTENT, c_instances)]
+            n_states = []  # TODO
+            states = ClientMapConfigStates(client_name, map_name, CONFIG_FLAG_DEPENDENT if is_dependency else 0,
+                                           c_states, v_states, n_states)
+            log.debug("Configuration state information: %s", states)
             yield states
 
     @abstractmethod

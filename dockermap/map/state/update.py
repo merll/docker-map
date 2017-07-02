@@ -8,7 +8,7 @@ import six
 
 from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
 from ...functional import resolve_value
-from ..policy import CONFIG_FLAG_ATTACHED
+from ..policy import CONTAINER_CONFIG_FLAG_ATTACHED
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
 from . import STATE_FLAG_OUTDATED, STATE_ABSENT
 
@@ -269,7 +269,7 @@ class UpdateContainerState(ContainerBaseState):
 
     def inspect(self, instance_alias, config_flags=0):
         super(UpdateContainerState, self).inspect(instance_alias, config_flags=config_flags)
-        if not config_flags & CONFIG_FLAG_ATTACHED:
+        if not config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
             check_exec_option = self.options['check_exec_commands']
             if check_exec_option and check_exec_option != CMD_CHECK_NONE and self.config.exec_commands:
                 self.current_commands = self.client.top(self.detail['Id'], ps_args='-eo pid,user,args')['Processes']
@@ -282,7 +282,7 @@ class UpdateContainerState(ContainerBaseState):
             return base_state, state_flags, extra
 
         c_image_id = self.detail['Image']
-        if self.config_flags & CONFIG_FLAG_ATTACHED:
+        if self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
             if self.options['update_persistent'] and c_image_id != self.base_image_id:
                 return base_state, state_flags | STATE_FLAG_OUTDATED, extra
             volumes = get_instance_volumes(self.detail)

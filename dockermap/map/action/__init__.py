@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from collections import namedtuple
+
 from six import string_types, python_2_unicode_compatible
+
+ITEM_TYPE_CONTAINER = 'container'
+ITEM_TYPE_VOLUME = 'volume'
+ITEM_TYPE_NETWORK = 'network'
 
 # Base actions provided by client.
 ACTION_CREATE = 'create'
@@ -17,7 +23,7 @@ UTIL_ACTION_EXEC_ALL = 'exec_all_commands'                  # Create & start all
 UTIL_ACTION_UPDATE = 'update'                               # Conditional reset or relaunch.
 UTIL_ACTION_SCRIPT = 'script'                               # Create & start container, then create & start exec.
 UTIL_ACTION_SIGNAL_STOP = 'signal_stop'                     # Send signal (kill) & wait.
-UTIL_ACTION_PREPARE_CONTAINER = 'prepare_container'         # Set up attached volume permissions.
+UTIL_ACTION_PREPARE_VOLUME = 'prepare_volume'               # Set up attached volume permissions.
 
 DERIVED_ACTION_STARTUP = [ACTION_CREATE, ACTION_START]                            # Create & start
 DERIVED_ACTION_SHUTDOWN = [UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE]                # Stop & remove
@@ -39,16 +45,17 @@ def _action_type_list(value):
     return []
 
 
-@python_2_unicode_compatible
-class InstanceAction(object):
-    """
-    Utility class for storing container actions.
+ClientMapActions = namedtuple('Actions', ['client', 'map', 'actions'])
 
-    :param client_name: Client configuration name.
-    :type client_name: unicode | str
-    :param map_name: Container map name.
-    :type map_name: unicode | str
-    :param config_name: Container configuration name.
+
+@python_2_unicode_compatible
+class ItemAction(object):
+    """
+    Utility class for storing actions.
+
+    :param config_type: Configuration item type.
+    :type config_type: unicode | str
+    :param config_name: Configuration name.
     :type config_name: unicode | str
     :param instance_name: Instance name.
     :type instance_name: unicode | str
@@ -56,11 +63,10 @@ class InstanceAction(object):
     :type action_types: unicode | str | list[unicode | str] | tuple[unicode | str]
     :param extra_data: Extra data. Typically passed on as keyword arguments to the client function.
     :type extra_data: dict
-    :param kwargs: Addtional keyword arguments; added to extra_data
+    :param kwargs: Additional keyword arguments; added to extra_data
     """
-    def __init__(self, client_name, map_name, config_name, instance_name, action_types=None, extra_data=None, **kwargs):
-        self._client = client_name
-        self._map = map_name
+    def __init__(self, config_type, config_name, instance_name=None, action_types=None, extra_data=None, **kwargs):
+        self._config_type = config_type
         self._config = config_name
         self._instance = instance_name
         self._action_types = _action_type_list(action_types)
@@ -68,58 +74,28 @@ class InstanceAction(object):
         self._extra_data.update(kwargs)
 
     def __str__(self):
-        return ("InstanceAction(client={0._client!r}, map={0._map!r}, config={0._config!r}, instance={0._instance!r}, "
-                "action_types={0._action_types!r}, extra_data={0._extra_data!r})".format(self))
+        return ("InstanceAction(config_type={0._config_type!r}, client={0._client!r}, map={0._map!r}, "
+                "config={0._config!r}, instance={0._instance!r}, action_types={0._action_types!r}, "
+                "extra_data={0._extra_data!r})".format(self))
 
     __repr__ = __str__
 
-    @classmethod
-    def config_partial(cls, client_name, map_name, config_name):
-        """
-        Generates and returns a partial function for creating a series of :class:`InstanceAction` objects with identical
-        client, map, config names, but different instance descriptions, action type, and extra arguments.
-
-        :param client_name: Client config name.
-        :type client_name: unicode | str
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param config_name: Container configuration name.
-        :type config_name: unicode | str
-        :return: Function with arguments ``instance_name`, ``action_type``, and ``extra_data``.
-        :rtype: (unicode | str, unicode | str, dict) -> InstanceAction
-        """
-        def _new_instance(instance_name, action_types=None, extra_data=None, **kwargs):
-            return cls(client_name, map_name, config_name, instance_name,
-                       action_types=action_types, extra_data=extra_data, **kwargs)
-
-        return _new_instance
-
     @property
-    def client_name(self):
+    def config_type(self):
         """
-        The client config name for the action to be performed on.
+        The configuration item type, e.g. container, network, or volume.
 
-        :return: Client config name.
+        :return: Configuration item type.
         :rtype: unicode | str
         """
-        return self._client
-
-    @property
-    def map_name(self):
-        """
-        The container map name containing the container configuration.
-
-        :return: Container map name.
-        :rtype: unicode | str
-        """
-        return self._map
+        return self._config_type
 
     @property
     def config_name(self):
         """
-        The container configuration name with the information to apply to the action.
+        The configuration name with the information to apply to the action.
 
-        :return: Container configuration name.
+        :return: Configuration name.
         :rtype: unicode | str
         """
         return self._config
@@ -134,26 +110,6 @@ class InstanceAction(object):
         :rtype: unicode | str | NoneType
         """
         return self._instance
-
-    @property
-    def config_tuple(self):
-        """
-        Tuple of client name, map name, and container configuration name.
-
-        :return: Tuple with aforementioned aliases.
-        :rtype: (unicode | str, unicode | str, unicode | str)
-        """
-        return self._client, self._map, self._config
-
-    @property
-    def instance_tuple(self):
-        """
-        Tuple of client name, map name, container configuration name, and instance.
-
-        :return: Tuple with aforementioned aliases.
-        :rtype: (unicode | str, unicode | str, unicode | str, unicode | str)
-        """
-        return self._client, self._map, self._config, self._instance
 
     @property
     def action_types(self):

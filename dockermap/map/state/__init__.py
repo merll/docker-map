@@ -15,6 +15,7 @@ STATE_FLAG_RESTARTING = 1 << 1       # Container is not running, but in the proc
 STATE_FLAG_NONRECOVERABLE = 1 << 10  # Container is stopped with an error that cannot be solved through restarting.
 STATE_FLAG_OUTDATED = 1 << 11        # Container in any base state does not correspond with current config.
 
-ContainerConfigStates = namedtuple('ContainerConfigState', ['client', 'map', 'config', 'flags', 'instances',
-                                                            'attached'])
-ContainerInstanceState = namedtuple('ContainerInstanceState', ['instance', 'base_state', 'flags', 'extra_data'])
+ConfigState = namedtuple('ConfigState', ['config', 'instance', 'config_flags', 'base_state', 'state_flags',
+                                         'extra_data'])
+ClientMapConfigStates = namedtuple('ClientMapConfigStates', ['client', 'map', 'flags', 'containers', 'volumes',
+                                                             'networks'])

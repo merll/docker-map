@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ..policy import CONFIG_FLAG_PERSISTENT
+from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
 from ..state import STATE_PRESENT, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_INITIAL, STATE_ABSENT, STATE_RUNNING
 from .base import AbstractActionGenerator
-from . import (InstanceAction, DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, ACTION_START,
-               UTIL_ACTION_PREPARE_CONTAINER, DERIVED_ACTION_RESET, UTIL_ACTION_EXEC_ALL)
+from . import (ItemAction, ClientMapActions, ITEM_TYPE_VOLUME, ITEM_TYPE_CONTAINER, ITEM_TYPE_NETWORK,
+               DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, ACTION_START, UTIL_ACTION_PREPARE_VOLUME,
+               DERIVED_ACTION_RESET, UTIL_ACTION_EXEC_ALL, ACTION_CREATE)
 
 
 class ResumeActionGenerator(AbstractActionGenerator):
@@ -18,56 +19,59 @@ class ResumeActionGenerator(AbstractActionGenerator):
         :param states: Configuration states.
         :type states: dockermap.map.state.ContainerConfigStates
         :param kwargs: Additional keyword arguments.
-        :return: List of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: dockermap.map.action.ClientMapActions
         """
-        new_action = InstanceAction.config_partial(states.client, states.map, states.config)
-        attached_actions = []
+        actions = [
+            ItemAction(ITEM_TYPE_NETWORK, state.config, action_type=ACTION_CREATE, extra_data=kwargs)
+            for state in states.networks
+            if state.base_state == STATE_ABSENT
+        ]
         recreate_attached = False
-        for attached_state in states.attached:
-            if attached_state.base_state == STATE_ABSENT:
+        for state in states.volumes:
+            if state.base_state == STATE_ABSENT:
                 action = DERIVED_ACTION_STARTUP
                 recreate_attached = True
             else:
-                if attached_state.flags & STATE_FLAG_NONRECOVERABLE:
+                if state.state_flags & STATE_FLAG_NONRECOVERABLE:
                     action = DERIVED_ACTION_RELAUNCH
                     recreate_attached = True
-                elif attached_state.flags & STATE_FLAG_INITIAL:
+                elif state.state_flags & STATE_FLAG_INITIAL:
                     action = ACTION_START
                 else:
                     continue
-            attached_actions.append(new_action(attached_state.instance, action))
-            attached_actions.append(new_action(attached_state.instance, UTIL_ACTION_PREPARE_CONTAINER))
+            actions.append(ItemAction(ITEM_TYPE_VOLUME, state.config, state.instance, action))
+            actions.append(ItemAction(ITEM_TYPE_VOLUME, state.config, state.instance, UTIL_ACTION_PREPARE_VOLUME))
 
-        instance_actions = []
         if recreate_attached:
-            for instance_state in states.instances:
-                if instance_state.base_state == STATE_ABSENT:
+            for state in states.containers:
+                if state.base_state == STATE_ABSENT:
                     action = DERIVED_ACTION_STARTUP
-                elif instance_state.base_state == STATE_RUNNING:
+                elif state.base_state == STATE_RUNNING:
                     action = DERIVED_ACTION_RESET
-                elif instance_state.base_state == STATE_PRESENT:
-                    if instance_state.base_state & STATE_FLAG_INITIAL:
+                elif state.base_state == STATE_PRESENT:
+                    if state.base_state & STATE_FLAG_INITIAL:
                         action = ACTION_START
                     else:
                         action = DERIVED_ACTION_RELAUNCH
                 else:
                     continue
-                instance_actions.append(new_action(instance_state.instance, action))
-                instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
+                actions.append(ItemAction(ITEM_TYPE_CONTAINER, state.config, state.instance, action))
+                actions.append(ItemAction(ITEM_TYPE_CONTAINER, state.config, state.instance, UTIL_ACTION_EXEC_ALL))
         else:
-            for instance_state in states.instances:
-                if instance_state.base_state == STATE_ABSENT:
+            for state in states.containers:
+                if state.base_state == STATE_ABSENT:
                     action = DERIVED_ACTION_STARTUP
                 else:
-                    if instance_state.flags & STATE_FLAG_NONRECOVERABLE:
+                    if state.state_flags & STATE_FLAG_NONRECOVERABLE:
                         action = DERIVED_ACTION_RESET
-                    elif (instance_state.base_state != STATE_RUNNING and
-                          (instance_state.flags & STATE_FLAG_INITIAL or not states.flags & CONFIG_FLAG_PERSISTENT)):
+                    elif (state.base_state != STATE_RUNNING and
+                          (state.state_flags & STATE_FLAG_INITIAL or
+                           not states.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT)):
                         action = ACTION_START
                     else:
                         continue
-                instance_actions.append(new_action(instance_state.instance, action))
-                instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
+                actions.append(ItemAction(ITEM_TYPE_CONTAINER, state.config, state.instance, action))
+                actions.append(ItemAction(ITEM_TYPE_CONTAINER, state.config, state.instance, UTIL_ACTION_EXEC_ALL))
 
-        return attached_actions, instance_actions
+        return ClientMapActions(states.client, states.map, actions)

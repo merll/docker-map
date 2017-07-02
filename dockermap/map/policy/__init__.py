@@ -3,9 +3,9 @@ from abc import ABCMeta
 
 from six import with_metaclass
 
-CONFIG_FLAG_ATTACHED = 1               # Container is an attached volume.
-CONFIG_FLAG_DEPENDENT = 1 << 1         # Container is checked in a relation to a dependent / dependency container.
-CONFIG_FLAG_PERSISTENT = 1 << 2        # Container is persistent.
+CONFIG_FLAG_DEPENDENT = 1  # Configuration is checked in a relation to a dependent / dependency container.
+CONTAINER_CONFIG_FLAG_ATTACHED = 1 << 1          # Container is an attached volume.
+CONTAINER_CONFIG_FLAG_PERSISTENT = 1 << 2        # Container is persistent.
 
 
 class PolicyUtilMeta(type):
