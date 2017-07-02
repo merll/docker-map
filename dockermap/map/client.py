@@ -119,7 +119,7 @@ class MappingDockerClient(object):
         state_generator = state_generator_cls(policy, kwargs)
         action_generator = action_generator_cls(policy, kwargs)
         runner = self.runner_class(policy, kwargs)
-        log.debug("Passing kwargs to client actions: {0}".format(kwargs))
+        log.debug("Passing kwargs to client actions: %s", kwargs)
         results = []
 
         config_ids = _get_config_ids(config_name, policy.container_maps, groups, map_name or self._default_map,
