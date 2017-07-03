@@ -124,6 +124,7 @@ class MappingDockerClient(object):
 
         config_ids = _get_config_ids(config_name, policy.container_maps, groups, map_name or self._default_map,
                                      instances)
+        log.debug("Generating states for configurations: %s", config_ids)
         for states in state_generator.get_states(config_ids):
             actions = action_generator.get_state_actions(states, **kwargs)
             log.debug("Running actions: %s", actions)
