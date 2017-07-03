@@ -45,7 +45,7 @@ def _action_type_list(value):
     return []
 
 
-ClientMapActions = namedtuple('Actions', ['client', 'map', 'actions'])
+ClientMapActions = namedtuple('ClientMapActions', ['client_name', 'map_name', 'actions'])
 
 
 @python_2_unicode_compatible

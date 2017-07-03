@@ -6,32 +6,31 @@ import signal
 
 from requests.exceptions import Timeout
 
-from ..action import UTIL_ACTION_SIGNAL_STOP
-
+from ..action import UTIL_ACTION_SIGNAL_STOP, ITEM_TYPE_CONTAINER
 
 log = logging.getLogger(__name__)
 
 
 class SignalMixin(object):
-    instance_action_method_names = [
-        (UTIL_ACTION_SIGNAL_STOP, 'signal_stop'),
+    action_method_names = [
+        (ITEM_TYPE_CONTAINER, UTIL_ACTION_SIGNAL_STOP, 'signal_stop'),
     ]
 
-    def signal_stop(self, config, c_name, **kwargs):
+    def signal_stop(self, action, c_name, **kwargs):
         """
         Stops a container, either using the default client stop method, or sending a custom signal and waiting
         for the container to stop.
 
-        :param config: Configuration.
-        :type config: dockermap.map.runner.ActionConfig
+        :param action: Action configuration.
+        :type action: dockermap.map.runner.ActionConfig
         :param c_name: Container name.
         :type c_name: unicode | str
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         """
-        client = config.client
-        sig = config.container_config.stop_signal
-        stop_kwargs = self.get_stop_kwargs(config, c_name, kwargs=kwargs)
+        client = action.client
+        sig = action.config.stop_signal
+        stop_kwargs = self.get_stop_kwargs(action, c_name, kwargs=kwargs)
         if not sig or sig == 'SIGTERM' or sig == signal.SIGTERM:
             try:
                 client.stop(**stop_kwargs)
