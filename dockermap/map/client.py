@@ -127,7 +127,7 @@ class MappingDockerClient(object):
         for states in state_generator.get_states(config_ids):
             actions = action_generator.get_state_actions(states, **kwargs)
             log.debug("Running actions: %s", actions)
-            results.extend(runner.run_actions(*actions))
+            results.extend(runner.run_actions(actions))
 
         return results
 
