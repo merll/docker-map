@@ -15,22 +15,21 @@ def merge_dependency_paths(item_paths):
     """
     merged_paths = []
     for item, path in item_paths:
-        sub_path_idx = None
+        sub_path_idx = []
         path_set = set(path)
         for index, (merged_item, merged_path, merged_set) in enumerate(merged_paths):
             if item in merged_set:
-                path, path_set = [], set()
+                path = None
                 break
             elif merged_item in path_set:
-                sub_path_idx = index
-                break
+                sub_path_idx.append(index)
             elif merged_set & path_set:
                 path = [p for p in path if p not in merged_set]
                 path_set = set(path)
                 if not path:
                     break
-        if sub_path_idx is not None:
-            merged_paths.pop(sub_path_idx)
-        if path:
+        for spi in reversed(sub_path_idx):
+            merged_paths.pop(spi)
+        if path is not None:
             merged_paths.append((item, path, path_set))
     return [(i[0], i[1]) for i in merged_paths]
