@@ -189,12 +189,12 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
         pass
 
     def _get_all_states(self, config_id, dependency_path):
-        log.debug("Following dependency path for %(map_name)s.%(config_name)s.", config_id)
+        log.debug("Following dependency path for %s.", config_id)
         for d_map_name, d_config_name, d_instances in dependency_path:
             log.debug("Dependency path at %s.%s, instances %s.", d_map_name, d_config_name, d_instances)
             for state in self.generate_config_states(d_map_name, d_config_name, d_instances, is_dependency=True):
                 yield state
-        log.debug("Processing state for %(map_name)s.%(config_name)s.", config_id)
+        log.debug("Processing state for %s.", config_id)
         for state in self.generate_config_states(*config_id):
             yield state
 
