@@ -12,6 +12,7 @@ from .. import DictMap, DefaultDictMap
 from ..input import bool_if_set, MapConfigId
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
+from .network import NetworkConfiguration
 
 
 get_map_config = itemgetter(0, 1)
@@ -183,6 +184,7 @@ class ContainerMap(ConfigurationObject):
         self._name = name
         self._extended = False
         self._containers = DefaultDictMap(ContainerConfiguration)
+        self._networks = DefaultDictMap(NetworkConfiguration)
         super(ContainerMap, self).__init__(initial, **kwargs)
         if self._containers and check_integrity:
             self.check_integrity(check_duplicates=check_duplicates)
@@ -196,6 +198,9 @@ class ContainerMap(ConfigurationObject):
         elif key == 'containers':
             for c_name, c_value in six.iteritems(value):
                 self._containers[c_name].update_from_dict(c_value)
+        elif key == 'networks':
+            for n_name, n_value in six.iteritems(value):
+                self._networks[n_name].update_from_dict(n_value)
         else:
             self._containers[key].update_from_dict(value)
 
@@ -209,6 +214,12 @@ class ContainerMap(ConfigurationObject):
                     self._containers[c_name].merge_from_dict(c_value, lists_only=lists_only)
                 else:
                     self._containers[c_name].update_from_dict(c_value)
+        elif key == 'networks':
+            for n_name, n_value in six.iteritems(value):
+                if n_name in self._networks:
+                    self._networks[n_name].merge_from_dict(n_value, lists_only=lists_only)
+                else:
+                    self._networks[n_name].update_from_dict(n_value)
         elif key in self._containers:
             self._containers[key].merge_from_dict(value, lists_only=lists_only)
         else:
@@ -222,6 +233,10 @@ class ContainerMap(ConfigurationObject):
         if containers:
             self._config['containers'] = containers = DefaultDictMap(ContainerConfiguration)
             containers.update(containers)
+        networks = dct.get('networks')
+        if networks:
+            self._config['networks'] = networks = DefaultDictMap(NetworkConfiguration)
+            networks.update(networks)
         super(ContainerMap, self).update_from_dict(dct)
 
     def update_from_obj(self, obj, copy=False, update_containers=True):
@@ -229,6 +244,8 @@ class ContainerMap(ConfigurationObject):
         if update_containers:
             for key, value in obj.containers:
                 self._containers[key].update_from_obj(value, copy=copy)
+        for key, value in obj.networks:
+            self._networks[key].update_from_obj(value, copy=copy)
         super(ContainerMap, self).update_from_obj(obj, copy=copy)
 
     def merge_from_obj(self, obj, lists_only=False):
@@ -237,6 +254,11 @@ class ContainerMap(ConfigurationObject):
                 self._containers[key].merge_from_obj(value, lists_only=lists_only)
             else:
                 self._containers[key].update_from_obj(value)
+        for key, value in obj.networks:
+            if key in self._networks:
+                self._networks[key].merge_from_obj(value, lists_only=lists_only)
+            else:
+                self._networks[key].update_from_obj(value)
         super(ContainerMap, self).merge_from_obj(obj, lists_only=lists_only)
 
     def get_persistent_items(self):
@@ -282,6 +304,24 @@ class ContainerMap(ConfigurationObject):
         else:
             self._containers.clear()
             self._containers.update(value)
+
+    @property
+    def networks(self):
+        """
+        Network configurations on the map.
+
+        :return: Network configurations.
+        :rtype: dict[unicode | str, dockermap.map.config.network.NetworkConfiguration]
+        """
+        return self._networks
+
+    @networks.setter
+    def networks(self, value):
+        if isinstance(value, DefaultDictMap) and value.default_factory is NetworkConfiguration:
+            self._networks = value
+        else:
+            self._networks.clear()
+            self._networks.update(value)
 
     def dependency_items(self, reverse=False):
         """
@@ -373,6 +413,30 @@ class ContainerMap(ConfigurationObject):
         :rtype: ContainerConfiguration
         """
         return self._containers.get(item)
+
+    def get_network(self, name):
+        """
+        Returns a network configuration from the map; if it does not yet exist, an initial config is created and
+        returned (to avoid this, use :meth:`get_existing_network` instead). `name` can be any valid network name.
+
+        :param name: Network name.
+        :type name: unicode | str
+        :return: A network configuration.
+        :rtype: NetworkConfiguration
+        """
+        return self._networks[name]
+
+    def get_existing_network(self, name):
+        """
+        Same as :meth:`get_network`, except for that non-existing network configurations will not be created; ``None``
+        is returned instead in this case.
+
+        :param name: Network name.
+        :type name: unicode | str
+        :return: A network configuration.
+        :rtype: NetworkConfiguration
+        """
+        return self._networks.get(name)
 
     def get_extended(self, config):
         """
