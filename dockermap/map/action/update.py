@@ -54,7 +54,6 @@ class UpdateActionGenerator(AbstractActionGenerator):
             actions.append(ItemAction(ITEM_TYPE_VOLUME, state.config, state.instance, action_type))
             actions.append(ItemAction(ITEM_TYPE_VOLUME, state.config, state.instance, UTIL_ACTION_PREPARE_VOLUME))
 
-        instance_actions = []
         for state in states.containers:
             instance_name = state.instance or '<default>'
             log.debug("Evaluating container instance %s.", instance_name)
