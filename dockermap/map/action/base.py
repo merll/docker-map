@@ -22,7 +22,7 @@ class AbstractActionGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         :param states: Container configuration states tuple.
         :type states: dockermap.map.state.ContainerConfigStates
         :param kwargs: Additional keyword arguments.
-        :return: Expanded list of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: dockermap.map.action.ClientMapActions
         """
         pass
