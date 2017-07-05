@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
+from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT, ITEM_TYPE_VOLUME, ITEM_TYPE_CONTAINER, ITEM_TYPE_NETWORK
 from ..state import STATE_PRESENT, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_INITIAL, STATE_ABSENT, STATE_RUNNING
 from .base import AbstractActionGenerator
-from . import (ItemAction, ClientMapActions, ITEM_TYPE_VOLUME, ITEM_TYPE_CONTAINER, ITEM_TYPE_NETWORK,
+from . import (ItemAction, ClientMapActions,
                DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, ACTION_START, UTIL_ACTION_PREPARE_VOLUME,
                DERIVED_ACTION_RESET, UTIL_ACTION_EXEC_ALL, ACTION_CREATE)
 

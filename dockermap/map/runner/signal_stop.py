@@ -6,7 +6,8 @@ import signal
 
 from requests.exceptions import Timeout
 
-from ..action import UTIL_ACTION_SIGNAL_STOP, ITEM_TYPE_CONTAINER
+from ..action import UTIL_ACTION_SIGNAL_STOP
+from ..policy import ITEM_TYPE_CONTAINER
 
 log = logging.getLogger(__name__)
 

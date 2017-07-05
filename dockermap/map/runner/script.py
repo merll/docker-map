@@ -7,7 +7,8 @@ import posixpath
 from requests import Timeout
 import six
 
-from ..action import UTIL_ACTION_SCRIPT, ITEM_TYPE_CONTAINER
+from ..action import UTIL_ACTION_SCRIPT
+from ..policy import ITEM_TYPE_CONTAINER
 
 
 class ScriptRunException(Exception):

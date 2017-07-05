@@ -5,10 +5,6 @@ from collections import namedtuple
 
 from six import string_types, python_2_unicode_compatible
 
-ITEM_TYPE_CONTAINER = 'container'
-ITEM_TYPE_VOLUME = 'volume'
-ITEM_TYPE_NETWORK = 'network'
-
 # Base actions provided by client.
 ACTION_CREATE = 'create'
 ACTION_START = 'start'

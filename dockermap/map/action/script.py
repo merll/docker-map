@@ -3,11 +3,10 @@ from __future__ import unicode_literals
 
 import logging
 
-from ..policy import CONFIG_FLAG_DEPENDENT
+from ..policy import CONFIG_FLAG_DEPENDENT, ITEM_TYPE_CONTAINER
 from ..state import STATE_ABSENT, STATE_RUNNING, STATE_FLAG_RESTARTING
 from .resume import ResumeActionGenerator
-from . import (ItemAction, ClientMapActions, ITEM_TYPE_CONTAINER, ACTION_REMOVE, DERIVED_ACTION_SHUTDOWN,
-               UTIL_ACTION_SCRIPT)
+from . import ItemAction, ClientMapActions, ACTION_REMOVE, DERIVED_ACTION_SHUTDOWN, UTIL_ACTION_SCRIPT
 
 
 log = logging.getLogger(__name__)
