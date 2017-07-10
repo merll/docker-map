@@ -260,16 +260,16 @@ class UpdateContainerState(ContainerBaseState):
         return [(exec_cmd, _cmd_state(exec_cmd[0], exec_cmd[1])) for exec_cmd in self.config.exec_commands]
 
     def _check_volumes(self):
-        return self.volume_checker.check(self.container_map, self.config_name, self.config, self.instance_alias,
+        return self.volume_checker.check(self.container_map, self.config_name, self.config, self.instance_name,
                                          self.detail)
 
     def set_defaults(self):
         super(UpdateContainerState, self).set_defaults()
         self.current_commands = None
 
-    def inspect(self, instance_alias, config_flags=0):
-        super(UpdateContainerState, self).inspect(instance_alias, config_flags=config_flags)
-        if not config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
+    def inspect(self):
+        super(UpdateContainerState, self).inspect()
+        if not self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
             check_exec_option = self.options['check_exec_commands']
             if check_exec_option and check_exec_option != CMD_CHECK_NONE and self.config.exec_commands:
                 self.current_commands = self.client.top(self.detail['Id'], ps_args='-eo pid,user,args')['Processes']
@@ -287,12 +287,12 @@ class UpdateContainerState(ContainerBaseState):
                 return base_state, state_flags | STATE_FLAG_OUTDATED, extra
             volumes = get_instance_volumes(self.detail)
             if volumes:
-                mapped_path = resolve_value(self.container_map.volumes[self.instance_alias])
+                mapped_path = resolve_value(self.container_map.volumes[self.instance_name])
                 if self.container_map.use_attached_parent_name:
-                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), self.instance_alias,
+                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), self.instance_name,
                                                           self.config_name)
                 else:
-                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), self.instance_alias)
+                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), self.instance_name)
         else:
             image_name = self.policy.image_name(self.config.image or self.config_name, self.container_map)
             images = self.policy.images[self.client_name]
@@ -358,9 +358,12 @@ class UpdateStateGenerator(DependencyStateGenerator):
             for client_name in policy.clients.keys()
         }
 
-    def get_container_state(self, map_name, c_map, client_name, client_config, client, config_name, c_config):
-        c_state = super(UpdateStateGenerator, self).get_container_state(map_name, c_map, client_name, client_config,
-                                                                        client, config_name, c_config)
+    def get_container_state(self, map_name, c_map, client_name, client_config, client, config_name, c_config,
+                            instance_name, config_flags, *args, **kwargs):
+        c_state = super(UpdateStateGenerator, self).get_container_state(map_name, c_map,
+                                                                        client_name, client_config, client, config_name,
+                                                                        c_config, instance_name, config_flags,
+                                                                        *args, **kwargs)
         c_state.base_image_ids = self._base_image_ids[client_name]
         c_state.volume_checker = self._volume_checkers[client_name]
         return c_state

@@ -6,20 +6,22 @@ import itertools
 from operator import itemgetter
 
 import six
+from six.moves import map
 
-from . import ConfigurationObject, CP
+from ...utils import merge_list
 from .. import DictMap, DefaultDictMap
 from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK, bool_if_set, MapConfigId
+from . import ConfigurationObject, CP
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
 from .network import NetworkConfiguration
 
 
-get_map_config = itemgetter(0, 1)
+get_map_config = itemgetter(0, 1, 2)
 
 
 def _get_single_instances(group_items):
-    return tuple(di[2] for di in group_items)
+    return tuple(di[3] for di in group_items)
 
 
 def _get_nested_instances(group_items):
@@ -27,8 +29,27 @@ def _get_nested_instances(group_items):
     instance_add = instance_set.add
     return tuple(ni
                  for di in group_items
-                 for ni in di[2] or (None, )
+                 for ni in di[3] or (None, )
                  if ni not in instance_set or instance_add(ni))
+
+
+def _get_config_instances(config_type, c_map, config_name):
+    if config_type == ITEM_TYPE_CONTAINER:
+        config = c_map.get_existing(config_name)
+        if not config:
+            raise KeyError(config_name)
+        return config.instances
+    elif config_type == ITEM_TYPE_VOLUME:
+        config = c_map.get_existing(config_name)
+        if not config:
+            raise KeyError(config_name)
+        return config.attaches
+    elif config_type == ITEM_TYPE_NETWORK:
+        config = c_map.get_existing_network(config_name)
+        if not config:
+            raise KeyError(config_name)
+        return None
+    raise ValueError("Invalid configuration type.", config_type)
 
 
 def expand_groups(config_ids, groups):
@@ -50,7 +71,8 @@ def expand_groups(config_ids, groups):
                     yield group_item
                 elif isinstance(group_item, six.string_types):
                     config_name, __, instance = group_item.partition('.')
-                    yield MapConfigId(config_id.map_name, config_name, (instance, ) if instance else config_id.instances)
+                    yield MapConfigId(config_id.config_type, config_id.map_name, config_name,
+                                      (instance, ) if instance else config_id.instances)
                 else:
                     raise ValueError("Invalid group item. Must be string or MapConfigId tuple; found {0}.".format(
                         type(group_item).__name__))
@@ -80,17 +102,18 @@ def group_instances(config_ids, single_instances=True, ext_map=None, ext_maps=No
         raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
     _get_instances = _get_single_instances if single_instances else _get_nested_instances
 
-    for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
-        map_name, config_name = map_config
+    for type_map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
+        config_type, map_name, config_name = type_map_config
         instances = _get_instances(items)
         c_map = ext_map or ext_maps[map_name]
-        config = c_map.get_existing(config_name)
-        if not config:
-            raise KeyError((map_name, config_name))
-        if config.instances and (None in instances or len(instances) == len(config.instances)):
-            yield MapConfigId(map_name, config_name, (None, ))
+        try:
+            c_instances = _get_config_instances(config_type, c_map, config_name)
+        except KeyError:
+            raise KeyError("Configuration not found.", type_map_config)
+        if c_instances and (None in instances or len(instances) == len(c_instances)):
+            yield MapConfigId(config_type, map_name, config_name, (None, ))
         else:
-            yield MapConfigId(map_name, config_name, instances)
+            yield MapConfigId(config_type, map_name, config_name, instances)
 
 
 def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=None):
@@ -114,19 +137,20 @@ def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=N
         raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
     _get_instances = _get_single_instances if single_instances else _get_nested_instances
 
-    for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
-        map_name, config_name = map_config
+    for type_map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
+        config_type, map_name, config_name = type_map_config
         instances = _get_instances(items)
         c_map = ext_map or ext_maps[map_name]
-        config = c_map.get_existing(config_name)
-        if not config:
-            raise KeyError(map_name, config_name)
-        if config.instances and None in instances:
-            for i in config.instances:
-                yield map_name, config_name, i
+        try:
+            c_instances = _get_config_instances(config_type, c_map, config_name)
+        except KeyError:
+            raise KeyError("Configuration not found.", type_map_config)
+        if c_instances and None in instances:
+            for i in c_instances:
+                yield config_type, map_name, config_name, i
         else:
             for i in instances:
-                yield map_name, config_name, i
+                yield config_type, map_name, config_name, i
 
 
 class MapIntegrityError(Exception):
@@ -323,72 +347,92 @@ class ContainerMap(ConfigurationObject):
             self._networks.clear()
             self._networks.update(value)
 
-    def dependency_items(self, reverse=False):
+    def dependency_items(self):
         """
         Generates all containers' dependencies, i.e. an iterator on tuples in the format
         ``(container_name, used_containers)``, whereas the used containers are a set, and can be empty.
 
         :return: Container dependencies.
-        :rtype: iterator
+        :rtype: collections.Iterable
         """
-        def _get_used_item_np(u):
-            v = u.volume
-            c, __, i = v.partition('.')
-            a = attached.get(c)
-            if a:
-                return self._name, a, None
-            return self._name, c, i or None
+        def _get_used_items_np(u):
+            volume_config_name, __, volume_instance = u.volume.partition('.')
+            attaching_config_name = attaching.get(volume_config_name)
+            if attaching_config_name:
+                used_c_name = attaching_config_name
+                used_instances = instances.get(attaching_config_name)
+            else:
+                used_c_name = volume_config_name
+                if volume_instance:
+                    used_instances = (volume_instance, )
+                else:
+                    used_instances = instances.get(volume_config_name)
+            return [(ITEM_TYPE_CONTAINER, self._name, used_c_name, ai)
+                    for ai in used_instances or (None, )]
 
-        def _get_used_item_ap(u):
-            v = u.volume
-            c, __, i = v.partition('.')
-            a = ext_map.get_existing(c)
-            if i in a.attaches:
-                return self._name, c, None
-            return self._name, c, i or None
+        def _get_used_items_ap(u):
+            volume_config_name, __, volume_instance = u.volume.partition('.')
+            attaching_config = ext_map.get_existing(volume_config_name)
+            attaching_instances = instances.get(volume_config_name)
+            if not volume_instance or volume_instance in attaching_config.attaches:
+                used_instances = attaching_instances
+            else:
+                used_instances = (volume_instance, )
+            return [(ITEM_TYPE_CONTAINER, self._name, volume_config_name, ai)
+                    for ai in used_instances or (None, )]
 
-        def _get_linked_item(l):
-            c, __, i = l.container.partition('.')
-            if i:
-                return self._name, c, i
-            return self._name, c, None
+        def _get_linked_items(l):
+            linked_config_name, __, linked_instance = l.container.partition('.')
+            if linked_instance:
+                linked_instances = (linked_instance, )
+            else:
+                linked_instances = instances.get(linked_config_name)
+            return [(ITEM_TYPE_CONTAINER, self._name, linked_config_name, li)
+                    for li in linked_instances or (None, )]
+
+        def _get_network_items(n):
+            net_config_name, net_instance = n
+            network_ref_config = ext_map.get_existing(net_config_name)
+            if network_ref_config:
+                if net_instance and net_instance in network_ref_config.instances:
+                    network_instances = (net_instance, )
+                else:
+                    network_instances = network_ref_config.instances
+                return [(ITEM_TYPE_CONTAINER, self._name, net_config_name, ni)
+                        for ni in network_instances]
+            return [(ITEM_TYPE_NETWORK, self._name, net_config_name, None)]
 
         if self._extended:
             ext_map = self
         else:
             ext_map = self.get_extended_map()
 
+        instances = {c_name: c_config.instances
+                     for c_name, c_config in ext_map}
         if not self.use_attached_parent_name:
-            attached = {attaches: c_name
-                        for c_name, c_config in ext_map
-                        for attaches in c_config.attaches}
-            used_func = _get_used_item_np
+            attaching = {attaches: c_name
+                         for c_name, c_config in ext_map
+                         for attaches in c_config.attaches}
+            used_func = _get_used_items_np
         else:
-            used_func = _get_used_item_ap
+            used_func = _get_used_items_ap
 
-        def _get_dep_set(config):
-            used_set = set(map(used_func, config.uses))
-            linked_set = set(map(_get_linked_item, config.links))
-            d_set = used_set | linked_set
+        def _get_dep_list(name, config):
             nw = config.network
             if isinstance(nw, tuple):
-                d_set.add((self._name, ) + nw)
-            return d_set
+                d = _get_network_items(nw)
+            else:
+                d = []
+            merge_list(d, [(ITEM_TYPE_VOLUME, self._name, name, a)
+                           for a in config.attaches])
+            merge_list(d, itertools.chain.from_iterable(map(used_func, config.uses)))
+            merge_list(d, itertools.chain.from_iterable(map(_get_linked_items, config.links)))
+            return d
 
-        if reverse:
-            # Consolidate dependents.
-            for c_name, c_config in ext_map:
-                dep_set = set(map(get_map_config, _get_dep_set(c_config)))
-                yield (self._name, c_name, (None, )), dep_set
-        else:
-            # Group instances, or replace with None where all of them are used.
-            for c_name, c_config in ext_map:
-                dep_set = _get_dep_set(c_config)
-                try:
-                    instance_set = set(group_instances(dep_set, ext_map=ext_map))
-                except KeyError as e:
-                    raise KeyError("Dependency {0[0]}.{0[1]} for {1}.{2} not found.".format(e.args[0], self._name, c_name))
-                yield (self._name, c_name), instance_set
+        for c_name, c_config in ext_map:
+            dep_list = _get_dep_list(c_name, c_config)
+            for c_instance in c_config.instances or (None, ):
+                yield (ITEM_TYPE_CONTAINER, self._name, c_name, c_instance), dep_list
 
     def get(self, item):
         """

@@ -10,7 +10,7 @@ class InitialContainerState(ContainerBaseState):
     Assumes every container to be absent. This is intended for testing and situations where the actual state
     cannot be determined.
     """
-    def inspect(self, instance_alias, config_flags=0):
+    def inspect(self):
         # No need to actually make any client call
         pass
 

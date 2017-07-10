@@ -13,7 +13,8 @@ from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume
                                  get_container_link, get_container_links, ContainerLink,
                                  get_port_binding, get_port_bindings, PortBinding,
                                  get_exec_command, get_exec_commands, ExecCommand, EXEC_POLICY_RESTART,
-                                 EXEC_POLICY_INITIAL, get_map_config_id, get_map_config_ids, MapConfigId)
+                                 EXEC_POLICY_INITIAL, get_map_config_id, get_map_config_ids, MapConfigId,
+                                 ITEM_TYPE_CONTAINER)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -192,11 +193,11 @@ class InputConversionTest(unittest.TestCase):
 
     def test_get_map_config_id(self):
         assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
-                                                              MapConfigId('m', 'c'))
+                                                              MapConfigId(ITEM_TYPE_CONTAINER, 'm', 'c'))
         assert_b = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
-                                                              MapConfigId('m', 'c', ('i', )))
+                                                              MapConfigId(ITEM_TYPE_CONTAINER, 'm', 'c', ('i', )))
         assert_c = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
-                                                              MapConfigId('m', 'c', ('i', 'j')))
+                                                              MapConfigId(ITEM_TYPE_CONTAINER, 'm', 'c', ('i', 'j')))
         assert_a('m.c')
         assert_a('m.c', 'x')
         assert_a('m.c.')
@@ -223,20 +224,20 @@ class InputConversionTest(unittest.TestCase):
     def test_get_map_config_ids(self):
         groups = {'m': DictMap(default=['c.i', 'd.i']), 'n': DictMap(default=['e'])}
         assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_ids(v, map_name=m, instances=i),
-                                                              [MapConfigId('m', 'c')])
+                                                              [MapConfigId(ITEM_TYPE_CONTAINER, 'm', 'c')])
         assert_b = lambda v, m=None, i=None: six.assertCountEqual(self, get_map_config_ids(v, map_name=m, instances=i),
-                                                                  [MapConfigId('m', 'c', ('i', )),
-                                                                   MapConfigId('m', 'd', ('i', )),
-                                                                   MapConfigId('n', 'e', ('i', 'j'))])
+                                                                  [MapConfigId(ITEM_TYPE_CONTAINER, 'm', 'c', ('i', )),
+                                                                   MapConfigId(ITEM_TYPE_CONTAINER, 'm', 'd', ('i', )),
+                                                                   MapConfigId(ITEM_TYPE_CONTAINER, 'n', 'e', ('i', 'j'))])
         assert_c = lambda v, m=None, i=None: six.assertCountEqual(self,
                                                                   expand_groups(
                                                                       get_map_config_ids(v, map_name=m, instances=i),
                                                                       groups
                                                                   ),
-                                                                  [MapConfigId('m', 'c', ('i', )),
-                                                                   MapConfigId('m', 'd', ('i', )),
-                                                                   MapConfigId('n', 'e', ('i', )),
-                                                                   MapConfigId('n', 'e', ('j', ))])
+                                                                  [MapConfigId(ITEM_TYPE_CONTAINER, 'm', 'c', ('i', )),
+                                                                   MapConfigId(ITEM_TYPE_CONTAINER, 'm', 'd', ('i', )),
+                                                                   MapConfigId(ITEM_TYPE_CONTAINER, 'n', 'e', ('i', )),
+                                                                   MapConfigId(ITEM_TYPE_CONTAINER, 'n', 'e', ('j', ))])
         assert_a('m.c')
         assert_a('c', 'm')
         assert_a('c', 'm', [])

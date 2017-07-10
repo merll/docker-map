@@ -39,8 +39,9 @@ class BasePolicy(object):
         self._f_resolver = ContainerDependencyResolver()
         self._r_resolver = ContainerDependencyResolver()
         for m in self._maps.values():
-            self._f_resolver.update(m.dependency_items())
-            self._r_resolver.update_backward(m.dependency_items(reverse=True))
+            depdendency_items = m.dependency_items()
+            self._f_resolver.update(depdendency_items)
+            self._r_resolver.update_backward(depdendency_items)
 
     @classmethod
     def cname(cls, map_name, container, instance=None):
@@ -167,20 +168,20 @@ class BasePolicy(object):
             client_suffix = client_suffix.replace(old, new)
         return '{0}-{1}'.format(base_name, client_suffix)
 
-    def get_clients(self, c_config, c_map):
+    def get_clients(self, c_map, c_config=None):
         """
         Returns the Docker client objects for a given container configuration or map. If there are no clients specified
         for the configuration, the list defaults to the one globally specified for the given map. If that is not defined
         either, the default client is returned.
 
-        :param c_config: Container configuration object.
-        :type c_config: dockermap.map.config.container.ContainerConfiguration
         :param c_map: Container map instance.
         :type c_map: dockermap.map.config.main.ContainerMap
+        :param c_config: Container configuration object.
+        :type c_config: dockermap.map.config.container.ContainerConfiguration
         :return: Docker client objects.
         :rtype: list[(unicode | str, dockermap.map.config.client.ClientConfiguration)]
         """
-        if c_config.clients:
+        if c_config and c_config.clients:
             return [(client_name, self._clients[client_name]) for client_name in c_config.clients]
         if c_map.clients:
             return [(client_name, self._clients[client_name]) for client_name in c_map.clients]
