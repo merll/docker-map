@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT, ITEM_TYPE_NETWORK, ITEM_TYPE_VOLUME, ITEM_TYPE_CONTAINER
+from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
+from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
 from ..state import STATE_ABSENT, STATE_PRESENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING
 from .base import AbstractActionGenerator
 from . import (ClientMapActions, ItemAction, ACTION_CREATE, ACTION_START, UTIL_ACTION_PREPARE_VOLUME, ACTION_RESTART,

@@ -3,9 +3,9 @@ from collections import namedtuple
 
 from six import with_metaclass
 
+from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
 from ..action import ACTION_CREATE, ACTION_REMOVE
-from ..policy import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK, PolicyUtilMeta, PolicyUtil
-
+from ..policy import PolicyUtilMeta, PolicyUtil
 
 ActionConfig = namedtuple('ActionConfig', ['client_name', 'client_config', 'client',
                                            'map_name', 'container_map',

@@ -8,7 +8,7 @@ from requests import Timeout
 import six
 
 from ..action import UTIL_ACTION_SCRIPT
-from ..policy import ITEM_TYPE_CONTAINER
+from ..input import ITEM_TYPE_CONTAINER
 
 
 class ScriptRunException(Exception):

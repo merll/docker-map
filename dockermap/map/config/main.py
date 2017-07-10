@@ -9,7 +9,7 @@ import six
 
 from . import ConfigurationObject, CP
 from .. import DictMap, DefaultDictMap
-from ..input import bool_if_set, MapConfigId
+from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK, bool_if_set, MapConfigId
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
 from .network import NetworkConfiguration

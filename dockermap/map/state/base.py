@@ -7,8 +7,9 @@ import logging
 
 from six import with_metaclass
 
+from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
 from ..policy import (CONFIG_FLAG_DEPENDENT, CONTAINER_CONFIG_FLAG_ATTACHED, CONTAINER_CONFIG_FLAG_PERSISTENT,
-                      ITEM_TYPE_CONTAINER, ITEM_TYPE_NETWORK, ITEM_TYPE_VOLUME, ABCPolicyUtilMeta, PolicyUtil)
+                      ABCPolicyUtilMeta, PolicyUtil)
 from . import (INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, STATE_FLAG_INITIAL,
                STATE_FLAG_RESTARTING, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_OUTDATED,
                ConfigState, ClientMapConfigStates)

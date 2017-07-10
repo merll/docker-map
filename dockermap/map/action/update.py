@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 
 import logging
 
-from ..input import EXEC_POLICY_INITIAL
-from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT, ITEM_TYPE_VOLUME, ITEM_TYPE_CONTAINER
+from ..input import EXEC_POLICY_INITIAL, ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME
+from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
 from ..state import (STATE_FLAG_NONRECOVERABLE, STATE_ABSENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_OUTDATED,
                      STATE_FLAG_RESTARTING)
 from .base import AbstractActionGenerator

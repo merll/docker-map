@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import logging
 
 from ..action import UTIL_ACTION_EXEC_ALL, UTIL_ACTION_EXEC_COMMANDS
-from ..policy import ITEM_TYPE_CONTAINER
+from ..input import ITEM_TYPE_CONTAINER
 
 log = logging.getLogger(__name__)
 

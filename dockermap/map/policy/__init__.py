@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
 from abc import ABCMeta
 
-from six import with_metaclass, text_type
+from six import with_metaclass
 
-
-ITEM_TYPE_CONTAINER = text_type('container')
-ITEM_TYPE_VOLUME = text_type('volume')
-ITEM_TYPE_NETWORK = text_type('network')
 
 CONFIG_FLAG_DEPENDENT = 1  # Configuration is checked in a relation to a dependent / dependency container.
 CONTAINER_CONFIG_FLAG_ATTACHED = 1 << 1          # Container is an attached volume.

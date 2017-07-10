@@ -10,8 +10,7 @@ from six import text_type
 from ...functional import resolve_value
 from ..action import ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ACTION_KILL, ACTION_WAIT
 from ..config.client import USE_HC_MERGE
-from ..input import NotSet
-from ..policy import ITEM_TYPE_VOLUME, ITEM_TYPE_CONTAINER, ITEM_TYPE_NETWORK
+from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK, NotSet
 from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes
 from . import AbstractRunner
 from .attached import AttachedPreparationMixin
