@@ -318,8 +318,8 @@ class MappingDockerClient(object):
             maps = [self._maps[map_name].get_extended_map()]
         else:
             maps = [m.get_extended_map() for m in self._maps.values()]
-        cname_func = self._policy_class.cname
-        aname_func = self._policy_class.aname
+        cname_func = self.policy_class.cname
+        aname_func = self.policy_class.aname
         c_names = []
         for c_map in maps:
             m_name = c_map.name
