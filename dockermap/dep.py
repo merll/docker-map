@@ -5,6 +5,8 @@ from abc import ABCMeta
 from collections import defaultdict
 from six import iteritems, with_metaclass
 
+from .utils import merge_list
+
 
 class NotInitialized(object):
     """
@@ -180,7 +182,7 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
     depends on one or multiple items.
     """
     def __init__(self, initial=None):
-        self._deps = defaultdict(lambda: CachedDependency(set()), _dependency_dict(initial))
+        self._deps = defaultdict(lambda: CachedDependency([]), _dependency_dict(initial))
 
     def merge_dependency(self, item, resolve_parent, parents):
         """
@@ -208,7 +210,7 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         """
         for item, parents in _iterate_dependencies(items):
             dep = self._deps[item]
-            dep.parent.update(parents)
+            merge_list(dep.parent, parents)
 
     def update_backward(self, items):
         """
@@ -221,4 +223,5 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         for parent, sub_items in _iterate_dependencies(items):
             for si in sub_items:
                 dep = self._deps[si]
-                dep.parent.add(parent)
+                if parent not in dep.parent:
+                    dep.parent.append(parent)
