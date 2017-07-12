@@ -19,10 +19,13 @@ def is_repo_image(image):
 
     :param image: Image structure from the Docker Remote API.
     :type image: dict
-    :return: ``False`` if the only image name and tag is <none>, ``True`` otherwise.
+    :return: ``False`` if the only image name and tag is <none>, or if there is no tag at all, ``True`` otherwise.
     :rtype: bool
     """
-    return image['RepoTags'][0] != '<none>:<none>'
+    repo_tags = image['RepoTags']
+    if not repo_tags:
+        return False
+    return repo_tags[0] != '<none>:<none>'
 
 
 def tag_check_function(tags):
@@ -37,7 +40,10 @@ def tag_check_function(tags):
     suffixes = [':{0}'.format(t) for t in tags]
 
     def _check_image(image):
-        return any(r_tag.endswith(s) for s in suffixes for r_tag in image['RepoTags'])
+        repo_tags = image['RepoTags']
+        if not repo_tags:
+            return False
+        return any(r_tag.endswith(s) for s in suffixes for r_tag in repo_tags)
 
     return _check_image
 
