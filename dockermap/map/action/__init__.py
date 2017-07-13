@@ -41,6 +41,7 @@ def _action_type_list(value):
     return []
 
 
+# TODO: Remove
 ClientMapActions = namedtuple('ClientMapActions', ['client_name', 'map_name', 'actions'])
 
 
@@ -49,63 +50,48 @@ class ItemAction(object):
     """
     Utility class for storing actions.
 
-    :param config_type: Configuration item type.
-    :type config_type: unicode | str
-    :param config_name: Configuration name.
-    :type config_name: unicode | str
-    :param instance_name: Instance name.
-    :type instance_name: unicode | str
+    :param client_name: Client configuration name.
+    :type client_name: unicode | str
+    :param config_id: Configuration id tuple.
+    :type config_id: dockermap.map.input.MapConfigId
     :param action_types: Action type name(s) to perform. Input is converted to a list.
     :type action_types: unicode | str | list[unicode | str] | tuple[unicode | str]
     :param extra_data: Extra data. Typically passed on as keyword arguments to the client function.
     :type extra_data: dict
     :param kwargs: Additional keyword arguments; added to extra_data
     """
-    def __init__(self, config_type, config_name, instance_name=None, action_types=None, extra_data=None, **kwargs):
-        self._config_type = config_type
-        self._config = config_name
-        self._instance = instance_name
+    def __init__(self, client_name, config_id, action_types=None, extra_data=None, **kwargs):
+        self._client_name = client_name
+        self._config_id = config_id
         self._action_types = _action_type_list(action_types)
         self._extra_data = extra_data.copy() if extra_data else {}
         self._extra_data.update(kwargs)
 
     def __str__(self):
-        return ("InstanceAction(config_type={0._config_type!r}, client={0._client!r}, map={0._map!r}, "
-                "config={0._config!r}, instance={0._instance!r}, action_types={0._action_types!r}, "
-                "extra_data={0._extra_data!r})".format(self))
+        return ("InstanceAction(client_name={0._client_name!r}, config_id={0._config_id!r}, "
+                "action_types={0._action_types!r}, extra_data={0._extra_data!r})".format(self))
 
     __repr__ = __str__
 
     @property
-    def config_type(self):
+    def client_name(self):
         """
-        The configuration item type, e.g. container, network, or volume.
+        Name of the client configuration affected by this action.
 
-        :return: Configuration item type.
+        :return: Client configuration name.
         :rtype: unicode | str
         """
-        return self._config_type
+        return self._client_name
 
     @property
-    def config_name(self):
+    def config_id(self):
         """
-        The configuration name with the information to apply to the action.
+        The map configuration id of the affected configuration.
 
-        :return: Configuration name.
-        :rtype: unicode | str
+        :return: Configuration id.
+        :rtype: dockermap.map.input.MapConfigId
         """
-        return self._config
-
-    @property
-    def instance_name(self):
-        """
-        The container instance name, that belongs to a container configuration. Can be ``None``
-        for the default instance.
-
-        :return: Container instance name.
-        :rtype: unicode | str | NoneType
-        """
-        return self._instance
+        return self._config_id
 
     @property
     def action_types(self):

@@ -170,23 +170,22 @@ class BasePolicy(object):
 
     def get_clients(self, c_map, c_config=None):
         """
-        Returns the Docker client objects for a given container configuration or map. If there are no clients specified
+        Returns the client configuration names for a given item configuration or map. If there are no clients specified
         for the configuration, the list defaults to the one globally specified for the given map. If that is not defined
         either, the default client is returned.
 
         :param c_map: Container map instance.
         :type c_map: dockermap.map.config.main.ContainerMap
-        :param c_config: Container configuration object.
-        :type c_config: dockermap.map.config.container.ContainerConfiguration
-        :return: Docker client objects.
-        :rtype: list[(unicode | str, dockermap.map.config.client.ClientConfiguration)]
+        :param c_config: Optional container configuration object.
+        :type c_config: dockermap.map.config.ContainerConfiguration
+        :return: Client configuration names.
+        :rtype: list[unicode | str]
         """
         if c_config and c_config.clients:
-            return [(client_name, self._clients[client_name]) for client_name in c_config.clients]
+            return c_config.clients
         if c_map.clients:
-            return [(client_name, self._clients[client_name]) for client_name in c_map.clients]
-        default_name = self.default_client_name
-        return [(default_name, self._clients[default_name])]
+            return c_map.clients
+        return [self.default_client_name]
 
     def get_dependencies(self, config_id):
         """

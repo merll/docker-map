@@ -21,7 +21,7 @@ ExecCommand.__new__.__defaults__ = None, EXEC_POLICY_RESTART
 ITEM_TYPE_CONTAINER = 'container'
 ITEM_TYPE_VOLUME = 'volume'
 ITEM_TYPE_NETWORK = 'network'
-MapConfigId = namedtuple('MapConfigId', ('config_type', 'map_name', 'config_name', 'instances'))
+MapConfigId = namedtuple('MapConfigId', ('config_type', 'map_name', 'config_name', 'instance_name'))
 MapConfigId.__new__.__defaults__ = None,
 
 

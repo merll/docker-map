@@ -99,31 +99,32 @@ def _check_network(container_config, client_config, instance_detail):
 class SingleContainerVfsCheck(object):
     """
     :type vfs_paths: dict[tuple, unicode | str]
+    :type config_id: dockermap.map.input.MapConfigId
     :type container_map: dockermap.map.config.main.ContainerMap
-    :type config_name: unicode | str
     :type instance_name: unicode | str
     :type instance_volumes: dict[unicode | str, unicode | str]
     """
-    def __init__(self, vfs_paths, container_map, config_name, instance_name, instance_volumes):
+    def __init__(self, vfs_paths, config_id, container_map, instance_volumes):
         self._vfs_paths = vfs_paths
         self._instance_volumes = instance_volumes
+        self._config_id = config_id
         self._container_map = container_map
-        self._config_name = config_name
-        self._instance_name = instance_name
         self._use_parent_name = container_map.use_attached_parent_name
         self._volumes = container_map.volumes
 
     def check_bind(self, config, instance):
+        config_id = self._config_id
         for shared_volume in config.binds:
             bind_path, host_path = get_shared_volume_path(self._container_map, shared_volume.volume, instance)
             instance_vfs = self._instance_volumes.get(bind_path)
             log.debug("Checking host bind. Config / container instance:\n%s\n%s", host_path, instance_vfs)
             if not (instance_vfs and host_path == instance_vfs):
                 return False
-            self._vfs_paths[self._config_name, self._instance_name, bind_path] = instance_vfs
+            self._vfs_paths[config_id.config_name, config_id.instance_name, bind_path] = instance_vfs
         return True
 
     def check_attached(self, config, parent_name):
+        config_id = self._config_id
         for attached in config.attaches:
             a_name = '{0}.{1}'.format(parent_name, attached) if self._use_parent_name else attached
             attached_path = resolve_value(self._volumes[attached])
@@ -133,10 +134,11 @@ class SingleContainerVfsCheck(object):
                       attached, attached_vfs, instance_vfs)
             if not (instance_vfs and attached_vfs == instance_vfs):
                 return False
-            self._vfs_paths[self._config_name, self._instance_name, attached_path] = instance_vfs
+            self._vfs_paths[config_id.config_name, config_id.instance_name, attached_path] = instance_vfs
         return True
 
     def check_used(self, config):
+        config_id = self._config_id
         for used in config.uses:
             used_volume = used.volume
             if self._use_parent_name:
@@ -164,7 +166,7 @@ class SingleContainerVfsCheck(object):
                               share, shared_vfs, i_shared_path)
                     if shared_vfs != i_shared_path:
                         return False
-                    self._vfs_paths[(self._config_name, self._instance_name, ref_shared_path)] = i_shared_path
+                    self._vfs_paths[(config_id.config_name, config_id.instance_name, ref_shared_path)] = i_shared_path
                 self.check_bind(ref_config, ref_i_name)
                 self.check_attached(ref_config, ref_c_name)
             else:
@@ -180,15 +182,15 @@ class ContainerVolumeChecker(object):
         alias = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
         self._vfs_paths[alias, None, mapped_path] = path
 
-    def check(self, container_map, config_name, container_config, instance_name, instance_detail):
+    def check(self, config_id, container_map, container_config, instance_detail):
         instance_volumes = get_instance_volumes(instance_detail)
-        vfs = SingleContainerVfsCheck(self._vfs_paths, container_map, container_config, instance_name, instance_volumes)
+        vfs = SingleContainerVfsCheck(self._vfs_paths, config_id, container_map, instance_volumes)
         for share in container_config.shares:
             cr_shared_path = resolve_value(share)
-            self._vfs_paths[config_name, instance_name, cr_shared_path] = instance_volumes.get(share)
-        if not vfs.check_bind(container_config, instance_name):
+            self._vfs_paths[config_id.config_name, config_id.instance_name, cr_shared_path] = instance_volumes.get(share)
+        if not vfs.check_bind(container_config, config_id.instance_name):
             return False
-        if not vfs.check_attached(container_config, config_name):
+        if not vfs.check_attached(container_config, config_id.config_name):
             return False
         if not vfs.check_used(container_config):
             return False
@@ -213,7 +215,7 @@ class UpdateContainerState(ContainerBaseState):
             link_name, __, link_alias = host_link.partition(':')
             link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
         for link in self.config.links:
-            instance_aliases = link_dict.get(self.policy.cname(self.map_name, link.container))
+            instance_aliases = link_dict.get(self.policy.cname(self.config_id.map_name, link.container))
             config_alias = link.alias or link.container
             if not instance_aliases or config_alias not in instance_aliases:
                 log.debug("Checked link %s - could not find alias %s", link.container, config_alias)
@@ -260,8 +262,7 @@ class UpdateContainerState(ContainerBaseState):
         return [(exec_cmd, _cmd_state(exec_cmd[0], exec_cmd[1])) for exec_cmd in self.config.exec_commands]
 
     def _check_volumes(self):
-        return self.volume_checker.check(self.container_map, self.config_name, self.config, self.instance_name,
-                                         self.detail)
+        return self.volume_checker.check(self.config_id, self.container_map, self.config, self.detail)
 
     def set_defaults(self):
         super(UpdateContainerState, self).set_defaults()
@@ -281,20 +282,21 @@ class UpdateContainerState(ContainerBaseState):
         if base_state == STATE_ABSENT or state_flags & STATE_FLAG_OUTDATED:
             return base_state, state_flags, extra
 
+        config_id = self.config_id
         c_image_id = self.detail['Image']
         if self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
             if self.options['update_persistent'] and c_image_id != self.base_image_id:
                 return base_state, state_flags | STATE_FLAG_OUTDATED, extra
             volumes = get_instance_volumes(self.detail)
             if volumes:
-                mapped_path = resolve_value(self.container_map.volumes[self.instance_name])
+                mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name])
                 if self.container_map.use_attached_parent_name:
-                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), self.instance_name,
-                                                          self.config_name)
+                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), config_id.instance_name,
+                                                          config_id.config_name)
                 else:
-                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), self.instance_name)
+                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), config_id.instance_name)
         else:
-            image_name = self.policy.image_name(self.config.image or self.config_name, self.container_map)
+            image_name = self.policy.image_name(self.config.image or config_id.config_name, self.container_map)
             images = self.policy.images[self.client_name]
             ref_image_id = images.ensure_image(image_name, pull=self.options['pull_before_update'],
                                                insecure_registry=self.options['pull_insecure_registry'])
@@ -358,12 +360,9 @@ class UpdateStateGenerator(DependencyStateGenerator):
             for client_name in policy.clients.keys()
         }
 
-    def get_container_state(self, map_name, c_map, client_name, client_config, client, config_name, c_config,
-                            instance_name, config_flags, *args, **kwargs):
-        c_state = super(UpdateStateGenerator, self).get_container_state(map_name, c_map,
-                                                                        client_name, client_config, client, config_name,
-                                                                        c_config, instance_name, config_flags,
-                                                                        *args, **kwargs)
+    def get_container_state(self, client_name, config_id, c_map, c_config, config_flags, *args, **kwargs):
+        c_state = super(UpdateStateGenerator, self).get_container_state(client_name, config_id, c_map, c_config,
+                                                                        config_flags, *args, **kwargs)
         c_state.base_image_ids = self._base_image_ids[client_name]
         c_state.volume_checker = self._volume_checkers[client_name]
         return c_state

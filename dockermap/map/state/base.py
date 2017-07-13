@@ -34,8 +34,8 @@ class AbstractState(object):
     :type policy: dockermap.map.policy.base.BasePolicy
     :param options: Dictionary of options passed to the state generator.
     :type options: dict
-    :param map_name: Container map name.
-    :type map_name: unicode | str
+    :param config_id: Configuration id tuple.
+    :type config_id: dockermap.map.input.MapConfigId
     :param container_map: Container map instance.
     :type container_map: dockermap.map.config.main.ContainerMap
     :param client_name: Client name.
@@ -44,18 +44,19 @@ class AbstractState(object):
     :type client_config: dockermap.map.config.client.ClientConfiguration
     :param client: Docker client.
     :type client: docker.client.Client
+    :param config_flags: Config flags on the container.
+    :type config_flags: int
     """
-    def __init__(self, policy, options, map_name, container_map, client_name, client_config,
-                 client, config_name, config, *args, **kwargs):
+    def __init__(self, policy, options, client_name, config_id, container_map, config, config_flags=0, *args, **kwargs):
         self.policy = policy
         self.options = options
-        self.map_name = map_name
+        self.config_id = config_id
         self.container_map = container_map
         self.client_name = client_name
-        self.client_config = client_config
-        self.client = client
-        self.config_name = config_name
+        self.client_config = client_config = policy.clients[client_name]
+        self.client = client_config.get_client()
         self.config = config
+        self.config_flags = config_flags
         self.detail = None
 
     def set_defaults(self, *args, **kwargs):
@@ -83,43 +84,27 @@ class AbstractState(object):
 
 class ContainerBaseState(AbstractState):
     """
-    Abstract base implementation for determining the current state of a single container on the client.
+    Base implementation for determining the current state of a single container on the client.
 
     :param policy: Policy object.
     :type policy: dockermap.map.policy.base.BasePolicy
     :param options: Dictionary of options passed to the state generator.
     :type options: dict
-    :param map_name: Container map name.
-    :type map_name: unicode | str
-    :param container_map: Container map instance.
-    :type container_map: dockermap.map.config.main.ContainerMap
     :param client_name: Client name.
     :type client_name: unicode | str
-    :param client_config: Client configuration object.
-    :type client_config: dockermap.map.config.client.ClientConfiguration
-    :param client: Docker client.
-    :type client: docker.client.Client
-    :param config_name: Configuration name.
-    :type config_name: unicode | str
-    :param config: Configuration object.
-    :type config: dockermap.map.config.ConfigurationObject
-    :param instance_name: Container instance name or attached alias.
-    :type instance_name: unicode | str
+    :param config_id: Configuration id tuple.
+    :type config_id: dockermap.map.input.MapConfigId
+    :param container_map: Container map instance.
+    :type container_map: dockermap.map.config.main.ContainerMap
     :param config_flags: Config flags on the container.
     :type config_flags: int
     """
-    def __init__(self, policy, options, map_name, container_map, client_name, client_config,
-                 client, config_name, config, instance_name, config_flags, *args, **kwargs):
-        super(ContainerBaseState, self).__init__(policy, options, map_name, container_map, client_name, client_config,
-                                                 client, config_name, config, *args, **kwargs)
-        self.instance_name = instance_name
-        self.config_flags = config_flags
+    def __init__(self, *args, **kwargs):
+        super(ContainerBaseState, self).__init__(*args, **kwargs)
         self.container_name = None
 
     def set_defaults(self, *args, **kwargs):
         super(ContainerBaseState, self).set_defaults(*args, **kwargs)
-        self.instance_name = None
-        self.config_flags = 0
         self.container_name = None
 
     def inspect(self):
@@ -128,13 +113,14 @@ class ContainerBaseState(AbstractState):
         """
         super(ContainerBaseState, self).inspect()
         policy = self.policy
+        config_id = self.config_id
         if self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
             if self.container_map.use_attached_parent_name:
-                container_name = policy.aname(self.map_name, self.instance_name, self.config_name)
+                container_name = policy.aname(config_id.map_name, config_id.instance_name, config_id.config_name)
             else:
-                container_name = policy.aname(self.map_name, self.instance_name)
+                container_name = policy.aname(config_id.map_name, config_id.instance_name)
         else:
-            container_name = policy.cname(self.map_name, self.config_name, self.instance_name)
+            container_name = policy.cname(config_id.map_name, config_id.config_name, config_id.instance_name)
 
         self.container_name = container_name
         if container_name in policy.container_names[self.client_name]:
@@ -162,12 +148,28 @@ class ContainerBaseState(AbstractState):
             if c_status['Restarting']:
                 state_flag |= STATE_FLAG_RESTARTING
         force_update = self.options['force_update']
-        if force_update and (ITEM_TYPE_CONTAINER, self.map_name, self.config_name, self.instance_name) in force_update:
+        if force_update and self.config_id in force_update:
             state_flag |= STATE_FLAG_OUTDATED
         return base_state, state_flag, {}
 
 
 class NetworkBaseState(AbstractState):
+    """
+    Base implementation for determining the current state of a single network on the client.
+
+    :param policy: Policy object.
+    :type policy: dockermap.map.policy.base.BasePolicy
+    :param options: Dictionary of options passed to the state generator.
+    :type options: dict
+    :param config_id: Configuration id tuple.
+    :type config_id: dockermap.map.input.MapConfigId
+    :param container_map: Container map instance.
+    :type container_map: dockermap.map.config.main.ContainerMap
+    :param client_name: Client name.
+    :type client_name: unicode | str
+    :param config_flags: Config flags on the container.
+    :type config_flags: int
+    """
     def __init__(self, *args, **kwargs):
         super(NetworkBaseState, self).__init__(*args, **kwargs)
         self.network_name = None
@@ -179,7 +181,8 @@ class NetworkBaseState(AbstractState):
         """
         Inspects the network state.
         """
-        network_name = self.network_name = self.policy.nname(self.map_name, self.config_name)
+        config_id = self.config_id
+        network_name = self.network_name = self.policy.nname(config_id.map_name, config_id.config_name)
         if network_name in self.policy.network_names[self.client_name]:
             self.detail = self.client.inspect_network(network_name)
         else:
@@ -189,7 +192,7 @@ class NetworkBaseState(AbstractState):
         if self.detail is NOT_FOUND:
             return STATE_ABSENT, 0, {}
         force_update = self.options['force_update']
-        if force_update and (ITEM_TYPE_NETWORK, self.map_name, self.config_name, None) in force_update:
+        if force_update and self.config_id in force_update:
             state_flag = STATE_FLAG_OUTDATED
         else:
             state_flag = 0
@@ -207,42 +210,34 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
     force_update = None
     policy_options = ['nonrecoverable_exit_codes', 'force_update']
 
-    def get_container_state(self, map_name, c_map, client_name, client_config, client, config_name, c_config,
-                            instance_name, config_flags, *args, **kwargs):
-        return self.container_state_class(self._policy, self.get_options(), map_name, c_map, client_name,
-                                          client_config, client, config_name, c_config, instance_name, config_flags,
-                                          *args, **kwargs)
+    def get_container_state(self, *args, **kwargs):
+        return self.container_state_class(self._policy, self.get_options(), *args, **kwargs)
 
-    def get_network_state(self, map_name, c_map, client_name, client_config, client, config_name, n_config,
-                          *args, **kwargs):
-        return self.network_state_class(self._policy, self.get_options(), map_name, c_map, client_name,
-                                        client_config, client, config_name, n_config, *args, **kwargs)
+    def get_network_state(self, *args, **kwargs):
+        return self.network_state_class(self._policy, self.get_options(), *args, **kwargs)
 
-    def generate_config_states(self, config_type, map_name, config_name, instance_name, is_dependency=False):
+    def generate_config_states(self, config_id, is_dependency=False):
         """
         Generates the actions on a single item, which can be either a dependency or a explicitly selected
         container.
 
-        :param config_type: Configuration type.
-        :type config_type: unicode | str
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param config_name: Container configuration name.
-        :type config_name: unicode | str
-        :param instance_name: Instance name. Can be ``[None]``
-        :type instance_name: unicode | str | NoneType
+        :param config_id: Configuration id tuple.
+        :type config_id: dockermap.map.input.MapConfigId
         :param is_dependency: Whether the state check is on a dependency or dependent container.
         :type is_dependency: bool
         :return: Generator for container state information.
         :rtype: collections.Iterable[dockermap.map.state.ContainerConfigStates]
         """
-        c_map = self._policy.container_maps[map_name]
+        c_map = self._policy.container_maps[config_id.map_name]
         c_flags = CONFIG_FLAG_DEPENDENT if is_dependency else 0
+        config_type = config_id.config_type
+        config_name = config_id.config_name
 
         if config_type == ITEM_TYPE_CONTAINER:
             config = c_map.get_existing(config_name)
             if not config:
-                raise KeyError("Container configuration '{0}' not found on map '{1}'.".format(config_name, map_name))
+                raise KeyError("Container configuration '{0.config_name}' not found on map '{0.map_name}'."
+                               "".format(config_id))
             clients = self._policy.get_clients(c_map, config)
             if config.persistent:
                 c_flags |= CONTAINER_CONFIG_FLAG_PERSISTENT
@@ -250,7 +245,8 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         elif config_type == ITEM_TYPE_VOLUME:
             config = c_map.get_existing(config_name)
             if not config:
-                raise KeyError("Container configuration '{0}' not found on map '{1}'.".format(config_name, map_name))
+                raise KeyError("Container configuration '{0.config_name}' not found on map '{0.map_name}'."
+                               "".format(config_id))
             clients = self._policy.get_clients(c_map, config)
             # TODO: Change for actual volumes.
             c_flags |= CONTAINER_CONFIG_FLAG_ATTACHED
@@ -258,20 +254,18 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         elif config_type == ITEM_TYPE_NETWORK:
             config = c_map.get_existing_network(config_name)
             if not config:
-                raise KeyError("Network configuration '{0}' not found on map '{1}'.".format(config_name, map_name))
+                raise KeyError("Network configuration '{0.config_name}' not found on map '{0.map_name}'."
+                               "".format(config_id))
             clients = self._policy.get_clients(c_map)
             state_func = self.get_network_state
         else:
             raise ValueError("Invalid configuration type.", config_type)
 
-        for client_name, client_config in clients:
-            client = client_config.get_client()
-            c_state = state_func(map_name, c_map, client_name, client_config, client, config_name, config,
-                                 instance_name, c_flags)
+        for client_name in clients:
+            c_state = state_func(client_name, config_id, c_map, config, c_flags)
             c_state.inspect()
             # Extract base state, state flags, and extra info.
-            state_info = ConfigState(client_name, map_name, config_type, config_name, instance_name, c_flags,
-                                     *c_state.get_state())
+            state_info = ConfigState(client_name, config_id, c_flags, *c_state.get_state())
             log.debug("Configuration state information: %s", state_info)
             yield state_info
 
@@ -312,7 +306,7 @@ class SingleStateGenerator(AbstractStateGenerator):
         :return: Return values of created main containers.
         :rtype: collections.Iterable[dockermap.map.state.ContainerConfigStates]
         """
-        return itertools.chain.from_iterable(self.generate_config_states(*config_id)
+        return itertools.chain.from_iterable(self.generate_config_states(config_id)
                                              for config_id in config_ids)
 
 
@@ -333,12 +327,13 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
 
     def _get_all_states(self, config_id, dependency_path):
         log.debug("Following dependency path for %(map_name)s.%(config_name)s.", config_id)
-        for d_type, d_map_name, d_config_name, d_instance in dependency_path:
-            log.debug("Dependency path at %s %s.%s, instance %s.", d_type, d_map_name, d_config_name, d_instance)
-            for state in self.generate_config_states(d_type, d_map_name, d_config_name, d_instance, is_dependency=True):
+        for d_config_id in dependency_path:
+            log.debug("Dependency path at %(config_type)s %(map_name)s.%(config_name)s, instance %(instance)s.",
+                      d_config_id)
+            for state in self.generate_config_states(d_config_id, is_dependency=True):
                 yield state
         log.debug("Processing state for %(config_type)s %(map_name)s.%(config_name)s, instance %(instance)s.", config_id)
-        for state in self.generate_config_states(*config_id):
+        for state in self.generate_config_states(config_id):
             yield state
 
     def get_states(self, config_ids):

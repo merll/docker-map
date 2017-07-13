@@ -188,7 +188,7 @@ def _add_inspect(rsps, container_map, map_name, c_config, config_name, instance_
 def _get_single_state(sg, config_ids):
     states = [s
               for s in sg.get_states(config_ids)
-              if s.config_type == ITEM_TYPE_CONTAINER]
+              if s.config_id.config_type == ITEM_TYPE_CONTAINER]
     return states[-1]
 
 
@@ -197,12 +197,13 @@ def _get_states_dict(sl):
     nd = {}
     vd = {}
     for s in sl:
-        if s.config_type == ITEM_TYPE_CONTAINER:
-            cd[(s.config_name, s.instance_name)] = s
-        elif s.config_type == ITEM_TYPE_VOLUME:
-            vd[(s.config_name, s.instance_name)] = s
-        elif s.config_type == ITEM_TYPE_NETWORK:
-            nd[s.config_name] = s
+        config_id = s.config_id
+        if config_id.config_type == ITEM_TYPE_CONTAINER:
+            cd[(config_id.config_name, config_id.instance_name)] = s
+        elif config_id.config_type == ITEM_TYPE_VOLUME:
+            vd[(config_id.config_name, config_id.instance_name)] = s
+        elif config_id.config_type == ITEM_TYPE_NETWORK:
+            nd[config_id.config_name] = s
         else:
             raise ValueError("Invalid configuration type.", s.config_type)
     return {
@@ -264,17 +265,17 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = list(DependencyStateGenerator(self.policy, {}).get_states(self.server_config_id))
             instance_base_states = [s.base_state
                                     for s in states
-                                    if s.config_type == ITEM_TYPE_CONTAINER]
+                                    if s.config_id.config_type == ITEM_TYPE_CONTAINER]
             attached_base_states = [s.base_state
                                     for s in states
-                                    if s.config_type == ITEM_TYPE_VOLUME]
+                                    if s.config_id.config_type == ITEM_TYPE_VOLUME]
             self.assertTrue(all(si == STATE_RUNNING
                                 for si in instance_base_states))
             self.assertTrue(all(si == STATE_PRESENT
                                 for si in attached_base_states))
             self.assertTrue(all(s.config_flags == CONFIG_FLAG_DEPENDENT
                                 for s in states
-                                if s.config_type == ITEM_TYPE_CONTAINER and s.config_name != 'server'))
+                                if s.config_id.config_type == ITEM_TYPE_CONTAINER and s.config_id.config_name != 'server'))
 
     def test_single_states_mixed(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -360,8 +361,9 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = list(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             valid_order = ['sub_sub_svc', 'sub_svc', 'redis', 'server']
             for c_state in states:
-                if c_state.config_type == ITEM_TYPE_CONTAINER:
-                    config_name = c_state.config_name
+                config_id = c_state.config_id
+                if config_id.config_type == ITEM_TYPE_CONTAINER:
+                    config_name = config_id.config_name
                     if config_name in valid_order:
                         self.assertEqual(valid_order[0], config_name)
                         valid_order.pop(0)
