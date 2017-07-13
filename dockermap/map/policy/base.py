@@ -188,31 +188,27 @@ class BasePolicy(object):
         default_name = self.default_client_name
         return [(default_name, self._clients[default_name])]
 
-    def get_dependencies(self, map_name, container):
+    def get_dependencies(self, config_id):
         """
         Generates the list of dependency containers, in reverse order (i.e. the last dependency coming first).
 
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param container: Container configuration name.
-        :type container: unicode | str
-        :return: Dependency container map names, container configuration names, and instances.
-        :rtype: iterator[(unicode | str, unicode | str, list[unicode | str | NoneType])]
+        :param config_id: MapConfigId tuple.
+        :type config_id: dockermap.map.input.MapConfigId
+        :return: Dependency configuration types, container map names, configuration names, and instances.
+        :rtype: collections.Iterable[(unicode | str, unicode | str, unicode | str, unicode | str)]
         """
-        return self._f_resolver.get_dependencies((map_name, container))
+        return self._f_resolver.get_dependencies(config_id)
 
-    def get_dependents(self, map_name, container):
+    def get_dependents(self, config_id):
         """
         Generates the list of dependent containers, in reverse order (i.e. the last dependent coming first).
 
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param container: Container configuration name.
-        :type container: unicode | str
-        :return: Dependent container map names, container configuration names, and instances.
-        :rtype: iterator[(unicode | str, unicode | str, list[unicode | str | NoneType])]
+        :param config_id: MapConfigId tuple.
+        :type config_id: dockermap.map.input.MapConfigId
+        :return: Dependent configuration types, container map names, configuration names, and instances.
+        :rtype: collections.Iterable[(unicode | str, unicode | str, unicode | str, unicode | str)]
         """
-        return self._r_resolver.get_dependencies((map_name, container))
+        return self._r_resolver.get_dependencies(config_id)
 
     @property
     def container_maps(self):

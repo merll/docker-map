@@ -418,15 +418,14 @@ class ContainerMap(ConfigurationObject):
             used_func = _get_used_items_ap
 
         def _get_dep_list(name, config):
+            d = []
             nw = config.network
             if isinstance(nw, tuple):
-                d = _get_network_items(nw)
-            else:
-                d = []
-            merge_list(d, [(ITEM_TYPE_VOLUME, self._name, name, a)
-                           for a in config.attaches])
+                merge_list(d, _get_network_items(nw))
             merge_list(d, itertools.chain.from_iterable(map(used_func, config.uses)))
             merge_list(d, itertools.chain.from_iterable(map(_get_linked_items, config.links)))
+            merge_list(d, [(ITEM_TYPE_VOLUME, self._name, name, a)
+                           for a in config.attaches])
             return d
 
         for c_name, c_config in ext_map:

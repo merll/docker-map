@@ -162,7 +162,7 @@ class ContainerBaseState(AbstractState):
             if c_status['Restarting']:
                 state_flag |= STATE_FLAG_RESTARTING
         force_update = self.options['force_update']
-        if force_update and (self.map_name, self.config_name, self.instance_name) in force_update:
+        if force_update and (ITEM_TYPE_CONTAINER, self.map_name, self.config_name, self.instance_name) in force_update:
             state_flag |= STATE_FLAG_OUTDATED
         return base_state, state_flag, {}
 
@@ -188,7 +188,12 @@ class NetworkBaseState(AbstractState):
     def get_state(self):
         if self.detail is NOT_FOUND:
             return STATE_ABSENT, 0, {}
-        return STATE_PRESENT, 0, {}
+        force_update = self.options['force_update']
+        if force_update and (ITEM_TYPE_NETWORK, self.map_name, self.config_name, None) in force_update:
+            state_flag = STATE_FLAG_OUTDATED
+        else:
+            state_flag = 0
+        return STATE_PRESENT, state_flag, {}
 
 
 class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
@@ -213,7 +218,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         return self.network_state_class(self._policy, self.get_options(), map_name, c_map, client_name,
                                         client_config, client, config_name, n_config, *args, **kwargs)
 
-    def generate_config_states(self, config_type, map_name, config_name, instance_names, is_dependency=False):
+    def generate_config_states(self, config_type, map_name, config_name, instance_name, is_dependency=False):
         """
         Generates the actions on a single item, which can be either a dependency or a explicitly selected
         container.
@@ -224,8 +229,8 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         :type map_name: unicode | str
         :param config_name: Container configuration name.
         :type config_name: unicode | str
-        :param instance_names: Instance names as a list. Can be ``[None]``
-        :type instance_names: list[unicode | str]
+        :param instance_name: Instance name. Can be ``[None]``
+        :type instance_name: unicode | str | NoneType
         :param is_dependency: Whether the state check is on a dependency or dependent container.
         :type is_dependency: bool
         :return: Generator for container state information.
@@ -238,13 +243,6 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             config = c_map.get_existing(config_name)
             if not config:
                 raise KeyError("Container configuration '{0}' not found on map '{1}'.".format(config_name, map_name))
-            if is_dependency:
-                if config.instances and len(instance_names) == 1 and instance_names[0] is None:
-                    config_instances = config.instances
-                else:
-                    config_instances = instance_names or [None]
-            else:
-                config_instances = instance_names or config.instances or [None]
             clients = self._policy.get_clients(c_map, config)
             if config.persistent:
                 c_flags |= CONTAINER_CONFIG_FLAG_PERSISTENT
@@ -253,7 +251,6 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             config = c_map.get_existing(config_name)
             if not config:
                 raise KeyError("Container configuration '{0}' not found on map '{1}'.".format(config_name, map_name))
-            config_instances = config.attaches
             clients = self._policy.get_clients(c_map, config)
             # TODO: Change for actual volumes.
             c_flags |= CONTAINER_CONFIG_FLAG_ATTACHED
@@ -262,7 +259,6 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             config = c_map.get_existing_network(config_name)
             if not config:
                 raise KeyError("Network configuration '{0}' not found on map '{1}'.".format(config_name, map_name))
-            config_instances = [None]
             clients = self._policy.get_clients(c_map)
             state_func = self.get_network_state
         else:
@@ -270,14 +266,14 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
 
         for client_name, client_config in clients:
             client = client_config.get_client()
-            for ci in config_instances:
-                c_state = state_func(map_name, c_map, client_name, client_config, client, config_name, config, ci,
-                                     c_flags)
-                c_state.inspect()
-                # Extract base state, state flags, and extra info.
-                state_info = ConfigState(client_name, map_name, config_type, config_name, ci, c_flags, *c_state.get_state())
-                log.debug("Configuration state information: %s", state_info)
-                yield state_info
+            c_state = state_func(map_name, c_map, client_name, client_config, client, config_name, config,
+                                 instance_name, c_flags)
+            c_state.inspect()
+            # Extract base state, state flags, and extra info.
+            state_info = ConfigState(client_name, map_name, config_type, config_name, instance_name, c_flags,
+                                     *c_state.get_state())
+            log.debug("Configuration state information: %s", state_info)
+            yield state_info
 
     @abstractmethod
     def get_states(self, config_ids):
@@ -322,26 +318,26 @@ class SingleStateGenerator(AbstractStateGenerator):
 
 class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, AbstractStateGenerator)):
     @abstractmethod
-    def get_dependency_path(self, map_name, config_name):
+    def get_dependency_path(self, config_id):
         """
         To be implemented by subclasses (or using :class:`ForwardActionGeneratorMixin` or
         :class:`ReverseActionGeneratorMixin`). Should provide an iterable of objects to be handled before the explicitly
         selected container configuration.
 
-        :param map_name: Container map name.
-        :param config_name: Container configuration name.
-        :return: Iterable of dependency objects in tuples of map name, container (config) name, instances.
+        :param config_id: MapConfigId tuple.
+        :type config_id: dockermap.map.input.MapConfigId
+        :return: Iterable of dependency objects in tuples of configuration type, map name, container (config) name, instances.
         :rtype: list[tuple]
         """
         pass
 
     def _get_all_states(self, config_id, dependency_path):
         log.debug("Following dependency path for %(map_name)s.%(config_name)s.", config_id)
-        for d_map_name, d_config_name, d_instances in dependency_path:
-            log.debug("Dependency path at %s.%s, instances %s.", d_map_name, d_config_name, d_instances)
-            for state in self.generate_config_states(d_map_name, d_config_name, d_instances, is_dependency=True):
+        for d_type, d_map_name, d_config_name, d_instance in dependency_path:
+            log.debug("Dependency path at %s %s.%s, instance %s.", d_type, d_map_name, d_config_name, d_instance)
+            for state in self.generate_config_states(d_type, d_map_name, d_config_name, d_instance, is_dependency=True):
                 yield state
-        log.debug("Processing state for %(map_name)s.%(config_name)s.", config_id)
+        log.debug("Processing state for %(config_type)s %(map_name)s.%(config_name)s, instance %(instance)s.", config_id)
         for state in self.generate_config_states(*config_id):
             yield state
 
@@ -355,7 +351,7 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
         :rtype: itertools.chain[dockermap.map.state.ContainerConfigStates]
         """
         dependency_paths = merge_dependency_paths(
-            (config_id, self.get_dependency_path(config_id.map_name, config_id.config_name))
+            (config_id, self.get_dependency_path(config_id))
             for config_id in config_ids
         )
         return itertools.chain.from_iterable(self._get_all_states(config_id, dependency_path)
@@ -363,12 +359,10 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
 
 
 class DependencyStateGenerator(AbstractDependencyStateGenerator):
-    def get_dependency_path(self, map_name, config_name):
-        return [(map_name, config_name, tuple(instances))
-                for map_name, config_name, instances in self._policy.get_dependencies(map_name, config_name)]
+    def get_dependency_path(self, config_id):
+        return self._policy.get_dependencies(config_id)
 
 
 class DependentStateGenerator(AbstractDependencyStateGenerator):
-    def get_dependency_path(self, map_name, config_name):
-        return [(map_name, config_name, tuple(instances))
-                for map_name, config_name, instances in self._policy.get_dependents(map_name, config_name)]
+    def get_dependency_path(self, config_id):
+        return self._policy.get_dependents(config_id)

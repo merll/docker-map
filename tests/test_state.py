@@ -11,7 +11,8 @@ from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from dockermap.map.config.client import ClientConfiguration
 from dockermap.map.config.host_volume import get_host_path
 from dockermap.map.config.main import ContainerMap, expand_instances
-from dockermap.map.input import ExecCommand, EXEC_POLICY_INITIAL, EXEC_POLICY_RESTART, MapConfigId
+from dockermap.map.input import (ExecCommand, EXEC_POLICY_INITIAL, EXEC_POLICY_RESTART, MapConfigId,
+                                 ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK)
 from dockermap.map.policy import CONFIG_FLAG_DEPENDENT
 from dockermap.map.policy.base import BasePolicy
 from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESENT, STATE_ABSENT,
@@ -185,10 +186,10 @@ def _add_inspect(rsps, container_map, map_name, c_config, config_name, instance_
 
 
 def _get_single_state(sg, config_ids):
-    states = [si
+    states = [s
               for s in sg.get_states(config_ids)
-              for si in s.containers]
-    return states[0]
+              if s.config_type == ITEM_TYPE_CONTAINER]
+    return states[-1]
 
 
 def _get_states_dict(sl):
@@ -196,12 +197,14 @@ def _get_states_dict(sl):
     nd = {}
     vd = {}
     for s in sl:
-        for n in s.networks:
-            nd[n.config] = n
-        for v in s.volumes:
-            vd[(v.config, v.instance)] = v
-        for c in s.containers:
-            cd[(c.config, c.instance)] = c
+        if s.config_type == ITEM_TYPE_CONTAINER:
+            cd[(s.config_name, s.instance_name)] = s
+        elif s.config_type == ITEM_TYPE_VOLUME:
+            vd[(s.config_name, s.instance_name)] = s
+        elif s.config_type == ITEM_TYPE_NETWORK:
+            nd[s.config_name] = s
+        else:
+            raise ValueError("Invalid configuration type.", s.config_type)
     return {
         'containers': cd,
         'volumes': vd,
@@ -224,7 +227,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
         self.images = list(enumerate(all_images))
 
     def _config_id(self, config_name, instance=None):
-        return [MapConfigId(self.map_name, config_name, (instance, ) if instance else None)]
+        return [MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, config_name, instance)]
 
     def _setup_containers(self, rsps, containers_states):
         container_names = []
@@ -259,19 +262,19 @@ class TestPolicyStateGenerators(unittest.TestCase):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_default_containers(rsps)
             states = list(DependencyStateGenerator(self.policy, {}).get_states(self.server_config_id))
-            instance_base_states = [si.base_state
+            instance_base_states = [s.base_state
                                     for s in states
-                                    for si in s.containers]
-            attached_base_states = [si.base_state
+                                    if s.config_type == ITEM_TYPE_CONTAINER]
+            attached_base_states = [s.base_state
                                     for s in states
-                                    for si in s.volumes]
+                                    if s.config_type == ITEM_TYPE_VOLUME]
             self.assertTrue(all(si == STATE_RUNNING
                                 for si in instance_base_states))
             self.assertTrue(all(si == STATE_PRESENT
                                 for si in attached_base_states))
-            self.assertTrue(all(s.flags == CONFIG_FLAG_DEPENDENT
+            self.assertTrue(all(s.config_flags == CONFIG_FLAG_DEPENDENT
                                 for s in states
-                                if s.containers[0].config != 'server'))
+                                if s.config_type == ITEM_TYPE_CONTAINER and s.config_name != 'server'))
 
     def test_single_states_mixed(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -303,7 +306,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self._setup_containers(rsps, [
                 _container('redis', instances=['cache', 'queue']),
             ])
-            force_update = set(expand_instances(self._config_id('redis'), single_instances=False,
+            force_update = set(expand_instances(self._config_id('redis'),
                                                 ext_map=self.sample_map))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
@@ -316,7 +319,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self._setup_containers(rsps, [
                 _container('redis', instances=['cache', 'queue']),
             ])
-            force_update = set(expand_instances(self._config_id('redis', 'cache'), single_instances=False,
+            force_update = set(expand_instances(self._config_id('redis', 'cache'),
                                                 ext_map=self.sample_map))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
@@ -356,14 +359,14 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self._setup_default_containers(rsps)
             states = list(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             valid_order = ['sub_sub_svc', 'sub_svc', 'redis', 'server']
-            for c_states in states:
-                i_state = c_states.containers[0]
-                config_name = i_state.config
-                if config_name in valid_order:
-                    self.assertEqual(valid_order[0], config_name)
-                    valid_order.pop(0)
-                    self.assertEqual(i_state.base_state, STATE_RUNNING)
-                    self.assertEqual(i_state.state_flags, 0)
+            for c_state in states:
+                if c_state.config_type == ITEM_TYPE_CONTAINER:
+                    config_name = c_state.config_name
+                    if config_name in valid_order:
+                        self.assertEqual(valid_order[0], config_name)
+                        valid_order.pop(0)
+                        self.assertEqual(c_state.base_state, STATE_RUNNING)
+                        self.assertEqual(c_state.state_flags, 0)
 
     def test_update_states_invalid_attached(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -494,89 +497,125 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.policy = policy = BasePolicy({map_name: sample_map}, {'__default__': client_config})
         self.state_gen = DependencyStateGenerator(policy, {})
         self.server_dependencies = [
-            (map_name, 'sub_sub_svc', (None,)),
-            (map_name, 'sub_svc', (None,)),
-            (map_name, 'svc', (None,)),
-            (map_name, 'redis', (None, )),
+            (ITEM_TYPE_CONTAINER, map_name, 'sub_sub_svc', None),
+            (ITEM_TYPE_CONTAINER, map_name, 'sub_svc', None),
+            (ITEM_TYPE_VOLUME, map_name, 'redis', 'redis_socket'),
+            (ITEM_TYPE_VOLUME, map_name, 'redis', 'redis_log'),
+            (ITEM_TYPE_CONTAINER, map_name, 'redis', 'queue'),
+            (ITEM_TYPE_CONTAINER, map_name, 'redis', 'cache'),
+            (ITEM_TYPE_CONTAINER, map_name, 'svc', None),
+            (ITEM_TYPE_VOLUME, map_name, 'server', 'app_log'),
+            (ITEM_TYPE_VOLUME, map_name, 'server', 'server_log'),
         ]
 
+    def _config_id(self, config_name, instance=None):
+        return MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, config_name, instance)
+
     def test_merge_two_common(self):
-        server_config = self.map_name, 'server', (None, )
-        worker_config = self.map_name, 'worker', (None, )
+        server_config = self._config_id('server')
+        worker_config = self._config_id('worker')
         merged_paths = merge_dependency_paths([
-            (c, self.state_gen.get_dependency_path(*c[:2]))
+            (c, self.state_gen.get_dependency_path(c))
             for c in [server_config, worker_config]
         ])
-        self.assertEqual(len(merged_paths), 1)
-        self.assertEqual(merged_paths[0][0], server_config)
-        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
-
-    def test_merge_three_common(self):
-        server_config = self.map_name, 'server', (None, )
-        worker_config = self.map_name, 'worker', (None, )
-        worker_q2_config = self.map_name, 'worker_q2', (None, )
-        merged_paths = merge_dependency_paths([
-            (c, self.state_gen.get_dependency_path(*c[:2]))
-            for c in [server_config, worker_config, worker_q2_config]
-        ])
-        self.assertEqual(len(merged_paths), 1)
-        self.assertEqual(merged_paths[0][0], server_config)
-        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
-
-    def test_merge_three_common_with_extension(self):
-        worker_config = self.map_name, 'worker', (None, )
-        server2_config = self.map_name, 'server2', (None, )
-        worker_q2_config = self.map_name, 'worker_q2', (None, )
-        merged_paths = merge_dependency_paths([
-            (c, self.state_gen.get_dependency_path(*c[:2]))
-            for c in [worker_config, server2_config, worker_q2_config]
-        ])
         self.assertEqual(len(merged_paths), 2)
-        self.assertEqual(merged_paths[0][0], worker_config)
-        self.assertEqual(merged_paths[1][0], server2_config)
-        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
-        self.assertItemsEqual([
-            (self.map_name, 'svc2', (None,)),
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertListEqual(self.server_dependencies, merged_paths[0][1])
+        self.assertEqual(merged_paths[1][0], worker_config)
+        self.assertListEqual([
+            (ITEM_TYPE_VOLUME, self.map_name, 'worker', 'app_log'),
         ], merged_paths[1][1])
 
-    def test_merge_included_first(self):
-        redis_config = self.map_name, 'redis', ('cache', )
-        server_config = self.map_name, 'server', (None, )
+    def test_merge_three_common(self):
+        server_config = self._config_id('server')
+        worker_config = self._config_id('worker')
+        worker_q2_config = self._config_id('worker_q2')
         merged_paths = merge_dependency_paths([
-            (c, self.state_gen.get_dependency_path(*c[:2]))
+            (c, self.state_gen.get_dependency_path(c))
+            for c in [server_config, worker_config, worker_q2_config]
+        ])
+        self.assertEqual(len(merged_paths), 3)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertEqual(merged_paths[1][0], worker_config)
+        self.assertEqual(merged_paths[2][0], worker_q2_config)
+        self.assertListEqual(self.server_dependencies, merged_paths[0][1])
+        self.assertListEqual([
+            (ITEM_TYPE_VOLUME, self.map_name, 'worker', 'app_log'),
+        ], merged_paths[1][1])
+        self.assertListEqual([
+            (ITEM_TYPE_VOLUME, self.map_name, 'worker_q2', 'app_log'),
+        ], merged_paths[2][1])
+
+    def test_merge_three_common_with_extension(self):
+        worker_config = self._config_id('worker')
+        server2_config = self._config_id('server2')
+        worker_q2_config = self._config_id('worker_q2')
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(c))
+            for c in [worker_config, server2_config, worker_q2_config]
+        ])
+        self.assertEqual(len(merged_paths), 3)
+        self.assertEqual(merged_paths[0][0], worker_config)
+        self.assertEqual(merged_paths[1][0], server2_config)
+        self.assertEqual(merged_paths[2][0], worker_q2_config)
+        self.assertListEqual([
+            (ITEM_TYPE_CONTAINER, self.map_name, 'sub_sub_svc', None),
+            (ITEM_TYPE_CONTAINER, self.map_name, 'sub_svc', None),
+            (ITEM_TYPE_VOLUME, self.map_name, 'redis', 'redis_socket'),
+            (ITEM_TYPE_VOLUME, self.map_name, 'redis', 'redis_log'),
+            (ITEM_TYPE_CONTAINER, self.map_name, 'redis', 'queue'),
+            (ITEM_TYPE_CONTAINER, self.map_name, 'redis', 'cache'),
+            (ITEM_TYPE_CONTAINER, self.map_name, 'svc', None),
+            (ITEM_TYPE_VOLUME, self.map_name, 'worker', 'app_log'),
+        ], merged_paths[0][1])
+        self.assertListEqual([
+            (ITEM_TYPE_CONTAINER, self.map_name, 'svc2', None),
+            (ITEM_TYPE_VOLUME, self.map_name, 'server2', 'app_log'),
+            (ITEM_TYPE_VOLUME, self.map_name, 'server2', 'server_log'),
+        ], merged_paths[1][1])
+        self.assertListEqual([
+            (ITEM_TYPE_VOLUME, self.map_name, 'worker_q2', 'app_log'),
+        ], merged_paths[2][1])
+
+    def test_merge_included_first(self):
+        redis_config = self._config_id('redis', 'cache')
+        server_config = self._config_id('server')
+        merged_paths = merge_dependency_paths([
+            (c, self.state_gen.get_dependency_path(c))
             for c in [redis_config, server_config]
         ])
-        # We'll end up with two paths, as the second might cover more instances than the first.
-        self.assertEqual(len(merged_paths), 2)
-        self.assertEqual(merged_paths[1][0], server_config)
-        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1] + merged_paths[1][1])
+        self.assertEqual(len(merged_paths), 1)
+        self.assertEqual(merged_paths[0][0], server_config)
+        self.assertListEqual(self.server_dependencies, merged_paths[0][1])
 
     def test_merge_included_second(self):
-        server_config = self.map_name, 'server', (None, )
-        redis_config = self.map_name, 'redis', ('cache', )
+        server_config = self._config_id('server')
+        redis_config = self._config_id('redis')
         merged_paths = merge_dependency_paths([
-            (c, self.state_gen.get_dependency_path(*c[:2]))
+            (c, self.state_gen.get_dependency_path(c))
             for c in [server_config, redis_config]
         ])
         self.assertEqual(len(merged_paths), 1)
         self.assertEqual(merged_paths[0][0], server_config)
-        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
+        self.assertListEqual(self.server_dependencies, merged_paths[0][1])
 
     def test_merge_included_multiple(self):
-        sub_svc_config = self.map_name, 'sub_svc', (None, )
-        sub_sub_svc_config = self.map_name, 'sub_sub_svc', (None, )
-        svc_config = self.map_name, 'svc', (None, )
-        server_config = self.map_name, 'server', (None, )
-        redis_config = self.map_name, 'redis', ('queue', )
-        server2_config = self.map_name, 'server2', (None, )
+        sub_svc_config = self._config_id('sub_svc')
+        sub_sub_svc_config = self._config_id('sub_sub_svc')
+        svc_config = self._config_id('svc')
+        server_config = self._config_id('server')
+        redis_config = self._config_id('redis', 'queue')
+        server2_config = self._config_id('server2')
         merged_paths = merge_dependency_paths([
-            (c, self.state_gen.get_dependency_path(*c[:2]))
+            (c, self.state_gen.get_dependency_path(c))
             for c in [sub_sub_svc_config, sub_svc_config, svc_config, server_config, redis_config, server2_config]
         ])
         self.assertEqual(len(merged_paths), 2)
         self.assertEqual(merged_paths[0][0], server_config)
         self.assertEqual(merged_paths[1][0], server2_config)
-        self.assertItemsEqual(self.server_dependencies, merged_paths[0][1])
-        self.assertItemsEqual([
-            (self.map_name, 'svc2', (None,)),
+        self.assertListEqual(self.server_dependencies, merged_paths[0][1])
+        self.assertListEqual([
+            (ITEM_TYPE_CONTAINER, self.map_name, 'svc2', None),
+            (ITEM_TYPE_VOLUME, self.map_name, 'server2', 'app_log'),
+            (ITEM_TYPE_VOLUME, self.map_name, 'server2', 'server_log'),
         ], merged_paths[1][1])
