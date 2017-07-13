@@ -249,7 +249,7 @@ class UpdateStateGenerator(DependencyStateGenerator):
             link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
         for link in c_config.links:
             instance_aliases = link_dict.get(self._policy.cname(map_name, link.container))
-            config_alias = link.alias or link.container
+            config_alias = self._policy.get_hostname(link.alias or link.container)
             if not instance_aliases or config_alias not in instance_aliases:
                 log.debug("Checked link %s - could not find alias %s", link.container, config_alias)
                 return False
