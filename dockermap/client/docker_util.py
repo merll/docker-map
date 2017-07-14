@@ -198,12 +198,11 @@ class DockerUtilityMixin(object):
         test_images = [image['Id']
                        for image in all_images
                        if image['Id'] not in keep_images]
-        keep_images = set(image['Id'] for image in all_images).difference(test_images)
         resolver = SingleDependencyResolver(image_dependencies)
         unused_images = []
         for image_id in test_images:
             image_deps = resolver.get_dependencies(image_id)
-            if not keep_images & set(image_deps):
+            if not keep_images.intersection(image_deps):
                 merge_list(unused_images, image_deps)
         for iid in reversed(unused_images):
             self.remove_image(iid, raise_on_error=raise_on_error)
