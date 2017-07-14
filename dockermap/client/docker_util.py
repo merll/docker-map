@@ -6,6 +6,7 @@ import logging
 from requests import Timeout
 
 from ..build.context import DockerContext
+from ..map.input import merge_list
 from ..dep import SingleDependencyResolver
 
 
@@ -69,37 +70,6 @@ def primary_container_name(names, default=None, strip_trailing_slash=True):
     if ex_names:
         return ex_names[0]
     return default
-
-
-class ContainerImageResolver(SingleDependencyResolver):
-    """
-    Finds dependencies of containers on images and images on one another, where each container depends on exactly one
-    image and each image depends on one or zero images. The purpose is only to find *if* images are used - not by what -
-    in order to perform a clean-up.
-
-    :param container_images: Set of image ids currently used by containers.
-    :type container_images: set[unicode | str]
-    :param images: Iterable or dictionary of images in the format `(image, parent_image)`.
-    :type images: iterable
-    """
-
-    def __init__(self, container_images=None, images=None):
-        super(ContainerImageResolver, self).__init__(images)
-        self._container_images = container_images
-
-    def merge_dependency(self, item, resolve_parent, parent):
-        """
-        Checks if any containers depend on the current image id; if not, moves down the hierarchy, checking the parent
-        images.
-
-        :param item: Image id to check for dependent items.
-        :type item: unicode | str
-        :param resolve_parent: Function to check parent image for dependencies.
-        :param parent: Parent image id.
-        :return: `True` if any dependency has been found, `False` otherwise.
-        :type: bool
-        """
-        return item in self._container_images or super(ContainerImageResolver, self).merge_dependency(item, resolve_parent, parent)
 
 
 class DockerUtilityMixin(object):
@@ -209,8 +179,10 @@ class DockerUtilityMixin(object):
         """
         used_images = set(self.inspect_container(container['Id'])['Image']
                           for container in self.containers(all=True))
-        image_dependencies = ((image['Id'], image['ParentId']) for image in self.images(all=True))
-        resolver = ContainerImageResolver(used_images, image_dependencies)
+        all_images = self.images(all=True)
+        image_dependencies = [(image['Id'], image['ParentId'])
+                              for image in all_images
+                              if image['ParentId']]
         if remove_old:
             check_tags = {'latest'}
             if keep_tags:
@@ -220,9 +192,20 @@ class DockerUtilityMixin(object):
             tag_check = tag_check_function(['latest'])
         else:
             tag_check = is_repo_image
-        unused_images = set(image['Id'] for image in self.images()
-                            if not tag_check(image) and not resolver.get_dependencies(image['Id']))
-        for iid in unused_images:
+        keep_images = {image['Id']
+                       for image in all_images
+                       if tag_check(image)} | used_images
+        test_images = [image['Id']
+                       for image in all_images
+                       if image['Id'] not in keep_images]
+        keep_images = set(image['Id'] for image in all_images).difference(test_images)
+        resolver = SingleDependencyResolver(image_dependencies)
+        unused_images = []
+        for image_id in test_images:
+            image_deps = resolver.get_dependencies(image_id)
+            if not keep_images & set(image_deps):
+                merge_list(unused_images, image_deps)
+        for iid in reversed(unused_images):
             self.remove_image(iid, raise_on_error=raise_on_error)
 
     def remove_all_containers(self, stop_timeout=10):
