@@ -86,6 +86,14 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
     def __contains__(self, item):
         return item in self._deps
 
+    def get_default(self):
+        """
+        Defines a return value if an item is not found on the dependency map or does not have any dependencies.
+
+        :return: Default value.
+        """
+        return []
+
     def merge_dependency(self, item, resolve_parent, parent):
         """
         Called by :meth:`~BaseDependencyResolver.get_dependencies` once on each node. The result is cached for
@@ -93,7 +101,8 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         current node `item`, and how the result is merged with dependencies from the deeper hierarchy. The latter are
         resolved by calling `resolve_parent(parent)`.
 
-        By default, this function will always return `False`, as the node relevancy is not defined.
+        By default, this function will always return a list only containing the parent itself (or an empty list, if
+        there is none).
 
         This function should, if applicable, also check for potential infinite recursions and in that case raise
         a :class:`~CircularDependency` exception.
@@ -102,11 +111,15 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         :param resolve_parent: Function to check on dependencies deeper in the hierarchy.
         :type resolve_parent: function
         :param parent: Parent node(s).
-        :return: Result of the dependency merge. May be boolean, a set, or anything else that represents all
+        :return: Result of the dependency merge. May be boolean, a list, a set, or anything else that represents all
          dependencies.
-        :rtype: bool
+        :rtype: collections.Iterable
         """
-        return parent is not None and resolve_parent(parent)
+        if parent is None:
+            return self.get_default()
+        dependencies = [parent]
+        dependencies.extend(resolve_parent(parent))
+        return dependencies
 
     def get_dependencies(self, item):
         """
@@ -118,7 +131,7 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         def _get_sub_dependency(sub_item):
             e = self._deps.get(sub_item)
             if e is None:
-                return ()
+                return self.get_default()
 
             if e.dependencies is NotInitialized:
                 e.dependencies = self.merge_dependency(sub_item, _get_sub_dependency, e.parent)
@@ -126,17 +139,16 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
 
         return _get_sub_dependency(item)
 
-    def get(self, item, default=()):
+    def get(self, item):
         """
         Returns the direct dependencies or dependents of a single item. Does not follow the entire dependency path.
 
         :param item: Node to return dependencies for.
-        :param default: Default value to return in case the item is not stored.
         :return: Immediate dependencies or dependents.
         """
         e = self._deps.get(item)
         if e is None:
-            return default
+            return self.get_default()
         return e.parent
 
     def reset(self):

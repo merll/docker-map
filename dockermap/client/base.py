@@ -60,19 +60,22 @@ class DockerClientWrapper(DockerUtilityMixin, docker.Client):
     """
     def _docker_log_stream(self, response, raise_on_error):
         log_str = None
+        image_str = None
         for e in response:
             output = parse_response(e)
             if 'stream' in output:
                 log_str = output['stream']
                 if log_str and log_str[-1] == '\n':
                     log_str = log_str[:-1]
+                if log_str.startswith('Successfully built '):
+                    image_str = log_str
                 self.push_log(log_str, logging.INFO)
             elif 'error' in output:
                 log_str = output['error']
                 self.push_log(log_str, logging.ERROR)
                 if raise_on_error:
                     raise DockerStatusError(log_str, output.get('errorDetail'))
-        return log_str  # Last line written to stdout
+        return image_str or log_str  # Line with image id or last line written to stdout
 
     def _docker_status_stream(self, response, raise_on_error):
         result = {}

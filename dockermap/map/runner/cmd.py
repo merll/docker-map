@@ -35,10 +35,14 @@ class ExecMixin(object):
             cmd_user = run_cmd.user
             log.debug("Creating exec command in container %s with user %s: %s.", c_name, cmd_user, cmd)
             ec_kwargs = self.get_exec_create_kwargs(action, c_name, cmd, cmd_user)
-            e_id = client.exec_create(**ec_kwargs)['Id']
-            log.debug("Starting exec command with id %s.", e_id)
-            es_kwargs = self.get_exec_start_kwargs(action, c_name, e_id)
-            client.exec_start(**es_kwargs)
+            create_result = client.exec_create(**ec_kwargs)
+            if create_result:
+                e_id = create_result['Id']
+                log.debug("Starting exec command with id %s.", e_id)
+                es_kwargs = self.get_exec_start_kwargs(action, c_name, e_id)
+                client.exec_start(**es_kwargs)
+            else:
+                log.debug("Exec command was created, but did not return an id. Assuming that it has been started.")
 
     def exec_container_commands(self, action, c_name, **kwargs):
         """

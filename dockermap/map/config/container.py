@@ -31,7 +31,7 @@ class ContainerConfiguration(ConfigurationObject):
     user = CP()
     permissions = CP()
     stop_timeout = CP()
-    stop_singal = CP()
+    stop_signal = CP()
     network = CP(input_func=get_network_mode)
     exec_commands = CP(list, input_func=get_exec_commands)
     persistent = CP(input_func=bool_if_set)

@@ -2,6 +2,28 @@
 
 Change History
 ==============
+0.7.6
+-----
+* More sensible solution of `Issue #15 <https://github.com/merll/docker-map/issues/15>`_, not changing user-defined
+  link aliases. Doing so could cause name resolution issues.
+
+0.7.5
+-----
+* Minor fixes for compatibility with newer Docker hosts.
+* Followup fixes from `Issue #15 <https://github.com/merll/docker-map/issues/15>`_.
+
+0.7.4
+-----
+* Fixed case where ``exec_create`` does not return anything, as when commands are started immediately (e.g. the CLI,
+  `Issue #17 <https://github.com/merll/docker-map/issues/17>`_).
+* Improved accuracy of comparing the container command from the configuration with the container inspection info.
+* Added parser for CLI ``top`` command, as needed for inspecting exec commands.
+
+0.7.3
+-----
+* Fixed command line generator for case where ``cmd`` is used as a keyword argument
+  (`Issue #16 <https://github.com/merll/docker-map/issues/16>`_).
+
 0.7.2
 -----
 * Fixed recursive dependency resolution order.

@@ -119,11 +119,12 @@ class MappingDockerClient(object):
         state_generator = state_generator_cls(policy, kwargs)
         action_generator = action_generator_cls(policy, kwargs)
         runner = self.runner_class(policy, kwargs)
-        log.debug("Passing kwargs to client actions: {0}".format(kwargs))
+        log.debug("Passing kwargs to client actions: %s", kwargs)
         results = []
 
         config_ids = _get_config_ids(config_name, policy.container_maps, groups, map_name or self._default_map,
                                      instances)
+        log.debug("Generating states for configurations: %s", config_ids)
         for states in state_generator.get_states(config_ids):
             actions = action_generator.get_state_actions(states, **kwargs)
             log.debug("Running actions: %s", actions)
@@ -338,8 +339,8 @@ class MappingDockerClient(object):
             maps = [self._maps[map_name].get_extended_map()]
         else:
             maps = [m.get_extended_map() for m in self._maps.values()]
-        cname_func = self._policy_class.cname
-        aname_func = self._policy_class.aname
+        cname_func = self.policy_class.cname
+        aname_func = self.policy_class.aname
         c_names = []
         for c_map in maps:
             m_name = c_map.name

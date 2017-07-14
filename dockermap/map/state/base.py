@@ -326,7 +326,7 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
         pass
 
     def _get_all_states(self, config_id, dependency_path):
-        log.debug("Following dependency path for %(map_name)s.%(config_name)s.", config_id)
+        log.debug("Following dependency path for %s.", config_id)
         for d_config_id in dependency_path:
             log.debug("Dependency path at %(config_type)s %(map_name)s.%(config_name)s, instance %(instance)s.",
                       d_config_id)
@@ -345,10 +345,13 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
         :return: Return values of created main containers.
         :rtype: itertools.chain[dockermap.map.state.ContainerConfigStates]
         """
-        dependency_paths = merge_dependency_paths(
+        input_paths = [
             (config_id, self.get_dependency_path(config_id))
             for config_id in config_ids
-        )
+        ]
+        log.debug("Dependency paths from input: %s", input_paths)
+        dependency_paths = merge_dependency_paths(input_paths)
+        log.debug("Merged dependency paths: %s", dependency_paths)
         return itertools.chain.from_iterable(self._get_all_states(config_id, dependency_path)
                                              for config_id, dependency_path in dependency_paths)
 

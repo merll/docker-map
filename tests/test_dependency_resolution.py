@@ -5,8 +5,8 @@ import unittest
 import six
 
 from dockermap.api import ContainerMap
-from dockermap.client.docker_util import ContainerImageResolver
 from dockermap.map.input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME
+from dockermap.dep import SingleDependencyResolver
 from dockermap.map.policy.dep import ContainerDependencyResolver
 
 
@@ -28,7 +28,6 @@ TEST_IMG_DATA = [
     ('d', 'e'),
     ('f', 'x'),
 ]
-TEST_CONTAINER_IMAGES = {'a', 'c', 'f'}
 
 
 class ContainerDependencyTest(unittest.TestCase):
@@ -91,18 +90,16 @@ class ContainerDependencyTest(unittest.TestCase):
                          (ITEM_TYPE_CONTAINER, 'test_map', 'd', '2'))
 
 
-class ImageDependencyTest(unittest.TestCase):
+class SingleDependencyTest(unittest.TestCase):
     def setUp(self):
-        self.res = ContainerImageResolver(TEST_CONTAINER_IMAGES, TEST_IMG_DATA)
+        self.res = SingleDependencyResolver(TEST_IMG_DATA)
 
     def test_image_dependencies(self):
-        self.assertTrue(self.res.get_dependencies('a'))
-        self.assertTrue(self.res.get_dependencies('b'))
-        self.assertTrue(self.res.get_dependencies('c'))
-        self.assertTrue(self.res.get_dependencies('f'))
-        self.assertFalse(self.res.get_dependencies('d'))
-        self.assertFalse(self.res.get_dependencies('e'))
-        self.assertFalse(self.res.get_dependencies('x'))
+        self.assertListEqual(['b', 'c', 'e'], self.res.get_dependencies('a'))
+        self.assertListEqual(['c', 'e'], self.res.get_dependencies('b'))
+        self.assertListEqual(['e'], self.res.get_dependencies('c'))
+        self.assertListEqual([], self.res.get_dependencies('e'))
+        self.assertListEqual(['x'], self.res.get_dependencies('f'))
 
 
 if __name__ == '__main__':
