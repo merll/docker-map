@@ -165,7 +165,7 @@ class DockerConfigMixin(object):
             volumes_from.extend([aname(map_name, attached)
                                  for attached in container_config.attaches])
         c_kwargs = dict(
-            links=[(cname(map_name, l_name), policy.get_hostname(alias or l_name))
+            links=[(cname(map_name, l_name), alias or policy.get_hostname(l_name))
                    for l_name, alias in container_config.links],
             binds=get_host_binds(container_map, container_config, config.instance_name),
             volumes_from=volumes_from,

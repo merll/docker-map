@@ -150,7 +150,7 @@ def _add_inspect(rsps, container_map, map_name, c_config, config_name, instance_
         'Mounts': list(_get_container_mounts(container_map, c_config, config_name, instance_name, valid, is_attached)),
         'HostConfig': {'Links': [
             '/{0}.{1}:/{2}/{3}'.format(map_name, link.container, container_name,
-                                       BasePolicy.get_hostname(link.alias or link.container))
+                                       link.alias or BasePolicy.get_hostname(link.container))
             for link in c_config.links
         ]},
         'Config': {
