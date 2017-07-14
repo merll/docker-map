@@ -2,6 +2,11 @@
 
 Change History
 ==============
+0.7.5
+-----
+* Minor fixes for compatibility with newer Docker hosts.
+* Followup fixes from (`Issue #15 <https://github.com/merll/docker-map/issues/15>`_).
+
 0.7.4
 -----
 * Fixed case where ``exec_create`` does not return anything, as when commands are started immediately (e.g. the CLI,
