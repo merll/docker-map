@@ -2,10 +2,15 @@
 
 Change History
 ==============
+0.7.6
+-----
+* More sensible solution of `Issue #15 <https://github.com/merll/docker-map/issues/15>`_, not changing user-defined
+  link aliases. Doing so could cause name resolution issues.
+
 0.7.5
 -----
 * Minor fixes for compatibility with newer Docker hosts.
-* Followup fixes from (`Issue #15 <https://github.com/merll/docker-map/issues/15>`_).
+* Followup fixes from `Issue #15 <https://github.com/merll/docker-map/issues/15>`_.
 
 0.7.4
 -----
