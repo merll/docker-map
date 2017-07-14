@@ -41,6 +41,20 @@ def _check_environment(c_config, instance_detail):
     return True
 
 
+def _strip_quotes(cmd_item):
+    if len(cmd_item) >= 2:
+        first, last = cmd_item[0], cmd_item[-1]
+        if first in ("'", '"') and first == last:
+            return cmd_item[1:-1]
+    return cmd_item
+
+
+def _normalize_cmd(cmd):
+    if isinstance(cmd, six.string_types):
+        cmd = shlex.split(cmd)
+    return list(map(_strip_quotes, cmd))
+
+
 def _check_cmd(c_config, instance_detail):
     create_options = init_options(c_config.create_options)
     if not create_options:
@@ -50,10 +64,7 @@ def _check_cmd(c_config, instance_detail):
     if config_cmd:
         instance_cmd = instance_config['Cmd'] or []
         log.debug("Checking command. Config / container instance:\n%s\n%s", config_cmd, instance_cmd)
-        if isinstance(config_cmd, six.string_types):
-            if shlex.split(config_cmd) != instance_cmd:
-                return False
-        elif list(config_cmd) != instance_cmd:
+        if _normalize_cmd(config_cmd) != instance_cmd:
             return False
     config_entrypoint = resolve_value(create_options.get('entrypoint')) if create_options else None
     if config_entrypoint:
@@ -238,7 +249,7 @@ class UpdateStateGenerator(DependencyStateGenerator):
             link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
         for link in c_config.links:
             instance_aliases = link_dict.get(self._policy.cname(map_name, link.container))
-            config_alias = link.alias or link.container
+            config_alias = link.alias or self._policy.get_hostname(link.container)
             if not instance_aliases or config_alias not in instance_aliases:
                 log.debug("Checked link %s - could not find alias %s", link.container, config_alias)
                 return False

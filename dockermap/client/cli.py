@@ -168,12 +168,30 @@ def _transform_create_kwargs(ka):
 
 
 def parse_containers_output(out):
+    """
+    Parses the output of the Docker CLI 'docker ps --format="{{ID}}||{{Image}}||..."' and returns it in the format
+    similar to the Docker API.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: list[dict]
+    """
     return [
         _container_info(line) for line in out.splitlines() or ()
     ]
 
 
 def parse_inspect_output(out):
+    """
+    Parses the output of the Docker CLI 'docker inspect <container>'. Essentially just returns the parsed JSON string,
+    like the Docker API does.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: dict
+    """
     parsed = json.loads(out, encoding='utf-8')
     if parsed:
         return parsed[0]
@@ -181,6 +199,16 @@ def parse_inspect_output(out):
 
 
 def parse_images_output(out):
+    """
+    Parses the output of the Docker CLI 'docker images'. Note this is currently incomplete and only returns the ids and
+    tags of images, as the Docker CLI heavily modifies the output for human readability. The parent image id is also
+    not available on the CLI, so a full API compatibility is not possible.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: list[dict]
+    """
     lines = out.splitlines()
     line_iter = iter(lines)
     next(line_iter)  # Skip header
@@ -192,10 +220,42 @@ def parse_images_output(out):
 
 
 def parse_version_output(out):
+    """
+    Parses the output of 'docker version --format="{{json .}}"'. Essentially just returns the parsed JSON string,
+    like the Docker API does. Fields are slightly different however.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: dict
+    """
     parsed = json.loads(out, encoding='utf-8')
     if parsed:
         return parsed.get('Client', {})
     return {}
+
+
+def parse_top_output(out):
+    """
+    Parses the output of the Docker CLI 'docker top <container>'. Note that if 'ps' output columns are modified and
+    'args' (for the command) is anywhere but in the last column, this will not parse correctly. However, the Docker API
+    produces wrong output in this case as well.
+    Returns a dictionary with entries 'Titles' and 'Processes' just like the Docker API would.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: dict
+    """
+    lines = out.splitlines()
+    line_iter = iter(lines)
+    header_line = next(line_iter)
+    titles = header_line.split()
+    max_split = len(titles) - 1
+    return {
+        'Titles': titles,
+        'Processes': [line.split(None, max_split) for line in line_iter],
+    }
 
 
 class DockerCommandLineOutput(object):
@@ -220,8 +280,8 @@ class DockerCommandLineOutput(object):
         else:
             self._cmd = cmd
 
-    def get_cmd(self, cmd, *args, **kwargs):
-        cli_cmd = self.cmd_map.get(cmd, cmd)
+    def get_cmd(self, c_cmd, *args, **kwargs):
+        cli_cmd = self.cmd_map.get(c_cmd, c_cmd)
         if not cli_cmd:
             return None
         cmd_prefix = None
