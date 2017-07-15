@@ -341,20 +341,20 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('worker'),
                 _container('worker_q2'),
             ])
-            states = list(DependentStateGenerator(self.policy, {}).get_states(self._config_id('redis')))
-            instance_base_states = [si.base_state
+            states = list(DependentStateGenerator(self.policy, {}).get_states(self._config_id('redis', 'cache')))
+            instance_base_states = [s.base_state
                                     for s in states
-                                    for si in s.containers]
-            volume_base_states = [si.base_state
-                                    for s in states
-                                    for si in s.volumes]
+                                    if s.config_id.config_type == ITEM_TYPE_CONTAINER]
+            volume_base_states = [s.base_state
+                                  for s in states
+                                  if s.config_id.config_type == ITEM_TYPE_VOLUME]
             self.assertTrue(all(si == STATE_RUNNING
                                 for si in instance_base_states))
             self.assertTrue(all(si == STATE_PRESENT
                                 for si in volume_base_states))
-            self.assertTrue(all(s.flags == CONFIG_FLAG_DEPENDENT
+            self.assertTrue(all(s.config_flags == CONFIG_FLAG_DEPENDENT
                                 for s in states
-                                if s.containers[0].config != 'redis'))
+                                if not (s.config_id.config_type == ITEM_TYPE_CONTAINER and s.config_id.config_name == 'redis')))
 
     def test_update_states_clean(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -511,23 +511,25 @@ class TestPolicyStateUtils(unittest.TestCase):
             (ITEM_TYPE_VOLUME, map_name, 'server', 'server_log'),
         ]
         self.redis_dependencies = [
-            (self.map_name, 'sub_sub_svc', (None,)),
-            (self.map_name, 'sub_svc', (None,)),
+            (ITEM_TYPE_CONTAINER, self.map_name, 'sub_sub_svc', None),
+            (ITEM_TYPE_CONTAINER, self.map_name, 'sub_svc', None),
+            (ITEM_TYPE_VOLUME, map_name, 'redis', 'redis_socket'),
+            (ITEM_TYPE_VOLUME, map_name, 'redis', 'redis_log'),
         ]
 
     def test_merge_single(self):
-        redis_config = self.map_name, 'redis', (None, )
+        redis_config = self._config_id('redis', 'queue')
         merged_paths = merge_dependency_paths([
-            (redis_config, self.state_gen.get_dependency_path(self.map_name, 'redis'))
+            (redis_config, self.state_gen.get_dependency_path(redis_config))
         ])
         self.assertItemsEqual([
             (redis_config, self.redis_dependencies)
         ], merged_paths)
 
     def test_merge_empty(self):
-        svc_config = self.map_name, 'sub_sub_svc', (None, )
+        svc_config = self._config_id('sub_sub_svc')
         merged_paths = merge_dependency_paths([
-            (svc_config, self.state_gen.get_dependency_path(self.map_name, 'sub_sub_svc'))
+            (svc_config, self.state_gen.get_dependency_path(svc_config))
         ])
         self.assertItemsEqual([(svc_config, [])], merged_paths)
 
@@ -613,7 +615,7 @@ class TestPolicyStateUtils(unittest.TestCase):
 
     def test_merge_included_second(self):
         server_config = self._config_id('server')
-        redis_config = self._config_id('redis')
+        redis_config = self._config_id('redis', 'cache')
         merged_paths = merge_dependency_paths([
             (c, self.state_gen.get_dependency_path(c))
             for c in [server_config, redis_config]
