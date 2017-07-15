@@ -227,7 +227,7 @@ class UpdateContainerState(ContainerBaseState):
             link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
         for link in self.config.links:
             instance_aliases = link_dict.get(self.policy.cname(self.config_id.map_name, link.container))
-            config_alias = link.alias or self._policy.get_hostname(link.container)
+            config_alias = link.alias or self.policy.get_hostname(link.container)
             if not instance_aliases or config_alias not in instance_aliases:
                 log.debug("Checked link %s - could not find alias %s", link.container, config_alias)
                 return False
