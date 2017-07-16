@@ -41,10 +41,6 @@ def _action_type_list(value):
     return []
 
 
-# TODO: Remove
-ClientMapActions = namedtuple('ClientMapActions', ['client_name', 'map_name', 'actions'])
-
-
 @python_2_unicode_compatible
 class ItemAction(object):
     """
@@ -60,15 +56,14 @@ class ItemAction(object):
     :type extra_data: dict
     :param kwargs: Additional keyword arguments; added to extra_data
     """
-    def __init__(self, client_name, config_id, action_types=None, extra_data=None, **kwargs):
-        self._client_name = client_name
-        self._config_id = config_id
+    def __init__(self, state, action_types=None, extra_data=None, **kwargs):
+        self._state = state
         self._action_types = _action_type_list(action_types)
         self._extra_data = extra_data.copy() if extra_data else {}
         self._extra_data.update(kwargs)
 
     def __str__(self):
-        return ("InstanceAction(client_name={0._client_name!r}, config_id={0._config_id!r}, "
+        return ("InstanceAction(client_name={0._state.client_name!r}, config_id={0._state.config_id!r}, "
                 "action_types={0._action_types!r}, extra_data={0._extra_data!r})".format(self))
 
     __repr__ = __str__
@@ -81,7 +76,7 @@ class ItemAction(object):
         :return: Client configuration name.
         :rtype: unicode | str
         """
-        return self._client_name
+        return self._state.client_name
 
     @property
     def config_id(self):
@@ -91,7 +86,7 @@ class ItemAction(object):
         :return: Configuration id.
         :rtype: dockermap.map.input.MapConfigId
         """
-        return self._config_id
+        return self._state.config_id
 
     @property
     def action_types(self):

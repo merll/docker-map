@@ -16,13 +16,12 @@ class AbstractActionGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
     @abstractmethod
     def get_state_actions(self, states, **kwargs):
         """
-        Generates actions from a container configuration state. The output is a tuple of two lists: Actions to
-        attached containers and actions to instance containers.
+        Generates actions from a container configuration state.
 
-        :param states: Container configuration states tuple.
-        :type states: dockermap.map.state.ContainerConfigStates
+        :param states: Container configuration states.
+        :type states: collections.Iterable[dockermap.map.state.ConfigState]
         :param kwargs: Additional keyword arguments.
         :return: Actions on the client, map, and configurations.
-        :rtype: dockermap.map.action.ClientMapActions
+        :rtype: list[dockermap.map.action.ItemAction]
         """
         pass
