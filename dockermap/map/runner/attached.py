@@ -12,13 +12,13 @@ from .utils import get_preparation_cmd
 
 
 class AttachedConfigMixin(object):
-    def get_attached_preparation_create_kwargs(self, config, volume_container, kwargs=None):
+    def get_attached_preparation_create_kwargs(self, action, volume_container, kwargs=None):
         """
         Generates keyword arguments for the Docker client to prepare an attached container (i.e. adjust user and
         permissions).
 
-        :param config: Configuration.
-        :type config: dockermap.map.runner.ActionConfig
+        :param action: Action configuration.
+        :type action: dockermap.map.runner.ActionConfig
         :param volume_container: Name of the container that shares the volume.
         :type volume_container: unicode | str
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
@@ -26,9 +26,9 @@ class AttachedConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        client_config = config.client_config
-        path = resolve_value(config.container_map.volumes[config.instance_name])
-        cmd = get_preparation_cmd(config.config, path)
+        client_config = action.client_config
+        path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
+        cmd = get_preparation_cmd(action.config, path)
         if not cmd:
             return None
         c_kwargs = dict(
@@ -50,13 +50,13 @@ class AttachedConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_attached_preparation_host_config_kwargs(self, config, container_name, volume_container, kwargs=None):
+    def get_attached_preparation_host_config_kwargs(self, action, container_name, volume_container, kwargs=None):
         """
         Generates keyword arguments for the Docker client to set up the HostConfig for preparing an attached container
         (i.e. adjust user and permissions) or start the preparation.
 
-        :param config: Configuration.
-        :type config: dockermap.map.runner.ActionConfig
+        :param action: Action configuration.
+        :type action: dockermap.map.runner.ActionConfig
         :param container_name: Container name or id. Set ``None`` when included in kwargs for ``create_container``.
         :type container_name: unicode | str | NoneType
         :param volume_container: Name of the container that shares the volume.
@@ -72,13 +72,13 @@ class AttachedConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_attached_preparation_wait_kwargs(self, config, container_name, kwargs=None):
+    def get_attached_preparation_wait_kwargs(self, action, container_name, kwargs=None):
         """
         Generates keyword arguments for waiting for a container when preparing a volume. The container name may be
         the container being prepared, or the id of the container calling preparation commands.
 
-        :param config: Configuration.
-        :type config: dockermap.map.runner.ActionConfig
+        :param action: Action configuration.
+        :type action: dockermap.map.runner.ActionConfig
         :param container_name: Container name or id. Set ``None`` when included in kwargs for ``create_container``.
         :type container_name: unicode | str | NoneType
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
@@ -86,7 +86,7 @@ class AttachedConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        client_config = config.client_config
+        client_config = action.client_config
         wait_timeout = client_config.get('wait_timeout')
         if wait_timeout is not None:
             c_kwargs = dict(timeout=wait_timeout)
@@ -150,11 +150,11 @@ class AttachedPreparationMixin(AttachedConfigMixin):
             return self._prepare_container(client, action, a_name)
         instance_detail = client.inspect_container(a_name)
         volumes = get_instance_volumes(instance_detail)
-        path = resolve_value(action.container_map.volumes[action.instance_name])
+        path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
         local_path = volumes.get(path)
         if not local_path:
             raise ValueError("Could not locate local path of volume alias '{0}' / "
-                             "path '{1}' in container {2}.".format(action.instance_name, path, a_name))
+                             "path '{1}' in container {2}.".format(action.config_id.instance_name, path, a_name))
         return [
             client.run_cmd(cmd)
             for cmd in get_preparation_cmd(action.config, local_path)

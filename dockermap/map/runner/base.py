@@ -119,7 +119,7 @@ class DockerConfigMixin(object):
         container_config = action.config
         c_kwargs = dict(
             name=container_name,
-            image=policy.image_name(container_config.image or action.config_name, container_map),
+            image=policy.image_name(container_config.image or action.config_id.config_name, container_map),
             volumes=get_volumes(container_map, container_config),
             user=extract_user(container_config.user),
             ports=[resolve_value(port_binding.exposed_port)
@@ -169,7 +169,7 @@ class DockerConfigMixin(object):
         cname = policy.cname
         volumes_from = list(map(volume_str, action.config.uses))
         if container_map.use_attached_parent_name:
-            volumes_from.extend([aname(map_name, attached, action.config_name)
+            volumes_from.extend([aname(map_name, attached, action.config_id.config_name)
                                  for attached in container_config.attaches])
         else:
             volumes_from.extend([aname(map_name, attached)
@@ -177,7 +177,7 @@ class DockerConfigMixin(object):
         c_kwargs = dict(
             links=[(cname(map_name, l_name), alias or policy.get_hostname(l_name))
                    for l_name, alias in container_config.links],
-            binds=get_host_binds(container_map, container_config, action.instance_name),
+            binds=get_host_binds(container_map, container_config, action.config_id.instance_name),
             volumes_from=volumes_from,
             port_bindings=get_port_bindings(container_config, client_config),
         )
@@ -205,7 +205,7 @@ class DockerConfigMixin(object):
         :rtype: dict
         """
         client_config = action.client_config
-        path = resolve_value(action.container_map.volumes[action.instance_name])
+        path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
         user = extract_user(action.config.user)
         c_kwargs = dict(
             name=container_name,

@@ -7,9 +7,8 @@ from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
 from ..action import ACTION_CREATE, ACTION_REMOVE
 from ..policy import PolicyUtilMeta, PolicyUtil
 
-ActionConfig = namedtuple('ActionConfig', ['client_name', 'client_config', 'client',
-                                           'map_name', 'container_map',
-                                           'config_name', 'config', 'instance_name'])
+ActionConfig = namedtuple('ActionConfig', ['client_name', 'config_id', 'client_config', 'client',
+                                           'container_map', 'config'])
 
 
 class RunnerMeta(PolicyUtilMeta):
@@ -38,44 +37,43 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
         Runs the given lists of attached actions and instance actions on the client.
 
         :param actions: Actions to apply.
-        :type actions: dockermap.map.action.ClientMapActions
+        :type actions: list[dockermap.map.action.ItemAction]
         :return: Where the result is not ``None``, returns the output from the client. Note that this is a generator
           and needs to be consumed in order for all actions to be performed.
         :rtype: collections.Iterable[dict]
         """
         policy = self._policy
+        for action in actions:
+            config_id = action.config_id
+            config_type = config_id.config_type
+            client_config = policy.clients[action.client_name]
+            client = client_config.get_client()
+            c_map = policy.container_maps[config_id.map_name]
 
-        client_config = policy.clients[actions.client_name]
-        client = client_config.get_client()
-        c_map = policy.container_maps[actions.map_name]
-
-        for action in actions.actions:
-            if action.config_type == ITEM_TYPE_CONTAINER:
-                config = c_map.get_existing(action.config_name)
-                item_name = policy.cname(actions.map_name, action.config_name, action.instance_name)
-                existing_items = policy.container_names[actions.client_name]
-            elif action.config_type == ITEM_TYPE_VOLUME:
-                # TODO
-                config = c_map.get_existing(action.config_name)
-                a_parent_name = action.config_name if c_map.use_attached_parent_name else None
-                item_name = policy.aname(cma.map_name, action.instance_name, parent_name=a_parent_name)
-                existing_items = policy.container_names[actions.client_name]
-            elif action.config_type == ITEM_TYPE_NETWORK:
-                # TODO
-                config = None
-                item_name = policy.nname(actions.map_name, action.config_name)
+            if config_type == ITEM_TYPE_CONTAINER:
+                config = c_map.get_existing(config_id.config_name)
+                item_name = policy.cname(config_id.map_name, config_id.config_name, config_id.instance_name)
+                existing_items = policy.container_names[action.client_name]
+            elif config_type == ITEM_TYPE_VOLUME:
+                # TODO: Implement for native volumes.
+                config = c_map.get_existing(config_id.config_name)
+                a_parent_name = config_id.config_name if c_map.use_attached_parent_name else None
+                item_name = policy.aname(config_id.map_name, config_id.instance_name, parent_name=a_parent_name)
+                existing_items = policy.container_names[action.client_name]
+            elif config_type == ITEM_TYPE_NETWORK:
+                config = c_map.get_existing_network(config_id.config_name)
+                item_name = policy.nname(config_id.map_name, config_id.config_name)
                 existing_items = policy.network_names[action.client_name]
             else:
                 raise ValueError("Invalid configuration type.", action.config_type)
 
             for action_type in action.action_types:
                 try:
-                    a_method = self.action_methods[(action.config_type, action.action_type)]
+                    a_method = self.action_methods[(config_type, action.action_type)]
                 except KeyError:
-                    raise ValueError("Invalid action.", action.config_type, action.action_type)
-                action_config = ActionConfig(action.client_name, client_config, client,
-                                             action.map, c_map,
-                                             action.config, config, action.instance_name)
+                    raise ValueError("Invalid action.", config_type, action.action_type)
+                action_config = ActionConfig(action.client_name, action.config_id, client_config, client,
+                                             c_map, config)
                 res = a_method(action_config, item_name, **action.extra_data)
                 if action_type == ACTION_CREATE:
                     existing_items.add(item_name)
