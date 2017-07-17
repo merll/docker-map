@@ -276,8 +276,8 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
 
         :param config_ids: MapConfigId tuple.
         :type config_ids: list[dockermap.map.input.MapConfigId]
-        :return: Iterator over container configuration states.
-        :rtype: collections.Iterable[dockermap.map.state.ContainerConfigStates]
+        :return: Iterable of configuration states.
+        :rtype: collections.Iterable[dockermap.map.state.ConfigState]
         """
         pass
 
@@ -303,8 +303,8 @@ class SingleStateGenerator(AbstractStateGenerator):
 
         :param config_ids: List of MapConfigId tuples.
         :type config_ids: list[dockermap.map.input.MapConfigId]
-        :return: Return values of created main containers.
-        :rtype: collections.Iterable[dockermap.map.state.ContainerConfigStates]
+        :return: Iterable of configuration states.
+        :rtype: collections.Iterable[dockermap.map.state.ConfigState]
         """
         return itertools.chain.from_iterable(self.generate_config_states(config_id)
                                              for config_id in config_ids)
@@ -320,19 +320,18 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
 
         :param config_id: MapConfigId tuple.
         :type config_id: dockermap.map.input.MapConfigId
-        :return: Iterable of dependency objects in tuples of configuration type, map name, container (config) name, instances.
-        :rtype: list[tuple]
+        :return: Iterable of dependency objects in tuples of configuration type, map name, config name, and instance.
+        :rtype: collections.Iterable[dockermap.map.input.MapConfigId]
         """
         pass
 
     def _get_all_states(self, config_id, dependency_path):
         log.debug("Following dependency path for %s.", config_id)
         for d_config_id in dependency_path:
-            log.debug("Dependency path at %(config_type)s %(map_name)s.%(config_name)s, instance %(instance)s.",
-                      d_config_id)
+            log.debug("Dependency path at %s.", d_config_id)
             for state in self.generate_config_states(d_config_id, is_dependency=True):
                 yield state
-        log.debug("Processing state for %(config_type)s %(map_name)s.%(config_name)s, instance %(instance)s.", config_id)
+        log.debug("Processing state for %s.", config_id)
         for state in self.generate_config_states(config_id):
             yield state
 
@@ -342,8 +341,8 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
 
         :param config_ids: MapConfigId tuples.
         :type config_ids: list[dockermap.map.input.MapConfigId]
-        :return: Return values of created main containers.
-        :rtype: itertools.chain[dockermap.map.state.ContainerConfigStates]
+        :return: Iterable of configuration states.
+        :rtype: collections.Iterable[dockermap.map.state.ConfigState]
         """
         input_paths = [
             (config_id, self.get_dependency_path(config_id))
