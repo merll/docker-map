@@ -40,7 +40,7 @@ class AttachedConfigMixin(object):
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         use_host_config = client_config.get('use_host_config')
         if use_host_config:
-            hc_kwargs = self.get_attached_preparation_host_config_kwargs(config, None, volume_container,
+            hc_kwargs = self.get_attached_preparation_host_config_kwargs(action, None, volume_container,
                                                                          kwargs=hc_extra_kwargs)
             if hc_kwargs:
                 if use_host_config == USE_HC_MERGE:
