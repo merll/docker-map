@@ -5,6 +5,7 @@ import unittest
 
 from docker.utils.utils import create_host_config
 from dockermap.api import ClientConfiguration, ContainerMap
+from dockermap.map.input import MapConfigId, ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME
 from dockermap.map.policy.base import BasePolicy
 from dockermap.map.runner import ActionConfig
 from dockermap.map.runner.base import DockerClientRunner
@@ -25,10 +26,10 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_create_kwargs_without_host_config(self):
         cfg_name = 'web_server'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_CONTAINER, 'main', cfg_name)
         c_name = 'main.web_server'
         self.sample_client_config.use_host_config = False
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, None)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_create_kwargs(config, c_name, kwargs=dict(ports=[22]))
         self.assertDictEqual(kwargs, dict(
             name=c_name,
@@ -43,9 +44,9 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_host_config_kwargs(self):
         cfg_name = 'web_server'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_CONTAINER, 'main', cfg_name)
         c_name = 'main.web_server'
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, None)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_host_config_kwargs(config, c_name,
                                                     kwargs=dict(binds=['/new_h:/new_c:rw']))
         self.assertDictEqual(kwargs, dict(
@@ -65,10 +66,10 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_create_kwargs_with_host_config(self):
         cfg_name = 'app_server'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_CONTAINER, 'main', cfg_name, 'instance1')
         c_name = 'main.app_server'
         self.sample_client_config.use_host_config = True
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, 'instance1')
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         hc_kwargs = dict(binds=['/new_h:/new_c:rw'])
         kwargs = self.runner.get_create_kwargs(config, c_name, kwargs=dict(host_config=hc_kwargs))
         self.assertDictEqual(kwargs, dict(
@@ -98,11 +99,10 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_attached_create_kwargs_without_host_config(self):
         cfg_name = 'app_server'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_VOLUME, 'main', cfg_name, 'app_server_socket')
         c_name = 'main.app_server'
-        alias = 'app_server_socket'
         self.sample_client_config.use_host_config = False
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, alias)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_attached_create_kwargs(config, c_name)
         self.assertDictEqual(kwargs, dict(
             name=c_name,
@@ -115,21 +115,19 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_attached_host_config_kwargs(self):
         cfg_name = 'app_server'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_VOLUME, 'main', cfg_name, 'app_server_socket')
         c_name = 'main.app_server'
-        alias = 'app_server_socket'
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, alias)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_attached_host_config_kwargs(config, c_name)
         self.assertDictEqual(kwargs, dict(container=c_name))
 
     def test_attached_preparation_create_kwargs(self):
         cfg_name = 'app_server'
         cfg = self.sample_map.get_existing(cfg_name)
-        alias = 'app_server_socket'
+        cfg_id = MapConfigId(ITEM_TYPE_VOLUME, 'main', cfg_name, 'app_server_socket')
         v_name = 'main.app_server_socket'
         self.sample_client_config.use_host_config = True
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, alias)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_attached_preparation_create_kwargs(config, v_name)
         self.assertDictEqual(kwargs, dict(
             image=BasePolicy.core_image,
@@ -145,11 +143,10 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_attached_preparation_host_config_kwargs(self):
         cfg_name = 'app_server'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_VOLUME, 'main', cfg_name, 'app_server_socket')
         c_name = 'temp'
-        alias = 'app_server_socket'
         v_name = 'main.app_server_socket'
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, alias)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_attached_preparation_host_config_kwargs(config, c_name, v_name)
         self.assertDictEqual(kwargs, dict(
             container=c_name,
@@ -159,9 +156,9 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_network_setting(self):
         cfg_name = 'app_extra'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_CONTAINER, 'main', cfg_name)
         c_name = 'main.app_extra'
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, None)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_host_config_kwargs(config, c_name)
         self.assertDictEqual(kwargs, dict(
             binds=[],
@@ -175,9 +172,9 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_restart_kwargs(self):
         cfg_name = 'web_server'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_CONTAINER, 'main', cfg_name)
         c_name = 'main.web_server'
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, None)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_restart_kwargs(config, c_name)
         self.assertDictEqual(kwargs, dict(
             container=c_name,
@@ -187,9 +184,9 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_stop_kwargs(self):
         cfg_name = 'web_server'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_CONTAINER, 'main', cfg_name)
         c_name = 'main.web_server'
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, None)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_stop_kwargs(config, c_name)
         self.assertDictEqual(kwargs, dict(
             container=c_name,
@@ -199,9 +196,9 @@ class TestPolicyClientKwargs(unittest.TestCase):
     def test_remove_kwargs(self):
         cfg_name = 'web_server'
         cfg = self.sample_map.get_existing(cfg_name)
+        cfg_id = MapConfigId(ITEM_TYPE_CONTAINER, 'main', cfg_name)
         c_name = 'main.web_server'
-        config = ActionConfig('__default__', self.sample_client_config, None, 'main', self.sample_map,
-                              cfg_name, cfg, None)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config, None, self.sample_map, cfg)
         kwargs = self.runner.get_remove_kwargs(config, c_name)
         self.assertDictEqual(kwargs, dict(
             container=c_name,
