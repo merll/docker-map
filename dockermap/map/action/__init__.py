@@ -63,7 +63,7 @@ class ItemAction(object):
         self._extra_data.update(kwargs)
 
     def __str__(self):
-        return ("InstanceAction(client_name={0._state.client_name!r}, config_id={0._state.config_id!r}, "
+        return ("ItemAction(client_name={0._state.client_name!r}, config_id={0._state.config_id!r}, "
                 "action_types={0._action_types!r}, extra_data={0._extra_data!r})".format(self))
 
     __repr__ = __str__
