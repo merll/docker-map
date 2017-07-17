@@ -48,7 +48,7 @@ def _get_config_instances(config_type, c_map, config_name):
         config = c_map.get_existing_network(config_name)
         if not config:
             raise KeyError(config_name)
-        return None
+        return None,
     raise ValueError("Invalid configuration type.", config_type)
 
 
@@ -147,10 +147,10 @@ def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=N
             raise KeyError("Configuration not found.", type_map_config)
         if c_instances and None in instances:
             for i in c_instances:
-                yield config_type, map_name, config_name, i
+                yield MapConfigId(config_type, map_name, config_name, i)
         else:
             for i in instances:
-                yield config_type, map_name, config_name, i
+                yield MapConfigId(config_type, map_name, config_name, i)
 
 
 class MapIntegrityError(Exception):
