@@ -348,7 +348,7 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
         :rtype: collections.Iterable[dockermap.map.state.ConfigState]
         """
         input_paths = [
-            (config_id, self.get_dependency_path(config_id))
+            (config_id, list(self.get_dependency_path(config_id)))
             for config_id in config_ids
         ]
         log.debug("Dependency paths from input: %s", input_paths)
