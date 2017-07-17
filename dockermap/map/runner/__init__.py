@@ -69,7 +69,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
 
             for action_type in action.action_types:
                 try:
-                    a_method = self.action_methods[(config_type, action.action_type)]
+                    a_method = self.action_methods[(config_type, action_type)]
                 except KeyError:
                     raise ValueError("Invalid action.", config_type, action.action_type)
                 action_config = ActionConfig(action.client_name, action.config_id, client_config, client,
