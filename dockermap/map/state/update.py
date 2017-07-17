@@ -281,7 +281,7 @@ class UpdateContainerState(ContainerBaseState):
 
     def inspect(self):
         super(UpdateContainerState, self).inspect()
-        if not self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
+        if self.detail and not self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
             check_exec_option = self.options['check_exec_commands']
             if check_exec_option and check_exec_option != CMD_CHECK_NONE and self.config.exec_commands:
                 self.current_commands = self.client.top(self.detail['Id'], ps_args='-eo pid,user,args')['Processes']

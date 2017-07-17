@@ -20,7 +20,10 @@ log = logging.getLogger(__name__)
 
 
 class _ObjectNotFound(object):
-    pass
+    def __nonzero__(self):
+        return False
+
+    __bool__ = __nonzero__
 
 
 NOT_FOUND = _ObjectNotFound()
