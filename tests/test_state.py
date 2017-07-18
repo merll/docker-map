@@ -92,22 +92,22 @@ def _add_image_list(rsps, image_names):
     rsps.add('POST', '{0}/images/create'.format(URL_PREFIX), content_type='application/json')
 
 
-def _get_container_mounts(container_map, c_config, config_name, instance_name, valid, is_attached=False):
+def _get_container_mounts(config_id, container_map, c_config, valid):
     if valid:
         path_prefix = '/valid'
     else:
-        path_prefix = '/invalid_{0}'.format(config_name)
+        path_prefix = '/invalid_{0}'.format(config_id.config_name)
     for a in c_config.attaches:
         c_path = container_map.volumes[a]
         yield {'Source': posixpath.join(path_prefix, 'attached', a), 'Destination': c_path, 'RW': True}
-    if not is_attached:
+    if config_id.config_type == ITEM_TYPE_CONTAINER:
         for vol, ro in c_config.binds:
             if isinstance(vol, tuple):
                 c_path, h_r_path = vol
-                h_path = get_host_path(container_map.host.root, h_r_path, instance_name)
+                h_path = get_host_path(container_map.host.root, h_r_path, config_id.instance_name)
             else:
                 c_path = container_map.volumes[vol]
-                h_path = container_map.host.get_path(vol, instance_name)
+                h_path = container_map.host.get_path(vol, config_id.instance_name)
             yield {'Source': posixpath.join(path_prefix, h_path), 'Destination': c_path, 'RW': not ro}
         for s in c_config.shares:
             yield {'Source': posixpath.join(path_prefix, 'shared', s), 'Destination': s, 'RW': True}
@@ -118,20 +118,37 @@ def _get_container_mounts(container_map, c_config, config_name, instance_name, v
                 c_path = container_map.volumes[i]
                 yield {'Source': posixpath.join(path_prefix, 'attached', i), 'Destination': c_path, 'RW': not ro}
             elif c_ref and (not i or i in c_ref.instances):
-                for r_mount in _get_container_mounts(container_map, c_ref, c, i, valid):
+                for r_mount in _get_container_mounts(MapConfigId(config_id.config_type, config_id.map_name, c, i),
+                                                     container_map, c_ref, valid):
                     yield r_mount
             else:
                 raise ValueError("Invalid uses declaration in {0}: {1}".format(config_name, vol))
 
 
-def _add_inspect(rsps, container_map, map_name, c_config, config_name, instance_name, state, valid, container_id,
-                 image_id, is_attached, **kwargs):
-    if instance_name:
-        container_name = '{0}.{1}.{2}'.format(map_name, config_name, instance_name)
+def _add_inspect(rsps, config_id, container_map, c_config, state, container_id, image_id,
+                 volumes_valid, links_valid=True, cmd_valid=True, env_valid=True, **kwargs):
+    config_type = config_id.config_type
+    if config_type == ITEM_TYPE_CONTAINER:
+        if config_id.instance_name:
+            container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
+        else:
+            container_name = '{0.map_name}.{0.config_name}'.format(config_id)
+    elif config_type == ITEM_TYPE_VOLUME:
+        if container_map.use_attached_parent_name:
+            container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
+        else:
+            container_name = '{0.map_name}.{0.instance_name}'.format(config_id)
     else:
-        container_name = '{0}.{1}'.format(map_name, config_name)
+        raise ValueError(config_type)
     ports = defaultdict(list)
-    if not is_attached:
+    host_config = {}
+    network_settings = {}
+    config_dict = {
+        'Env': None,
+        'Cmd': [],
+        'Entrypoint': [],
+    }
+    if config_type == ITEM_TYPE_CONTAINER:
         for ex in c_config.exposes:
             ex_port = '{0}/tcp'.format(ex.exposed_port)
             if ex.host_port:
@@ -145,25 +162,23 @@ def _add_inspect(rsps, container_map, map_name, c_config, config_name, instance_
                 })
             else:
                 ports[ex_port].extend(())
+        host_config = {'Links': [
+            '/{0}.{1}:/{2}/{3}'.format(config_id.map_name, link.container, container_name,
+                                       link.alias or BasePolicy.get_hostname(link.container))
+            for link in c_config.links
+        ]}
+        network_settings = {
+            'Ports': ports,
+        }
     results = {
         'Id': '{0}'.format(container_id),
         'Names': ['/{0}'.format(container_name)],
         'State': STATE_RESULTS[state],
         'Image': '{0}'.format(image_id),
-        'Mounts': list(_get_container_mounts(container_map, c_config, config_name, instance_name, valid, is_attached)),
-        'HostConfig': {'Links': [
-            '/{0}.{1}:/{2}/{3}'.format(map_name, link.container, container_name,
-                                       link.alias or BasePolicy.get_hostname(link.container))
-            for link in c_config.links
-        ]},
-        'Config': {
-            'Env': None,
-            'Cmd': [],
-            'Entrypoint': [],
-        },
-        'NetworkSettings': {
-            'Ports': ports,
-        },
+        'Mounts': list(_get_container_mounts(config_id, container_map, c_config, volumes_valid)),
+        'HostConfig': host_config,
+        'Config': config_dict,
+        'NetworkSettings': network_settings,
     }
     exec_results = {
         'Processes': [
@@ -242,14 +257,15 @@ class TestPolicyStateGenerators(unittest.TestCase):
             c_config = self.sample_map.get_existing(name)
             for a in c_config.attaches:
                 container_id += 1
-                container_names.append(_add_inspect(rsps, self.sample_map, self.map_name, c_config, name, a,
-                                                    P_STATE_EXITED_0, attached_valid, container_id, base_image_id,
-                                                    True))
+                config_id = MapConfigId(ITEM_TYPE_VOLUME, self.map_name, name, a)
+                container_names.append(_add_inspect(rsps, config_id, self.sample_map, c_config,
+                                                    P_STATE_EXITED_0, container_id, base_image_id, attached_valid))
             image_id = image_dict[c_config.image or name]
             for i in instances or c_config.instances or [None]:
                 container_id += 1
-                container_names.append(_add_inspect(rsps, self.sample_map, self.map_name, c_config, name, i,
-                                                    state, instances_valid, container_id, image_id, False, **kwargs))
+                config_id = MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, name, i)
+                container_names.append(_add_inspect(rsps, config_id, self.sample_map, c_config,
+                                                    state, container_id, image_id, instances_valid, **kwargs))
         _add_container_list(rsps, container_names)
 
     def _setup_default_containers(self, rsps):
