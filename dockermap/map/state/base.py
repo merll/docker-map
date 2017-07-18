@@ -11,8 +11,7 @@ from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
 from ..policy import (CONFIG_FLAG_DEPENDENT, CONTAINER_CONFIG_FLAG_ATTACHED, CONTAINER_CONFIG_FLAG_PERSISTENT,
                       ABCPolicyUtilMeta, PolicyUtil)
 from . import (INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, STATE_FLAG_INITIAL,
-               STATE_FLAG_RESTARTING, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_OUTDATED,
-               ConfigState)
+               STATE_FLAG_RESTARTING, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_FORCED_RESET, ConfigState)
 from .utils import merge_dependency_paths
 
 
@@ -152,7 +151,7 @@ class ContainerBaseState(AbstractState):
                 state_flag |= STATE_FLAG_RESTARTING
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
-            state_flag |= STATE_FLAG_OUTDATED
+            state_flag |= STATE_FLAG_FORCED_RESET
         return base_state, state_flag, {}
 
 
@@ -196,7 +195,7 @@ class NetworkBaseState(AbstractState):
             return STATE_ABSENT, 0, {}
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
-            state_flag = STATE_FLAG_OUTDATED
+            state_flag = STATE_FLAG_FORCED_RESET
         else:
             state_flag = 0
         return STATE_PRESENT, state_flag, {}

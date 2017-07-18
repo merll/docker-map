@@ -10,7 +10,8 @@ from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
 from ...functional import resolve_value
 from ..policy import CONTAINER_CONFIG_FLAG_ATTACHED
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
-from . import STATE_FLAG_OUTDATED, STATE_ABSENT
+from . import (STATE_FLAG_IMAGE_MISMATCH, STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_MISSING_LINK, STATE_FLAG_MISC_MISMATCH,
+               STATE_FLAG_NEEDS_RESET, STATE_ABSENT)
 
 log = logging.getLogger(__name__)
 
@@ -290,14 +291,14 @@ class UpdateContainerState(ContainerBaseState):
 
     def get_state(self):
         base_state, state_flags, extra = super(UpdateContainerState, self).get_state()
-        if base_state == STATE_ABSENT or state_flags & STATE_FLAG_OUTDATED:
+        if base_state == STATE_ABSENT or state_flags & STATE_FLAG_NEEDS_RESET:
             return base_state, state_flags, extra
 
         config_id = self.config_id
         c_image_id = self.detail['Image']
         if self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
             if self.options['update_persistent'] and c_image_id != self.base_image_id:
-                return base_state, state_flags | STATE_FLAG_OUTDATED, extra
+                return base_state, state_flags | STATE_FLAG_IMAGE_MISMATCH, extra
             volumes = get_instance_volumes(self.detail)
             if volumes:
                 mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name])
@@ -311,18 +312,21 @@ class UpdateContainerState(ContainerBaseState):
             images = self.policy.images[self.client_name]
             ref_image_id = images.ensure_image(image_name, pull=self.options['pull_before_update'],
                                                insecure_registry=self.options['pull_insecure_registry'])
-            if not (((self.config.persistent and not self.options['update_persistent']) or c_image_id == ref_image_id) and
-                    self._check_volumes() and
-                    self._check_links() and
-                    _check_environment(self.config, self.detail) and
-                    _check_cmd(self.config, self.detail) and
+            if c_image_id != ref_image_id and (not self.config.persistent or self.options['update_persistent']):
+                state_flags |= STATE_FLAG_IMAGE_MISMATCH
+            if not self._check_volumes():
+                state_flags |= STATE_FLAG_VOLUME_MISMATCH
+            if not self._check_links():
+                state_flags |= STATE_FLAG_MISSING_LINK
+            if not (_check_environment(self.config, self.detail) and _check_cmd(self.config, self.detail) and
                     _check_network(self.config, self.client_config, self.detail)):
-                return base_state, state_flags | STATE_FLAG_OUTDATED, extra
+                state_flags |= STATE_FLAG_MISC_MISMATCH
             check_exec_option = self.options['check_exec_commands']
             if check_exec_option:
                 exec_results = self._check_commands(check_exec_option)
                 if exec_results is not None:
                     extra.update(exec_commands=exec_results)
+            return base_state, state_flags, extra
         return base_state, state_flags, extra
 
 
