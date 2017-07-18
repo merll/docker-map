@@ -122,7 +122,7 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
                                                      container_map, c_ref, valid):
                     yield r_mount
             else:
-                raise ValueError("Invalid uses declaration in {0}: {1}".format(config_name, vol))
+                raise ValueError("Invalid uses declaration in {0}: {1}".format(config_id.config_name, vol))
 
 
 def _add_inspect(rsps, config_id, container_map, c_config, state, container_id, image_id,
