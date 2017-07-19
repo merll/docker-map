@@ -194,12 +194,13 @@ class NetworkBaseState(AbstractState):
     def get_state(self):
         if self.detail is NOT_FOUND:
             return STATE_ABSENT, 0, {}
+        connected_containers = list(self.detail['Containers'])
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
             state_flag = STATE_FLAG_FORCED_RESET
         else:
             state_flag = 0
-        return STATE_PRESENT, state_flag, {}
+        return STATE_PRESENT, state_flag, {'containers': connected_containers}
 
 
 class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
