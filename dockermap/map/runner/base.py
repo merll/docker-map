@@ -30,17 +30,13 @@ class DockerBaseRunnerMixin(object):
 
         (ITEM_TYPE_VOLUME, ACTION_CREATE, 'create_volume'),
         (ITEM_TYPE_VOLUME, ACTION_START, 'start_volume'),
-        (ITEM_TYPE_VOLUME, ACTION_RESTART, 'restart'),
-        (ITEM_TYPE_VOLUME, ACTION_STOP, 'stop'),
-        (ITEM_TYPE_VOLUME, ACTION_REMOVE, 'remove'),
-        (ITEM_TYPE_VOLUME, ACTION_KILL, 'kill'),
-        (ITEM_TYPE_VOLUME, ACTION_WAIT, 'wait'),
+        (ITEM_TYPE_VOLUME, ACTION_REMOVE, 'remove_volume'),
 
         (ITEM_TYPE_CONTAINER, ACTION_CREATE, 'create_container'),
         (ITEM_TYPE_CONTAINER, ACTION_START, 'start_container'),
         (ITEM_TYPE_CONTAINER, ACTION_RESTART, 'restart'),
         (ITEM_TYPE_CONTAINER, ACTION_STOP, 'stop'),
-        (ITEM_TYPE_CONTAINER, ACTION_REMOVE, 'remove'),
+        (ITEM_TYPE_CONTAINER, ACTION_REMOVE, 'remove_container'),
         (ITEM_TYPE_CONTAINER, ACTION_KILL, 'kill'),
         (ITEM_TYPE_CONTAINER, ACTION_WAIT, 'wait'),
     ]
@@ -54,53 +50,59 @@ class DockerBaseRunnerMixin(object):
         return None
 
     def create_volume(self, action, v_name, **kwargs):
-        c_kwargs = self.get_attached_create_kwargs(action, v_name, kwargs=kwargs)
+        c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
         return action.client.create_container(**c_kwargs)
 
     def start_volume(self, action, v_name, **kwargs):
+        # TODO: Merge with create.
         if action.client_config.get('use_host_config'):
             res = action.client.start(v_name)
         else:
-            c_kwargs = self.get_attached_host_config_kwargs(action, v_name, kwargs=kwargs)
+            c_kwargs = self.get_attached_container_host_config_kwargs(action, v_name, kwargs=kwargs)
             res = action.client.start(**c_kwargs)
         return res
 
+    def remove_volume(self, action, c_name, **kwargs):
+        # TODO: Currently this is a copy of remove_container. Vary implementation for directly using Docker volumes.
+        c_kwargs = self.get_container_remove_kwargs(action, c_name, kwargs=kwargs)
+        return action.client.remove_container(**c_kwargs)
+
     def create_container(self, action, c_name, **kwargs):
-        c_kwargs = self.get_create_kwargs(action, c_name, kwargs=kwargs)
+        c_kwargs = self.get_container_create_kwargs(action, c_name, kwargs=kwargs)
         return action.client.create_container(**c_kwargs)
 
     def start_container(self, action, c_name, **kwargs):
         if action.client_config.get('use_host_config'):
             return action.client.start(c_name)
-        c_kwargs = self.get_host_config_kwargs(action, c_name, kwargs=kwargs)
+        c_kwargs = self.get_container_host_config_kwargs(action, c_name, kwargs=kwargs)
         return action.client.start(**c_kwargs)
 
     def restart(self, action, c_name, **kwargs):
-        c_kwargs = self.get_restart_kwargs(action, c_name, kwargs=kwargs)
+        c_kwargs = self.get_container_restart_kwargs(action, c_name, kwargs=kwargs)
         return action.client.restart(**c_kwargs)
 
     def stop(self, action, c_name, **kwargs):
-        c_kwargs = self.get_stop_kwargs(action, c_name, kwargs=kwargs)
+        c_kwargs = self.get_container_stop_kwargs(action, c_name, kwargs=kwargs)
         try:
             return action.client.stop(**c_kwargs)
         except Timeout:
             log.warning("Container did not stop in time - sent SIGKILL.")
         return None
 
-    def remove(self, action, c_name, **kwargs):
-        c_kwargs = self.get_remove_kwargs(action, c_name, kwargs=kwargs)
+    def remove_container(self, action, c_name, **kwargs):
+        c_kwargs = self.get_container_remove_kwargs(action, c_name, kwargs=kwargs)
         return action.client.remove_container(**c_kwargs)
 
     def kill(self, action, c_name, **kwargs):
         return action.client.kill(c_name, **kwargs)
 
     def wait(self, action, c_name, **kwargs):
-        c_kwargs = self.get_wait_kwargs(action, c_name, kwargs=kwargs)
+        c_kwargs = self.get_container_wait_kwargs(action, c_name, kwargs=kwargs)
         return action.client.wait(c_name, **c_kwargs)
 
 
 class DockerConfigMixin(object):
-    def get_create_kwargs(self, action, container_name, kwargs=None):
+    def get_container_create_kwargs(self, action, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to create a container.
 
@@ -132,7 +134,7 @@ class DockerConfigMixin(object):
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         use_host_config = client_config.get('use_host_config')
         if use_host_config:
-            hc_kwargs = self.get_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
+            hc_kwargs = self.get_container_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:
                 if use_host_config == USE_HC_MERGE:
                     c_kwargs.update(hc_kwargs)
@@ -141,7 +143,7 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
         return c_kwargs
 
-    def get_host_config_kwargs(self, action, container_name, kwargs=None):
+    def get_container_host_config_kwargs(self, action, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to set up the HostConfig or start a container.
 
@@ -191,7 +193,7 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, init_options(container_config.host_config), kwargs)
         return c_kwargs
 
-    def get_attached_create_kwargs(self, action, container_name, kwargs=None):
+    def get_attached_container_create_kwargs(self, action, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to create an attached container.
 
@@ -217,7 +219,7 @@ class DockerConfigMixin(object):
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         use_host_config = client_config.get('use_host_config')
         if use_host_config:
-            hc_kwargs = self.get_attached_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
+            hc_kwargs = self.get_attached_container_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:
                 if use_host_config == USE_HC_MERGE:
                     c_kwargs.update(hc_kwargs)
@@ -226,7 +228,7 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_attached_host_config_kwargs(self, action, container_name, kwargs=None):
+    def get_attached_container_host_config_kwargs(self, action, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to set up the HostConfig or start an attached container.
 
@@ -246,7 +248,7 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_restart_kwargs(self, action, container_name, kwargs=None):
+    def get_container_restart_kwargs(self, action, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to restart a container.
 
@@ -270,7 +272,7 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_wait_kwargs(self, action, container_name, kwargs=None):
+    def get_container_wait_kwargs(self, action, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to wait for a container.
 
@@ -291,7 +293,7 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_stop_kwargs(self, action, container_name, kwargs=None):
+    def get_container_stop_kwargs(self, action, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to stop a container.
 
@@ -317,7 +319,7 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_remove_kwargs(self, action, container_name, kwargs=None):
+    def get_container_remove_kwargs(self, action, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to remove a container.
 
