@@ -2,10 +2,12 @@
 from __future__ import unicode_literals
 
 import six
+from six.moves import map
 
+from ...functional import resolve_value
+from ...utils import merge_list
 from ..config.host_volume import get_host_path
 from ..input import is_path
-from ...functional import resolve_value
 
 INITIAL_START_TIME = '0001-01-01T00:00:00Z'
 
@@ -39,7 +41,7 @@ def update_kwargs(kwargs, *updates):
     Utility function for merging multiple keyword arguments, depending on their type:
 
     * Non-existent keys are added.
-    * Existing lists or tuples are extended.
+    * Existing lists or tuples are extended, but not duplicating entries.
       The keywords ``command`` and ``entrypoint`` are however simply overwritten.
     * Nested dictionaries are updated, overriding previous key-value assignments.
     * Other items are simply overwritten (just like in a regular dictionary update) unless the updating value is
@@ -66,10 +68,10 @@ def update_kwargs(kwargs, *updates):
                 kw_item = kwargs.get(key)
                 u_list = map(resolve_value, u_item)
                 if isinstance(kw_item, list):
-                    kw_item.extend(u_list)
+                    merge_list(kw_item, u_list)
                 elif isinstance(kw_item, tuple):
                     new_list = list(kw_item)
-                    new_list.extend(u_list)
+                    merge_list(new_list, u_list)
                     kwargs[key] = new_list
                 else:
                     kwargs[key] = list(u_list)
