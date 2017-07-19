@@ -18,7 +18,7 @@ from dockermap.map.policy.base import BasePolicy
 from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESENT, STATE_ABSENT,
                                  STATE_FLAG_NONRECOVERABLE, STATE_FLAG_RESTARTING, STATE_FLAG_INITIAL,
                                  STATE_FLAG_NEEDS_RESET, STATE_FLAG_MISC_MISMATCH, STATE_FLAG_IMAGE_MISMATCH,
-                                 STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_FORCED_RESET)
+                                 STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_FORCED_RESET, STATE_FLAG_MISSING_LINK)
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
 from dockermap.map.state.utils import merge_dependency_paths
@@ -126,7 +126,7 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
 
 
 def _add_inspect(rsps, config_id, container_map, c_config, state, container_id, image_id,
-                 volumes_valid, links_valid=True, cmd_valid=True, env_valid=True, **kwargs):
+                 volumes_valid, links_valid=True, **kwargs):
     config_type = config_id.config_type
     if config_type == ITEM_TYPE_CONTAINER:
         if config_id.instance_name:
@@ -162,11 +162,15 @@ def _add_inspect(rsps, config_id, container_map, c_config, state, container_id, 
                 })
             else:
                 ports[ex_port].extend(())
-        host_config = {'Links': [
-            '/{0}.{1}:/{2}/{3}'.format(config_id.map_name, link.container, container_name,
-                                       link.alias or BasePolicy.get_hostname(link.container))
+        if links_valid:
+            links_format = '/{0}.{1}:/{2}/{3}'
+        else:
+            links_format = '/{0}.{1}:/{2}/invalid-{3}'
+        host_config['Links'] = [
+            links_format.format(config_id.map_name, link.container, container_name,
+                                link.alias or BasePolicy.get_hostname(link.container))
             for link in c_config.links
-        ]}
+        ]
         network_settings = {
             'Ports': ports,
         }
@@ -455,6 +459,20 @@ class TestPolicyStateGenerators(unittest.TestCase):
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
             self.assertEqual(server_state.state_flags & STATE_FLAG_IMAGE_MISMATCH, STATE_FLAG_IMAGE_MISMATCH)
+
+    def test_update_states_invalid_links(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_containers(rsps, [
+                _container('sub_sub_svc'),
+                _container('sub_svc'),
+                _container('redis'),
+                _container('svc'),
+                _container('server', links_valid=False),
+            ])
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            server_state = states['containers'][('server', None)]
+            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.state_flags & STATE_FLAG_MISSING_LINK, STATE_FLAG_MISSING_LINK)
 
     def test_update_states_invalid_network(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
