@@ -7,9 +7,10 @@ from ..input import EXEC_POLICY_INITIAL, ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, 
 from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
 from ..state import STATE_ABSENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING, STATE_FLAG_NEEDS_RESET
 from .base import AbstractActionGenerator
-from . import (ItemAction, ACTION_START, UTIL_ACTION_EXEC_ALL, UTIL_ACTION_EXEC_COMMANDS,
-               DERIVED_ACTION_RESET, DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, UTIL_ACTION_PREPARE_VOLUME,
-               ACTION_CREATE)
+from . import (ItemAction, ACTION_START, C_UTIL_ACTION_EXEC_ALL, C_UTIL_ACTION_EXEC_COMMANDS,
+               DERIVED_ACTION_RESET_CONTAINER, DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH,
+               V_UTIL_ACTION_PREPARE,
+               ACTION_CREATE, DERIVED_ACTION_RESET_NETWORK)
 
 
 log = logging.getLogger(__name__)
@@ -39,13 +40,14 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 log.debug("Not found - creating network %s.", config_id)
                 return [ItemAction(state, ACTION_CREATE)]
         elif config_type == ITEM_TYPE_VOLUME:
+            # TODO: To be changed for Docker volumes.
             if state.base_state == STATE_ABSENT:
                 log.debug("Not found - creating and starting attached container %s.", config_id)
                 action_type = DERIVED_ACTION_STARTUP
             elif state.state_flags & STATE_FLAG_NEEDS_RESET:
                 if state.base_state == STATE_RUNNING:
                     log.debug("Found to be outdated or non-recoverable - resetting %s.", config_id)
-                    action_type = DERIVED_ACTION_RESET
+                    action_type = DERIVED_ACTION_RESET_CONTAINER
                 else:
                     log.debug("Found to be outdated or non-recoverable - relaunching %s.", config_id)
                     action_type = DERIVED_ACTION_RELAUNCH
@@ -56,7 +58,7 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 return None
             return [
                 ItemAction(state, action_type),
-                ItemAction(state, UTIL_ACTION_PREPARE_VOLUME),
+                ItemAction(state, V_UTIL_ACTION_PREPARE),
             ]
         elif config_type == ITEM_TYPE_CONTAINER:
             ci_initial = state.state_flags & STATE_FLAG_INITIAL
@@ -66,7 +68,7 @@ class UpdateActionGenerator(AbstractActionGenerator):
             elif state.state_flags & STATE_FLAG_NEEDS_RESET:
                 if state.base_state == STATE_RUNNING or state.state_flags & STATE_FLAG_RESTARTING:
                     log.debug("Found to be outdated or non-recoverable - resetting %s.", config_id)
-                    action_type = DERIVED_ACTION_RESET
+                    action_type = DERIVED_ACTION_RESET_CONTAINER
                 else:
                     log.debug("Found to be outdated or non-recoverable - relaunching %s.", config_id)
                     action_type = DERIVED_ACTION_RELAUNCH
@@ -82,9 +84,9 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 ]
                 if run_cmds:
                     log.debug("Container %s up-to-date, but with missing commands %s.", config_id, run_cmds)
-                    return [ItemAction(state, UTIL_ACTION_EXEC_COMMANDS, run_cmds=run_cmds)]
+                    return [ItemAction(state, C_UTIL_ACTION_EXEC_COMMANDS, run_cmds=run_cmds)]
                 return None
             return [
                 ItemAction(state, action_type),
-                ItemAction(state, UTIL_ACTION_EXEC_ALL),
+                ItemAction(state, C_UTIL_ACTION_EXEC_ALL),
             ]

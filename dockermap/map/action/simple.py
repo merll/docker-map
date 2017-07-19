@@ -5,8 +5,8 @@ from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
 from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
 from ..state import STATE_ABSENT, STATE_PRESENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING
 from .base import AbstractActionGenerator
-from . import (ItemAction, ACTION_CREATE, ACTION_START, UTIL_ACTION_PREPARE_VOLUME, ACTION_RESTART,
-               UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE, UTIL_ACTION_EXEC_ALL, DERIVED_ACTION_STARTUP,
+from . import (ItemAction, ACTION_CREATE, ACTION_START, V_UTIL_ACTION_PREPARE, ACTION_RESTART,
+               C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE, C_UTIL_ACTION_EXEC_ALL, DERIVED_ACTION_STARTUP,
                DERIVED_ACTION_SHUTDOWN)
 
 
@@ -43,12 +43,12 @@ class StartActionGenerator(AbstractActionGenerator):
                 state.state_flags & STATE_FLAG_INITIAL):
             return [
                 ItemAction(state, ACTION_START),
-                ItemAction(state, UTIL_ACTION_PREPARE_VOLUME),
+                ItemAction(state, V_UTIL_ACTION_PREPARE),
             ]
         elif config_type == ITEM_TYPE_CONTAINER and state.base_state == STATE_PRESENT:
             return [
                 ItemAction(state, ACTION_START, extra_data=kwargs),
-                ItemAction(state, UTIL_ACTION_EXEC_ALL),
+                ItemAction(state, C_UTIL_ACTION_EXEC_ALL),
             ]
 
 
@@ -82,7 +82,7 @@ class StopActionGenerator(AbstractActionGenerator):
         """
         if (state.config_id.config_type == ITEM_TYPE_CONTAINER and state.base_state != STATE_ABSENT and
                 not state.state_flags & STATE_FLAG_INITIAL):
-            return [ItemAction(state, UTIL_ACTION_SIGNAL_STOP, extra_data=kwargs)]
+            return [ItemAction(state, C_UTIL_ACTION_SIGNAL_STOP, extra_data=kwargs)]
 
 
 class RemoveActionGenerator(AbstractActionGenerator):
@@ -131,23 +131,23 @@ class StartupActionGenerator(AbstractActionGenerator):
             if state.base_state == STATE_ABSENT:
                 return [
                     ItemAction(state, DERIVED_ACTION_STARTUP),
-                    ItemAction(state, UTIL_ACTION_PREPARE_VOLUME),
+                    ItemAction(state, V_UTIL_ACTION_PREPARE),
                 ]
             elif state.base_state == STATE_PRESENT and state.state_flags & STATE_FLAG_INITIAL:
                 return [
                     ItemAction(state, ACTION_START),
-                    ItemAction(state, UTIL_ACTION_PREPARE_VOLUME),
+                    ItemAction(state, V_UTIL_ACTION_PREPARE),
                 ]
         elif config_type == ITEM_TYPE_CONTAINER:
             if state.base_state == STATE_ABSENT:
                 return [
                     ItemAction(state, DERIVED_ACTION_STARTUP),
-                    ItemAction(state, UTIL_ACTION_EXEC_ALL),
+                    ItemAction(state, C_UTIL_ACTION_EXEC_ALL),
                 ]
             elif state.base_state == STATE_PRESENT:
                 return [
                     ItemAction(state, ACTION_START),
-                    ItemAction(state, UTIL_ACTION_EXEC_ALL),
+                    ItemAction(state, C_UTIL_ACTION_EXEC_ALL),
                 ]
 
 

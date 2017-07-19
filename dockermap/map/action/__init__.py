@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from collections import namedtuple
-
 from six import string_types, python_2_unicode_compatible
 
 # Base actions provided by client.
@@ -12,20 +10,24 @@ ACTION_RESTART = 'restart'
 ACTION_STOP = 'stop'
 ACTION_REMOVE = 'remove'
 ACTION_KILL = 'kill'
-ACTION_WAIT = 'wait'
+ACTION_WAIT = 'wait'         # Wait for item to finish.
+ACTION_UPDATE = 'update'     # Update the configuration of an object in-place.
 
-UTIL_ACTION_EXEC_COMMANDS = 'exec_single_command'           # Create & start exec certain commands.
-UTIL_ACTION_EXEC_ALL = 'exec_all_commands'                  # Create & start all configured exec commands
-UTIL_ACTION_UPDATE = 'update'                               # Conditional reset or relaunch.
-UTIL_ACTION_SCRIPT = 'script'                               # Create & start container, then create & start exec.
-UTIL_ACTION_SIGNAL_STOP = 'signal_stop'                     # Send signal (kill) & wait.
-UTIL_ACTION_PREPARE_VOLUME = 'prepare_volume'               # Set up attached volume permissions.
+C_UTIL_ACTION_EXEC_COMMANDS = 'exec_single_command'           # Create & start exec certain commands.
+C_UTIL_ACTION_EXEC_ALL = 'exec_all_commands'                  # Create & start all configured exec commands
+C_UTIL_ACTION_SCRIPT = 'script'                               # Create & start container, then create & start exec.
+C_UTIL_ACTION_SIGNAL_STOP = 'signal_stop'                     # Send signal (kill) & wait.
+V_UTIL_ACTION_PREPARE = 'prepare_volume'                      # Set up volume permissions.
+
+N_UTIL_ACTION_DISCONNECT_ALL = 'disconnect_all'               # Disconnect all containers from a network.
 
 DERIVED_ACTION_STARTUP = [ACTION_CREATE, ACTION_START]                            # Create & start
-DERIVED_ACTION_SHUTDOWN = [UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE]                # Stop & remove
-DERIVED_ACTION_RESET = [UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE,
-                        ACTION_CREATE, ACTION_START]                              # Stop, remove, create, & start
+DERIVED_ACTION_SHUTDOWN = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE]              # Stop & remove
+DERIVED_ACTION_RESET_CONTAINER = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE,
+                                  ACTION_CREATE, ACTION_START]                    # Stop, remove, create, & start
 DERIVED_ACTION_RELAUNCH = [ACTION_REMOVE, ACTION_CREATE, ACTION_START]            # Remove, create, & start
+DERIVED_ACTION_RESET_NETWORK = [N_UTIL_ACTION_DISCONNECT_ALL, ACTION_REMOVE,
+                                ACTION_CREATE]                                    # Disconnect, remove, & re-create
 
 
 def _action_type_list(value):

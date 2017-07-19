@@ -5,8 +5,8 @@ from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
 from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
 from ..state import STATE_PRESENT, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_INITIAL, STATE_ABSENT, STATE_RUNNING
 from .base import AbstractActionGenerator
-from . import (ItemAction, DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, ACTION_START, UTIL_ACTION_PREPARE_VOLUME,
-               DERIVED_ACTION_RESET, UTIL_ACTION_EXEC_ALL, ACTION_CREATE)
+from . import (ItemAction, DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, ACTION_START, V_UTIL_ACTION_PREPARE,
+               DERIVED_ACTION_RESET_CONTAINER, C_UTIL_ACTION_EXEC_ALL, ACTION_CREATE)
 
 
 class ResumeActionGenerator(AbstractActionGenerator):
@@ -44,13 +44,13 @@ class ResumeActionGenerator(AbstractActionGenerator):
                 else:
                     return actions
             actions.append(ItemAction(state, action))
-            actions.append(ItemAction(state, UTIL_ACTION_PREPARE_VOLUME))
+            actions.append(ItemAction(state, V_UTIL_ACTION_PREPARE))
         elif config_type == ITEM_TYPE_CONTAINER:
             if config_tuple in self.recreated_volumes:
                 if state.base_state == STATE_ABSENT:
                     action = DERIVED_ACTION_STARTUP
                 elif state.base_state == STATE_RUNNING:
-                    action = DERIVED_ACTION_RESET
+                    action = DERIVED_ACTION_RESET_CONTAINER
                 elif state.base_state == STATE_PRESENT:
                     if state.base_state & STATE_FLAG_INITIAL:
                         action = ACTION_START
@@ -59,13 +59,13 @@ class ResumeActionGenerator(AbstractActionGenerator):
                 else:
                     return actions
                 actions.append(ItemAction(state, action))
-                actions.append(ItemAction(state, UTIL_ACTION_EXEC_ALL))
+                actions.append(ItemAction(state, C_UTIL_ACTION_EXEC_ALL))
             else:
                 if state.base_state == STATE_ABSENT:
                     action = DERIVED_ACTION_STARTUP
                 else:
                     if state.state_flags & STATE_FLAG_NONRECOVERABLE:
-                        action = DERIVED_ACTION_RESET
+                        action = DERIVED_ACTION_RESET_CONTAINER
                     elif (state.base_state != STATE_RUNNING and
                           (state.state_flags & STATE_FLAG_INITIAL or
                            not state.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT)):
@@ -73,6 +73,6 @@ class ResumeActionGenerator(AbstractActionGenerator):
                     else:
                         return actions
                 actions.append(ItemAction(state, action))
-                actions.append(ItemAction(state, UTIL_ACTION_EXEC_ALL))
+                actions.append(ItemAction(state, C_UTIL_ACTION_EXEC_ALL))
 
         return actions

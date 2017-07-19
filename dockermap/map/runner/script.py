@@ -7,7 +7,7 @@ import posixpath
 from requests import Timeout
 import six
 
-from ..action import UTIL_ACTION_SCRIPT
+from ..action import C_UTIL_ACTION_SCRIPT
 from ..input import ITEM_TYPE_CONTAINER
 
 
@@ -17,7 +17,7 @@ class ScriptRunException(Exception):
 
 class ScriptMixin(object):
     action_method_names = [
-        (ITEM_TYPE_CONTAINER, UTIL_ACTION_SCRIPT, 'run_script'),
+        (ITEM_TYPE_CONTAINER, C_UTIL_ACTION_SCRIPT, 'run_script'),
     ]
     remove_created_after = True
     policy_options = ['remove_created_after']
