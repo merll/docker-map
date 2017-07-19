@@ -302,7 +302,7 @@ class DockerConfigMixin(object):
             timeout = config.client_config.get('stop_timeout')
             if timeout is not None:
                 c_kwargs['timeout'] = timeout
-        else:
+        elif stop_timeout is not None:
             c_kwargs['timeout'] = stop_timeout
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
