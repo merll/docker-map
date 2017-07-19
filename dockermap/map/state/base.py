@@ -36,16 +36,13 @@ class AbstractState(object):
     :type policy: dockermap.map.policy.base.BasePolicy
     :param options: Dictionary of options passed to the state generator.
     :type options: dict
+    :param client_name: Client name.
+    :type client_name: unicode | str
     :param config_id: Configuration id tuple.
     :type config_id: dockermap.map.input.MapConfigId
     :param container_map: Container map instance.
     :type container_map: dockermap.map.config.main.ContainerMap
-    :param client_name: Client name.
-    :type client_name: unicode | str
-    :param client_config: Client configuration object.
-    :type client_config: dockermap.map.config.client.ClientConfiguration
-    :param client: Docker client.
-    :type client: docker.client.Client
+    :param config: Configuration object.
     :param config_flags: Config flags on the container.
     :type config_flags: int
     """
@@ -98,6 +95,8 @@ class ContainerBaseState(AbstractState):
     :type config_id: dockermap.map.input.MapConfigId
     :param container_map: Container map instance.
     :type container_map: dockermap.map.config.main.ContainerMap
+    :param config: Container configuration object.
+    :type config: dockermap.map.config.container.ContainerConfiguration
     :param config_flags: Config flags on the container.
     :type config_flags: int
     """
@@ -163,12 +162,14 @@ class NetworkBaseState(AbstractState):
     :type policy: dockermap.map.policy.base.BasePolicy
     :param options: Dictionary of options passed to the state generator.
     :type options: dict
+    :param client_name: Client name.
+    :type client_name: unicode | str
     :param config_id: Configuration id tuple.
     :type config_id: dockermap.map.input.MapConfigId
     :param container_map: Container map instance.
     :type container_map: dockermap.map.config.main.ContainerMap
-    :param client_name: Client name.
-    :type client_name: unicode | str
+    :param config: Network configuration object.
+    :type config: dockermap.map.config.network.NetworkConfiguration
     :param config_flags: Config flags on the container.
     :type config_flags: int
     """
