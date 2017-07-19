@@ -10,6 +10,10 @@ from . import (ItemAction, DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, ACTI
 
 
 class ResumeActionGenerator(AbstractActionGenerator):
+    def __init__(self, *args, **kwargs):
+        super(ResumeActionGenerator, self).__init__(*args, **kwargs)
+        self.recreated_volumes = set()
+
     def get_state_actions(self, state, **kwargs):
         """
         Attached containers are created and prepared, if they are missing. They are re-created if they have terminated
@@ -23,18 +27,18 @@ class ResumeActionGenerator(AbstractActionGenerator):
         :rtype: list[dockermap.map.action.ItemAction]
         """
         actions = []
-        recreate_attached = False  # FIXME: This is no longer evaluated with the new iteration method.
         config_type = state.config_id.config_type
+        config_tuple = (state.client_name, state.config_id.map_name, state.config_id.config_name)
         if config_type == ITEM_TYPE_NETWORK:
             actions.append(ItemAction(state, ACTION_CREATE))
         elif config_type == ITEM_TYPE_VOLUME:
             if state.base_state == STATE_ABSENT:
                 action = DERIVED_ACTION_STARTUP
-                recreate_attached = True
+                self.recreated_volumes.add(config_tuple)
             else:
                 if state.state_flags & STATE_FLAG_NONRECOVERABLE:
                     action = DERIVED_ACTION_RELAUNCH
-                    recreate_attached = True
+                    self.recreated_volumes.add(config_tuple)
                 elif state.state_flags & STATE_FLAG_INITIAL:
                     action = ACTION_START
                 else:
@@ -42,7 +46,7 @@ class ResumeActionGenerator(AbstractActionGenerator):
             actions.append(ItemAction(state, action))
             actions.append(ItemAction(state, UTIL_ACTION_PREPARE_VOLUME))
         elif config_type == ITEM_TYPE_CONTAINER:
-            if recreate_attached:
+            if config_tuple in self.recreated_volumes:
                 if state.base_state == STATE_ABSENT:
                     action = DERIVED_ACTION_STARTUP
                 elif state.base_state == STATE_RUNNING:
