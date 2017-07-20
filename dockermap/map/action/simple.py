@@ -5,9 +5,9 @@ from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
 from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
 from ..state import STATE_ABSENT, STATE_PRESENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING
 from .base import AbstractActionGenerator
-from . import (ItemAction, ACTION_CREATE, ACTION_START, V_UTIL_ACTION_PREPARE, ACTION_RESTART,
-               C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE, C_UTIL_ACTION_EXEC_ALL, DERIVED_ACTION_STARTUP,
-               DERIVED_ACTION_SHUTDOWN)
+from . import (ItemAction, ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_REMOVE, V_UTIL_ACTION_PREPARE,
+               C_UTIL_ACTION_SIGNAL_STOP, C_UTIL_ACTION_EXEC_ALL, N_UTIL_ACTION_DISCONNECT_ALL,
+               DERIVED_ACTION_STARTUP_CONTAINER, DERIVED_ACTION_SHUTDOWN_CONTAINER)
 
 
 class CreateActionGenerator(AbstractActionGenerator):
@@ -101,15 +101,24 @@ class RemoveActionGenerator(AbstractActionGenerator):
         :return: Actions on the client, map, and configurations.
         :rtype: list[dockermap.map.action.ItemAction]
         """
-        if state.config_id.config_type == ITEM_TYPE_CONTAINER:
+        config_type = state.config_id.config_type
+        if config_type == ITEM_TYPE_CONTAINER:
             extra_data = kwargs
         else:
             extra_data = None
-        if (state.base_state == STATE_PRESENT and (state.config_id.config_type == ITEM_TYPE_NETWORK or
-                   (state.config_id.config_type == ITEM_TYPE_VOLUME and self.remove_attached) or
-                   (state.config_id.config_type == ITEM_TYPE_CONTAINER and
-                    self.remove_persistent or not state.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT))):
-            return [ItemAction(state, ACTION_REMOVE, extra_data=extra_data)]
+        if state.base_state == STATE_PRESENT:
+            if ((config_type == ITEM_TYPE_VOLUME and self.remove_attached) or
+                    (config_type == ITEM_TYPE_CONTAINER and
+                     self.remove_persistent or not state.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT)):
+                return [ItemAction(state, ACTION_REMOVE, extra_data=extra_data)]
+            elif config_type == ITEM_TYPE_NETWORK:
+                connected_containers = state.extra_data.get('containers')
+                if connected_containers:
+                    actions = [ItemAction(state, N_UTIL_ACTION_DISCONNECT_ALL, {'containers': connected_containers})]
+                else:
+                    actions = []
+                actions.append(ItemAction(state, ACTION_REMOVE, extra_data=kwargs))
+                return actions
 
 
 class StartupActionGenerator(AbstractActionGenerator):
@@ -130,7 +139,7 @@ class StartupActionGenerator(AbstractActionGenerator):
         elif config_type == ITEM_TYPE_VOLUME:
             if state.base_state == STATE_ABSENT:
                 return [
-                    ItemAction(state, DERIVED_ACTION_STARTUP),
+                    ItemAction(state, DERIVED_ACTION_STARTUP_CONTAINER),
                     ItemAction(state, V_UTIL_ACTION_PREPARE),
                 ]
             elif state.base_state == STATE_PRESENT and state.state_flags & STATE_FLAG_INITIAL:
@@ -141,7 +150,7 @@ class StartupActionGenerator(AbstractActionGenerator):
         elif config_type == ITEM_TYPE_CONTAINER:
             if state.base_state == STATE_ABSENT:
                 return [
-                    ItemAction(state, DERIVED_ACTION_STARTUP),
+                    ItemAction(state, DERIVED_ACTION_STARTUP_CONTAINER),
                     ItemAction(state, C_UTIL_ACTION_EXEC_ALL),
                 ]
             elif state.base_state == STATE_PRESENT:
@@ -164,12 +173,22 @@ class ShutdownActionGenerator(RemoveActionGenerator):
         :rtype: list[dockermap.map.action.ItemAction]
         """
         config_type = state.config_id.config_type
-        if config_type == ITEM_TYPE_NETWORK or (config_type == ITEM_TYPE_VOLUME and self.remove_attached):
+        if config_type == ITEM_TYPE_NETWORK:
+            if state.base_state == STATE_PRESENT:
+                connected_containers = state.extra_data.get('containers')
+                if connected_containers:
+                    actions = [ItemAction(state, N_UTIL_ACTION_DISCONNECT_ALL,
+                                          extra_data={'containers': connected_containers})]
+                else:
+                    actions = []
+                actions.append(ItemAction(state, ACTION_REMOVE, extra_data=kwargs))
+                return actions
+        elif config_type == ITEM_TYPE_VOLUME and self.remove_attached:
             return [ItemAction(state, ACTION_REMOVE)]
         elif config_type == ITEM_TYPE_CONTAINER:
             if self.remove_persistent or not state.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT:
                 if state.base_state == STATE_RUNNING or state.state_flags & STATE_FLAG_RESTARTING:
-                    return [ItemAction(state, DERIVED_ACTION_SHUTDOWN)]
+                    return [ItemAction(state, DERIVED_ACTION_SHUTDOWN_CONTAINER)]
                 elif state.base_state == STATE_PRESENT:
                     return [ItemAction(state, ACTION_REMOVE)]
             elif state.base_state == STATE_RUNNING or state.state_flags & STATE_FLAG_RESTARTING:

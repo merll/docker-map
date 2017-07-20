@@ -6,15 +6,18 @@ import logging
 from docker.utils import create_host_config
 from requests import Timeout
 from six import text_type
+from six.moves import map
 
 from ...functional import resolve_value
-from ..action import ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ACTION_KILL, ACTION_WAIT
+from ..action import (ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ACTION_KILL, ACTION_WAIT,
+                      ACTION_CONNECT, ACTION_DISCONNECT)
 from ..config.client import USE_HC_MERGE
 from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK, NotSet
 from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes
 from . import AbstractRunner
 from .attached import AttachedPreparationMixin
 from .cmd import ExecMixin
+from .network import NetworkUtilMixin
 from .script import ScriptMixin
 from .signal_stop import SignalMixin
 from .utils import get_host_binds, get_port_bindings
@@ -27,6 +30,8 @@ class DockerBaseRunnerMixin(object):
     action_method_names = [
         (ITEM_TYPE_NETWORK, ACTION_CREATE, 'create_network'),
         (ITEM_TYPE_NETWORK, ACTION_REMOVE, 'remove_network'),
+        (ITEM_TYPE_NETWORK, ACTION_CONNECT, 'connect_network'),
+        (ITEM_TYPE_NETWORK, ACTION_DISCONNECT, 'disconnect_network'),
 
         (ITEM_TYPE_VOLUME, ACTION_CREATE, 'create_volume'),
         (ITEM_TYPE_VOLUME, ACTION_START, 'start_volume'),
@@ -42,12 +47,20 @@ class DockerBaseRunnerMixin(object):
     ]
 
     def create_network(self, action, n_name, **kwargs):
-        # TODO
-        return None
+        c_kwargs = self.get_network_create_kwargs(action, n_name, **kwargs)
+        return action.client.create_network(**c_kwargs)
 
     def remove_network(self, action, n_name, **kwargs):
-        # TODO
-        return None
+        c_kwargs = self.get_network_remove_kwargs(action, n_name, **kwargs)
+        return action.client.remove_network(**c_kwargs)
+
+    def connect_network(self, action, n_name, container_name, **kwargs):
+        c_kwargs = self.get_network_connect_kwargs(action, n_name, container_name, **kwargs)
+        return action.client.connect_container_to_network(**c_kwargs)
+
+    def disconnect_network(self, action, n_name, container_name, **kwargs):
+        c_kwargs = self.get_network_disconnect_kwargs(action, n_name, container_name, **kwargs)
+        return action.client.disconnect_container_from_network(**c_kwargs)
 
     def create_volume(self, action, v_name, **kwargs):
         c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
@@ -336,6 +349,91 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
+    def get_network_create_kwargs(self, action, network_name, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to create a network.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param network_name: Network name or id.
+        :type network_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        config = action.config
+        c_kwargs = dict(
+            name=network_name,
+            driver=config.driver,
+            options=config.driver_options,
+        )
+        if config.internal:
+            c_kwargs['internal'] = True
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
+    def get_network_remove_kwargs(self, action, network_name, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to remove a network.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param network_name: Network name or id.
+        :type network_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        c_kwargs = dict(net_id=network_name)
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
+    def get_network_connect_kwargs(self, action, container_name, network_name, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to add a container to a network.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param network_name: Network name or id.
+        :type network_name: unicode | str
+        :param container_name: Container name or id.
+        :type container_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        c_kwargs = dict(
+            container=container_name,
+            net_id=network_name,
+        )
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
+    def get_network_disconnect_kwargs(self, action, container_name, network_name, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to remove a container from a network.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param network_name: Network name or id.
+        :type network_name: unicode | str
+        :param container_name: Container name or id.
+        :type container_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        c_kwargs = dict(
+            container=container_name,
+            net_id=network_name,
+        )
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
     def get_exec_create_kwargs(self, action, container_name, exec_cmd, exec_user, kwargs=None):
         """
         Generates keyword arguments for the Docker client to set up the HostConfig or start a container.
@@ -385,7 +483,7 @@ class DockerConfigMixin(object):
 
 
 class DockerClientRunner(DockerBaseRunnerMixin, DockerConfigMixin, AttachedPreparationMixin, ExecMixin, SignalMixin,
-                         ScriptMixin, AbstractRunner):
+                         ScriptMixin, NetworkUtilMixin, AbstractRunner):
     """
     Runs actions on a Docker client and returns results from the API.
     """

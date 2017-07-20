@@ -108,6 +108,17 @@ def _check_network(container_config, client_config, instance_detail):
     return True
 
 
+def _check_network_driver_opts(network_config, instance_detail):
+    if not network_config.driver_options:
+        return True
+    opts = {option_key.rpartition('.')[2]: option_value
+            for option_key, option_value in six.iteritems(instance_detail['Options'])}
+    for c_key, c_val in network_config.driver_options:
+        if c_val != opts.get(c_key):
+            return False
+    return True
+
+
 class SingleContainerVfsCheck(object):
     """
     :type vfs_paths: dict[tuple, unicode | str]
@@ -331,7 +342,16 @@ class UpdateContainerState(ContainerBaseState):
 
 
 class UpdateNetworkState(NetworkBaseState):
-    pass
+    def get_state(self):
+        base_state, state_flags, extra = super(NetworkBaseState, self).get_state()
+        if base_state == STATE_ABSENT or state_flags & STATE_FLAG_NEEDS_RESET:
+            return base_state, state_flags, extra
+
+        if (self.detail['Driver'] != self.config.driver or
+                not _check_network_driver_opts(self.config, self.detail) or
+                bool(self.config.internal) != self.detail['Internal']):
+            state_flags |= STATE_FLAG_MISC_MISMATCH
+        return base_state, state_flags, extra
 
 
 class UpdateStateGenerator(DependencyStateGenerator):

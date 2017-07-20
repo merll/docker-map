@@ -10,24 +10,26 @@ ACTION_RESTART = 'restart'
 ACTION_STOP = 'stop'
 ACTION_REMOVE = 'remove'
 ACTION_KILL = 'kill'
-ACTION_WAIT = 'wait'         # Wait for item to finish.
-ACTION_UPDATE = 'update'     # Update the configuration of an object in-place.
+ACTION_WAIT = 'wait'               # Wait for item to finish.
+ACTION_UPDATE = 'update'           # Update the configuration of an object in-place.
+ACTION_CONNECT = 'connect'         # Connect to network.
+ACTION_DISCONNECT = 'disconnect'   # Disconnect from network.
 
 C_UTIL_ACTION_EXEC_COMMANDS = 'exec_single_command'           # Create & start exec certain commands.
 C_UTIL_ACTION_EXEC_ALL = 'exec_all_commands'                  # Create & start all configured exec commands
 C_UTIL_ACTION_SCRIPT = 'script'                               # Create & start container, then create & start exec.
 C_UTIL_ACTION_SIGNAL_STOP = 'signal_stop'                     # Send signal (kill) & wait.
+C_UTIL_ACTION_CONNECT = 'connect_networks'                    # Connect container to a list of networks.
 V_UTIL_ACTION_PREPARE = 'prepare_volume'                      # Set up volume permissions.
 
 N_UTIL_ACTION_DISCONNECT_ALL = 'disconnect_all'               # Disconnect all containers from a network.
 
-DERIVED_ACTION_STARTUP = [ACTION_CREATE, ACTION_START]                            # Create & start
-DERIVED_ACTION_SHUTDOWN = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE]              # Stop & remove
+DERIVED_ACTION_STARTUP_CONTAINER = [ACTION_CREATE, ACTION_START]                  # Create & start
+DERIVED_ACTION_SHUTDOWN_CONTAINER = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE]    # Stop & remove
 DERIVED_ACTION_RESET_CONTAINER = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE,
                                   ACTION_CREATE, ACTION_START]                    # Stop, remove, create, & start
 DERIVED_ACTION_RELAUNCH = [ACTION_REMOVE, ACTION_CREATE, ACTION_START]            # Remove, create, & start
-DERIVED_ACTION_RESET_NETWORK = [N_UTIL_ACTION_DISCONNECT_ALL, ACTION_REMOVE,
-                                ACTION_CREATE]                                    # Disconnect, remove, & re-create
+DERIVED_ACTION_RESET_NETWORK = [ACTION_REMOVE, ACTION_CREATE]                     # Remove & re-create
 
 
 def _action_type_list(value):

@@ -7,7 +7,7 @@ from ..input import ITEM_TYPE_CONTAINER
 from ..policy import CONFIG_FLAG_DEPENDENT
 from ..state import STATE_ABSENT, STATE_RUNNING, STATE_FLAG_RESTARTING
 from .resume import ResumeActionGenerator
-from . import ItemAction, ACTION_REMOVE, DERIVED_ACTION_SHUTDOWN, C_UTIL_ACTION_SCRIPT
+from . import ItemAction, ACTION_REMOVE, DERIVED_ACTION_SHUTDOWN_CONTAINER, C_UTIL_ACTION_SCRIPT
 
 
 log = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class ScriptActionGenerator(ResumeActionGenerator):
 
             if state.base_state == STATE_RUNNING or state.state_flags & STATE_FLAG_RESTARTING:
                 log.debug("Preparing shutdown of existing container: %s", state.config_id)
-                actions = [ItemAction(state, DERIVED_ACTION_SHUTDOWN)]
+                actions = [ItemAction(state, DERIVED_ACTION_SHUTDOWN_CONTAINER)]
             else:
                 log.debug("Preparing removal existing container: %s", state.config_id)
                 actions = [ItemAction(state, ACTION_REMOVE)]
