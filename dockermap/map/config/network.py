@@ -8,7 +8,7 @@ from ..config import ConfigurationObject, CP
 class NetworkConfiguration(ConfigurationObject):
     driver = CP()
     driver_options = CP(dict)
-    internal = CP(input_func=bool_if_set)
+    internal = CP(default=False, input_func=bool_if_set)
     create_options = CP(dict)
 
     DOCSTRINGS = {

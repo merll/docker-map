@@ -349,7 +349,7 @@ class UpdateNetworkState(NetworkBaseState):
 
         if (self.detail['Driver'] != self.config.driver or
                 not _check_network_driver_opts(self.config, self.detail) or
-                bool(self.config.internal) != self.detail['Internal']):
+                self.config.internal != self.detail['Internal']):
             state_flags |= STATE_FLAG_MISC_MISMATCH
         return base_state, state_flags, extra
 
