@@ -33,7 +33,7 @@ MAP_DATA_1 = {
         'permissions': 'u=rwX,g=rX,o=',
     },
     'app_extra': {
-        'network': 'app_server.instance1',
+        'network_mode': 'app_server.instance1',
     },
     'volumes': { # Configure volume paths inside containers
         'web_log': '/var/log/nginx',

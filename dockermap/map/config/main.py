@@ -398,9 +398,9 @@ class ContainerMap(ConfigurationObject):
                     network_instances = (net_instance, )
                 else:
                     network_instances = network_ref_config.instances
-                return [(ITEM_TYPE_CONTAINER, self._name, net_config_name, ni)
+                return [MapConfigId(ITEM_TYPE_CONTAINER, self._name, net_config_name, ni)
                         for ni in network_instances]
-            return [MapConfigId(ITEM_TYPE_NETWORK, self._name, net_config_name, None)]
+            return [MapConfigId(ITEM_TYPE_NETWORK, self._name, net_config_name)]
 
         if self._extended:
             ext_map = self
@@ -419,7 +419,7 @@ class ContainerMap(ConfigurationObject):
 
         def _get_dep_list(name, config):
             d = []
-            nw = config.network
+            nw = config.network_mode
             if isinstance(nw, tuple):
                 merge_list(d, _get_network_items(nw))
             merge_list(d, itertools.chain.from_iterable(map(used_func, config.uses)))
@@ -543,11 +543,12 @@ class ContainerMap(ConfigurationObject):
             bind = [b.volume for b in c_config.binds if not isinstance(b.volume, tuple)]
             link = [l.container for l in c_config.links]
             uses = [u.volume for u in c_config.uses]
-            if isinstance(c_config.network, tuple):
-                if c_config.network[1]:
-                    network = '{0}.{1}'.format(*c_config.network)
+            network_mode = c_config.network_mode
+            if isinstance(network_mode, tuple):
+                if network_mode[1]:
+                    network = '{0[0]}.{0[1]}'.format(network_mode)
                 else:
-                    network = c_config.network[0]
+                    network = network_mode[0]
             else:
                 network = None
             if self.use_attached_parent_name:
