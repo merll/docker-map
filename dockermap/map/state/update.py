@@ -252,6 +252,7 @@ class UpdateContainerState(ContainerBaseState):
                 if c_user == f_user and c_cmd == f_cmd:
                     log.debug("Command for user %s found: %s.", c_user, c_cmd)
                     return True
+            log.debug("Command for user %s not found: %s.", f_user, f_cmd)
             return False
 
         def _find_partial_command(f_cmd, f_user):
@@ -259,6 +260,7 @@ class UpdateContainerState(ContainerBaseState):
                 if c_user == f_user and f_cmd in c_cmd:
                     log.debug("Command for user %s found: %s.", c_user, c_cmd)
                     return True
+            log.debug("Command for user %s not found: %s.", f_user, f_cmd)
             return False
 
         def _cmd_state(cmd, cmd_user):
@@ -274,6 +276,11 @@ class UpdateContainerState(ContainerBaseState):
             log.debug("Looking up %s command for user %s: %s", check_option, res_user, res_cmd)
             return cmd_exists(res_cmd, res_user)
 
+        if not self.config.exec_commands:
+            return None
+        if not self.current_commands:
+            log.debug("No running exec commands found for container.")
+            return [(exec_cmd, False) for exec_cmd in self.config.exec_commands]
         log.debug("Checking commands for container %s.", self.container_name)
         if check_option == CMD_CHECK_FULL:
             cmd_exists = _find_full_command
@@ -297,8 +304,6 @@ class UpdateContainerState(ContainerBaseState):
             check_exec_option = self.options['check_exec_commands']
             if check_exec_option and check_exec_option != CMD_CHECK_NONE and self.config.exec_commands:
                 self.current_commands = self.client.top(self.detail['Id'], ps_args='-eo pid,user,args')['Processes']
-            else:
-                self.options['check_exec_commands'] = None
 
     def get_state(self):
         base_state, state_flags, extra = super(UpdateContainerState, self).get_state()
