@@ -31,7 +31,7 @@ class SignalMixin(object):
         """
         client = action.client
         sig = action.config.stop_signal
-        stop_kwargs = self.get_stop_kwargs(action, c_name, kwargs=kwargs)
+        stop_kwargs = self.get_container_stop_kwargs(action, c_name, kwargs=kwargs)
         if not sig or sig == 'SIGTERM' or sig == signal.SIGTERM:
             try:
                 client.stop(**stop_kwargs)

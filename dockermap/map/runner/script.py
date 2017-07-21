@@ -93,14 +93,14 @@ class ScriptMixin(object):
         else:
             create_extra_kwargs = {}
             start_extra_kwargs = {'binds': binds}
-        created = self.create_instance(action, c_name, entrypoint=entrypoint, command=command,
-                                       volumes=volumes, **create_extra_kwargs)
+        created = self.create_container(action, c_name, entrypoint=entrypoint, command=command,
+                                        volumes=volumes, **create_extra_kwargs)
         if not created:
             raise ScriptRunException("No new containers were created.")
         result = {'id': created['Id'], 'client': action.client_name}
         stopped = True
         try:
-            self.start_instance(action, c_name, **start_extra_kwargs)
+            self.start_container(action, c_name, **start_extra_kwargs)
             stopped = False
             timeout = wait_timeout or action.config.stop_timeout or client_config.get('timeout')
             container_id = created['Id']
@@ -117,5 +117,5 @@ class ScriptMixin(object):
             if self.remove_created_after:
                 if not stopped:
                     self.stop(action, c_name, timeout=3)
-                self.remove(action, c_name)
+                self.remove_container(action, c_name)
         return result
