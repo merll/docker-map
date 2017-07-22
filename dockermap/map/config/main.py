@@ -197,7 +197,7 @@ class ContainerMap(ConfigurationObject):
         'clients': "Alias names of clients associated with this container map.",
         'groups': "Groups of configured containers.",
         'default_domain': "Value to use as domain name for new containers, unless the client specifies otherwise.",
-        'set_hostname': "Whether to set the hostname for new containers. When set to ``False``, uses Docker's default"
+        'set_hostname': "Whether to set the hostname for new containers. When set to ``False``, uses Docker's default "
                         "autogeneration of hostnames instead.",
         'use_attached_parent_name': "Whether to include the parent name of an attached volume in the attached "
                                     "container name for disambiguation.",
@@ -424,6 +424,8 @@ class ContainerMap(ConfigurationObject):
                 merge_list(d, _get_network_items(nw))
             merge_list(d, itertools.chain.from_iterable(map(used_func, config.uses)))
             merge_list(d, itertools.chain.from_iterable(map(_get_linked_items, config.links)))
+            merge_list(d, [MapConfigId(ITEM_TYPE_NETWORK, self._name, n.network_name)
+                           for n in config.networks])
             merge_list(d, [MapConfigId(ITEM_TYPE_VOLUME, self._name, name, a)
                            for a in config.attaches])
             return d
@@ -543,23 +545,23 @@ class ContainerMap(ConfigurationObject):
             bind = [b.volume for b in c_config.binds if not isinstance(b.volume, tuple)]
             link = [l.container for l in c_config.links]
             uses = [u.volume for u in c_config.uses]
+            networks = [n.network_name for n in c_config.networks]
             network_mode = c_config.network_mode
             if isinstance(network_mode, tuple):
                 if network_mode[1]:
-                    network = '{0[0]}.{0[1]}'.format(network_mode)
+                    networks.append('{0[0]}.{0[1]}'.format(network_mode))
                 else:
-                    network = network_mode[0]
-            else:
-                network = None
+                    networks.append(network_mode[0])
             if self.use_attached_parent_name:
                 attaches = [(c_name, a) for a in c_config.attaches]
             else:
                 attaches = c_config.attaches
-            return instance_names, group_ref_names, uses, attaches, shared, bind, link, network
+            return instance_names, group_ref_names, uses, attaches, shared, bind, link, networks
 
-        all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links, all_networks = zip(*[
+        (all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links,
+         all_connected) = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
-        ])
+         ])
         if self.use_attached_parent_name:
             all_attached_names = tuple('{0}.{1}'.format(c_name, a)
                                        for c_name, a in itertools.chain.from_iterable(all_attached))
@@ -590,7 +592,8 @@ class ContainerMap(ConfigurationObject):
         missing_shares = used_set - shared_set
         if missing_shares:
             missing_share_str = ', '.join(missing_shares)
-            raise MapIntegrityError("No shared or attached volumes found for used volume(s): {0}.".format(missing_share_str))
+            raise MapIntegrityError("No shared or attached volumes found for used volume(s): "
+                                    "{0}.".format(missing_share_str))
         binds_set = set(itertools.chain.from_iterable(all_binds))
         host_set = set(self.host.keys())
         missing_binds = binds_set - host_set
@@ -605,15 +608,18 @@ class ContainerMap(ConfigurationObject):
         missing_names = volume_set - named_set
         if missing_names:
             missing_names_str = ', '.join(missing_names)
-            raise MapIntegrityError("No volume name-path-assignments found for volume(s): {0}.".format(missing_names_str))
+            raise MapIntegrityError("No volume name-path-assignments found for volume(s): "
+                                    "{0}.".format(missing_names_str))
         instance_set = set(itertools.chain.from_iterable(all_instances))
         linked_set = set(itertools.chain.from_iterable(all_links))
         missing_links = linked_set - instance_set
         if missing_links:
             missing_links_str = ', '.join(missing_links)
             raise MapIntegrityError("No container instance found for link(s): {0}.".format(missing_links_str))
-        network_set = set(filter(None, all_networks))
-        missing_networks = network_set - instance_set
+        used_network_set = set(itertools.chain.from_iterable(all_connected))
+        available_network_set = set(self.networks.keys()) | instance_set
+        missing_networks = used_network_set - available_network_set
         if missing_networks:
             missing_networks_str = ', '.join(missing_networks)
-            raise MapIntegrityError("No container instance found for the following network reference(s): {0}".format(missing_networks_str))
+            raise MapIntegrityError("No network configuration or container instance found for the following network "
+                                    "reference(s): {0}".format(missing_networks_str))

@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from . import ConfigurationObject, CP
 from ..input import (get_shared_volumes, get_shared_host_volumes, get_container_links, get_network_mode,
-                     get_port_bindings, get_exec_commands, bool_if_set)
+                     get_port_bindings, get_exec_commands, get_network_endpoints, bool_if_set)
 
 
 def _merge_first(current, update_list):
@@ -33,6 +33,7 @@ class ContainerConfiguration(ConfigurationObject):
     stop_timeout = CP()
     stop_signal = CP()
     network_mode = CP(input_func=get_network_mode)
+    networks = CP(list, input_func=get_network_endpoints, merge_func=_merge_first)
     exec_commands = CP(list, input_func=get_exec_commands)
     persistent = CP(input_func=bool_if_set)
     create_options = CP(dict)
@@ -90,6 +91,7 @@ class ContainerConfiguration(ConfigurationObject):
                         "docker-py docs), tries to locate a container configuration on this map. Prefixed with ``/`` "
                         "assumes the full container name. Setting it to ``disabled`` deactivates networking for the "
                         "container.",
+        'networks': "Names of configured networks for this container to join.",
         'exec_commands': "Commands to run as soon as the container is started. Set in the format "
                          "`ExecCommand(cmd, user, policy)`, where the user is set to the same as this configuration's "
                          "user by default (or root, if not available). The policy decides when to start the command.",

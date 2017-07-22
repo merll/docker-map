@@ -14,7 +14,7 @@ from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume
                                  get_port_binding, get_port_bindings, PortBinding,
                                  get_exec_command, get_exec_commands, ExecCommand, EXEC_POLICY_RESTART,
                                  EXEC_POLICY_INITIAL, get_map_config_id, get_map_config_ids, MapConfigId,
-                                 ITEM_TYPE_CONTAINER)
+                                 ITEM_TYPE_CONTAINER, NetworkEndpoint, get_network_endpoint, get_network_endpoints)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -190,6 +190,48 @@ class InputConversionTest(unittest.TestCase):
         assert_b([(['a', 'b', 'c'], None),
                   ExecCommand('a b c', 'user', EXEC_POLICY_RESTART),
                   [['a', 'b', 'c'], 'root', EXEC_POLICY_INITIAL]])
+
+    def test_get_network_endpoint(self):
+        assert_e1 = lambda v: self.assertEqual(get_network_endpoint(v), NetworkEndpoint('endpoint1'))
+        assert_e2 = lambda v: self.assertEqual(get_network_endpoint(v), NetworkEndpoint('endpoint2', ['alias1']))
+        assert_e3 = lambda v: self.assertEqual(get_network_endpoint(v),
+                                               NetworkEndpoint('endpoint3', ['alias1'], ipv4_address='0.0.0.0'))
+        assert_e1('endpoint1')
+        assert_e1(['endpoint1'])
+        assert_e1({'endpoint1': ''})
+        assert_e2(['endpoint2', 'alias1'])
+        assert_e2({'endpoint2': 'alias1'})
+        assert_e2(['endpoint2', dict(aliases='alias1')])
+        assert_e2(['endpoint2', ('alias1', )])
+        assert_e2({'endpoint2': 'alias1'})
+        assert_e2({'endpoint2': ('alias1', )})
+        assert_e2({'endpoint2': dict(aliases='alias1')})
+        assert_e2({'endpoint2': dict(aliases=('alias1', ))})
+        assert_e3(['endpoint3', 'alias1', None, '0.0.0.0'])
+        assert_e3({'endpoint3': ('alias1', None, '0.0.0.0')})
+        assert_e3(['endpoint3', dict(aliases='alias1', ipv4_address='0.0.0.0')])
+        assert_e3({'endpoint3': dict(aliases='alias1', ipv4_address='0.0.0.0')})
+
+    def test_get_network_endpoints(self):
+        assert_e1 = lambda v: self.assertEqual(get_network_endpoints(v), [NetworkEndpoint('endpoint1')])
+        assert_e2 = lambda v: six.assertCountEqual(self, get_network_endpoints(v),
+                                                   [NetworkEndpoint('endpoint2', ['alias1']),
+                                                    NetworkEndpoint('endpoint3', ['alias1'], ipv4_address='0.0.0.0')])
+        assert_e1('endpoint1')
+        assert_e1(['endpoint1'])
+        assert_e1({'endpoint1': None})
+        assert_e2([
+            ('endpoint2', 'alias1'),
+            ['endpoint3', 'alias1', None, '0.0.0.0'],
+        ])
+        assert_e2([
+            ('endpoint2', 'alias1'),
+            ['endpoint3', 'alias1', None, '0.0.0.0'],
+        ])
+        assert_e2([
+            ('endpoint2', dict(aliases='alias1')),
+            ['endpoint3', dict(aliases=('alias1', ), ipv4_address='0.0.0.0')],
+        ])
 
     def test_get_map_config_id(self):
         assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),

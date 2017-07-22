@@ -44,6 +44,32 @@ class _NotSet(object):
 NotSet = _NotSet()
 
 
+def _get_list(value):
+    """
+    Wraps the given value in a list. Empty values are returned as ``None`` (unlike in ``get_list`` in this module).
+    Lists and tuples are returned as lists. Single strings and registered types are wrapped in a list.
+
+    :param value: Value to return as a list.
+    :return: List with the provided value(s).
+    :rtype: list
+    """
+    if not value:
+        return None
+    elif isinstance(value, (list, tuple)):
+        return list(value)
+    elif isinstance(value, six.string_types + (lazy_type, )) or uses_type_registry(value):
+        return [value]
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(
+        type(value).__name__))
+
+
+class NetworkEndpoint(namedtuple('NetworkEndpoint', ('network_name', 'aliases', 'links', 'ipv4_address', 'ipv6_address',
+                                                     'link_local_ips'))):
+    def __new__(cls, network_name, aliases=None, links=None, ipv4_address=None, ipv6_address=None, link_local_ips=None):
+        return super(NetworkEndpoint, cls).__new__(cls, network_name, _get_list(aliases), _get_list(links),
+                                                   ipv4_address, ipv6_address, _get_list(link_local_ips))
+
+
 def _get_listed_tuples(value, element_type, conversion_func, **kwargs):
     if value is None:
         return []
@@ -297,6 +323,53 @@ def get_exec_command(value):
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
+def get_network_endpoint(value):
+    """
+    Converts the input to a NetworkEndpoint tuple. It can be from a single-entry dictionary, single string, list, or
+    tuple. Single values (also single-element lists or tuples) are considered a network name. Dictionaries can also
+    contain nested dictionaries with keyword arguments to the NetworkEndpoint. Lists / tuples of length 2 are also
+    checked for such dictionaries.
+
+    :param value: Input value for conversion.
+    :return: NetworkEndpoint tuple.
+    :rtype: NetworkEndpoint
+    """
+    if isinstance(value, NetworkEndpoint):
+        return value
+    elif isinstance(value, six.string_types + (lazy_type, )):
+        return NetworkEndpoint(value)
+    elif isinstance(value, (list, tuple)):
+        v_len = len(value)
+        if v_len == 2 and isinstance(value[1], dict):
+            return NetworkEndpoint(value[0], **value[1])
+        elif 1 <= v_len <= 6:
+            return NetworkEndpoint(*value)
+        raise ValueError("Invalid element length; only dictionaries, pr tuples and lists of length 1-6 can be "
+                         "converted to a NetworkEndpoint tuple. Found length {0}.".format(v_len))
+    elif isinstance(value, dict):
+        d_len = len(value)
+        if d_len == 1:
+            k, v = list(value.items())[0]
+            if not v:
+                return NetworkEndpoint(k)
+            if isinstance(v, six.string_types):
+                return NetworkEndpoint(k, v)
+            v_len = len(v)
+            if isinstance(v, dict):
+                return NetworkEndpoint(k, **v)
+            elif isinstance(v, (list, tuple)):
+                if 1 <= v_len <= 5:
+                    return NetworkEndpoint(k, *v)
+                raise ValueError("Invalid sub-element length; lists and tuples of length 1-5 can be converted. "
+                                 "Found length {0}.".format(v_len))
+            raise ValueError("Invalid sub-element format; only dicts and tuples of length 1-5 can be converted. Found "
+                             "type {0}.".format(type(value).__name__))
+        raise ValueError("Invalid element length; only dicts with one element can be converted to a NetworkEndpoint "
+                         "tuple. Found length {0}.".format(d_len))
+    raise ValueError("Invalid type; expected a dict, list, tuple, or string type, found "
+                     "{0}.".format(type(value).__name__))
+
+
 def get_map_config_id(value, map_name=None, instances=None):
     """
     Converts the input to a MapConfigId tuple. It can be from a single string, list, or tuple. Single values
@@ -431,6 +504,17 @@ def get_port_bindings(value):
     :rtype: list[PortBinding]
     """
     return _get_listed_tuples(value, PortBinding, get_port_binding)
+
+
+def get_network_endpoints(value):
+    """
+    Converts a single value, a list or tuple, or a dictionary into a list of NetworkEndpoint tuples.
+
+    :param value: Input value to convert.
+    :return: List of NetworkEndpoint tuples.
+    :rtype: list[NetworkEndpoint]
+    """
+    return _get_listed_tuples(value, NetworkEndpoint, get_network_endpoint)
 
 
 def get_map_config_ids(value, map_name=None, instances=None):
