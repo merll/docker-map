@@ -118,7 +118,7 @@ def group_instances(config_ids, single_instances=True, ext_map=None, ext_maps=No
 
 def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=None):
     """
-    Iterates over a list of container configuration ids, expanding configured instances if ``None`` is specified.
+    Iterates over a list of configuration ids, expanding configured instances if ``None`` is specified.
 
     :param config_ids: Iterable of container configuration ids or (map, config, instance) tuples.
     :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId] |
@@ -130,8 +130,8 @@ def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=N
     :type ext_map: ContainerMap
     :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
     :type ext_maps: dict[unicode | str, ContainerMap]
-    :return: Tuples of map name, container configuration name, and a single instance name (or ``None``).
-    :rtype: collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
+    :return: MapConfigId tuples.
+    :rtype: collections.Iterable[dockermap.map.input.MapConfigId]
     """
     if not (ext_map or ext_maps):
         raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
