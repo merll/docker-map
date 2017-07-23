@@ -233,7 +233,8 @@ def get_port_binding(value):
     """
     Converts the given value to a ``PortBinding`` tuple. Input may come as a single value (exposed port for container
     linking only), a two-element tuple/list (port published on all host interfaces) or a three-element tuple/list
-    (port published on a particular host interface).
+    (port published on a particular host interface). It can also be a dictionary with keyword arguments
+    ``exposed_port``, ``host_port``, ``interface``, and ``ipv6``.
 
     :param value: Input value for conversion.
     :return: PortBinding tuple.
@@ -249,25 +250,25 @@ def get_port_binding(value):
         if v_len == 1 and isinstance(value[0], sub_types):
             return PortBinding(value[0])
         if v_len == 2:
+            if isinstance(value[1], dict):
+                return PortBinding(value[0], **value[1])
             ex_port, host_bind = value
             if isinstance(host_bind, sub_types + (lazy_type, )) or host_bind is None or uses_type_registry(host_bind):
                 # Port, host port
                 return PortBinding(ex_port, host_bind)
             elif isinstance(host_bind, (list, tuple)):
                 s_len = len(host_bind)
-                if s_len == 2:  # Port, (host port, interface)
-                    host_port, interface = host_bind
-                    return PortBinding(ex_port, host_port, interface)
-                elif s_len == 3:  # Port, (host port, interface, ipv6)
-                    host_port, interface, ipv6 = host_bind
-                    return PortBinding(ex_port, host_port, interface, ipv6)
+                if s_len in (2, 3):  # Port, (host port, interface) or (host port, interface, ipv6)
+                    return PortBinding(ex_port, *host_bind)
             raise ValueError("Invalid sub-element type or length. Needs to be a port number or a tuple / list: "
                              "(port, interface) or (port, interface, ipv6).")
         elif v_len in (3, 4):
             return PortBinding(*value)
         raise ValueError("Invalid element length; only tuples and lists of length 2 to 4 can be converted to a "
                          "PortBinding tuple.")
-    raise ValueError("Invalid type; expected a list, tuple, int or string type, found "
+    elif isinstance(value, dict):
+        return PortBinding(**value)
+    raise ValueError("Invalid type; expected a dict, list, tuple, int, or string type, found "
                      "{0}.".format(type(value).__name__))
 
 

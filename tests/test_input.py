@@ -120,32 +120,35 @@ class InputConversionTest(unittest.TestCase):
         assert_b({'a': None, 'b': 'b_'})
 
     def test_get_port_binding(self):
-        assert_a = lambda a: self.assertEqual(get_port_binding(a), PortBinding('1234', None, None, False))
-        assert_b = lambda b: self.assertEqual(get_port_binding(b), PortBinding(1234, 1234, None, False))
-        assert_c = lambda c: self.assertEqual(get_port_binding(c), PortBinding(1234, 1234, '0.0.0.0', False))
+        assert_a = lambda a: self.assertEqual(get_port_binding(a), PortBinding('1234'))
+        assert_b = lambda b: self.assertEqual(get_port_binding(b), PortBinding(1234, 1234))
+        assert_c = lambda c: self.assertEqual(get_port_binding(c), PortBinding(1234, 1234, '0.0.0.0'))
         assert_d = lambda d: self.assertEqual(get_port_binding(d), PortBinding(1234, 1234, '0.0.0.0', True))
 
         assert_a('1234')
         assert_a(('1234', ))
         assert_a(['1234', None])
+        assert_a({'exposed_port': '1234'})
         assert_b((1234, lazy_once(lambda: 1234)))
         assert_c((1234, 1234, '0.0.0.0'))
         assert_c((1234, [1234, '0.0.0.0']))
         assert_d((1234, 1234, '0.0.0.0', True))
+        assert_d(dict(exposed_port=1234, host_port=1234, interface='0.0.0.0', ipv6=True))
         assert_d((1234, [1234, '0.0.0.0', True]))
 
     def test_get_port_bindings(self):
-        assert_a = lambda a: self.assertEqual(get_port_bindings(a), [PortBinding('1234', None, None, False)])
-        assert_b = lambda b: six.assertCountEqual(self, get_port_bindings(b), [PortBinding('1234', None, None, False),
-                                                                               PortBinding(1234, 1234, None, False),
+        assert_a = lambda a: self.assertEqual(get_port_bindings(a), [PortBinding('1234')])
+        assert_b = lambda b: six.assertCountEqual(self, get_port_bindings(b), [PortBinding('1234'),
+                                                                               PortBinding(1234, 1234),
                                                                                PortBinding(1235, 1235, '0.0.0.0', True)])
 
         assert_a('1234')
         assert_a(PortBinding('1234', None, None, False))
         assert_a((['1234'], ))
         assert_b(['1234', (1234, 1234), (1235, 1235, '0.0.0.0', True)])
-        assert_b([('1234', [None, None]), PortBinding(1234, 1234, None, False), (1235, [1235, '0.0.0.0', True])])
+        assert_b([('1234', [None, None]), PortBinding(1234, 1234), (1235, [1235, '0.0.0.0', True])])
         assert_b({'1234': None, 1234: 1234, 1235: (1235, '0.0.0.0', True)})
+        assert_b({'1234': None, 1234: dict(host_port=1234), 1235: dict(host_port=1235, interface='0.0.0.0', ipv6=True)})
 
     def test_get_exec_command(self):
         assert_a = lambda a: self.assertEqual(get_exec_command(a),
