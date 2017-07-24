@@ -68,7 +68,7 @@ class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
         return six.iteritems(self)
 
     def __nonzero__(self):
-        return len(self) > 0 and any(getattr(self, p) for p in self.__class__.internal_properties)
+        return len(self) > 0 or any(getattr(self, p) for p in self.__class__.internal_properties)
 
     __bool__ = __nonzero__
 

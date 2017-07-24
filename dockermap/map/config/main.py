@@ -207,10 +207,10 @@ class ContainerMap(ConfigurationObject):
     def __init__(self, name, initial=None, check_integrity=True, check_duplicates=True, **kwargs):
         self._name = name
         self._extended = False
-        self._containers = DefaultDictMap(ContainerConfiguration)
+        self._containers = containers = DefaultDictMap(ContainerConfiguration)
         self._networks = DefaultDictMap(NetworkConfiguration)
         super(ContainerMap, self).__init__(initial, **kwargs)
-        if self._containers and check_integrity:
+        if containers and check_integrity:
             self.check_integrity(check_duplicates=check_duplicates)
 
     def __iter__(self):
