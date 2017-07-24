@@ -348,7 +348,7 @@ class UpdateContainerState(ContainerBaseState):
 
 class UpdateNetworkState(NetworkBaseState):
     def get_state(self):
-        base_state, state_flags, extra = super(NetworkBaseState, self).get_state()
+        base_state, state_flags, extra = super(UpdateNetworkState, self).get_state()
         if base_state == STATE_ABSENT or state_flags & STATE_FLAG_NEEDS_RESET:
             return base_state, state_flags, extra
 
