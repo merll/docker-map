@@ -67,6 +67,13 @@ MAP_DATA_2 = {
         },
         'sub_sub_svc': {
         },
+        'net_sub_svc': {
+        },
+        'net_svc': {
+            'networks': [('app_net1', {
+                'links': 'net_sub_svc',
+            })],
+        },
         'abstract_config': {
             'abstract': True,
             'image': 'server',
@@ -104,6 +111,9 @@ MAP_DATA_2 = {
         'server2': {
             'extends': 'server',
             'links': ['svc2']
+        },
+        'server3': {
+            'networks': ['app_net1', ('app_net2', 'server_x')],
         },
         'abstract_worker': {
             'abstract': True,
@@ -171,6 +181,10 @@ MAP_DATA_2 = {
         'app_data': 'app/data',
         'app_config': 'app/config',
     },
+    'networks': {
+        'app_net1': {'driver': 'bridge'},
+        'app_net2': {'driver': 'bridge'},
+    },
     'groups': {
         'group1': ['server', 'worker', 'worker_q2'],
     }
@@ -200,5 +214,5 @@ MAP_DATA_3 = {
 
 CLIENT_DATA_1 = {
     'interfaces': {'private': '10.0.0.11'},
-    'version': '1.19',
+    'version': '1.21',
 }

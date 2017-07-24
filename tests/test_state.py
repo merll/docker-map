@@ -18,7 +18,8 @@ from dockermap.map.policy.base import BasePolicy
 from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESENT, STATE_ABSENT,
                                  STATE_FLAG_NONRECOVERABLE, STATE_FLAG_RESTARTING, STATE_FLAG_INITIAL,
                                  STATE_FLAG_NEEDS_RESET, STATE_FLAG_MISC_MISMATCH, STATE_FLAG_IMAGE_MISMATCH,
-                                 STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_FORCED_RESET, STATE_FLAG_MISSING_LINK)
+                                 STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_FORCED_RESET, STATE_FLAG_MISSING_LINK,
+                                 STATE_FLAG_NETWORK_DISCONNECT)
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
 from dockermap.map.state.utils import merge_dependency_paths
@@ -72,12 +73,24 @@ def _container(config_name, p_state=P_STATE_RUNNING, instances=None, attached_vo
     return config_name, p_state, instances, attached_volumes_valid, instance_volumes_valid, kwargs
 
 
+def _network(config_name, **kwargs):
+    return config_name, kwargs
+
+
 def _add_container_list(rsps, container_names):
     results = [
-        {'Id': '{0}'.format(c_id), 'Names': ['/{0}'.format(name)]}
-        for c_id, name in container_names
+        {'Id': c_id, 'Names': name_list}
+        for c_id, name_list in container_names
     ]
     rsps.add('GET', '{0}/containers/json'.format(URL_PREFIX), content_type='application/json', json=results)
+
+
+def _add_network_list(rsps, network_names):
+    results = [
+        {'Id': n_id, 'Name': name}
+        for n_id, name in network_names
+    ]
+    rsps.add('GET', '{0}/networks'.format(URL_PREFIX), content_type='application/json', json=results)
 
 
 def _add_image_list(rsps, image_names):
@@ -125,8 +138,8 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
                 raise ValueError("Invalid uses declaration in {0}: {1}".format(config_id.config_name, vol))
 
 
-def _add_inspect(rsps, config_id, container_map, c_config, state, container_id, image_id,
-                 volumes_valid, links_valid=True, **kwargs):
+def _add_container_inspect(rsps, config_id, container_map, c_config, state, container_id, image_id,
+                           volumes_valid, links_valid=True, **kwargs):
     config_type = config_id.config_type
     if config_type == ITEM_TYPE_CONTAINER:
         if config_id.instance_name:
@@ -174,9 +187,11 @@ def _add_inspect(rsps, config_id, container_map, c_config, state, container_id, 
         network_settings = {
             'Ports': ports,
         }
+    id_str = '{0}'.format(container_id)
+    name_list = ['/{0}'.format(container_name)]
     results = {
-        'Id': '{0}'.format(container_id),
-        'Names': ['/{0}'.format(container_name)],
+        'Id': id_str,
+        'Names': name_list,
         'State': STATE_RESULTS[state],
         'Image': '{0}'.format(image_id),
         'Mounts': list(_get_container_mounts(config_id, container_map, c_config, volumes_valid)),
@@ -191,19 +206,39 @@ def _add_inspect(rsps, config_id, container_map, c_config, state, container_id, 
         ],
     }
     results.update(kwargs)
-    rsps.add('GET', '{0}/containers/{1}/json'.format(URL_PREFIX, container_name),
-             content_type='application/json',
-             json=results)
-    rsps.add('GET', '{0}/containers/{1}/json'.format(URL_PREFIX, container_id),
-             content_type='application/json',
-             json=results)
-    rsps.add('GET', '{0}/containers/{1}/top'.format(URL_PREFIX, container_name),
-             content_type='application/json',
-             json=exec_results)
-    rsps.add('GET', '{0}/containers/{1}/top'.format(URL_PREFIX, container_id),
-             content_type='application/json',
-             json=exec_results)
-    return container_id, container_name
+    for i_id in (container_name, container_id):
+        rsps.add('GET', '{0}/containers/{1}/json'.format(URL_PREFIX, i_id),
+                 content_type='application/json',
+                 json=results)
+        rsps.add('GET', '{0}/containers/{1}/top'.format(URL_PREFIX, i_id),
+                 content_type='application/json',
+                 json=exec_results)
+    return id_str, name_list
+
+
+def _add_network_inspect(rsps, config_id, n_config, network_id, containers, **kwargs):
+    network_name = '{0.map_name}.{0.config_name}'.format(config_id)
+    id_str = '{0}'.format(network_id)
+    results = {
+        'Id': id_str,
+        'Name': network_name,
+        'Driver': n_config.driver,
+        'Internal': n_config.internal,
+        'Options': {},
+        'Containers': [{
+            c_id: {
+                'Name': c_name,
+                'EndpointID': c_ep_id,
+            }
+            for c_ep_id, c_id, c_name in containers
+        }],
+    }
+    results.update(kwargs)
+    for i_id in (network_name, network_id):
+        rsps.add('GET', '{0}/networks/{1}'.format(URL_PREFIX, i_id),
+                 content_type='application/json',
+                 json=results)
+    return network_id, network_name
 
 
 def _get_single_state(sg, config_ids):
@@ -251,26 +286,43 @@ class TestPolicyStateGenerators(unittest.TestCase):
     def _config_id(self, config_name, instance=None):
         return [MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, config_name, instance)]
 
-    def _setup_containers(self, rsps, containers_states):
+    def _setup_containers(self, rsps, containers_states, networks=()):
         container_names = []
+        network_names = []
         _add_image_list(rsps, self.images)
         image_dict = {name: _id for _id, name in self.images}
         container_id = 0
+        network_id = 0
         base_image_id = image_dict[DEFAULT_BASEIMAGE]
+        network_containers = defaultdict(list)
+        net_ep_id = 0
         for name, state, instances, attached_valid, instances_valid, kwargs in containers_states:
             c_config = self.sample_map.get_existing(name)
             for a in c_config.attaches:
                 container_id += 1
                 config_id = MapConfigId(ITEM_TYPE_VOLUME, self.map_name, name, a)
-                container_names.append(_add_inspect(rsps, config_id, self.sample_map, c_config,
-                                                    P_STATE_EXITED_0, container_id, base_image_id, attached_valid))
+                container_names.append(_add_container_inspect(rsps, config_id, self.sample_map, c_config,
+                                                              P_STATE_EXITED_0, container_id, base_image_id, attached_valid))
             image_id = image_dict[c_config.image or name]
             for i in instances or c_config.instances or [None]:
                 container_id += 1
                 config_id = MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, name, i)
-                container_names.append(_add_inspect(rsps, config_id, self.sample_map, c_config,
-                                                    state, container_id, image_id, instances_valid, **kwargs))
+                container_id_names = _add_container_inspect(rsps, config_id, self.sample_map, c_config,
+                                                            state, container_id, image_id, instances_valid, **kwargs)
+                container_names.append(container_id_names)
+                if c_config.networks:
+                    cn_id, cn_names = container_id_names
+                    for cn in c_config.networks:
+                        net_ep_id += 1
+                        network_containers[cn.network_name].append((net_ep_id, cn_id, cn_names[0]))
+        for name, kwargs in networks:
+            n_config = self.sample_map.get_existing_network(name)
+            network_id += 1
+            config_id = MapConfigId(ITEM_TYPE_NETWORK, self.map_name, name)
+            network_names.append(_add_network_inspect(rsps, config_id, n_config, network_id,
+                                                      network_containers.get(name, []), **kwargs))
         _add_container_list(rsps, container_names)
+        _add_network_list(rsps, network_names)
 
     def _setup_default_containers(self, rsps):
         self._setup_containers(rsps, [
@@ -474,7 +526,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.assertEqual(server_state.base_state, STATE_RUNNING)
             self.assertEqual(server_state.state_flags & STATE_FLAG_MISSING_LINK, STATE_FLAG_MISSING_LINK)
 
-    def test_update_states_invalid_network(self):
+    def test_update_states_invalid_network_mode(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
                 _container('sub_sub_svc'),
@@ -487,6 +539,39 @@ class TestPolicyStateGenerators(unittest.TestCase):
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
             self.assertEqual(server_state.state_flags & STATE_FLAG_MISC_MISMATCH, STATE_FLAG_MISC_MISMATCH)
+
+    def test_update_states_network_clean(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_containers(rsps, [
+                _container('net_svc'),
+                _container('server3'),
+            ], [
+                _network('app_net1'),
+                _network('app_net2'),
+            ])
+            svc_id = self._config_id('server3')
+            states = list(UpdateStateGenerator(self.policy, {}).get_states(svc_id))
+            self.assertTrue(all(((cs.config_id.config_type in (ITEM_TYPE_NETWORK, ITEM_TYPE_VOLUME) and
+                                  cs.base_state == STATE_PRESENT) or
+                                 (cs.config_id.config_type == ITEM_TYPE_CONTAINER and
+                                  cs.base_state == STATE_RUNNING)) and
+                                not cs.state_flags & STATE_FLAG_NEEDS_RESET
+                                for cs in states))
+
+    def test_update_states_updated_or_missing_network(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_containers(rsps, [
+                _container('net_svc'),
+                _container('server3'),
+            ], [
+                _network('app_net2', Driver='new'),
+            ])
+            svc_id = self._config_id('server3')
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_id))
+            self.assertEqual(states['containers'][('net_svc', None)].state_flags & STATE_FLAG_NETWORK_DISCONNECT, STATE_FLAG_NETWORK_DISCONNECT)
+            self.assertEqual(states['containers'][('server3', None)].state_flags & STATE_FLAG_NETWORK_DISCONNECT, STATE_FLAG_NETWORK_DISCONNECT)
+            self.assertEqual(states['networks']['app_net1'].base_state, STATE_ABSENT)
+            self.assertEqual(states['networks']['app_net2'].state_flags & STATE_FLAG_MISC_MISMATCH, STATE_FLAG_MISC_MISMATCH)
 
     def test_update_states_updated_environment(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
