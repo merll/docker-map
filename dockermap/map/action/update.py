@@ -42,8 +42,9 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 log.debug("Found to be outdated - resetting %s.", config_id)
                 connected_containers = state.extra_data.get('containers')
                 if connected_containers:
-                    log.debug("Disconnecting containers from %s: %s.", config_id, connected_containers)
-                    actions = [ItemAction(state, N_UTIL_ACTION_DISCONNECT_ALL, containers=connected_containers)]
+                    cc_names = [c.get('Name', c['Id']) for c in connected_containers]
+                    log.debug("Disconnecting containers from %s: %s.", config_id, cc_names)
+                    actions = [ItemAction(state, N_UTIL_ACTION_DISCONNECT_ALL, containers=cc_names)]
                 else:
                     actions = []
                 actions.append(ItemAction(state, DERIVED_ACTION_RESET_NETWORK))

@@ -194,7 +194,7 @@ class NetworkBaseState(AbstractState):
     def get_state(self):
         if self.detail is NOT_FOUND:
             return STATE_ABSENT, 0, {}
-        connected_containers = list(self.detail['Containers'])
+        connected_containers = self.detail.get('Containers', {})
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
             state_flag = STATE_FLAG_FORCED_RESET
