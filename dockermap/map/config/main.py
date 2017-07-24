@@ -381,8 +381,8 @@ class ContainerMap(ConfigurationObject):
             return [MapConfigId(ITEM_TYPE_CONTAINER, self._name, volume_config_name, ai)
                     for ai in used_instances or (None, )]
 
-        def _get_linked_items(l):
-            linked_config_name, __, linked_instance = l.container.partition('.')
+        def _get_linked_items(lc):
+            linked_config_name, __, linked_instance = lc.partition('.')
             if linked_instance:
                 linked_instances = (linked_instance, )
             else:
@@ -390,7 +390,7 @@ class ContainerMap(ConfigurationObject):
             return [MapConfigId(ITEM_TYPE_CONTAINER, self._name, linked_config_name, li)
                     for li in linked_instances or (None, )]
 
-        def _get_network_items(n):
+        def _get_network_mode_items(n):
             net_config_name, net_instance = n
             network_ref_config = ext_map.get_existing(net_config_name)
             if network_ref_config:
@@ -401,6 +401,12 @@ class ContainerMap(ConfigurationObject):
                 return [MapConfigId(ITEM_TYPE_CONTAINER, self._name, net_config_name, ni)
                         for ni in network_instances]
             return [MapConfigId(ITEM_TYPE_NETWORK, self._name, net_config_name)]
+
+        def _get_network_items(n):
+            net_items = [MapConfigId(ITEM_TYPE_NETWORK, self._name, n.network_name)]
+            if n.links:
+                net_items.extend(itertools.chain.from_iterable(map(_get_linked_items, n.links)))
+            return net_items
 
         if self._extended:
             ext_map = self
@@ -421,11 +427,10 @@ class ContainerMap(ConfigurationObject):
             d = []
             nw = config.network_mode
             if isinstance(nw, tuple):
-                merge_list(d, _get_network_items(nw))
+                merge_list(d, _get_network_mode_items(nw))
+            merge_list(d, itertools.chain.from_iterable(map(_get_network_items, config.networks)))
             merge_list(d, itertools.chain.from_iterable(map(used_func, config.uses)))
-            merge_list(d, itertools.chain.from_iterable(map(_get_linked_items, config.links)))
-            merge_list(d, [MapConfigId(ITEM_TYPE_NETWORK, self._name, n.network_name)
-                           for n in config.networks])
+            merge_list(d, itertools.chain.from_iterable(_get_linked_items(l.container) for l in config.links))
             merge_list(d, [MapConfigId(ITEM_TYPE_VOLUME, self._name, name, a)
                            for a in config.attaches])
             return d
