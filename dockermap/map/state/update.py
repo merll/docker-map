@@ -11,7 +11,8 @@ from ...functional import resolve_value
 from ..policy import CONTAINER_CONFIG_FLAG_ATTACHED
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
 from . import (STATE_FLAG_IMAGE_MISMATCH, STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_MISSING_LINK, STATE_FLAG_MISC_MISMATCH,
-               STATE_FLAG_NEEDS_RESET, STATE_ABSENT)
+               STATE_FLAG_NEEDS_RESET, STATE_ABSENT, STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_MISMATCH,
+               STATE_FLAG_NETWORK_LEFT)
 
 log = logging.getLogger(__name__)
 
@@ -124,7 +125,6 @@ class SingleContainerVfsCheck(object):
     :type vfs_paths: dict[tuple, unicode | str]
     :type config_id: dockermap.map.input.MapConfigId
     :type container_map: dockermap.map.config.main.ContainerMap
-    :type instance_name: unicode | str
     :type instance_volumes: dict[unicode | str, unicode | str]
     """
     def __init__(self, vfs_paths, config_id, container_map, instance_volumes):
@@ -220,6 +220,63 @@ class ContainerVolumeChecker(object):
         return True
 
 
+class NetworkEndpointRegisty(object):
+    def __init__(self, n_name_func, c_name_func, container_names):
+        self._n_name_func = n_name_func
+        self._c_name_func = c_name_func
+        self._container_names = container_names
+        self._endpoints = defaultdict(set)
+
+    def register_network(self, detail):
+        network_id = detail['Id']
+        for c_id, c_detail in six.iteritems(detail.get('Containers') or {}):
+            self._endpoints[c_id].update((network_id, c_detail['EndpointID']))
+
+    def check_container_config(self, config_id, c_config, detail):
+        networks = detail['NetworkSettings'].get('Networks', {})
+        connected_network_names = set(networks.keys())
+        disconnected_networks = []
+        configured_network_names = set()
+        network_endpoints = self._endpoints.get(detail['Id'])
+        reset_networks = []
+        for cn_config in c_config.networks:
+            ref_n_name = self._n_name_func(config_id.map_name, cn_config.network_name)
+            configured_network_names.add(ref_n_name)
+            if ref_n_name not in connected_network_names:
+                disconnected_networks.append(cn_config)
+                continue
+            network_detail = networks[ref_n_name]
+            c_alias_set = set(cn_config.aliases)
+            if ((c_alias_set and set(network_detail.get('Aliases', []) or ()) != c_alias_set) or
+                    not network_endpoints or
+                    (network_detail['Id'], network_detail['EndpointID']) not in network_endpoints):
+                reset_networks.append(cn_config)
+                continue
+            linked_names = {self._c_name_func(config_id.map_name, lc_name)
+                            for lc_name in cn_config.links}
+            if set(network_detail.get('Links', []) or ()) != linked_names:
+                reset_networks.append(cn_config)
+                continue
+        if disconnected_networks:
+            log.debug("Container is not connected to configured networks: %s.", disconnected_networks)
+            s_flags = STATE_FLAG_NETWORK_DISCONNECTED
+            extra = {'disconnected': disconnected_networks}
+        else:
+            s_flags = 0
+            extra = {}
+        if reset_networks:
+            log.debug("Container is connected, but with different settings from the configuration: %s.", reset_networks)
+            s_flags |= STATE_FLAG_NETWORK_MISMATCH
+            extra['reset'] = reset_networks
+        left_networks = connected_network_names - configured_network_names
+        if left_networks:
+            log.debug("Container is connected to the following networks that it is not configured for: %s.",
+                      left_networks)
+            s_flags |= STATE_FLAG_NETWORK_LEFT
+            extra['left'] = left_networks
+        return s_flags, extra
+
+
 class UpdateContainerState(ContainerBaseState):
     """
     Extends the base state by checking the current instance detail against the container configuration and volumes
@@ -229,6 +286,7 @@ class UpdateContainerState(ContainerBaseState):
         super(UpdateContainerState, self).__init__(*args, **kwargs)
         self.base_image_id = None
         self.volume_checker = None
+        self.endpoint_registry = None
         self.current_commands = None
 
     def _check_links(self):
@@ -342,16 +400,23 @@ class UpdateContainerState(ContainerBaseState):
                 exec_results = self._check_commands(check_exec_option)
                 if exec_results is not None:
                     extra.update(exec_commands=exec_results)
-            return base_state, state_flags, extra
+            net_s_flags, net_extra = self.endpoint_registry.check_container_config(config_id, self.config, self.detail)
+            state_flags |= net_s_flags
+            extra.update(net_extra)
         return base_state, state_flags, extra
 
 
 class UpdateNetworkState(NetworkBaseState):
+    def __init__(self, *args, **kwargs):
+        super(UpdateNetworkState, self).__init__(*args, **kwargs)
+        self.endpoint_registry = None
+
     def get_state(self):
         base_state, state_flags, extra = super(UpdateNetworkState, self).get_state()
         if base_state == STATE_ABSENT or state_flags & STATE_FLAG_NEEDS_RESET:
             return base_state, state_flags, extra
 
+        self.endpoint_registry.register_network(self.detail)
         if (self.detail['Driver'] != self.config.driver or
                 not _check_network_driver_opts(self.config, self.detail) or
                 self.config.internal != self.detail['Internal']):
@@ -399,10 +464,19 @@ class UpdateStateGenerator(DependencyStateGenerator):
             client_name: ContainerVolumeChecker()
             for client_name in policy.clients.keys()
         }
+        self._network_registries = {
+            client_name: NetworkEndpointRegisty(policy.nname, policy.cname, policy.container_names[client_name])
+            for client_name in policy.clients.keys()
+        }
 
-    def get_container_state(self, client_name, config_id, c_map, c_config, config_flags, *args, **kwargs):
-        c_state = super(UpdateStateGenerator, self).get_container_state(client_name, config_id, c_map, c_config,
-                                                                        config_flags, *args, **kwargs)
+    def get_container_state(self, client_name, *args, **kwargs):
+        c_state = super(UpdateStateGenerator, self).get_container_state(client_name, *args, **kwargs)
         c_state.base_image_ids = self._base_image_ids[client_name]
         c_state.volume_checker = self._volume_checkers[client_name]
+        c_state.endpoint_registry = self._network_registries[client_name]
         return c_state
+
+    def get_network_state(self, client_name, *args, **kwargs):
+        n_state = super(UpdateStateGenerator, self).get_network_state(client_name, *args, **kwargs)
+        n_state.endpoint_registry = self._network_registries[client_name]
+        return n_state

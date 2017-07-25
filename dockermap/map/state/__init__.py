@@ -17,7 +17,9 @@ STATE_FLAG_FORCED_RESET = 1 << 11     # Container in any state should be reset.
 STATE_FLAG_IMAGE_MISMATCH = 1 << 12   # Container does not correspond with configured image.
 STATE_FLAG_MISSING_LINK = 1 << 13     # A configured linked container cannot be found.
 STATE_FLAG_VOLUME_MISMATCH = 1 << 14  # Container is pointing to a different path than some of its configured volumes.
-STATE_FLAG_NETWORK_DISCONNECT = 1 << 15  # Container is not connected to a network that it is configured for.
+STATE_FLAG_NETWORK_DISCONNECTED = 1 << 15  # Container is not connected to a network that it is configured for.
+STATE_FLAG_NETWORK_LEFT = 1 << 16     # Container is connected to a network that it is not configured for.
+STATE_FLAG_NETWORK_MISMATCH = 1 << 17  # Container has different configured connection parameters than the current link.
 STATE_FLAG_MISC_MISMATCH = 1 << 20    # Container does otherwise not correspond with the configuration.
 
 # TODO: Depends on Docker version

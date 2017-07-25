@@ -19,7 +19,7 @@ from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESEN
                                  STATE_FLAG_NONRECOVERABLE, STATE_FLAG_RESTARTING, STATE_FLAG_INITIAL,
                                  STATE_FLAG_NEEDS_RESET, STATE_FLAG_MISC_MISMATCH, STATE_FLAG_IMAGE_MISMATCH,
                                  STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_FORCED_RESET, STATE_FLAG_MISSING_LINK,
-                                 STATE_FLAG_NETWORK_DISCONNECT)
+                                 STATE_FLAG_NETWORK_DISCONNECTED)
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
 from dockermap.map.state.utils import merge_dependency_paths
@@ -225,13 +225,13 @@ def _add_network_inspect(rsps, config_id, n_config, network_id, containers, **kw
         'Driver': n_config.driver,
         'Internal': n_config.internal,
         'Options': {},
-        'Containers': [{
+        'Containers': {
             c_id: {
                 'Name': c_name,
                 'EndpointID': c_ep_id,
             }
             for c_ep_id, c_id, c_name in containers
-        }],
+        },
     }
     results.update(kwargs)
     for i_id in (network_name, network_id):
@@ -566,10 +566,13 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ], [
                 _network('app_net2', Driver='new'),
             ])
-            svc_id = self._config_id('server3')
-            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_id))
-            self.assertEqual(states['containers'][('net_svc', None)].state_flags & STATE_FLAG_NETWORK_DISCONNECT, STATE_FLAG_NETWORK_DISCONNECT)
-            self.assertEqual(states['containers'][('server3', None)].state_flags & STATE_FLAG_NETWORK_DISCONNECT, STATE_FLAG_NETWORK_DISCONNECT)
+            svc_ids = [
+                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'server3'),
+                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'net_svc')
+            ]
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_ids))
+            self.assertEqual(states['containers'][('net_svc', None)].state_flags & STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_DISCONNECTED)
+            self.assertEqual(states['containers'][('server3', None)].state_flags & STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_DISCONNECTED)
             self.assertEqual(states['networks']['app_net1'].base_state, STATE_ABSENT)
             self.assertEqual(states['networks']['app_net2'].state_flags & STATE_FLAG_MISC_MISMATCH, STATE_FLAG_MISC_MISMATCH)
 
