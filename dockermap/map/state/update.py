@@ -230,7 +230,7 @@ class NetworkEndpointRegisty(object):
     def register_network(self, detail):
         network_id = detail['Id']
         for c_id, c_detail in six.iteritems(detail.get('Containers') or {}):
-            self._endpoints[c_id].update((network_id, c_detail['EndpointID']))
+            self._endpoints[c_id].add((network_id, c_detail['EndpointID']))
 
     def check_container_config(self, config_id, c_config, detail):
         networks = detail['NetworkSettings'].get('Networks', {})
@@ -246,14 +246,17 @@ class NetworkEndpointRegisty(object):
                 disconnected_networks.append(cn_config)
                 continue
             network_detail = networks[ref_n_name]
-            c_alias_set = set(cn_config.aliases)
+            c_alias_set = set(cn_config.aliases or ())
             if ((c_alias_set and set(network_detail.get('Aliases', []) or ()) != c_alias_set) or
                     not network_endpoints or
-                    (network_detail['Id'], network_detail['EndpointID']) not in network_endpoints):
+                    (network_detail['NetworkID'], network_detail['EndpointID']) not in network_endpoints):
                 reset_networks.append(cn_config)
                 continue
-            linked_names = {self._c_name_func(config_id.map_name, lc_name)
-                            for lc_name in cn_config.links}
+            if cn_config.links:
+                linked_names = {self._c_name_func(config_id.map_name, lc_name)
+                                for lc_name in cn_config.links}
+            else:
+                linked_names = set()
             if set(network_detail.get('Links', []) or ()) != linked_names:
                 reset_networks.append(cn_config)
                 continue

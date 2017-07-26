@@ -2,6 +2,7 @@
 from __future__ import absolute_import, unicode_literals
 
 from collections import defaultdict
+from hashlib import md5
 
 import posixpath
 import unittest
@@ -19,7 +20,7 @@ from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESEN
                                  STATE_FLAG_NONRECOVERABLE, STATE_FLAG_RESTARTING, STATE_FLAG_INITIAL,
                                  STATE_FLAG_NEEDS_RESET, STATE_FLAG_MISC_MISMATCH, STATE_FLAG_IMAGE_MISMATCH,
                                  STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_FORCED_RESET, STATE_FLAG_MISSING_LINK,
-                                 STATE_FLAG_NETWORK_DISCONNECTED)
+                                 STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_MISMATCH, STATE_FLAG_NETWORK_LEFT)
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
 from dockermap.map.state.utils import merge_dependency_paths
@@ -68,6 +69,33 @@ STATE_RESULTS = {
 }
 
 
+def _get_hash(main, *args):
+    h = md5(main)
+    for a in args:
+        h.update(a)
+    return h.hexdigest()
+
+
+def get_image_id(image_name):
+    return _get_hash('image_name', image_name)
+
+
+def get_container_id(container_name):
+    return _get_hash('container', container_name)
+
+
+def get_network_id(network_name):
+    return _get_hash('network', network_name)
+
+
+def get_endpoint_id(network_name, container_id):
+    return _get_hash('network-endpoint', network_name, container_id)
+
+
+def get_invalid_endpoint_id(network_name, container_id):
+    return 'invalid-{0}'.format(get_endpoint_id(network_name, container_id))
+
+
 def _container(config_name, p_state=P_STATE_RUNNING, instances=None, attached_volumes_valid=True,
                instance_volumes_valid=True, **kwargs):
     return config_name, p_state, instances, attached_volumes_valid, instance_volumes_valid, kwargs
@@ -79,16 +107,16 @@ def _network(config_name, **kwargs):
 
 def _add_container_list(rsps, container_names):
     results = [
-        {'Id': c_id, 'Names': name_list}
-        for c_id, name_list in container_names
+        {'Id': get_container_id(name), 'Names': ['/{0}'.format(name)]}
+        for name in container_names
     ]
     rsps.add('GET', '{0}/containers/json'.format(URL_PREFIX), content_type='application/json', json=results)
 
 
 def _add_network_list(rsps, network_names):
     results = [
-        {'Id': n_id, 'Name': name}
-        for n_id, name in network_names
+        {'Id': get_network_id(name), 'Name': name}
+        for name in network_names
     ]
     rsps.add('GET', '{0}/networks'.format(URL_PREFIX), content_type='application/json', json=results)
 
@@ -138,8 +166,9 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
                 raise ValueError("Invalid uses declaration in {0}: {1}".format(config_id.config_name, vol))
 
 
-def _add_container_inspect(rsps, config_id, container_map, c_config, state, container_id, image_id,
-                           volumes_valid, links_valid=True, **kwargs):
+def _add_container_inspect(rsps, config_id, container_map, c_config, state, image_id,
+                           volumes_valid, links_valid=True, network_ep_valid=True, network_link_valid=True,
+                           skip_network=None, extra_network=False, **kwargs):
     config_type = config_id.config_type
     if config_type == ITEM_TYPE_CONTAINER:
         if config_id.instance_name:
@@ -153,6 +182,7 @@ def _add_container_inspect(rsps, config_id, container_map, c_config, state, cont
             container_name = '{0.map_name}.{0.instance_name}'.format(config_id)
     else:
         raise ValueError(config_type)
+    container_id = get_container_id(container_name)
     ports = defaultdict(list)
     host_config = {}
     network_settings = {}
@@ -184,16 +214,39 @@ def _add_container_inspect(rsps, config_id, container_map, c_config, state, cont
                                 link.alias or BasePolicy.get_hostname(link.container))
             for link in c_config.links
         ]
+        networks = {}
+        network_ep_func = get_endpoint_id if network_ep_valid else get_invalid_endpoint_id
+        for n in c_config.networks:
+            if n.network_name == skip_network:
+                continue
+            network_name = '{0}.{1}'.format(config_id.map_name, n.network_name)
+            if n.links and network_link_valid:
+                link_list = ['{0}.{1}'.format(config_id.map_name, nl) for nl in n.links]
+            else:
+                link_list = None
+            networks[network_name] = {
+                'Links':  link_list,
+                'Aliases': n.aliases or ['{0}_alias'.format(config_id.config_name)],
+                'NetworkID': get_network_id(network_name),
+                'EndpointID': network_ep_func(network_name, container_id),
+            }
+        if extra_network:
+            networks['extra'] = {
+                'Links':  None,
+                'Aliases': ['{0}_alias'.format(config_id.config_name)],
+                'NetworkID': get_network_id('extra'),
+                'EndpointID': network_ep_func('extra', container_id),
+            }
         network_settings = {
             'Ports': ports,
+            'Networks': networks,
         }
-    id_str = '{0}'.format(container_id)
-    name_list = ['/{0}'.format(container_name)]
+    name_list = [container_name]
     results = {
-        'Id': id_str,
+        'Id': container_id,
         'Names': name_list,
         'State': STATE_RESULTS[state],
-        'Image': '{0}'.format(image_id),
+        'Image': image_id,
         'Mounts': list(_get_container_mounts(config_id, container_map, c_config, volumes_valid)),
         'HostConfig': host_config,
         'Config': config_dict,
@@ -213,14 +266,15 @@ def _add_container_inspect(rsps, config_id, container_map, c_config, state, cont
         rsps.add('GET', '{0}/containers/{1}/top'.format(URL_PREFIX, i_id),
                  content_type='application/json',
                  json=exec_results)
-    return id_str, name_list
+    return container_name
 
 
-def _add_network_inspect(rsps, config_id, n_config, network_id, containers, **kwargs):
+def _add_network_inspect(rsps, config_id, n_config, containers, **kwargs):
     network_name = '{0.map_name}.{0.config_name}'.format(config_id)
-    id_str = '{0}'.format(network_id)
+    network_id = get_network_id(network_name)
+    container_ids = [(get_container_id(c_name), c_name) for c_name in containers]
     results = {
-        'Id': id_str,
+        'Id': network_id,
         'Name': network_name,
         'Driver': n_config.driver,
         'Internal': n_config.internal,
@@ -228,9 +282,9 @@ def _add_network_inspect(rsps, config_id, n_config, network_id, containers, **kw
         'Containers': {
             c_id: {
                 'Name': c_name,
-                'EndpointID': c_ep_id,
+                'EndpointID': get_endpoint_id(network_name, c_id),
             }
-            for c_ep_id, c_id, c_name in containers
+            for c_id, c_name in container_ids
         },
     }
     results.update(kwargs)
@@ -238,7 +292,7 @@ def _add_network_inspect(rsps, config_id, n_config, network_id, containers, **kw
         rsps.add('GET', '{0}/networks/{1}'.format(URL_PREFIX, i_id),
                  content_type='application/json',
                  json=results)
-    return network_id, network_name
+    return network_name
 
 
 def _get_single_state(sg, config_ids):
@@ -281,7 +335,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
         all_images = set(c_config.image or c_name for c_name, c_config in sample_map)
         all_images.add(DEFAULT_COREIMAGE)
         all_images.add(DEFAULT_BASEIMAGE)
-        self.images = list(enumerate(all_images))
+        self.images = [(get_image_id(image_name), image_name)
+                       for image_name in all_images]
 
     def _config_id(self, config_name, instance=None):
         return [MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, config_name, instance)]
@@ -291,35 +346,27 @@ class TestPolicyStateGenerators(unittest.TestCase):
         network_names = []
         _add_image_list(rsps, self.images)
         image_dict = {name: _id for _id, name in self.images}
-        container_id = 0
-        network_id = 0
         base_image_id = image_dict[DEFAULT_BASEIMAGE]
         network_containers = defaultdict(list)
-        net_ep_id = 0
         for name, state, instances, attached_valid, instances_valid, kwargs in containers_states:
             c_config = self.sample_map.get_existing(name)
             for a in c_config.attaches:
-                container_id += 1
                 config_id = MapConfigId(ITEM_TYPE_VOLUME, self.map_name, name, a)
                 container_names.append(_add_container_inspect(rsps, config_id, self.sample_map, c_config,
-                                                              P_STATE_EXITED_0, container_id, base_image_id, attached_valid))
+                                                              P_STATE_EXITED_0, base_image_id, attached_valid))
             image_id = image_dict[c_config.image or name]
             for i in instances or c_config.instances or [None]:
-                container_id += 1
                 config_id = MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, name, i)
-                container_id_names = _add_container_inspect(rsps, config_id, self.sample_map, c_config,
-                                                            state, container_id, image_id, instances_valid, **kwargs)
-                container_names.append(container_id_names)
+                container_name = _add_container_inspect(rsps, config_id, self.sample_map, c_config,
+                                                        state, image_id, instances_valid, **kwargs)
+                container_names.append(container_name)
                 if c_config.networks:
-                    cn_id, cn_names = container_id_names
                     for cn in c_config.networks:
-                        net_ep_id += 1
-                        network_containers[cn.network_name].append((net_ep_id, cn_id, cn_names[0]))
+                        network_containers[cn.network_name].append(container_name)
         for name, kwargs in networks:
             n_config = self.sample_map.get_existing_network(name)
-            network_id += 1
             config_id = MapConfigId(ITEM_TYPE_NETWORK, self.map_name, name)
-            network_names.append(_add_network_inspect(rsps, config_id, n_config, network_id,
+            network_names.append(_add_network_inspect(rsps, config_id, n_config,
                                                       network_containers.get(name, []), **kwargs))
         _add_container_list(rsps, container_names)
         _add_network_list(rsps, network_names)
@@ -555,14 +602,14 @@ class TestPolicyStateGenerators(unittest.TestCase):
                                   cs.base_state == STATE_PRESENT) or
                                  (cs.config_id.config_type == ITEM_TYPE_CONTAINER and
                                   cs.base_state == STATE_RUNNING)) and
-                                not cs.state_flags & STATE_FLAG_NEEDS_RESET
+                                cs.state_flags == 0
                                 for cs in states))
 
     def test_update_states_updated_or_missing_network(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
-                _container('net_svc'),
-                _container('server3'),
+                _container('net_svc', skip_network='app_net1'),
+                _container('server3', skip_network='app_net1'),
             ], [
                 _network('app_net2', Driver='new'),
             ])
@@ -575,6 +622,37 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.assertEqual(states['containers'][('server3', None)].state_flags & STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_DISCONNECTED)
             self.assertEqual(states['networks']['app_net1'].base_state, STATE_ABSENT)
             self.assertEqual(states['networks']['app_net2'].state_flags & STATE_FLAG_MISC_MISMATCH, STATE_FLAG_MISC_MISMATCH)
+
+    def test_update_states_network_mismatch(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_containers(rsps, [
+                _container('net_svc', network_link_valid=False),
+                _container('server3', network_ep_valid=False),
+            ], [
+                _network('app_net1'),
+                _network('app_net2'),
+            ])
+            svc_ids = [
+                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'server3'),
+                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'net_svc')
+            ]
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_ids))
+            self.assertEqual(states['containers'][('net_svc', None)].state_flags & STATE_FLAG_NETWORK_MISMATCH, STATE_FLAG_NETWORK_MISMATCH)
+            self.assertEqual(states['containers'][('server3', None)].state_flags & STATE_FLAG_NETWORK_MISMATCH, STATE_FLAG_NETWORK_MISMATCH)
+
+    def test_update_states_left_network(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_containers(rsps, [
+                _container('server3', extra_network=True),
+            ], [
+                _network('app_net1'),
+                _network('app_net2'),
+            ])
+            svc_ids = [
+                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'server3'),
+            ]
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_ids))
+            self.assertEqual(states['containers'][('server3', None)].state_flags & STATE_FLAG_NETWORK_LEFT, STATE_FLAG_NETWORK_LEFT)
 
     def test_update_states_updated_environment(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -618,7 +696,6 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.map_name = map_name = 'main'
         self.sample_map = sample_map = ContainerMap('main', MAP_DATA_2,
                                                     use_attached_parent_name=True).get_extended_map()
-        # self.sample_map.repository = None
         self.sample_client_config = client_config = ClientConfiguration(**CLIENT_DATA_1)
         self.policy = policy = BasePolicy({map_name: sample_map}, {'__default__': client_config})
         self.state_gen = DependencyStateGenerator(policy, {})
