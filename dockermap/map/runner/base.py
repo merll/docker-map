@@ -28,11 +28,6 @@ log = logging.getLogger(__name__)
 
 class DockerBaseRunnerMixin(object):
     action_method_names = [
-        (ITEM_TYPE_NETWORK, ACTION_CREATE, 'create_network'),
-        (ITEM_TYPE_NETWORK, ACTION_REMOVE, 'remove_network'),
-        (ITEM_TYPE_NETWORK, ACTION_CONNECT, 'connect_network'),
-        (ITEM_TYPE_NETWORK, ACTION_DISCONNECT, 'disconnect_network'),
-
         (ITEM_TYPE_VOLUME, ACTION_CREATE, 'create_volume'),
         (ITEM_TYPE_VOLUME, ACTION_START, 'start_volume'),
         (ITEM_TYPE_VOLUME, ACTION_REMOVE, 'remove_volume'),
@@ -45,22 +40,6 @@ class DockerBaseRunnerMixin(object):
         (ITEM_TYPE_CONTAINER, ACTION_KILL, 'kill'),
         (ITEM_TYPE_CONTAINER, ACTION_WAIT, 'wait'),
     ]
-
-    def create_network(self, action, n_name, **kwargs):
-        c_kwargs = self.get_network_create_kwargs(action, n_name, **kwargs)
-        return action.client.create_network(**c_kwargs)
-
-    def remove_network(self, action, n_name, **kwargs):
-        c_kwargs = self.get_network_remove_kwargs(action, n_name, **kwargs)
-        return action.client.remove_network(**c_kwargs)
-
-    def connect_network(self, action, n_name, container_name, **kwargs):
-        c_kwargs = self.get_network_connect_kwargs(action, n_name, container_name, **kwargs)
-        return action.client.connect_container_to_network(**c_kwargs)
-
-    def disconnect_network(self, action, n_name, container_name, **kwargs):
-        c_kwargs = self.get_network_disconnect_kwargs(action, n_name, container_name, **kwargs)
-        return action.client.disconnect_container_from_network(**c_kwargs)
 
     def create_volume(self, action, v_name, **kwargs):
         c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
@@ -280,7 +259,7 @@ class DockerConfigMixin(object):
             timeout = action.client_config.get('stop_timeout')
             if timeout is not None:
                 c_kwargs['timeout'] = timeout
-        else:
+        elif stop_timeout is not None:
             c_kwargs['timeout'] = stop_timeout
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
@@ -327,7 +306,7 @@ class DockerConfigMixin(object):
             timeout = action.client_config.get('stop_timeout')
             if timeout is not None:
                 c_kwargs['timeout'] = timeout
-        else:
+        elif stop_timeout is not None:
             c_kwargs['timeout'] = stop_timeout
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
@@ -390,7 +369,7 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_network_connect_kwargs(self, action, container_name, network_name, kwargs=None):
+    def get_network_connect_kwargs(self, action, network_name, container_name, endpoint_config=None, kwargs=None):
         """
         Generates keyword arguments for the Docker client to add a container to a network.
 
@@ -400,28 +379,41 @@ class DockerConfigMixin(object):
         :type network_name: unicode | str
         :param container_name: Container name or id.
         :type container_name: unicode | str
+        :param endpoint_config: Network endpoint configuration.
+        :type endpoint_config: dockermap.map.input.NetworkEndpoint
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.
         :rtype: dict
         """
+        policy = self._policy
+        map_name = action.config_id.map_name
         c_kwargs = dict(
             container=container_name,
             net_id=network_name,
         )
+        if endpoint_config:
+            c_kwargs.update(
+                aliases=endpoint_config.aliases,
+                links=[(policy.cname(map_name, l_name), alias or policy.get_hostname(l_name))
+                       for l_name, alias in endpoint_config.links],
+                ipv4_address=endpoint_config.ipv4_address,
+                ipv6_address=endpoint_config.ipv6_address,
+                link_local_ips=endpoint_config.link_local_ips,
+            )
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
-    def get_network_disconnect_kwargs(self, action, container_name, network_name, kwargs=None):
+    def get_network_disconnect_kwargs(self, action, network_name, container_name, kwargs=None):
         """
         Generates keyword arguments for the Docker client to remove a container from a network.
 
         :param action: Action configuration.
         :type action: ActionConfig
-        :param network_name: Network name or id.
-        :type network_name: unicode | str
         :param container_name: Container name or id.
         :type container_name: unicode | str
+        :param network_name: Network name or id.
+        :type network_name: unicode | str
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         :return: Resulting keyword arguments.

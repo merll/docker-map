@@ -71,7 +71,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                 try:
                     a_method = self.action_methods[(config_type, action_type)]
                 except KeyError:
-                    raise ValueError("Invalid action.", config_type, action.action_type)
+                    raise ValueError("Invalid action.", config_type, action_type)
                 action_config = ActionConfig(action.client_name, action.config_id, client_config, client,
                                              c_map, config)
                 res = a_method(action_config, item_name, **action.extra_data)

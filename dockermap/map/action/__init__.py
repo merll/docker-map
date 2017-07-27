@@ -19,17 +19,25 @@ C_UTIL_ACTION_EXEC_COMMANDS = 'exec_single_command'           # Create & start e
 C_UTIL_ACTION_EXEC_ALL = 'exec_all_commands'                  # Create & start all configured exec commands
 C_UTIL_ACTION_SCRIPT = 'script'                               # Create & start container, then create & start exec.
 C_UTIL_ACTION_SIGNAL_STOP = 'signal_stop'                     # Send signal (kill) & wait.
-C_UTIL_ACTION_CONNECT = 'connect_networks'                    # Connect container to a list of networks.
+C_UTIL_ACTION_CONNECT_ALL = 'connect_all_networks'            # Connect container to all configured networks.
+
 V_UTIL_ACTION_PREPARE = 'prepare_volume'                      # Set up volume permissions.
 
-N_UTIL_ACTION_DISCONNECT_ALL = 'disconnect_all'               # Disconnect all containers from a network.
+N_UTIL_ACTION_DISCONNECT_ALL = 'disconnect_all_containers'    # Disconnect all containers from a network.
 
-DERIVED_ACTION_STARTUP_CONTAINER = [ACTION_CREATE, ACTION_START]                  # Create & start
-DERIVED_ACTION_SHUTDOWN_CONTAINER = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE]    # Stop & remove
+DERIVED_ACTION_STARTUP_VOLUME = [ACTION_CREATE, ACTION_START]                   # Create, connect, & start
+DERIVED_ACTION_STARTUP_CONTAINER = [ACTION_CREATE, C_UTIL_ACTION_CONNECT_ALL,
+                                    ACTION_START]                               # Create & start
+DERIVED_ACTION_SHUTDOWN_CONTAINER = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE]  # Stop & remove
+DERIVED_ACTION_RESET_VOLUME = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE,
+                               ACTION_CREATE, ACTION_START]                     # Stop, remove, create, & start
 DERIVED_ACTION_RESET_CONTAINER = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE,
-                                  ACTION_CREATE, ACTION_START]                    # Stop, remove, create, & start
-DERIVED_ACTION_RELAUNCH = [ACTION_REMOVE, ACTION_CREATE, ACTION_START]            # Remove, create, & start
-DERIVED_ACTION_RESET_NETWORK = [ACTION_REMOVE, ACTION_CREATE]                     # Remove & re-create
+                                  ACTION_CREATE, C_UTIL_ACTION_CONNECT_ALL,
+                                  ACTION_START]                                 # Stop, remove, create, connect, & start
+DERIVED_ACTION_RELAUNCH_VOLUME = [ACTION_REMOVE, ACTION_CREATE, ACTION_START]   # Remove, create, & start
+DERIVED_ACTION_RELAUNCH_CONTAINER = [ACTION_REMOVE, ACTION_CREATE,
+                                     C_UTIL_ACTION_CONNECT_ALL, ACTION_START]   # Remove, create, connect, & start
+DERIVED_ACTION_RESET_NETWORK = [ACTION_REMOVE, ACTION_CREATE]                   # Remove & re-create
 
 
 def _action_type_list(value):

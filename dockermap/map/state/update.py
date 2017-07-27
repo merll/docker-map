@@ -251,7 +251,7 @@ class NetworkEndpointRegisty(object):
             if ((c_alias_set and set(network_detail.get('Aliases', []) or ()) != c_alias_set) or
                     not network_endpoints or
                     (network_detail['NetworkID'], network_detail['EndpointID']) not in network_endpoints):
-                reset_networks.append(cn_config)
+                reset_networks.append((ref_n_name, cn_config))
                 continue
             if cn_config.links:
                 linked_names = {self._c_name_func(config_id.map_name, lc_name)
@@ -259,19 +259,18 @@ class NetworkEndpointRegisty(object):
             else:
                 linked_names = set()
             if set(network_detail.get('Links', []) or ()) != linked_names:
-                reset_networks.append(cn_config)
+                reset_networks.append((ref_n_name, cn_config))
                 continue
+        s_flags = 0
+        extra = {}
         if disconnected_networks:
             log.debug("Container is not connected to configured networks: %s.", disconnected_networks)
-            s_flags = STATE_FLAG_NETWORK_DISCONNECTED
-            extra = {'disconnected': disconnected_networks}
-        else:
-            s_flags = 0
-            extra = {}
+            s_flags |= STATE_FLAG_NETWORK_DISCONNECTED
+            extra['disconnected'] = disconnected_networks
         if reset_networks:
             log.debug("Container is connected, but with different settings from the configuration: %s.", reset_networks)
             s_flags |= STATE_FLAG_NETWORK_MISMATCH
-            extra['reset'] = reset_networks
+            extra['reconnect'] = reset_networks
         left_networks = connected_network_names - configured_network_names
         if left_networks:
             log.debug("Container is connected to the following networks that it is not configured for: %s.",

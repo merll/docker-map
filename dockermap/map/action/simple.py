@@ -6,8 +6,9 @@ from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
 from ..state import STATE_ABSENT, STATE_PRESENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING
 from .base import AbstractActionGenerator
 from . import (ItemAction, ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_REMOVE, V_UTIL_ACTION_PREPARE,
-               C_UTIL_ACTION_SIGNAL_STOP, C_UTIL_ACTION_EXEC_ALL, N_UTIL_ACTION_DISCONNECT_ALL,
-               DERIVED_ACTION_STARTUP_CONTAINER, DERIVED_ACTION_SHUTDOWN_CONTAINER)
+               C_UTIL_ACTION_SIGNAL_STOP, C_UTIL_ACTION_EXEC_ALL, C_UTIL_ACTION_CONNECT_ALL,
+               N_UTIL_ACTION_DISCONNECT_ALL, DERIVED_ACTION_STARTUP_CONTAINER, DERIVED_ACTION_SHUTDOWN_CONTAINER,
+               DERIVED_ACTION_STARTUP_VOLUME)
 
 
 class CreateActionGenerator(AbstractActionGenerator):
@@ -22,7 +23,10 @@ class CreateActionGenerator(AbstractActionGenerator):
         :rtype: list[dockermap.map.action.ItemAction]
         """
         if state.base_state == STATE_ABSENT:
-            return [ItemAction(state, ACTION_CREATE, extra_data=kwargs)]
+            actions = [ItemAction(state, ACTION_CREATE, extra_data=kwargs)]
+            if state.config_id.config_type == ITEM_TYPE_CONTAINER:
+                actions.append(ItemAction(state, C_UTIL_ACTION_CONNECT_ALL))
+            return actions
 
 
 class StartActionGenerator(AbstractActionGenerator):
@@ -139,7 +143,7 @@ class StartupActionGenerator(AbstractActionGenerator):
         elif config_type == ITEM_TYPE_VOLUME:
             if state.base_state == STATE_ABSENT:
                 return [
-                    ItemAction(state, DERIVED_ACTION_STARTUP_CONTAINER),
+                    ItemAction(state, DERIVED_ACTION_STARTUP_VOLUME),
                     ItemAction(state, V_UTIL_ACTION_PREPARE),
                 ]
             elif state.base_state == STATE_PRESENT and state.state_flags & STATE_FLAG_INITIAL:
@@ -177,8 +181,9 @@ class ShutdownActionGenerator(RemoveActionGenerator):
             if state.base_state == STATE_PRESENT:
                 connected_containers = state.extra_data.get('containers')
                 if connected_containers:
+                    cc_names = [c.get('Name', c['Id']) for c in connected_containers]
                     actions = [ItemAction(state, N_UTIL_ACTION_DISCONNECT_ALL,
-                                          extra_data={'containers': connected_containers})]
+                                          extra_data={'containers': cc_names})]
                 else:
                     actions = []
                 actions.append(ItemAction(state, ACTION_REMOVE, extra_data=kwargs))

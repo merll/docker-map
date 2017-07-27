@@ -6,12 +6,15 @@ import logging
 from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
 from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
 from ..state import (STATE_ABSENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING, STATE_FLAG_NEEDS_RESET,
-                     STATE_FLAG_EXEC_COMMANDS)
+                     STATE_FLAG_EXEC_COMMANDS, STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_LEFT,
+                     STATE_FLAG_NETWORK_MISMATCH)
 from .base import AbstractActionGenerator
-from . import (ItemAction, ACTION_CREATE, ACTION_START, C_UTIL_ACTION_EXEC_ALL, C_UTIL_ACTION_EXEC_COMMANDS,
+from . import (ItemAction, ACTION_CREATE, ACTION_START, ACTION_CONNECT, ACTION_DISCONNECT,
+               C_UTIL_ACTION_EXEC_ALL, C_UTIL_ACTION_EXEC_COMMANDS,
                N_UTIL_ACTION_DISCONNECT_ALL, V_UTIL_ACTION_PREPARE,
-               DERIVED_ACTION_RESET_CONTAINER, DERIVED_ACTION_STARTUP_CONTAINER, DERIVED_ACTION_RELAUNCH,
-               DERIVED_ACTION_RESET_NETWORK)
+               DERIVED_ACTION_RESET_CONTAINER, DERIVED_ACTION_STARTUP_CONTAINER, DERIVED_ACTION_STARTUP_VOLUME,
+               DERIVED_ACTION_RELAUNCH_CONTAINER, DERIVED_ACTION_RELAUNCH_VOLUME, DERIVED_ACTION_RESET_NETWORK,
+               DERIVED_ACTION_RESET_VOLUME)
 
 
 log = logging.getLogger(__name__)
@@ -54,14 +57,14 @@ class UpdateActionGenerator(AbstractActionGenerator):
             # TODO: To be changed for Docker volumes.
             if state.base_state == STATE_ABSENT:
                 log.debug("Not found - creating and starting attached container %s.", config_id)
-                action_type = DERIVED_ACTION_STARTUP_CONTAINER
+                action_type = DERIVED_ACTION_STARTUP_VOLUME
             elif state.state_flags & STATE_FLAG_NEEDS_RESET:
                 if state.base_state == STATE_RUNNING:
                     log.debug("Found to be outdated or non-recoverable - resetting %s.", config_id)
-                    action_type = DERIVED_ACTION_RESET_CONTAINER
+                    action_type = DERIVED_ACTION_RESET_VOLUME
                 else:
                     log.debug("Found to be outdated or non-recoverable - relaunching %s.", config_id)
-                    action_type = DERIVED_ACTION_RELAUNCH
+                    action_type = DERIVED_ACTION_RELAUNCH_VOLUME
             elif state.state_flags & STATE_FLAG_INITIAL:
                 log.debug("Container found but initial, starting %s.", config_id)
                 action_type = ACTION_START
@@ -82,18 +85,39 @@ class UpdateActionGenerator(AbstractActionGenerator):
                     action_type = DERIVED_ACTION_RESET_CONTAINER
                 else:
                     log.debug("Found to be outdated or non-recoverable - relaunching %s.", config_id)
-                    action_type = DERIVED_ACTION_RELAUNCH
-            elif (state.base_state != STATE_RUNNING and
-                  (ci_initial or not state.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT)):
-                log.debug("Container found but not running, starting %s.", config_id)
-                action_type = ACTION_START
+                    action_type = DERIVED_ACTION_RELAUNCH_CONTAINER
             else:
-                if state.state_flags & STATE_FLAG_EXEC_COMMANDS:
-                    run_cmds = state.extra_data['exec_commands']
-                    if run_cmds:
-                        log.debug("Container %s up-to-date, but with missing commands %s.", config_id, run_cmds)
-                        return [ItemAction(state, C_UTIL_ACTION_EXEC_COMMANDS, run_cmds=run_cmds)]
-                return None
+                actions = []
+                if state.state_flags & STATE_FLAG_NETWORK_DISCONNECTED:
+                    dn = state.extra_data['disconnected']
+                    log.debug("Container is connecting to the following networks: %s.", dn)
+                    actions.append(ItemAction(state, ACTION_CONNECT, endpoints=dn))
+                if state.state_flags & STATE_FLAG_NETWORK_MISMATCH:
+                    rn = state.extra_data['reconnect']
+                    n_names, n_ep = zip(*rn)
+                    log.debug("Container is reconnecting to the following networks: %s.", n_names)
+                    actions.extend([
+                        ItemAction(state, ACTION_DISCONNECT, networks=n_names),
+                        ItemAction(state, ACTION_CONNECT, endpoints=n_ep),
+                    ])
+                if state.state_flags & STATE_FLAG_NETWORK_LEFT:
+                    ln = state.extra_data['left']
+                    log.debug("Container is disconnecting to the following networks: %s.", ln)
+                    actions.append(ItemAction(state, ACTION_DISCONNECT, networks=ln))
+                if (state.base_state != STATE_RUNNING and
+                        (ci_initial or not state.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT)):
+                    log.debug("Container found but not running, starting %s.", config_id)
+                    actions.extend([
+                        ItemAction(state, ACTION_START),
+                        ItemAction(state, C_UTIL_ACTION_EXEC_ALL),
+                    ])
+                else:
+                    if state.state_flags & STATE_FLAG_EXEC_COMMANDS:
+                        run_cmds = state.extra_data['exec_commands']
+                        if run_cmds:
+                            log.debug("Container %s up-to-date, but with missing commands %s.", config_id, run_cmds)
+                            actions.append(ItemAction(state, C_UTIL_ACTION_EXEC_COMMANDS, run_cmds=run_cmds))
+                return actions
             return [
                 ItemAction(state, action_type),
                 ItemAction(state, C_UTIL_ACTION_EXEC_ALL),
