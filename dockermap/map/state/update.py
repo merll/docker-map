@@ -8,11 +8,12 @@ import six
 
 from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
 from ...functional import resolve_value
+from ..input import EXEC_POLICY_INITIAL
 from ..policy import CONTAINER_CONFIG_FLAG_ATTACHED
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
 from . import (STATE_FLAG_IMAGE_MISMATCH, STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_MISSING_LINK, STATE_FLAG_MISC_MISMATCH,
                STATE_FLAG_NEEDS_RESET, STATE_ABSENT, STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_MISMATCH,
-               STATE_FLAG_NETWORK_LEFT)
+               STATE_FLAG_NETWORK_LEFT, STATE_FLAG_EXEC_COMMANDS, STATE_RUNNING)
 
 log = logging.getLogger(__name__)
 
@@ -324,7 +325,7 @@ class UpdateContainerState(ContainerBaseState):
             log.debug("Command for user %s not found: %s.", f_user, f_cmd)
             return False
 
-        def _cmd_state(cmd, cmd_user):
+        def _cmd_running(cmd, cmd_user):
             res_cmd = resolve_value(cmd)
             if isinstance(res_cmd, (list, tuple)):
                 res_cmd = ' '.join(res_cmd)
@@ -341,7 +342,7 @@ class UpdateContainerState(ContainerBaseState):
             return None
         if not self.current_commands:
             log.debug("No running exec commands found for container.")
-            return [(exec_cmd, False) for exec_cmd in self.config.exec_commands]
+            return self.config.exec_commands
         log.debug("Checking commands for container %s.", self.container_name)
         if check_option == CMD_CHECK_FULL:
             cmd_exists = _find_full_command
@@ -350,7 +351,8 @@ class UpdateContainerState(ContainerBaseState):
         else:
             log.debug("Invalid check mode %s - skipping.", check_option)
             return None
-        return [(exec_cmd, _cmd_state(exec_cmd[0], exec_cmd[1])) for exec_cmd in self.config.exec_commands]
+        return [exec_cmd for exec_cmd in self.config.exec_commands
+                if not _cmd_running(exec_cmd.cmd, exec_cmd.user) and exec_cmd.policy != EXEC_POLICY_INITIAL]
 
     def _check_volumes(self):
         return self.volume_checker.check(self.config_id, self.container_map, self.config, self.detail)
@@ -398,11 +400,13 @@ class UpdateContainerState(ContainerBaseState):
             if not (_check_environment(self.config, self.detail) and _check_cmd(self.config, self.detail) and
                     _check_network(self.config, self.client_config, self.detail)):
                 state_flags |= STATE_FLAG_MISC_MISMATCH
-            check_exec_option = self.options['check_exec_commands']
-            if check_exec_option:
-                exec_results = self._check_commands(check_exec_option)
-                if exec_results is not None:
-                    extra.update(exec_commands=exec_results)
+            if base_state == STATE_RUNNING:
+                check_exec_option = self.options['check_exec_commands']
+                if check_exec_option:
+                    missing_exec_cmds = self._check_commands(check_exec_option)
+                    if missing_exec_cmds is not None:
+                        state_flags |= STATE_FLAG_EXEC_COMMANDS
+                        extra['exec_commands'] = missing_exec_cmds
             net_s_flags, net_extra = self.endpoint_registry.check_container_config(config_id, self.config, self.detail)
             state_flags |= net_s_flags
             extra.update(net_extra)

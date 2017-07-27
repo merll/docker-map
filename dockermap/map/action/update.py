@@ -3,9 +3,10 @@ from __future__ import unicode_literals
 
 import logging
 
-from ..input import EXEC_POLICY_INITIAL, ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
+from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
 from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
-from ..state import STATE_ABSENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING, STATE_FLAG_NEEDS_RESET
+from ..state import (STATE_ABSENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING, STATE_FLAG_NEEDS_RESET,
+                     STATE_FLAG_EXEC_COMMANDS)
 from .base import AbstractActionGenerator
 from . import (ItemAction, ACTION_CREATE, ACTION_START, C_UTIL_ACTION_EXEC_ALL, C_UTIL_ACTION_EXEC_COMMANDS,
                N_UTIL_ACTION_DISCONNECT_ALL, V_UTIL_ACTION_PREPARE,
@@ -87,14 +88,11 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 log.debug("Container found but not running, starting %s.", config_id)
                 action_type = ACTION_START
             else:
-                run_cmds = [
-                    exec_cmd
-                    for exec_cmd, running in state.extra_data.get('exec_commands', [])
-                    if not running and (ci_initial or exec_cmd.policy != EXEC_POLICY_INITIAL)
-                ]
-                if run_cmds:
-                    log.debug("Container %s up-to-date, but with missing commands %s.", config_id, run_cmds)
-                    return [ItemAction(state, C_UTIL_ACTION_EXEC_COMMANDS, run_cmds=run_cmds)]
+                if state.state_flags & STATE_FLAG_EXEC_COMMANDS:
+                    run_cmds = state.extra_data['exec_commands']
+                    if run_cmds:
+                        log.debug("Container %s up-to-date, but with missing commands %s.", config_id, run_cmds)
+                        return [ItemAction(state, C_UTIL_ACTION_EXEC_COMMANDS, run_cmds=run_cmds)]
                 return None
             return [
                 ItemAction(state, action_type),

@@ -20,7 +20,8 @@ from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESEN
                                  STATE_FLAG_NONRECOVERABLE, STATE_FLAG_RESTARTING, STATE_FLAG_INITIAL,
                                  STATE_FLAG_NEEDS_RESET, STATE_FLAG_MISC_MISMATCH, STATE_FLAG_IMAGE_MISMATCH,
                                  STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_FORCED_RESET, STATE_FLAG_MISSING_LINK,
-                                 STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_MISMATCH, STATE_FLAG_NETWORK_LEFT)
+                                 STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_MISMATCH, STATE_FLAG_NETWORK_LEFT,
+                                 STATE_FLAG_EXEC_COMMANDS)
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
 from dockermap.map.state.utils import merge_dependency_paths
@@ -684,11 +685,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
             self.assertEqual(server_state.state_flags & STATE_FLAG_NEEDS_RESET, 0)
-            self.assertDictEqual(server_state.extra_data, {'exec_commands': [
-                (cmd1, True),
-                (cmd2, False),
-                (cmd3, False),
-            ]})
+            self.assertEqual(server_state.state_flags & STATE_FLAG_EXEC_COMMANDS, STATE_FLAG_EXEC_COMMANDS)
+            self.assertDictEqual(server_state.extra_data, {'exec_commands': [cmd3]})
 
 
 class TestPolicyStateUtils(unittest.TestCase):
