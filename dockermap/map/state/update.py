@@ -240,7 +240,7 @@ class NetworkEndpointRegisty(object):
         connected_network_names = set(networks.keys())
         disconnected_networks = []
         configured_network_names = set()
-        network_endpoints = self._endpoints.get(detail['Id'])
+        network_endpoints = self._endpoints.get(detail['Id'], set())
         reset_networks = []
         if c_config.networks:
             named_endpoints = [(self._n_name_func(config_id.map_name, cn_config.network_name), cn_config)
@@ -255,9 +255,13 @@ class NetworkEndpointRegisty(object):
                 continue
             network_detail = networks[ref_n_name]
             c_alias_set = set(cn_config.aliases or ())
-            if ((c_alias_set and not c_alias_set.issubset(network_detail.get('Aliases') or ())) or
-                    not network_endpoints or
-                    (network_detail['NetworkID'], network_detail['EndpointID']) not in network_endpoints):
+            if c_alias_set and not c_alias_set.issubset(network_detail.get('Aliases')):
+                log.debug("Aliases in network %s differ or are not present.", ref_n_name)
+                reset_networks.append((ref_n_name, cn_config))
+                continue
+            if (network_detail['NetworkID'], network_detail['EndpointID']) not in network_endpoints:
+                log.debug("Network endpoint not found in %s (%s): %s", ref_n_name, network_detail['NetworkID'],
+                          network_detail['EndpointID'])
                 reset_networks.append((ref_n_name, cn_config))
                 continue
             if cn_config.links:
@@ -266,6 +270,7 @@ class NetworkEndpointRegisty(object):
             else:
                 linked_names = set()
             if set(network_detail.get('Links', []) or ()) != linked_names:
+                log.debug("Links in %s differ from configuration: %s.", ref_n_name, network_detail.get('Links', []))
                 reset_networks.append((ref_n_name, cn_config))
                 continue
         s_flags = 0
