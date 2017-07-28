@@ -107,10 +107,7 @@ class CachedNetworkNames(CachedItems, set):
             return
         current_networks = self._client.networks()
         self.clear()
-        self.update(net['Name']
-                    for net in current_networks)
-        for default_name in ('bridge', 'local', 'default'):
-            self.discard(default_name)
+        self.update(net['Name'] for net in current_networks)
 
 
 class DockerHostItemCache(dict):

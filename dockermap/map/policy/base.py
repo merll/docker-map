@@ -26,6 +26,7 @@ class BasePolicy(object):
     base_image = DEFAULT_BASEIMAGE
     default_client_name = '__default__'
     hostname_replace = DEFAULT_HOSTNAME_REPLACEMENT
+    default_network_names = ['bridge']
 
     def __init__(self, container_maps, clients):
         self._maps = {

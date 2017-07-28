@@ -167,22 +167,10 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
                 raise ValueError("Invalid uses declaration in {0}: {1}".format(config_id.config_name, vol))
 
 
-def _add_container_inspect(rsps, config_id, container_map, c_config, state, image_id,
+def _add_container_inspect(rsps, config_id, container_name, container_map, c_config, state, image_id,
                            volumes_valid, links_valid=True, network_ep_valid=True, network_link_valid=True,
                            skip_network=None, extra_network=False, **kwargs):
     config_type = config_id.config_type
-    if config_type == ITEM_TYPE_CONTAINER:
-        if config_id.instance_name:
-            container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
-        else:
-            container_name = '{0.map_name}.{0.config_name}'.format(config_id)
-    elif config_type == ITEM_TYPE_VOLUME:
-        if container_map.use_attached_parent_name:
-            container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
-        else:
-            container_name = '{0.map_name}.{0.instance_name}'.format(config_id)
-    else:
-        raise ValueError(config_type)
     container_id = get_container_id(container_name)
     ports = defaultdict(list)
     host_config = {}
@@ -192,6 +180,7 @@ def _add_container_inspect(rsps, config_id, container_map, c_config, state, imag
         'Cmd': [],
         'Entrypoint': [],
     }
+    host_config['NetworkMode'] = 'default'  # TODO: Vary.
     if config_type == ITEM_TYPE_CONTAINER:
         for ex in c_config.exposes:
             ex_port = '{0}/tcp'.format(ex.exposed_port)
@@ -217,31 +206,44 @@ def _add_container_inspect(rsps, config_id, container_map, c_config, state, imag
         ]
         networks = {}
         network_ep_func = get_endpoint_id if network_ep_valid else get_invalid_endpoint_id
-        for n in c_config.networks:
-            if n.network_name == skip_network:
-                continue
-            network_name = '{0}.{1}'.format(config_id.map_name, n.network_name)
-            if n.links and network_link_valid:
-                link_list = ['{0}.{1}'.format(config_id.map_name, nl) for nl in n.links]
-            else:
-                link_list = None
-            networks[network_name] = {
-                'Links':  link_list,
-                'Aliases': n.aliases or ['{0}_alias'.format(config_id.config_name)],
-                'NetworkID': get_network_id(network_name),
-                'EndpointID': network_ep_func(network_name, container_id),
-            }
-        if extra_network:
-            networks['extra'] = {
-                'Links':  None,
-                'Aliases': ['{0}_alias'.format(config_id.config_name)],
-                'NetworkID': get_network_id('extra'),
-                'EndpointID': network_ep_func('extra', container_id),
-            }
+        default_aliases = ['{0}_alias'.format(config_id.config_name)]
+        if c_config.network_mode != 'disabled':  # TODO: Vary.
+            for n in c_config.networks:
+                if n.network_name == skip_network:
+                    continue
+                network_name = '{0}.{1}'.format(config_id.map_name, n.network_name)
+                if n.links and network_link_valid:
+                    link_list = ['{0}.{1}'.format(config_id.map_name, nl) for nl in n.links]
+                else:
+                    link_list = None
+                networks[network_name] = {
+                    'Links': link_list,
+                    'Aliases': n.aliases or default_aliases,
+                    'NetworkID': get_network_id(network_name),
+                    'EndpointID': network_ep_func(network_name, container_id),
+                }
+            if not c_config.networks:
+                networks['bridge'] = {
+                    'Links': None,
+                    'Aliases': default_aliases,
+                    'NetworkID': get_network_id('bridge'),
+                    'EndpointID': network_ep_func('bridge', container_id),
+                }
+            if extra_network:
+                networks['extra'] = {
+                    'Links':  None,
+                    'Aliases': default_aliases,
+                    'NetworkID': get_network_id('extra'),
+                    'EndpointID': network_ep_func('extra', container_id),
+                }
+        else:
+            config_dict['NetworkDisabled'] = True
         network_settings = {
             'Ports': ports,
             'Networks': networks,
         }
+    else:
+        config_dict['NetworkDisabled'] = True
     name_list = [container_name]
     results = {
         'Id': container_id,
@@ -270,15 +272,20 @@ def _add_container_inspect(rsps, config_id, container_map, c_config, state, imag
     return container_name
 
 
-def _add_network_inspect(rsps, config_id, n_config, containers, **kwargs):
-    network_name = '{0.map_name}.{0.config_name}'.format(config_id)
+def _add_network_inspect(rsps, network_name, n_config, containers, **kwargs):
     network_id = get_network_id(network_name)
     container_ids = [(get_container_id(c_name), c_name) for c_name in containers]
+    if n_config:
+        driver = n_config.driver
+        internal = n_config.internal
+    else:
+        driver = network_name if network_name != 'none' else 'null'
+        internal = False
     results = {
         'Id': network_id,
         'Name': network_name,
-        'Driver': n_config.driver,
-        'Internal': n_config.internal,
+        'Driver': driver,
+        'Internal': internal,
         'Options': {},
         'Containers': {
             c_id: {
@@ -293,7 +300,6 @@ def _add_network_inspect(rsps, config_id, n_config, containers, **kwargs):
         rsps.add('GET', '{0}/networks/{1}'.format(URL_PREFIX, i_id),
                  content_type='application/json',
                  json=results)
-    return network_name
 
 
 def _get_single_state(sg, config_ids):
@@ -353,22 +359,39 @@ class TestPolicyStateGenerators(unittest.TestCase):
             c_config = self.sample_map.get_existing(name)
             for a in c_config.attaches:
                 config_id = MapConfigId(ITEM_TYPE_VOLUME, self.map_name, name, a)
-                container_names.append(_add_container_inspect(rsps, config_id, self.sample_map, c_config,
-                                                              P_STATE_EXITED_0, base_image_id, attached_valid))
+                if self.sample_map.use_attached_parent_name:
+                    container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
+                else:
+                    container_name = '{0.map_name}.{0.instance_name}'.format(config_id)
+                _add_container_inspect(rsps, config_id, container_name, self.sample_map, c_config,
+                                       P_STATE_EXITED_0, base_image_id, attached_valid)
+                container_names.append(container_name)
             image_id = image_dict[c_config.image or name]
             for i in instances or c_config.instances or [None]:
                 config_id = MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, name, i)
-                container_name = _add_container_inspect(rsps, config_id, self.sample_map, c_config,
-                                                        state, image_id, instances_valid, **kwargs)
+                if config_id.instance_name:
+                    container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
+                else:
+                    container_name = '{0.map_name}.{0.config_name}'.format(config_id)
+                _add_container_inspect(rsps, config_id, container_name, self.sample_map, c_config,
+                                       state, image_id, instances_valid, **kwargs)
                 container_names.append(container_name)
                 if c_config.networks:
                     for cn in c_config.networks:
                         network_containers[cn.network_name].append(container_name)
-        for name, kwargs in networks:
-            n_config = self.sample_map.get_existing_network(name)
-            config_id = MapConfigId(ITEM_TYPE_NETWORK, self.map_name, name)
-            network_names.append(_add_network_inspect(rsps, config_id, n_config,
-                                                      network_containers.get(name, []), **kwargs))
+                elif c_config.network_mode != 'disabled':
+                    network_containers['bridge'].append(container_name)
+                    if kwargs.get('extra_network'):
+                        network_containers['extra'].append(container_name)
+        for n_name, kwargs in networks:
+            n_config = self.sample_map.get_existing_network(n_name)
+            config_id = MapConfigId(ITEM_TYPE_NETWORK, self.map_name, n_name)
+            network_name = '{0.map_name}.{0.config_name}'.format(config_id)
+            _add_network_inspect(rsps, network_name, n_config, network_containers.get(n_name, []), **kwargs)
+            network_names.append(network_name)
+        for dn_name in ('bridge', 'none', 'host'):
+            _add_network_inspect(rsps, dn_name, None, network_containers.get(dn_name, []))
+            network_names.append(dn_name)
         _add_container_list(rsps, container_names)
         _add_network_list(rsps, network_names)
 
@@ -574,7 +597,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.assertEqual(server_state.base_state, STATE_RUNNING)
             self.assertEqual(server_state.state_flags & STATE_FLAG_MISSING_LINK, STATE_FLAG_MISSING_LINK)
 
-    def test_update_states_invalid_network_mode(self):
+    def test_update_states_invalid_network_ports(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
                 _container('sub_sub_svc'),
