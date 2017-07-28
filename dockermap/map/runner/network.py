@@ -80,7 +80,7 @@ class NetworkUtilMixin(object):
         map_name = action.config_id.map_name
         nname = self._policy.nname
         for network_endpoint in endpoints:
-            if network_endpoint.network_name not in ('host', 'default', 'none'):
+            if network_endpoint.network_name not in ('host', 'bridge', 'none'):
                 network_name = nname(map_name, network_endpoint.network_name)
             else:
                 network_name = network_endpoint.network_name
