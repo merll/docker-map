@@ -116,7 +116,7 @@ def _check_network_driver_opts(network_config, instance_detail):
     opts = {option_key.rpartition('.')[2]: option_value
             for option_key, option_value in six.iteritems(instance_detail['Options'])}
     for c_key, c_val in network_config.driver_options:
-        if c_val != opts.get(c_key):
+        if resolve_value(c_val) != opts.get(c_key):
             return False
     return True
 
@@ -463,9 +463,9 @@ class UpdateNetworkState(NetworkBaseState):
             return base_state, state_flags, extra
 
         self.endpoint_registry.register_network(self.detail)
-        if (self.detail['Driver'] != self.config.driver or
+        if (self.detail['Driver'] != resolve_value(self.config.driver) or
                 not _check_network_driver_opts(self.config, self.detail) or
-                self.config.internal != self.detail['Internal']):
+                self.detail['Internal'] != resolve_value(self.config.internal)):
             state_flags |= STATE_FLAG_MISC_MISMATCH
         return base_state, state_flags, extra
 
