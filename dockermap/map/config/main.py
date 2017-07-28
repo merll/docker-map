@@ -400,7 +400,7 @@ class ContainerMap(ConfigurationObject):
                     network_instances = network_ref_config.instances
                 return [MapConfigId(ITEM_TYPE_CONTAINER, self._name, net_config_name, ni)
                         for ni in network_instances]
-            return [MapConfigId(ITEM_TYPE_NETWORK, self._name, net_config_name)]
+            return []
 
         def _get_network_items(n):
             net_items = [MapConfigId(ITEM_TYPE_NETWORK, self._name, n.network_name)]
@@ -554,17 +554,19 @@ class ContainerMap(ConfigurationObject):
             network_mode = c_config.network_mode
             if isinstance(network_mode, tuple):
                 if network_mode[1]:
-                    networks.append('{0[0]}.{0[1]}'.format(network_mode))
+                    net_containers = ['{0[0]}.{0[1]}'.format(network_mode)]
                 else:
-                    networks.append(network_mode[0])
+                    net_containers = [network_mode[0]]
+            else:
+                net_containers = []
             if self.use_attached_parent_name:
                 attaches = [(c_name, a) for a in c_config.attaches]
             else:
                 attaches = c_config.attaches
-            return instance_names, group_ref_names, uses, attaches, shared, bind, link, networks
+            return instance_names, group_ref_names, uses, attaches, shared, bind, link, networks, net_containers
 
         (all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links,
-         all_connected) = zip(*[
+         all_connected, all_net_containers) = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
          ])
         if self.use_attached_parent_name:
@@ -622,9 +624,15 @@ class ContainerMap(ConfigurationObject):
             missing_links_str = ', '.join(missing_links)
             raise MapIntegrityError("No container instance found for link(s): {0}.".format(missing_links_str))
         used_network_set = set(itertools.chain.from_iterable(all_connected))
-        available_network_set = set(self.networks.keys()) | instance_set
+        used_net_container_set = set(itertools.chain.from_iterable(all_net_containers))
+        available_network_set = set(self.networks.keys())
         missing_networks = used_network_set - available_network_set
         if missing_networks:
             missing_networks_str = ', '.join(missing_networks)
-            raise MapIntegrityError("No network configuration or container instance found for the following network "
-                                    "reference(s): {0}".format(missing_networks_str))
+            raise MapIntegrityError("No network configuration found for the following network reference(s): "
+                                    "{0}".format(missing_networks_str))
+        missing_net_containers = used_net_container_set - instance_set
+        if missing_net_containers:
+            missing_net_cnt_str = ', '.join(missing_net_containers)
+            raise MapIntegrityError("No container instance found for the following network mode reference(s): "
+                                    "{0}".format(missing_net_cnt_str))
