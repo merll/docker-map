@@ -7,6 +7,7 @@ from ...client.base import DockerClientWrapper
 from .. import DictMap
 
 HOST_CONFIG_VERSION = StrictVersion(str('1.15'))
+NETWORKS_VERSION = StrictVersion(str('1.21'))
 USE_HC_MERGE = 'merge'
 
 
@@ -31,6 +32,7 @@ class ClientConfiguration(DictMap):
         self._base_url = base_url
         self._version = version
         self.use_host_config = kwargs.pop('use_host_config', False)
+        self.supports_networks = False
         self._timeout = timeout
         if 'interfaces' in kwargs:
             self._interfaces = DictMap(kwargs.pop('interfaces'))
@@ -67,7 +69,9 @@ class ClientConfiguration(DictMap):
     def update_settings(self, **kwargs):
         version = kwargs.pop('version', None)
         if version and version != 'auto':
-            self.use_host_config = str(version) >= HOST_CONFIG_VERSION
+            version_str = str(version)
+            self.use_host_config = version_str >= HOST_CONFIG_VERSION
+            self.supports_networks = version_str >= NETWORKS_VERSION
 
     def get_init_kwargs(self):
         """
