@@ -8,12 +8,10 @@ import six
 
 from ...functional import resolve_value
 from ..input import EXEC_POLICY_INITIAL, NetworkEndpoint
-from ..policy import CONTAINER_CONFIG_FLAG_ATTACHED
+from ..policy import ConfigFlags
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
+from . import STATE_RUNNING, STATE_ABSENT, StateFlags
 from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
-from . import (STATE_FLAG_IMAGE_MISMATCH, STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_MISSING_LINK, STATE_FLAG_MISC_MISMATCH,
-               STATE_FLAG_NEEDS_RESET, STATE_ABSENT, STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_MISMATCH,
-               STATE_FLAG_NETWORK_LEFT, STATE_FLAG_EXEC_COMMANDS, STATE_RUNNING)
 
 log = logging.getLogger(__name__)
 
@@ -273,21 +271,21 @@ class NetworkEndpointRegisty(object):
                 log.debug("Links in %s differ from configuration: %s.", ref_n_name, network_detail.get('Links', []))
                 reset_networks.append((ref_n_name, cn_config))
                 continue
-        s_flags = 0
+        s_flags = StateFlags.NONE
         extra = {}
         if disconnected_networks:
             log.debug("Container is not connected to configured networks: %s.", disconnected_networks)
-            s_flags |= STATE_FLAG_NETWORK_DISCONNECTED
+            s_flags |= StateFlags.NETWORK_DISCONNECTED
             extra['disconnected'] = disconnected_networks
         if reset_networks:
             log.debug("Container is connected, but with different settings from the configuration: %s.", reset_networks)
-            s_flags |= STATE_FLAG_NETWORK_MISMATCH
+            s_flags |= StateFlags.NETWORK_MISMATCH
             extra['reconnect'] = reset_networks
         left_networks = connected_network_names - configured_network_names
         if left_networks:
             log.debug("Container is connected to the following networks that it is not configured for: %s.",
                       left_networks)
-            s_flags |= STATE_FLAG_NETWORK_LEFT
+            s_flags |= StateFlags.NETWORK_LEFT
             extra['left'] = left_networks
         return s_flags, extra
 
@@ -374,9 +372,9 @@ class UpdateContainerState(ContainerBaseState):
         if (net_mode == 'disabled') != self.detail['Config'].get('NetworkDisabled', False):
             if has_nw_support:
                 if self.config.networks:
-                    return STATE_FLAG_NETWORK_DISCONNECTED, {'disconnected': self.config.networks}
+                    return StateFlags.NETWORK_DISCONNECTED, {'disconnected': self.config.networks}
                 return 0, {}
-            return STATE_FLAG_MISC_MISMATCH, {}
+            return StateFlags.MISC_MISMATCH, {}
         instance_mode = self.detail['HostConfig'].get('NetworkMode') or 'default'
         if isinstance(net_mode, tuple):
             ref_mode = 'container:{0}'.format(self.policy.cname(self.config_id.map_name, *net_mode))
@@ -386,16 +384,16 @@ class UpdateContainerState(ContainerBaseState):
             ref_mode = net_mode
         if ref_mode != instance_mode:
             if has_nw_support:
-                state_flag = 0
+                state_flag = StateFlags.NONE
                 extra_data = {}
                 if instance_mode != 'default':
-                    state_flag |= STATE_FLAG_NETWORK_LEFT
+                    state_flag |= StateFlags.NETWORK_LEFT
                     extra_data['left'] = [instance_mode]
                 if ref_mode == 'bridge':
-                    state_flag |= STATE_FLAG_NETWORK_DISCONNECTED
+                    state_flag |= StateFlags.NETWORK_DISCONNECTED
                     extra_data['disconnected'] = self.config.networks
                 return state_flag, extra_data
-            return STATE_FLAG_MISC_MISMATCH, {}
+            return StateFlags.MISC_MISMATCH, {}
         return 0, {}
 
     def set_defaults(self):
@@ -404,21 +402,21 @@ class UpdateContainerState(ContainerBaseState):
 
     def inspect(self):
         super(UpdateContainerState, self).inspect()
-        if self.detail and self.detail['State']['Running'] and not self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
+        if self.detail and self.detail['State']['Running'] and not self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
             check_exec_option = self.options['check_exec_commands']
             if check_exec_option and check_exec_option != CMD_CHECK_NONE and self.config.exec_commands:
                 self.current_commands = self.client.top(self.detail['Id'], ps_args='-eo pid,user,args')['Processes']
 
     def get_state(self):
         base_state, state_flags, extra = super(UpdateContainerState, self).get_state()
-        if base_state == STATE_ABSENT or state_flags & STATE_FLAG_NEEDS_RESET:
+        if base_state == STATE_ABSENT or state_flags & StateFlags.NEEDS_RESET:
             return base_state, state_flags, extra
 
         config_id = self.config_id
         c_image_id = self.detail['Image']
-        if self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
+        if self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
             if self.options['update_persistent'] and c_image_id != self.base_image_id:
-                return base_state, state_flags | STATE_FLAG_IMAGE_MISMATCH, extra
+                return base_state, state_flags | StateFlags.IMAGE_MISMATCH, extra
             volumes = get_instance_volumes(self.detail)
             if volumes:
                 mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name])
@@ -433,23 +431,23 @@ class UpdateContainerState(ContainerBaseState):
             ref_image_id = images.ensure_image(image_name, pull=self.options['pull_before_update'],
                                                insecure_registry=self.options['pull_insecure_registry'])
             if c_image_id != ref_image_id and (not self.config.persistent or self.options['update_persistent']):
-                state_flags |= STATE_FLAG_IMAGE_MISMATCH
+                state_flags |= StateFlags.IMAGE_MISMATCH
             if not self._check_volumes():
-                state_flags |= STATE_FLAG_VOLUME_MISMATCH
+                state_flags |= StateFlags.VOLUME_MISMATCH
             if not self._check_links():
-                state_flags |= STATE_FLAG_MISSING_LINK
+                state_flags |= StateFlags.MISSING_LINK
             if not (_check_environment(self.config, self.detail) and _check_cmd(self.config, self.detail) and
                     _check_container_network_ports(self.config, self.client_config, self.detail)):
-                state_flags |= STATE_FLAG_MISC_MISMATCH
+                state_flags |= StateFlags.MISC_MISMATCH
             if base_state == STATE_RUNNING:
                 check_exec_option = self.options['check_exec_commands']
                 if check_exec_option:
                     missing_exec_cmds = self._check_commands(check_exec_option)
                     if missing_exec_cmds is not None:
-                        state_flags |= STATE_FLAG_EXEC_COMMANDS
+                        state_flags |= StateFlags.EXEC_COMMANDS
                         extra['exec_commands'] = missing_exec_cmds
             net_s_flags, net_extra = self._check_container_network_mode()
-            if net_s_flags == 0 and self.endpoint_registry:
+            if net_s_flags == StateFlags.NONE and self.endpoint_registry:
                 net_s_flags, net_extra = self.endpoint_registry.check_container_config(config_id, self.config,
                                                                                        self.detail)
             state_flags |= net_s_flags
@@ -464,14 +462,14 @@ class UpdateNetworkState(NetworkBaseState):
 
     def get_state(self):
         base_state, state_flags, extra = super(UpdateNetworkState, self).get_state()
-        if base_state == STATE_ABSENT or state_flags & STATE_FLAG_NEEDS_RESET:
+        if base_state == STATE_ABSENT or state_flags & StateFlags.NEEDS_RESET:
             return base_state, state_flags, extra
 
         self.endpoint_registry.register_network(self.detail)
         if (self.detail['Driver'] != resolve_value(self.config.driver) or
                 not _check_network_driver_opts(self.config, self.detail) or
                 self.detail['Internal'] != resolve_value(self.config.internal)):
-            state_flags |= STATE_FLAG_MISC_MISMATCH
+            state_flags |= StateFlags.MISC_MISMATCH
         return base_state, state_flags, extra
 
 

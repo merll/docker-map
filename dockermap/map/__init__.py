@@ -101,3 +101,35 @@ class DefaultDictMap(AttributeMixin, defaultdict):
         new_instance = self.__class__(self.default_factory, self)
         _update_instance_from_obj(new_instance, self)
         return new_instance
+
+
+class FlagsMeta(type):
+    def __new__(mcs, name, bases, dct):
+        fields = {field_name: field_value
+                  for field_name, field_value in six.iteritems(dct)
+                  if isinstance(field_value, int)}
+        dct['fields'] = fields
+        new_cls = type.__new__(mcs, name, bases, dct)
+        for field_name, field_value in six.iteritems(fields):
+            setattr(new_cls, field_name, new_cls(field_value))
+        return new_cls
+
+
+class Flags(six.with_metaclass(FlagsMeta, int)):
+    NONE = 0
+
+    def __repr__(self):
+        cls = self.__class__
+        set_fields = [field_name
+                      for field_name, field_value in six.iteritems(cls.fields)
+                      if self & field_value]
+        return '{0}({1})'.format(cls.__name__, ', '.join(set_fields))
+
+    def __contains__(self, other):
+        return self & other > 0
+
+    def __or__(self, other):
+        return self.__class__(int.__or__(self, other))
+
+    def __xor__(self, other):
+        return self.__class__(int.__xor__(self, other))

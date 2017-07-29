@@ -8,10 +8,8 @@ import logging
 from six import with_metaclass
 
 from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
-from ..policy import (CONFIG_FLAG_DEPENDENT, CONTAINER_CONFIG_FLAG_ATTACHED, CONTAINER_CONFIG_FLAG_PERSISTENT,
-                      ABCPolicyUtilMeta, PolicyUtil)
-from . import (INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, STATE_FLAG_INITIAL,
-               STATE_FLAG_RESTARTING, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_FORCED_RESET, ConfigState)
+from ..policy import ConfigFlags, ABCPolicyUtilMeta, PolicyUtil
+from . import INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, StateFlags, ConfigState
 from .utils import merge_dependency_paths
 
 
@@ -46,7 +44,8 @@ class AbstractState(object):
     :param config_flags: Config flags on the container.
     :type config_flags: int
     """
-    def __init__(self, policy, options, client_name, config_id, container_map, config, config_flags=0, *args, **kwargs):
+    def __init__(self, policy, options, client_name, config_id, container_map, config, config_flags=ConfigFlags.NONE,
+                 *args, **kwargs):
         self.policy = policy
         self.options = options
         self.config_id = config_id
@@ -115,7 +114,7 @@ class ContainerBaseState(AbstractState):
         super(ContainerBaseState, self).inspect()
         policy = self.policy
         config_id = self.config_id
-        if self.config_flags & CONTAINER_CONFIG_FLAG_ATTACHED:
+        if self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
             if self.container_map.use_attached_parent_name:
                 container_name = policy.aname(config_id.map_name, config_id.instance_name, config_id.config_name)
             else:
@@ -132,25 +131,25 @@ class ContainerBaseState(AbstractState):
     def get_state(self):
         c_detail = self.detail
         if c_detail is NOT_FOUND:
-            return STATE_ABSENT, 0, {}
+            return STATE_ABSENT, StateFlags.NONE, {}
 
         c_status = c_detail['State']
         if c_status['Running']:
             base_state = STATE_RUNNING
-            state_flag = 0
+            state_flag = StateFlags.NONE
         else:
             base_state = STATE_PRESENT
             if c_status['StartedAt'] == INITIAL_START_TIME:
-                state_flag = STATE_FLAG_INITIAL
+                state_flag = StateFlags.INITIAL
             elif c_status['ExitCode'] in self.options['nonrecoverable_exit_codes']:
-                state_flag = STATE_FLAG_NONRECOVERABLE
+                state_flag = StateFlags.NONRECOVERABLE
             else:
-                state_flag = 0
+                state_flag = StateFlags.NONE
             if c_status['Restarting']:
-                state_flag |= STATE_FLAG_RESTARTING
+                state_flag |= StateFlags.RESTARTING
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
-            state_flag |= STATE_FLAG_FORCED_RESET
+            state_flag |= StateFlags.FORCED_RESET
         return base_state, state_flag, {}
 
 
@@ -195,13 +194,13 @@ class NetworkBaseState(AbstractState):
 
     def get_state(self):
         if self.detail is NOT_FOUND:
-            return STATE_ABSENT, 0, {}
+            return STATE_ABSENT, StateFlags.NONE, {}
         connected_containers = self.detail.get('Containers', {})
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
-            state_flag = STATE_FLAG_FORCED_RESET
+            state_flag = StateFlags.FORCED_RESET
         else:
-            state_flag = 0
+            state_flag = StateFlags.NONE
         return STATE_PRESENT, state_flag, {'containers': connected_containers}
 
 
@@ -235,7 +234,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         :rtype: collections.Iterable[dockermap.map.state.ContainerConfigStates]
         """
         c_map = self._policy.container_maps[config_id.map_name]
-        c_flags = CONFIG_FLAG_DEPENDENT if is_dependency else 0
+        c_flags = ConfigFlags.DEPENDENT if is_dependency else ConfigFlags.NONE
         config_type = config_id.config_type
         config_name = config_id.config_name
 
@@ -246,7 +245,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                                "".format(config_id))
             clients = self._policy.get_clients(c_map, config)
             if config.persistent:
-                c_flags |= CONTAINER_CONFIG_FLAG_PERSISTENT
+                c_flags |= ConfigFlags.CONTAINER_PERSISTENT
             state_func = self.get_container_state
         elif config_type == ITEM_TYPE_VOLUME:
             config = c_map.get_existing(config_name)
@@ -255,7 +254,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                                "".format(config_id))
             clients = self._policy.get_clients(c_map, config)
             # TODO: Change for actual volumes.
-            c_flags |= CONTAINER_CONFIG_FLAG_ATTACHED
+            c_flags |= ConfigFlags.CONTAINER_ATTACHED
             state_func = self.get_container_state
         elif config_type == ITEM_TYPE_NETWORK:
             config = c_map.get_existing_network(config_name)

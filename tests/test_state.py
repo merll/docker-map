@@ -14,14 +14,9 @@ from dockermap.map.config.host_volume import get_host_path
 from dockermap.map.config.main import ContainerMap, expand_instances
 from dockermap.map.input import (ExecCommand, EXEC_POLICY_INITIAL, EXEC_POLICY_RESTART, MapConfigId,
                                  ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK)
-from dockermap.map.policy import CONFIG_FLAG_DEPENDENT
+from dockermap.map.policy import ConfigFlags
 from dockermap.map.policy.base import BasePolicy
-from dockermap.map.state import (INITIAL_START_TIME, STATE_RUNNING, STATE_PRESENT, STATE_ABSENT,
-                                 STATE_FLAG_NONRECOVERABLE, STATE_FLAG_RESTARTING, STATE_FLAG_INITIAL,
-                                 STATE_FLAG_NEEDS_RESET, STATE_FLAG_MISC_MISMATCH, STATE_FLAG_IMAGE_MISMATCH,
-                                 STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_FORCED_RESET, STATE_FLAG_MISSING_LINK,
-                                 STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_MISMATCH, STATE_FLAG_NETWORK_LEFT,
-                                 STATE_FLAG_EXEC_COMMANDS)
+from dockermap.map.state import INITIAL_START_TIME, STATE_RUNNING, STATE_PRESENT, STATE_ABSENT, StateFlags
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
 from dockermap.map.state.utils import merge_dependency_paths
@@ -418,7 +413,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                                 for si in instance_base_states))
             self.assertTrue(all(si == STATE_PRESENT
                                 for si in attached_base_states))
-            self.assertTrue(all(s.config_flags == CONFIG_FLAG_DEPENDENT
+            self.assertTrue(all(s.config_flags == ConfigFlags.DEPENDENT
                                 for s in states
                                 if s.config_id.config_type == ITEM_TYPE_CONTAINER and s.config_id.config_name != 'server'))
 
@@ -438,12 +433,12 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.assertEqual(queue_state.base_state, STATE_RUNNING)
             svc_state = _get_single_state(sg, self._config_id('svc'))
             self.assertEqual(svc_state.base_state, STATE_PRESENT)
-            self.assertEqual(svc_state.state_flags & STATE_FLAG_NONRECOVERABLE, STATE_FLAG_NONRECOVERABLE)
+            self.assertEqual(svc_state.state_flags & StateFlags.NONRECOVERABLE, StateFlags.NONRECOVERABLE)
             worker_state = _get_single_state(sg, self._config_id('worker'))
-            self.assertEqual(worker_state.state_flags & STATE_FLAG_RESTARTING, STATE_FLAG_RESTARTING)
+            self.assertEqual(worker_state.state_flags & StateFlags.RESTARTING, StateFlags.RESTARTING)
             worker2_state = _get_single_state(sg, self._config_id('worker_q2'))
             self.assertEqual(worker2_state.base_state, STATE_PRESENT)
-            self.assertEqual(worker2_state.state_flags & STATE_FLAG_INITIAL, STATE_FLAG_INITIAL)
+            self.assertEqual(worker2_state.state_flags & StateFlags.INITIAL, StateFlags.INITIAL)
             server_states = _get_single_state(sg, self.server_config_id)
             self.assertEqual(server_states.base_state, STATE_ABSENT)
 
@@ -456,9 +451,9 @@ class TestPolicyStateGenerators(unittest.TestCase):
                                                 ext_map=self.sample_map))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
-            self.assertEqual(cache_state.state_flags & STATE_FLAG_FORCED_RESET, STATE_FLAG_FORCED_RESET)
+            self.assertEqual(cache_state.state_flags & StateFlags.FORCED_RESET, StateFlags.FORCED_RESET)
             queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
-            self.assertEqual(queue_state.state_flags & STATE_FLAG_FORCED_RESET, STATE_FLAG_FORCED_RESET)
+            self.assertEqual(queue_state.state_flags & StateFlags.FORCED_RESET, StateFlags.FORCED_RESET)
 
     def test_single_states_forced_instance(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -469,9 +464,9 @@ class TestPolicyStateGenerators(unittest.TestCase):
                                                 ext_map=self.sample_map))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
-            self.assertEqual(cache_state.state_flags & STATE_FLAG_FORCED_RESET, STATE_FLAG_FORCED_RESET)
+            self.assertEqual(cache_state.state_flags & StateFlags.FORCED_RESET, StateFlags.FORCED_RESET)
             queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
-            self.assertEqual(queue_state.state_flags & STATE_FLAG_NEEDS_RESET, 0)
+            self.assertEqual(queue_state.state_flags & StateFlags.NEEDS_RESET, 0)
 
     def test_dependent_states(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -496,7 +491,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                                 for si in instance_base_states))
             self.assertTrue(all(si == STATE_PRESENT
                                 for si in volume_base_states))
-            self.assertTrue(all(s.config_flags == CONFIG_FLAG_DEPENDENT
+            self.assertTrue(all(s.config_flags == ConfigFlags.DEPENDENT
                                 for s in states
                                 if not (s.config_id.config_type == ITEM_TYPE_CONTAINER and s.config_id.config_name == 'redis')))
 
@@ -527,11 +522,11 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_VOLUME_MISMATCH)
+            self.assertEqual(server_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
             for ri in ('cache', 'queue'):
                 redis_state = states['containers'][('redis', ri)]
                 self.assertEqual(redis_state.base_state, STATE_RUNNING)
-                self.assertEqual(redis_state.state_flags & STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_VOLUME_MISMATCH)
+                self.assertEqual(redis_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
 
     def test_update_states_invalid_dependent_instance(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -545,11 +540,11 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_NEEDS_RESET, 0)
+            self.assertEqual(server_state.state_flags & StateFlags.NEEDS_RESET, 0)
             for ri in ('cache', 'queue'):
                 redis_state = states['containers'][('redis', ri)]
                 self.assertEqual(redis_state.base_state, STATE_RUNNING)
-                self.assertEqual(redis_state.state_flags & STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_VOLUME_MISMATCH)
+                self.assertEqual(redis_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
 
     def test_update_states_invalid_dependent_instance_attached(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -563,11 +558,11 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_VOLUME_MISMATCH, STATE_FLAG_VOLUME_MISMATCH)
+            self.assertEqual(server_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
             for ri in ('cache', 'queue'):
                 redis_state = states['containers'][('redis', ri)]
                 self.assertEqual(redis_state.base_state, STATE_RUNNING)
-                self.assertEqual(redis_state.state_flags & STATE_FLAG_NEEDS_RESET, 0)
+                self.assertEqual(redis_state.state_flags & StateFlags.NEEDS_RESET, 0)
 
     def test_update_states_invalid_image(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -581,7 +576,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_IMAGE_MISMATCH, STATE_FLAG_IMAGE_MISMATCH)
+            self.assertEqual(server_state.state_flags & StateFlags.IMAGE_MISMATCH, StateFlags.IMAGE_MISMATCH)
 
     def test_update_states_invalid_links(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -595,7 +590,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_MISSING_LINK, STATE_FLAG_MISSING_LINK)
+            self.assertEqual(server_state.state_flags & StateFlags.MISSING_LINK, StateFlags.MISSING_LINK)
 
     def test_update_states_invalid_network_ports(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -609,7 +604,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_MISC_MISMATCH, STATE_FLAG_MISC_MISMATCH)
+            self.assertEqual(server_state.state_flags & StateFlags.MISC_MISMATCH, StateFlags.MISC_MISMATCH)
 
     def test_update_states_network_clean(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -642,10 +637,10 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'net_svc')
             ]
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_ids))
-            self.assertEqual(states['containers'][('net_svc', None)].state_flags & STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_DISCONNECTED)
-            self.assertEqual(states['containers'][('server3', None)].state_flags & STATE_FLAG_NETWORK_DISCONNECTED, STATE_FLAG_NETWORK_DISCONNECTED)
+            self.assertEqual(states['containers'][('net_svc', None)].state_flags & StateFlags.NETWORK_DISCONNECTED, StateFlags.NETWORK_DISCONNECTED)
+            self.assertEqual(states['containers'][('server3', None)].state_flags & StateFlags.NETWORK_DISCONNECTED, StateFlags.NETWORK_DISCONNECTED)
             self.assertEqual(states['networks']['app_net1'].base_state, STATE_ABSENT)
-            self.assertEqual(states['networks']['app_net2'].state_flags & STATE_FLAG_MISC_MISMATCH, STATE_FLAG_MISC_MISMATCH)
+            self.assertEqual(states['networks']['app_net2'].state_flags & StateFlags.MISC_MISMATCH, StateFlags.MISC_MISMATCH)
 
     def test_update_states_network_mismatch(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -661,8 +656,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'net_svc')
             ]
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_ids))
-            self.assertEqual(states['containers'][('net_svc', None)].state_flags & STATE_FLAG_NETWORK_MISMATCH, STATE_FLAG_NETWORK_MISMATCH)
-            self.assertEqual(states['containers'][('server3', None)].state_flags & STATE_FLAG_NETWORK_MISMATCH, STATE_FLAG_NETWORK_MISMATCH)
+            self.assertEqual(states['containers'][('net_svc', None)].state_flags & StateFlags.NETWORK_MISMATCH, StateFlags.NETWORK_MISMATCH)
+            self.assertEqual(states['containers'][('server3', None)].state_flags & StateFlags.NETWORK_MISMATCH, StateFlags.NETWORK_MISMATCH)
 
     def test_update_states_left_network(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -676,7 +671,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'server3'),
             ]
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_ids))
-            self.assertEqual(states['containers'][('server3', None)].state_flags & STATE_FLAG_NETWORK_LEFT, STATE_FLAG_NETWORK_LEFT)
+            self.assertEqual(states['containers'][('server3', None)].state_flags & StateFlags.NETWORK_LEFT, StateFlags.NETWORK_LEFT)
 
     def test_update_states_updated_environment(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -685,7 +680,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_MISC_MISMATCH, STATE_FLAG_MISC_MISMATCH)
+            self.assertEqual(server_state.state_flags & StateFlags.MISC_MISMATCH, StateFlags.MISC_MISMATCH)
 
     def test_update_states_updated_command(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -694,7 +689,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_MISC_MISMATCH, STATE_FLAG_MISC_MISMATCH)
+            self.assertEqual(server_state.state_flags & StateFlags.MISC_MISMATCH, StateFlags.MISC_MISMATCH)
 
     def test_update_states_updated_exec(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -707,8 +702,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, STATE_RUNNING)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_NEEDS_RESET, 0)
-            self.assertEqual(server_state.state_flags & STATE_FLAG_EXEC_COMMANDS, STATE_FLAG_EXEC_COMMANDS)
+            self.assertEqual(server_state.state_flags & StateFlags.NEEDS_RESET, 0)
+            self.assertEqual(server_state.state_flags & StateFlags.EXEC_COMMANDS, StateFlags.EXEC_COMMANDS)
             self.assertDictEqual(server_state.extra_data, {'exec_commands': [cmd3]})
 
 

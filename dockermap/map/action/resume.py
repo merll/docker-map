@@ -2,8 +2,8 @@
 from __future__ import unicode_literals
 
 from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
-from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
-from ..state import STATE_PRESENT, STATE_FLAG_NONRECOVERABLE, STATE_FLAG_INITIAL, STATE_ABSENT, STATE_RUNNING
+from ..policy import ConfigFlags
+from ..state import STATE_PRESENT, STATE_ABSENT, STATE_RUNNING, StateFlags
 from .base import AbstractActionGenerator
 from . import (ItemAction, DERIVED_ACTION_STARTUP_CONTAINER, DERIVED_ACTION_STARTUP_VOLUME,
                DERIVED_ACTION_RELAUNCH_CONTAINER, DERIVED_ACTION_RELAUNCH_VOLUME, ACTION_START, V_UTIL_ACTION_PREPARE,
@@ -36,10 +36,10 @@ class ResumeActionGenerator(AbstractActionGenerator):
                 action = DERIVED_ACTION_STARTUP_VOLUME
                 self.recreated_volumes.add(config_tuple)
             else:
-                if state.state_flags & STATE_FLAG_NONRECOVERABLE:
+                if state.state_flags & StateFlags.NONRECOVERABLE:
                     action = DERIVED_ACTION_RELAUNCH_VOLUME
                     self.recreated_volumes.add(config_tuple)
-                elif state.state_flags & STATE_FLAG_INITIAL:
+                elif state.state_flags & StateFlags.INITIAL:
                     action = ACTION_START
                 else:
                     return None
@@ -54,7 +54,7 @@ class ResumeActionGenerator(AbstractActionGenerator):
                 elif state.base_state == STATE_RUNNING:
                     action = DERIVED_ACTION_RESET_CONTAINER
                 elif state.base_state == STATE_PRESENT:
-                    if state.base_state & STATE_FLAG_INITIAL:
+                    if state.base_state & StateFlags.INITIAL:
                         action = ACTION_START
                     else:
                         action = DERIVED_ACTION_RELAUNCH_CONTAINER
@@ -64,11 +64,11 @@ class ResumeActionGenerator(AbstractActionGenerator):
                 if state.base_state == STATE_ABSENT:
                     action = DERIVED_ACTION_STARTUP_CONTAINER
                 else:
-                    if state.state_flags & STATE_FLAG_NONRECOVERABLE:
+                    if state.state_flags & StateFlags.NONRECOVERABLE:
                         action = DERIVED_ACTION_RESET_CONTAINER
                     elif (state.base_state != STATE_RUNNING and
-                          (state.state_flags & STATE_FLAG_INITIAL or
-                           not state.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT)):
+                          (state.state_flags & StateFlags.INITIAL or
+                           not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
                         action = ACTION_START
                     else:
                         return None

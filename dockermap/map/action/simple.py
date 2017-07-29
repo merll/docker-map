@@ -2,8 +2,8 @@
 from __future__ import unicode_literals
 
 from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
-from ..policy import CONTAINER_CONFIG_FLAG_PERSISTENT
-from ..state import STATE_ABSENT, STATE_PRESENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING
+from ..policy import ConfigFlags
+from ..state import STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, StateFlags
 from .base import AbstractActionGenerator
 from . import (ItemAction, ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_REMOVE, V_UTIL_ACTION_PREPARE,
                C_UTIL_ACTION_SIGNAL_STOP, C_UTIL_ACTION_EXEC_ALL, C_UTIL_ACTION_CONNECT_ALL,
@@ -44,7 +44,7 @@ class StartActionGenerator(AbstractActionGenerator):
         """
         config_type = state.config_id.config_type
         if (config_type == ITEM_TYPE_VOLUME and state.base_state == STATE_PRESENT and
-                state.state_flags & STATE_FLAG_INITIAL):
+                state.state_flags & StateFlags.INITIAL):
             return [
                 ItemAction(state, ACTION_START),
                 ItemAction(state, V_UTIL_ACTION_PREPARE),
@@ -68,7 +68,7 @@ class RestartActionGenerator(AbstractActionGenerator):
         :rtype: list[dockermap.map.action.ItemAction]
         """
         if (state.config_id.config_type == ITEM_TYPE_CONTAINER and state.base_state != STATE_ABSENT and
-                not state.state_flags & STATE_FLAG_INITIAL):
+                not state.state_flags & StateFlags.INITIAL):
             return [ItemAction(state, ACTION_RESTART, extra_data=kwargs)]
 
 
@@ -85,7 +85,7 @@ class StopActionGenerator(AbstractActionGenerator):
         :rtype: list[dockermap.map.action.ItemAction]
         """
         if (state.config_id.config_type == ITEM_TYPE_CONTAINER and state.base_state != STATE_ABSENT and
-                not state.state_flags & STATE_FLAG_INITIAL):
+                not state.state_flags & StateFlags.INITIAL):
             return [ItemAction(state, C_UTIL_ACTION_SIGNAL_STOP, extra_data=kwargs)]
 
 
@@ -113,7 +113,7 @@ class RemoveActionGenerator(AbstractActionGenerator):
         if state.base_state == STATE_PRESENT:
             if ((config_type == ITEM_TYPE_VOLUME and self.remove_attached) or
                     (config_type == ITEM_TYPE_CONTAINER and
-                     self.remove_persistent or not state.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT)):
+                     self.remove_persistent or not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
                 return [ItemAction(state, ACTION_REMOVE, extra_data=extra_data)]
             elif config_type == ITEM_TYPE_NETWORK:
                 connected_containers = state.extra_data.get('containers')
@@ -146,7 +146,7 @@ class StartupActionGenerator(AbstractActionGenerator):
                     ItemAction(state, DERIVED_ACTION_STARTUP_VOLUME),
                     ItemAction(state, V_UTIL_ACTION_PREPARE),
                 ]
-            elif state.base_state == STATE_PRESENT and state.state_flags & STATE_FLAG_INITIAL:
+            elif state.base_state == STATE_PRESENT and state.state_flags & StateFlags.INITIAL:
                 return [
                     ItemAction(state, ACTION_START),
                     ItemAction(state, V_UTIL_ACTION_PREPARE),
@@ -191,10 +191,10 @@ class ShutdownActionGenerator(RemoveActionGenerator):
         elif config_type == ITEM_TYPE_VOLUME and self.remove_attached:
             return [ItemAction(state, ACTION_REMOVE)]
         elif config_type == ITEM_TYPE_CONTAINER:
-            if self.remove_persistent or not state.config_flags & CONTAINER_CONFIG_FLAG_PERSISTENT:
-                if state.base_state == STATE_RUNNING or state.state_flags & STATE_FLAG_RESTARTING:
+            if self.remove_persistent or not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT:
+                if state.base_state == STATE_RUNNING or state.state_flags & StateFlags.RESTARTING:
                     return [ItemAction(state, DERIVED_ACTION_SHUTDOWN_CONTAINER)]
                 elif state.base_state == STATE_PRESENT:
                     return [ItemAction(state, ACTION_REMOVE)]
-            elif state.base_state == STATE_RUNNING or state.state_flags & STATE_FLAG_RESTARTING:
+            elif state.base_state == STATE_RUNNING or state.state_flags & StateFlags.RESTARTING:
                 return [ItemAction(state, ACTION_REMOVE)]

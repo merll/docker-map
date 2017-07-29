@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from . import STATE_ABSENT
+from . import STATE_ABSENT, StateFlags
 from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
 
 
@@ -15,7 +15,7 @@ class InitialContainerState(ContainerBaseState):
         pass
 
     def get_state(self):
-        return STATE_ABSENT, 0, {}
+        return STATE_ABSENT, StateFlags.NONE, {}
 
 
 class InitialNetworkState(NetworkBaseState):
@@ -28,7 +28,7 @@ class InitialNetworkState(NetworkBaseState):
         pass
 
     def get_state(self):
-        return STATE_ABSENT, 0, {}
+        return STATE_ABSENT, StateFlags.NONE, {}
 
 
 class InitialStateGenerator(DependencyStateGenerator):
