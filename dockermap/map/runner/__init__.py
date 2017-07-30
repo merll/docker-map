@@ -3,8 +3,8 @@ from collections import namedtuple
 
 from six import with_metaclass
 
-from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
-from ..action import ACTION_CREATE, ACTION_REMOVE
+from ..input import ItemType
+from ..action import Action
 from ..policy import PolicyUtilMeta, PolicyUtil
 
 ActionConfig = namedtuple('ActionConfig', ['client_name', 'config_id', 'client_config', 'client',
@@ -50,17 +50,17 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
             client = client_config.get_client()
             c_map = policy.container_maps[config_id.map_name]
 
-            if config_type == ITEM_TYPE_CONTAINER:
+            if config_type == ItemType.CONTAINER:
                 config = c_map.get_existing(config_id.config_name)
                 item_name = policy.cname(config_id.map_name, config_id.config_name, config_id.instance_name)
                 existing_items = policy.container_names[action.client_name]
-            elif config_type == ITEM_TYPE_VOLUME:
+            elif config_type == ItemType.VOLUME:
                 # TODO: Implement for native volumes.
                 config = c_map.get_existing(config_id.config_name)
                 a_parent_name = config_id.config_name if c_map.use_attached_parent_name else None
                 item_name = policy.aname(config_id.map_name, config_id.instance_name, parent_name=a_parent_name)
                 existing_items = policy.container_names[action.client_name]
-            elif config_type == ITEM_TYPE_NETWORK:
+            elif config_type == ItemType.NETWORK:
                 config = c_map.get_existing_network(config_id.config_name)
                 item_name = policy.nname(config_id.map_name, config_id.config_name)
                 existing_items = policy.network_names[action.client_name]
@@ -75,9 +75,9 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                 action_config = ActionConfig(action.client_name, action.config_id, client_config, client,
                                              c_map, config)
                 res = a_method(action_config, item_name, **action.extra_data)
-                if action_type == ACTION_CREATE:
+                if action_type == Action.CREATE:
                     existing_items.add(item_name)
-                elif action_type == ACTION_REMOVE:
+                elif action_type == Action.REMOVE:
                     existing_items.discard(item_name)
                 if res is not None:
                     yield res

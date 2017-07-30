@@ -9,10 +9,9 @@ from six import text_type
 from six.moves import map
 
 from ...functional import resolve_value
-from ..action import (ACTION_CREATE, ACTION_START, ACTION_RESTART, ACTION_STOP, ACTION_REMOVE, ACTION_KILL, ACTION_WAIT,
-                      ACTION_CONNECT, ACTION_DISCONNECT)
+from ..action import Action
 from ..config.client import USE_HC_MERGE
-from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK, NotSet
+from ..input import ItemType, NotSet
 from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes
 from . import AbstractRunner
 from .attached import AttachedPreparationMixin
@@ -28,17 +27,17 @@ log = logging.getLogger(__name__)
 
 class DockerBaseRunnerMixin(object):
     action_method_names = [
-        (ITEM_TYPE_VOLUME, ACTION_CREATE, 'create_volume'),
-        (ITEM_TYPE_VOLUME, ACTION_START, 'start_volume'),
-        (ITEM_TYPE_VOLUME, ACTION_REMOVE, 'remove_volume'),
+        (ItemType.VOLUME, Action.CREATE, 'create_volume'),
+        (ItemType.VOLUME, Action.START, 'start_volume'),
+        (ItemType.VOLUME, Action.REMOVE, 'remove_volume'),
 
-        (ITEM_TYPE_CONTAINER, ACTION_CREATE, 'create_container'),
-        (ITEM_TYPE_CONTAINER, ACTION_START, 'start_container'),
-        (ITEM_TYPE_CONTAINER, ACTION_RESTART, 'restart'),
-        (ITEM_TYPE_CONTAINER, ACTION_STOP, 'stop'),
-        (ITEM_TYPE_CONTAINER, ACTION_REMOVE, 'remove_container'),
-        (ITEM_TYPE_CONTAINER, ACTION_KILL, 'kill'),
-        (ITEM_TYPE_CONTAINER, ACTION_WAIT, 'wait'),
+        (ItemType.CONTAINER, Action.CREATE, 'create_container'),
+        (ItemType.CONTAINER, Action.START, 'start_container'),
+        (ItemType.CONTAINER, Action.RESTART, 'restart'),
+        (ItemType.CONTAINER, Action.STOP, 'stop'),
+        (ItemType.CONTAINER, Action.REMOVE, 'remove_container'),
+        (ItemType.CONTAINER, Action.KILL, 'kill'),
+        (ItemType.CONTAINER, Action.WAIT, 'wait'),
     ]
 
     def create_volume(self, action, v_name, **kwargs):

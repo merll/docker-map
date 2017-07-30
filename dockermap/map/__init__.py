@@ -2,6 +2,7 @@
 from collections import defaultdict
 import itertools
 import six
+from enum import Enum
 
 from ..utils import merge_list
 
@@ -133,3 +134,9 @@ class Flags(six.with_metaclass(FlagsMeta, int)):
 
     def __xor__(self, other):
         return self.__class__(int.__xor__(self, other))
+
+
+class SimpleEnum(Enum):
+    # Just like regular enum, but less verbose.
+    def __repr__(self):
+        return '{0.__class__.__name__}.{0.name}'.format(self)

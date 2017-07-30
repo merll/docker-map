@@ -6,15 +6,15 @@ import signal
 
 from requests.exceptions import Timeout
 
-from ..action import C_UTIL_ACTION_SIGNAL_STOP
-from ..input import ITEM_TYPE_CONTAINER
+from ..action import ContainerUtilAction
+from ..input import ItemType
 
 log = logging.getLogger(__name__)
 
 
 class SignalMixin(object):
     action_method_names = [
-        (ITEM_TYPE_CONTAINER, C_UTIL_ACTION_SIGNAL_STOP, 'signal_stop'),
+        (ItemType.CONTAINER, ContainerUtilAction.SIGNAL_STOP, 'signal_stop'),
     ]
 
     def signal_stop(self, action, c_name, **kwargs):

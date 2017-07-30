@@ -7,9 +7,9 @@ import logging
 
 from six import with_metaclass
 
-from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
+from ..input import ItemType
 from ..policy import ConfigFlags, ABCPolicyUtilMeta, PolicyUtil
-from . import INITIAL_START_TIME, STATE_ABSENT, STATE_PRESENT, STATE_RUNNING, StateFlags, ConfigState
+from . import INITIAL_START_TIME, State, StateFlags, ConfigState
 from .utils import merge_dependency_paths
 
 
@@ -131,14 +131,14 @@ class ContainerBaseState(AbstractState):
     def get_state(self):
         c_detail = self.detail
         if c_detail is NOT_FOUND:
-            return STATE_ABSENT, StateFlags.NONE, {}
+            return State.ABSENT, StateFlags.NONE, {}
 
         c_status = c_detail['State']
         if c_status['Running']:
-            base_state = STATE_RUNNING
+            base_state = State.RUNNING
             state_flag = StateFlags.NONE
         else:
-            base_state = STATE_PRESENT
+            base_state = State.PRESENT
             if c_status['StartedAt'] == INITIAL_START_TIME:
                 state_flag = StateFlags.INITIAL
             elif c_status['ExitCode'] in self.options['nonrecoverable_exit_codes']:
@@ -194,14 +194,14 @@ class NetworkBaseState(AbstractState):
 
     def get_state(self):
         if self.detail is NOT_FOUND:
-            return STATE_ABSENT, StateFlags.NONE, {}
+            return State.ABSENT, StateFlags.NONE, {}
         connected_containers = self.detail.get('Containers', {})
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
             state_flag = StateFlags.FORCED_RESET
         else:
             state_flag = StateFlags.NONE
-        return STATE_PRESENT, state_flag, {'containers': connected_containers}
+        return State.PRESENT, state_flag, {'containers': connected_containers}
 
 
 class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
@@ -238,7 +238,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
         config_type = config_id.config_type
         config_name = config_id.config_name
 
-        if config_type == ITEM_TYPE_CONTAINER:
+        if config_type == ItemType.CONTAINER:
             config = c_map.get_existing(config_name)
             if not config:
                 raise KeyError("Container configuration '{0.config_name}' not found on map '{0.map_name}'."
@@ -247,7 +247,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             if config.persistent:
                 c_flags |= ConfigFlags.CONTAINER_PERSISTENT
             state_func = self.get_container_state
-        elif config_type == ITEM_TYPE_VOLUME:
+        elif config_type == ItemType.VOLUME:
             config = c_map.get_existing(config_name)
             if not config:
                 raise KeyError("Container configuration '{0.config_name}' not found on map '{0.map_name}'."
@@ -256,7 +256,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             # TODO: Change for actual volumes.
             c_flags |= ConfigFlags.CONTAINER_ATTACHED
             state_func = self.get_container_state
-        elif config_type == ITEM_TYPE_NETWORK:
+        elif config_type == ItemType.NETWORK:
             config = c_map.get_existing_network(config_name)
             if not config:
                 raise KeyError("Network configuration '{0.config_name}' not found on map '{0.map_name}'."

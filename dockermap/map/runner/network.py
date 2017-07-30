@@ -1,20 +1,19 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ..action import (ACTION_DISCONNECT, ACTION_CONNECT, ACTION_CREATE, ACTION_REMOVE, C_UTIL_ACTION_CONNECT_ALL,
-                      N_UTIL_ACTION_DISCONNECT_ALL)
-from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_NETWORK
+from ..action import Action, ContainerUtilAction, NetworkUtilAction
+from ..input import ItemType
 
 
 class NetworkUtilMixin(object):
     action_method_names = [
-        (ITEM_TYPE_NETWORK, ACTION_CREATE, 'create_network'),
-        (ITEM_TYPE_NETWORK, ACTION_REMOVE, 'remove_network'),
-        (ITEM_TYPE_NETWORK, N_UTIL_ACTION_DISCONNECT_ALL, 'disconnect_all_containers'),
+        (ItemType.NETWORK, Action.CREATE, 'create_network'),
+        (ItemType.NETWORK, Action.REMOVE, 'remove_network'),
+        (ItemType.NETWORK, NetworkUtilAction.DISCONNECT_ALL, 'disconnect_all_containers'),
 
-        (ITEM_TYPE_CONTAINER, ACTION_CONNECT, 'connect_networks'),
-        (ITEM_TYPE_CONTAINER, ACTION_DISCONNECT, 'disconnect_networks'),
-        (ITEM_TYPE_CONTAINER, C_UTIL_ACTION_CONNECT_ALL, 'connect_all_networks'),
+        (ItemType.CONTAINER, Action.CONNECT, 'connect_networks'),
+        (ItemType.CONTAINER, Action.DISCONNECT, 'disconnect_networks'),
+        (ItemType.CONTAINER, ContainerUtilAction.CONNECT_ALL, 'connect_all_networks'),
     ]
 
     def create_network(self, action, n_name, **kwargs):

@@ -12,11 +12,10 @@ from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from dockermap.map.config.client import ClientConfiguration
 from dockermap.map.config.host_volume import get_host_path
 from dockermap.map.config.main import ContainerMap, expand_instances
-from dockermap.map.input import (ExecCommand, EXEC_POLICY_INITIAL, EXEC_POLICY_RESTART, MapConfigId,
-                                 ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK)
+from dockermap.map.input import ExecCommand, ExecPolicy, MapConfigId, ItemType
 from dockermap.map.policy import ConfigFlags
 from dockermap.map.policy.base import BasePolicy
-from dockermap.map.state import INITIAL_START_TIME, STATE_RUNNING, STATE_PRESENT, STATE_ABSENT, StateFlags
+from dockermap.map.state import INITIAL_START_TIME, State, StateFlags
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
 from dockermap.map.state.utils import merge_dependency_paths
@@ -137,7 +136,7 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
     for a in c_config.attaches:
         c_path = container_map.volumes[a]
         yield {'Source': posixpath.join(path_prefix, 'attached', a), 'Destination': c_path, 'RW': True}
-    if config_id.config_type == ITEM_TYPE_CONTAINER:
+    if config_id.config_type == ItemType.CONTAINER:
         for vol, ro in c_config.binds:
             if isinstance(vol, tuple):
                 c_path, h_r_path = vol
@@ -176,7 +175,7 @@ def _add_container_inspect(rsps, config_id, container_name, container_map, c_con
         'Entrypoint': [],
     }
     host_config['NetworkMode'] = 'default'  # TODO: Vary.
-    if config_type == ITEM_TYPE_CONTAINER:
+    if config_type == ItemType.CONTAINER:
         for ex in c_config.exposes:
             ex_port = '{0}/tcp'.format(ex.exposed_port)
             if ex.host_port:
@@ -300,7 +299,7 @@ def _add_network_inspect(rsps, network_name, n_config, containers, **kwargs):
 def _get_single_state(sg, config_ids):
     states = [s
               for s in sg.get_states(config_ids)
-              if s.config_id.config_type == ITEM_TYPE_CONTAINER]
+              if s.config_id.config_type == ItemType.CONTAINER]
     return states[-1]
 
 
@@ -310,11 +309,11 @@ def _get_states_dict(sl):
     vd = {}
     for s in sl:
         config_id = s.config_id
-        if config_id.config_type == ITEM_TYPE_CONTAINER:
+        if config_id.config_type == ItemType.CONTAINER:
             cd[(config_id.config_name, config_id.instance_name)] = s
-        elif config_id.config_type == ITEM_TYPE_VOLUME:
+        elif config_id.config_type == ItemType.VOLUME:
             vd[(config_id.config_name, config_id.instance_name)] = s
-        elif config_id.config_type == ITEM_TYPE_NETWORK:
+        elif config_id.config_type == ItemType.NETWORK:
             nd[config_id.config_name] = s
         else:
             raise ValueError("Invalid configuration type.", s.config_type)
@@ -341,7 +340,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                        for image_name in all_images]
 
     def _config_id(self, config_name, instance=None):
-        return [MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, config_name, instance)]
+        return [MapConfigId(ItemType.CONTAINER, self.map_name, config_name, instance)]
 
     def _setup_containers(self, rsps, containers_states, networks=()):
         container_names = []
@@ -353,7 +352,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
         for name, state, instances, attached_valid, instances_valid, kwargs in containers_states:
             c_config = self.sample_map.get_existing(name)
             for a in c_config.attaches:
-                config_id = MapConfigId(ITEM_TYPE_VOLUME, self.map_name, name, a)
+                config_id = MapConfigId(ItemType.VOLUME, self.map_name, name, a)
                 if self.sample_map.use_attached_parent_name:
                     container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
                 else:
@@ -363,7 +362,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 container_names.append(container_name)
             image_id = image_dict[c_config.image or name]
             for i in instances or c_config.instances or [None]:
-                config_id = MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, name, i)
+                config_id = MapConfigId(ItemType.CONTAINER, self.map_name, name, i)
                 if config_id.instance_name:
                     container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
                 else:
@@ -380,7 +379,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                         network_containers['extra'].append(container_name)
         for n_name, kwargs in networks:
             n_config = self.sample_map.get_existing_network(n_name)
-            config_id = MapConfigId(ITEM_TYPE_NETWORK, self.map_name, n_name)
+            config_id = MapConfigId(ItemType.NETWORK, self.map_name, n_name)
             network_name = '{0.map_name}.{0.config_name}'.format(config_id)
             _add_network_inspect(rsps, network_name, n_config, network_containers.get(n_name, []), **kwargs)
             network_names.append(network_name)
@@ -405,17 +404,17 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = list(DependencyStateGenerator(self.policy, {}).get_states(self.server_config_id))
             instance_base_states = [s.base_state
                                     for s in states
-                                    if s.config_id.config_type == ITEM_TYPE_CONTAINER]
+                                    if s.config_id.config_type == ItemType.CONTAINER]
             attached_base_states = [s.base_state
                                     for s in states
-                                    if s.config_id.config_type == ITEM_TYPE_VOLUME]
-            self.assertTrue(all(si == STATE_RUNNING
+                                    if s.config_id.config_type == ItemType.VOLUME]
+            self.assertTrue(all(si == State.RUNNING
                                 for si in instance_base_states))
-            self.assertTrue(all(si == STATE_PRESENT
+            self.assertTrue(all(si == State.PRESENT
                                 for si in attached_base_states))
             self.assertTrue(all(s.config_flags == ConfigFlags.DEPENDENT
                                 for s in states
-                                if s.config_id.config_type == ITEM_TYPE_CONTAINER and s.config_id.config_name != 'server'))
+                                if s.config_id.config_type == ItemType.CONTAINER and s.config_id.config_name != 'server'))
 
     def test_single_states_mixed(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -428,19 +427,19 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ])
             sg = SingleStateGenerator(self.policy, {})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
-            self.assertEqual(cache_state.base_state, STATE_PRESENT)
+            self.assertEqual(cache_state.base_state, State.PRESENT)
             queue_state = _get_single_state(sg, self._config_id('redis', 'queue'))
-            self.assertEqual(queue_state.base_state, STATE_RUNNING)
+            self.assertEqual(queue_state.base_state, State.RUNNING)
             svc_state = _get_single_state(sg, self._config_id('svc'))
-            self.assertEqual(svc_state.base_state, STATE_PRESENT)
+            self.assertEqual(svc_state.base_state, State.PRESENT)
             self.assertEqual(svc_state.state_flags & StateFlags.NONRECOVERABLE, StateFlags.NONRECOVERABLE)
             worker_state = _get_single_state(sg, self._config_id('worker'))
             self.assertEqual(worker_state.state_flags & StateFlags.RESTARTING, StateFlags.RESTARTING)
             worker2_state = _get_single_state(sg, self._config_id('worker_q2'))
-            self.assertEqual(worker2_state.base_state, STATE_PRESENT)
+            self.assertEqual(worker2_state.base_state, State.PRESENT)
             self.assertEqual(worker2_state.state_flags & StateFlags.INITIAL, StateFlags.INITIAL)
             server_states = _get_single_state(sg, self.server_config_id)
-            self.assertEqual(server_states.base_state, STATE_ABSENT)
+            self.assertEqual(server_states.base_state, State.ABSENT)
 
     def test_single_states_forced_config(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -483,17 +482,17 @@ class TestPolicyStateGenerators(unittest.TestCase):
             states = list(DependentStateGenerator(self.policy, {}).get_states(self._config_id('redis', 'cache')))
             instance_base_states = [s.base_state
                                     for s in states
-                                    if s.config_id.config_type == ITEM_TYPE_CONTAINER]
+                                    if s.config_id.config_type == ItemType.CONTAINER]
             volume_base_states = [s.base_state
                                   for s in states
-                                  if s.config_id.config_type == ITEM_TYPE_VOLUME]
-            self.assertTrue(all(si == STATE_RUNNING
+                                  if s.config_id.config_type == ItemType.VOLUME]
+            self.assertTrue(all(si == State.RUNNING
                                 for si in instance_base_states))
-            self.assertTrue(all(si == STATE_PRESENT
+            self.assertTrue(all(si == State.PRESENT
                                 for si in volume_base_states))
             self.assertTrue(all(s.config_flags == ConfigFlags.DEPENDENT
                                 for s in states
-                                if not (s.config_id.config_type == ITEM_TYPE_CONTAINER and s.config_id.config_name == 'redis')))
+                                if not (s.config_id.config_type == ItemType.CONTAINER and s.config_id.config_name == 'redis')))
 
     def test_update_states_clean(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -502,12 +501,12 @@ class TestPolicyStateGenerators(unittest.TestCase):
             valid_order = ['sub_sub_svc', 'sub_svc', 'redis', 'server']
             for c_state in states:
                 config_id = c_state.config_id
-                if config_id.config_type == ITEM_TYPE_CONTAINER:
+                if config_id.config_type == ItemType.CONTAINER:
                     config_name = config_id.config_name
                     if config_name in valid_order:
                         self.assertEqual(valid_order[0], config_name)
                         valid_order.pop(0)
-                        self.assertEqual(c_state.base_state, STATE_RUNNING)
+                        self.assertEqual(c_state.base_state, State.RUNNING)
                         self.assertEqual(c_state.state_flags, 0)
 
     def test_update_states_invalid_attached(self):
@@ -521,11 +520,11 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ])
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
-            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
             for ri in ('cache', 'queue'):
                 redis_state = states['containers'][('redis', ri)]
-                self.assertEqual(redis_state.base_state, STATE_RUNNING)
+                self.assertEqual(redis_state.base_state, State.RUNNING)
                 self.assertEqual(redis_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
 
     def test_update_states_invalid_dependent_instance(self):
@@ -539,11 +538,11 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ])
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
-            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.NEEDS_RESET, 0)
             for ri in ('cache', 'queue'):
                 redis_state = states['containers'][('redis', ri)]
-                self.assertEqual(redis_state.base_state, STATE_RUNNING)
+                self.assertEqual(redis_state.base_state, State.RUNNING)
                 self.assertEqual(redis_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
 
     def test_update_states_invalid_dependent_instance_attached(self):
@@ -557,11 +556,11 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ])
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
-            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
             for ri in ('cache', 'queue'):
                 redis_state = states['containers'][('redis', ri)]
-                self.assertEqual(redis_state.base_state, STATE_RUNNING)
+                self.assertEqual(redis_state.base_state, State.RUNNING)
                 self.assertEqual(redis_state.state_flags & StateFlags.NEEDS_RESET, 0)
 
     def test_update_states_invalid_image(self):
@@ -575,7 +574,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ])
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
-            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.IMAGE_MISMATCH, StateFlags.IMAGE_MISMATCH)
 
     def test_update_states_invalid_links(self):
@@ -589,7 +588,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ])
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
-            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.MISSING_LINK, StateFlags.MISSING_LINK)
 
     def test_update_states_invalid_network_ports(self):
@@ -603,7 +602,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ])
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
-            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.MISC_MISMATCH, StateFlags.MISC_MISMATCH)
 
     def test_update_states_network_clean(self):
@@ -617,10 +616,10 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ])
             svc_id = self._config_id('server3')
             states = list(UpdateStateGenerator(self.policy, {}).get_states(svc_id))
-            self.assertTrue(all(((cs.config_id.config_type in (ITEM_TYPE_NETWORK, ITEM_TYPE_VOLUME) and
-                                  cs.base_state == STATE_PRESENT) or
-                                 (cs.config_id.config_type == ITEM_TYPE_CONTAINER and
-                                  cs.base_state == STATE_RUNNING)) and
+            self.assertTrue(all(((cs.config_id.config_type in (ItemType.NETWORK, ItemType.VOLUME) and
+                                  cs.base_state == State.PRESENT) or
+                                 (cs.config_id.config_type == ItemType.CONTAINER and
+                                  cs.base_state == State.RUNNING)) and
                                 cs.state_flags == 0
                                 for cs in states))
 
@@ -633,13 +632,13 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _network('app_net2', Driver='new'),
             ])
             svc_ids = [
-                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'server3'),
-                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'net_svc')
+                MapConfigId(ItemType.CONTAINER, self.map_name, 'server3'),
+                MapConfigId(ItemType.CONTAINER, self.map_name, 'net_svc')
             ]
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_ids))
             self.assertEqual(states['containers'][('net_svc', None)].state_flags & StateFlags.NETWORK_DISCONNECTED, StateFlags.NETWORK_DISCONNECTED)
             self.assertEqual(states['containers'][('server3', None)].state_flags & StateFlags.NETWORK_DISCONNECTED, StateFlags.NETWORK_DISCONNECTED)
-            self.assertEqual(states['networks']['app_net1'].base_state, STATE_ABSENT)
+            self.assertEqual(states['networks']['app_net1'].base_state, State.ABSENT)
             self.assertEqual(states['networks']['app_net2'].state_flags & StateFlags.MISC_MISMATCH, StateFlags.MISC_MISMATCH)
 
     def test_update_states_network_mismatch(self):
@@ -652,8 +651,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _network('app_net2'),
             ])
             svc_ids = [
-                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'server3'),
-                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'net_svc')
+                MapConfigId(ItemType.CONTAINER, self.map_name, 'server3'),
+                MapConfigId(ItemType.CONTAINER, self.map_name, 'net_svc')
             ]
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_ids))
             self.assertEqual(states['containers'][('net_svc', None)].state_flags & StateFlags.NETWORK_MISMATCH, StateFlags.NETWORK_MISMATCH)
@@ -668,7 +667,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _network('app_net2'),
             ])
             svc_ids = [
-                MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, 'server3'),
+                MapConfigId(ItemType.CONTAINER, self.map_name, 'server3'),
             ]
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(svc_ids))
             self.assertEqual(states['containers'][('server3', None)].state_flags & StateFlags.NETWORK_LEFT, StateFlags.NETWORK_LEFT)
@@ -679,7 +678,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.sample_map.containers['server'].create_options.update(environment=dict(Test='x'))
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
-            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.MISC_MISMATCH, StateFlags.MISC_MISMATCH)
 
     def test_update_states_updated_command(self):
@@ -688,20 +687,20 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.sample_map.containers['server'].create_options.update(command='/bin/true')
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
-            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.MISC_MISMATCH, StateFlags.MISC_MISMATCH)
 
     def test_update_states_updated_exec(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-            cmd1 = ExecCommand(2, '/bin/true', EXEC_POLICY_INITIAL)
-            cmd2 = ExecCommand(3, '/bin/true', EXEC_POLICY_INITIAL)
-            cmd3 = ExecCommand(4, '/bin/true', EXEC_POLICY_RESTART)
+            cmd1 = ExecCommand(2, '/bin/true', ExecPolicy.INITIAL)
+            cmd2 = ExecCommand(3, '/bin/true', ExecPolicy.INITIAL)
+            cmd3 = ExecCommand(4, '/bin/true', ExecPolicy.RESTART)
             self.sample_map.containers['server'].exec_commands = [cmd1]
             self._setup_default_containers(rsps)
             self.sample_map.containers['server'].exec_commands = [cmd1, cmd2, cmd3]
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
-            self.assertEqual(server_state.base_state, STATE_RUNNING)
+            self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.NEEDS_RESET, 0)
             self.assertEqual(server_state.state_flags & StateFlags.EXEC_COMMANDS, StateFlags.EXEC_COMMANDS)
             self.assertDictEqual(server_state.extra_data, {'exec_commands': [cmd3]})
@@ -716,21 +715,21 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.policy = policy = BasePolicy({map_name: sample_map}, {'__default__': client_config})
         self.state_gen = DependencyStateGenerator(policy, {})
         self.server_dependencies = [
-            (ITEM_TYPE_CONTAINER, map_name, 'sub_sub_svc', None),
-            (ITEM_TYPE_CONTAINER, map_name, 'sub_svc', None),
-            (ITEM_TYPE_VOLUME, map_name, 'redis', 'redis_socket'),
-            (ITEM_TYPE_VOLUME, map_name, 'redis', 'redis_log'),
-            (ITEM_TYPE_CONTAINER, map_name, 'redis', 'queue'),
-            (ITEM_TYPE_CONTAINER, map_name, 'redis', 'cache'),
-            (ITEM_TYPE_CONTAINER, map_name, 'svc', None),
-            (ITEM_TYPE_VOLUME, map_name, 'server', 'app_log'),
-            (ITEM_TYPE_VOLUME, map_name, 'server', 'server_log'),
+            (ItemType.CONTAINER, map_name, 'sub_sub_svc', None),
+            (ItemType.CONTAINER, map_name, 'sub_svc', None),
+            (ItemType.VOLUME, map_name, 'redis', 'redis_socket'),
+            (ItemType.VOLUME, map_name, 'redis', 'redis_log'),
+            (ItemType.CONTAINER, map_name, 'redis', 'queue'),
+            (ItemType.CONTAINER, map_name, 'redis', 'cache'),
+            (ItemType.CONTAINER, map_name, 'svc', None),
+            (ItemType.VOLUME, map_name, 'server', 'app_log'),
+            (ItemType.VOLUME, map_name, 'server', 'server_log'),
         ]
         self.redis_dependencies = [
-            (ITEM_TYPE_CONTAINER, self.map_name, 'sub_sub_svc', None),
-            (ITEM_TYPE_CONTAINER, self.map_name, 'sub_svc', None),
-            (ITEM_TYPE_VOLUME, map_name, 'redis', 'redis_socket'),
-            (ITEM_TYPE_VOLUME, map_name, 'redis', 'redis_log'),
+            (ItemType.CONTAINER, self.map_name, 'sub_sub_svc', None),
+            (ItemType.CONTAINER, self.map_name, 'sub_svc', None),
+            (ItemType.VOLUME, map_name, 'redis', 'redis_socket'),
+            (ItemType.VOLUME, map_name, 'redis', 'redis_log'),
         ]
 
     def test_merge_single(self):
@@ -750,7 +749,7 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.assertItemsEqual([(svc_config, [])], merged_paths)
 
     def _config_id(self, config_name, instance=None):
-        return MapConfigId(ITEM_TYPE_CONTAINER, self.map_name, config_name, instance)
+        return MapConfigId(ItemType.CONTAINER, self.map_name, config_name, instance)
 
     def test_merge_two_common(self):
         server_config = self._config_id('server')
@@ -764,7 +763,7 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.assertListEqual(self.server_dependencies, merged_paths[0][1])
         self.assertEqual(merged_paths[1][0], worker_config)
         self.assertListEqual([
-            (ITEM_TYPE_VOLUME, self.map_name, 'worker', 'app_log'),
+            (ItemType.VOLUME, self.map_name, 'worker', 'app_log'),
         ], merged_paths[1][1])
 
     def test_merge_three_common(self):
@@ -781,10 +780,10 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.assertEqual(merged_paths[2][0], worker_q2_config)
         self.assertListEqual(self.server_dependencies, merged_paths[0][1])
         self.assertListEqual([
-            (ITEM_TYPE_VOLUME, self.map_name, 'worker', 'app_log'),
+            (ItemType.VOLUME, self.map_name, 'worker', 'app_log'),
         ], merged_paths[1][1])
         self.assertListEqual([
-            (ITEM_TYPE_VOLUME, self.map_name, 'worker_q2', 'app_log'),
+            (ItemType.VOLUME, self.map_name, 'worker_q2', 'app_log'),
         ], merged_paths[2][1])
 
     def test_merge_three_common_with_extension(self):
@@ -800,22 +799,22 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.assertEqual(merged_paths[1][0], server2_config)
         self.assertEqual(merged_paths[2][0], worker_q2_config)
         self.assertListEqual([
-            (ITEM_TYPE_CONTAINER, self.map_name, 'sub_sub_svc', None),
-            (ITEM_TYPE_CONTAINER, self.map_name, 'sub_svc', None),
-            (ITEM_TYPE_VOLUME, self.map_name, 'redis', 'redis_socket'),
-            (ITEM_TYPE_VOLUME, self.map_name, 'redis', 'redis_log'),
-            (ITEM_TYPE_CONTAINER, self.map_name, 'redis', 'queue'),
-            (ITEM_TYPE_CONTAINER, self.map_name, 'redis', 'cache'),
-            (ITEM_TYPE_CONTAINER, self.map_name, 'svc', None),
-            (ITEM_TYPE_VOLUME, self.map_name, 'worker', 'app_log'),
+            (ItemType.CONTAINER, self.map_name, 'sub_sub_svc', None),
+            (ItemType.CONTAINER, self.map_name, 'sub_svc', None),
+            (ItemType.VOLUME, self.map_name, 'redis', 'redis_socket'),
+            (ItemType.VOLUME, self.map_name, 'redis', 'redis_log'),
+            (ItemType.CONTAINER, self.map_name, 'redis', 'queue'),
+            (ItemType.CONTAINER, self.map_name, 'redis', 'cache'),
+            (ItemType.CONTAINER, self.map_name, 'svc', None),
+            (ItemType.VOLUME, self.map_name, 'worker', 'app_log'),
         ], merged_paths[0][1])
         self.assertListEqual([
-            (ITEM_TYPE_CONTAINER, self.map_name, 'svc2', None),
-            (ITEM_TYPE_VOLUME, self.map_name, 'server2', 'app_log'),
-            (ITEM_TYPE_VOLUME, self.map_name, 'server2', 'server_log'),
+            (ItemType.CONTAINER, self.map_name, 'svc2', None),
+            (ItemType.VOLUME, self.map_name, 'server2', 'app_log'),
+            (ItemType.VOLUME, self.map_name, 'server2', 'server_log'),
         ], merged_paths[1][1])
         self.assertListEqual([
-            (ITEM_TYPE_VOLUME, self.map_name, 'worker_q2', 'app_log'),
+            (ItemType.VOLUME, self.map_name, 'worker_q2', 'app_log'),
         ], merged_paths[2][1])
 
     def test_merge_included_first(self):
@@ -856,7 +855,7 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.assertEqual(merged_paths[1][0], server2_config)
         self.assertListEqual(self.server_dependencies, merged_paths[0][1])
         self.assertListEqual([
-            (ITEM_TYPE_CONTAINER, self.map_name, 'svc2', None),
-            (ITEM_TYPE_VOLUME, self.map_name, 'server2', 'app_log'),
-            (ITEM_TYPE_VOLUME, self.map_name, 'server2', 'server_log'),
+            (ItemType.CONTAINER, self.map_name, 'svc2', None),
+            (ItemType.VOLUME, self.map_name, 'server2', 'app_log'),
+            (ItemType.VOLUME, self.map_name, 'server2', 'server_log'),
         ], merged_paths[1][1])

@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ..input import ITEM_TYPE_CONTAINER
 from ...dep import MultiDependencyResolver, CircularDependency
 from ...utils import merge_list
+from ..input import ItemType
 
 
 class ContainerDependencyResolver(MultiDependencyResolver):
@@ -28,7 +28,7 @@ class ContainerDependencyResolver(MultiDependencyResolver):
         """
         dep = []
         for parent_key in parents:
-            if parent_key.config_type == ITEM_TYPE_CONTAINER:
+            if parent_key.config_type == ItemType.CONTAINER:
                 parent_dep = resolve_parent(parent_key)
                 merge_list(dep, parent_dep)
         merge_list(dep, parents)

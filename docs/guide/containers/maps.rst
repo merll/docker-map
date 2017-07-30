@@ -443,15 +443,15 @@ considered:
         (['/bin/bash', '-c', 'script2.sh'], 'user'),
     ]
 
-* A third element in a tuple defines when the command should be run. :const:`dockermap.map.input.EXEC_POLICY_RESTART`
+* A third element in a tuple defines when the command should be run. :const:`dockermap.map.input.ExecPolicy.RESTART`
   is the default, and starts the command each time the container is started. Setting it to
-  :const:`dockermap.map.input.EXEC_POLICY_INITIAL` indicates that the command should only be run once at container
+  :const:`dockermap.map.input.ExecPolicy.INITIAL` indicates that the command should only be run once at container
   creation, but not at a later time, e.g. when the container is restarted or updated::
 
-    from dockermap.map.input import EXEC_POLICY_INITIAL
+    from dockermap.map.input import ExecPolicy.INITIAL
     config.exec_commands = [
         ("/bin/bash -c 'script1.sh'", 'root'),                              # Run each time the container is started.
-        (['/bin/bash', '-c', 'script2.sh'], 'user', EXEC_POLICY_INITIAL),   # Run only when the container is created.
+        (['/bin/bash', '-c', 'script2.sh'], 'user', ExecPolicy.INITIAL),   # Run only when the container is created.
     ]
 
 

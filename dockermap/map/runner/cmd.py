@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 
 import logging
 
-from ..action import C_UTIL_ACTION_EXEC_ALL, C_UTIL_ACTION_EXEC_COMMANDS
-from ..input import ITEM_TYPE_CONTAINER
+from ..action import ContainerUtilAction
+from ..input import ItemType
 
 log = logging.getLogger(__name__)
 
@@ -14,8 +14,8 @@ class ExecMixin(object):
     Utility mixin for executing configured commands inside containers.
     """
     action_method_names = [
-        (ITEM_TYPE_CONTAINER, C_UTIL_ACTION_EXEC_COMMANDS, 'exec_commands'),
-        (ITEM_TYPE_CONTAINER, C_UTIL_ACTION_EXEC_ALL, 'exec_container_commands'),
+        (ItemType.CONTAINER, ContainerUtilAction.EXEC_COMMANDS, 'exec_commands'),
+        (ItemType.CONTAINER, ContainerUtilAction.EXEC_ALL, 'exec_container_commands'),
     ]
 
     def exec_commands(self, action, c_name, run_cmds, **kwargs):

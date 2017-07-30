@@ -4,9 +4,9 @@ from __future__ import unicode_literals
 from docker.utils import create_host_config
 
 from ...functional import resolve_value
-from ..action import V_UTIL_ACTION_PREPARE
+from ..action import VolumeUtilAction
 from ..config.client import USE_HC_MERGE
-from ..input import ITEM_TYPE_VOLUME
+from ..input import ItemType
 from ..policy.utils import update_kwargs, get_instance_volumes
 from .utils import get_preparation_cmd
 
@@ -100,7 +100,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
     Utility mixin for preparing attached containers with file system owners and permissions.
     """
     action_method_names = [
-        (ITEM_TYPE_VOLUME, V_UTIL_ACTION_PREPARE, 'prepare_attached'),
+        (ItemType.VOLUME, VolumeUtilAction.PREPARE, 'prepare_attached'),
     ]
     prepare_local = True
     policy_options = ['prepare_local']

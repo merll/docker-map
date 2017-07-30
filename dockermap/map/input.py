@@ -6,6 +6,18 @@ from collections import namedtuple
 import six
 
 from ..functional import lazy_type, uses_type_registry
+from . import SimpleEnum
+
+
+class ExecPolicy(SimpleEnum):
+    RESTART = 'restart'
+    INITIAL = 'initial'
+
+
+class ItemType(SimpleEnum):
+    CONTAINER = 'container'
+    VOLUME = 'volume'
+    NETWORK = 'network'
 
 
 SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
@@ -14,13 +26,10 @@ ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 ContainerLink.__new__.__defaults__ = None,
 PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface', 'ipv6'))
 PortBinding.__new__.__defaults__ = None, None, False
-EXEC_POLICY_RESTART = 'restart'
-EXEC_POLICY_INITIAL = 'initial'
+EXEC_POLICY_RESTART = ExecPolicy.RESTART  # For backwards compatibility.
+EXEC_POLICY_INITIAL = ExecPolicy.INITIAL  # For backwards compatibility.
 ExecCommand = namedtuple('ExecCommand', ('cmd', 'user', 'policy'))
-ExecCommand.__new__.__defaults__ = None, EXEC_POLICY_RESTART
-ITEM_TYPE_CONTAINER = 'container'
-ITEM_TYPE_VOLUME = 'volume'
-ITEM_TYPE_NETWORK = 'network'
+ExecCommand.__new__.__defaults__ = None, ExecPolicy.RESTART
 MapConfigId = namedtuple('MapConfigId', ('config_type', 'map_name', 'config_name', 'instance_name'))
 MapConfigId.__new__.__defaults__ = None,
 
@@ -401,25 +410,25 @@ def get_map_config_id(value, map_name=None, instances=None):
             config_name = s_map_name
             s_map_name = map_name
             s_instances = None
-        return MapConfigId(ITEM_TYPE_CONTAINER, s_map_name, config_name, s_instances or instances)
+        return MapConfigId(ItemType.CONTAINER, s_map_name, config_name, s_instances or instances)
     if isinstance(value, (tuple, list)):
         v_len = len(value)
         if v_len == 3:
             v_instances = value[2]
             if not v_instances:
-                return MapConfigId(ITEM_TYPE_CONTAINER, value[0], value[1], None)
+                return MapConfigId(ItemType.CONTAINER, value[0], value[1], None)
             if isinstance(v_instances, tuple):
-                return MapConfigId(ITEM_TYPE_CONTAINER, *value)
+                return MapConfigId(ItemType.CONTAINER, *value)
             elif isinstance(v_instances, list):
-                return MapConfigId(ITEM_TYPE_CONTAINER, value[0], value[1], tuple(v_instances))
+                return MapConfigId(ItemType.CONTAINER, value[0], value[1], tuple(v_instances))
             elif isinstance(v_instances, six.string_types):
-                return MapConfigId(ITEM_TYPE_CONTAINER, value[0], value[1], (v_instances, ))
+                return MapConfigId(ItemType.CONTAINER, value[0], value[1], (v_instances, ))
             raise ValueError("Invalid type of instance specification in '{0}'; expected a list, tuple, or string type, "
                              "found {1}.".format(value, type(v_instances).__name__))
         elif v_len == 2:
-            return MapConfigId(ITEM_TYPE_CONTAINER, value[0] or map_name, value[1], instances)
+            return MapConfigId(ItemType.CONTAINER, value[0] or map_name, value[1], instances)
         elif v_len == 1:
-            return MapConfigId(ITEM_TYPE_CONTAINER, map_name, value[0], instances)
+            return MapConfigId(ItemType.CONTAINER, map_name, value[0], instances)
         raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
                          "MapConfigId tuple. Found length {0}.".format(v_len))
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))

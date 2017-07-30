@@ -10,7 +10,7 @@ from six.moves import map
 
 from ...utils import merge_list
 from .. import DictMap, DefaultDictMap
-from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK, bool_if_set, MapConfigId
+from ..input import ItemType, bool_if_set, MapConfigId
 from . import ConfigurationObject, CP
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
@@ -34,17 +34,17 @@ def _get_nested_instances(group_items):
 
 
 def _get_config_instances(config_type, c_map, config_name):
-    if config_type == ITEM_TYPE_CONTAINER:
+    if config_type == ItemType.CONTAINER:
         config = c_map.get_existing(config_name)
         if not config:
             raise KeyError(config_name)
         return config.instances
-    elif config_type == ITEM_TYPE_VOLUME:
+    elif config_type == ItemType.VOLUME:
         config = c_map.get_existing(config_name)
         if not config:
             raise KeyError(config_name)
         return config.attaches
-    elif config_type == ITEM_TYPE_NETWORK:
+    elif config_type == ItemType.NETWORK:
         config = c_map.get_existing_network(config_name)
         if not config:
             raise KeyError(config_name)
@@ -367,7 +367,7 @@ class ContainerMap(ConfigurationObject):
                     used_instances = (volume_instance, )
                 else:
                     used_instances = instances.get(volume_config_name)
-            return [MapConfigId(ITEM_TYPE_CONTAINER, self._name, used_c_name, ai)
+            return [MapConfigId(ItemType.CONTAINER, self._name, used_c_name, ai)
                     for ai in used_instances or (None, )]
 
         def _get_used_items_ap(u):
@@ -378,7 +378,7 @@ class ContainerMap(ConfigurationObject):
                 used_instances = attaching_instances
             else:
                 used_instances = (volume_instance, )
-            return [MapConfigId(ITEM_TYPE_CONTAINER, self._name, volume_config_name, ai)
+            return [MapConfigId(ItemType.CONTAINER, self._name, volume_config_name, ai)
                     for ai in used_instances or (None, )]
 
         def _get_linked_items(lc):
@@ -387,7 +387,7 @@ class ContainerMap(ConfigurationObject):
                 linked_instances = (linked_instance, )
             else:
                 linked_instances = instances.get(linked_config_name)
-            return [MapConfigId(ITEM_TYPE_CONTAINER, self._name, linked_config_name, li)
+            return [MapConfigId(ItemType.CONTAINER, self._name, linked_config_name, li)
                     for li in linked_instances or (None, )]
 
         def _get_network_mode_items(n):
@@ -398,12 +398,12 @@ class ContainerMap(ConfigurationObject):
                     network_instances = (net_instance, )
                 else:
                     network_instances = network_ref_config.instances
-                return [MapConfigId(ITEM_TYPE_CONTAINER, self._name, net_config_name, ni)
+                return [MapConfigId(ItemType.CONTAINER, self._name, net_config_name, ni)
                         for ni in network_instances]
             return []
 
         def _get_network_items(n):
-            net_items = [MapConfigId(ITEM_TYPE_NETWORK, self._name, n.network_name)]
+            net_items = [MapConfigId(ItemType.NETWORK, self._name, n.network_name)]
             if n.links:
                 net_items.extend(itertools.chain.from_iterable(map(_get_linked_items, n.links)))
             return net_items
@@ -431,14 +431,14 @@ class ContainerMap(ConfigurationObject):
             merge_list(d, itertools.chain.from_iterable(map(_get_network_items, config.networks)))
             merge_list(d, itertools.chain.from_iterable(map(used_func, config.uses)))
             merge_list(d, itertools.chain.from_iterable(_get_linked_items(l.container) for l in config.links))
-            merge_list(d, [MapConfigId(ITEM_TYPE_VOLUME, self._name, name, a)
+            merge_list(d, [MapConfigId(ItemType.VOLUME, self._name, name, a)
                            for a in config.attaches])
             return d
 
         for c_name, c_config in ext_map:
             dep_list = _get_dep_list(c_name, c_config)
             for c_instance in c_config.instances or (None, ):
-                yield MapConfigId(ITEM_TYPE_CONTAINER, self._name, c_name, c_instance), dep_list
+                yield MapConfigId(ItemType.CONTAINER, self._name, c_name, c_instance), dep_list
 
     def get(self, item):
         """

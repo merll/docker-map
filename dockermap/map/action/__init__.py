@@ -1,54 +1,70 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from six import string_types, python_2_unicode_compatible
+from six import python_2_unicode_compatible
 
-# Base actions provided by client.
-ACTION_CREATE = 'create'
-ACTION_START = 'start'
-ACTION_RESTART = 'restart'
-ACTION_STOP = 'stop'
-ACTION_REMOVE = 'remove'
-ACTION_KILL = 'kill'
-ACTION_WAIT = 'wait'               # Wait for item to finish.
-ACTION_UPDATE = 'update'           # Update the configuration of an object in-place.
-ACTION_CONNECT = 'connect'         # Connect to network.
-ACTION_DISCONNECT = 'disconnect'   # Disconnect from network.
+from .. import SimpleEnum
 
-C_UTIL_ACTION_EXEC_COMMANDS = 'exec_single_command'           # Create & start exec certain commands.
-C_UTIL_ACTION_EXEC_ALL = 'exec_all_commands'                  # Create & start all configured exec commands
-C_UTIL_ACTION_SCRIPT = 'script'                               # Create & start container, then create & start exec.
-C_UTIL_ACTION_SIGNAL_STOP = 'signal_stop'                     # Send signal (kill) & wait.
-C_UTIL_ACTION_CONNECT_ALL = 'connect_all_networks'            # Connect container to all configured networks.
 
-V_UTIL_ACTION_PREPARE = 'prepare_volume'                      # Set up volume permissions.
+class ActionEnum(SimpleEnum):
+    pass
 
-N_UTIL_ACTION_DISCONNECT_ALL = 'disconnect_all_containers'    # Disconnect all containers from a network.
 
-DERIVED_ACTION_STARTUP_VOLUME = [ACTION_CREATE, ACTION_START]                   # Create, connect, & start
-DERIVED_ACTION_STARTUP_CONTAINER = [ACTION_CREATE, C_UTIL_ACTION_CONNECT_ALL,
-                                    ACTION_START]                               # Create & start
-DERIVED_ACTION_SHUTDOWN_CONTAINER = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE]  # Stop & remove
-DERIVED_ACTION_RESET_VOLUME = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE,
-                               ACTION_CREATE, ACTION_START]                     # Stop, remove, create, & start
-DERIVED_ACTION_RESET_CONTAINER = [C_UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE,
-                                  ACTION_CREATE, C_UTIL_ACTION_CONNECT_ALL,
-                                  ACTION_START]                                 # Stop, remove, create, connect, & start
-DERIVED_ACTION_RELAUNCH_VOLUME = [ACTION_REMOVE, ACTION_CREATE, ACTION_START]   # Remove, create, & start
-DERIVED_ACTION_RELAUNCH_CONTAINER = [ACTION_REMOVE, ACTION_CREATE,
-                                     C_UTIL_ACTION_CONNECT_ALL, ACTION_START]   # Remove, create, connect, & start
-DERIVED_ACTION_RESET_NETWORK = [ACTION_REMOVE, ACTION_CREATE]                   # Remove & re-create
+class Action(ActionEnum):
+    # Base actions provided by client.
+    CREATE = 'create'
+    START = 'start'
+    RESTART = 'restart'
+    STOP = 'stop'
+    REMOVE = 'remove'
+    KILL = 'kill'
+    WAIT = 'wait'               # Wait for item to finish.
+    UPDATE = 'update'           # Update the configuration of an object in-place.
+    CONNECT = 'connect'         # Connect to network.
+    DISCONNECT = 'disconnect'   # Disconnect from network.
+
+
+class ContainerUtilAction(ActionEnum):
+    EXEC_COMMANDS = 'exec_single_command'  # Create & start exec certain commands.
+    EXEC_ALL = 'exec_all_commands'         # Create & start all configured exec commands
+    SCRIPT = 'script'                      # Create & start container, then create & start exec.
+    SIGNAL_STOP = 'signal_stop'            # Send signal (kill) & wait.
+    CONNECT_ALL = 'connect_all_networks'   # Connect container to all configured networks.
+
+
+class VolumeUtilAction(ActionEnum):
+    PREPARE = 'prepare_volume'             # Set up volume permissions.
+
+
+class NetworkUtilAction(ActionEnum):
+    DISCONNECT_ALL = 'disconnect_all_containers'    # Disconnect all containers from a network.
+
+
+class DerivedAction(object):
+    STARTUP_VOLUME = [Action.CREATE, Action.START]                         # Create & start
+    STARTUP_CONTAINER = [Action.CREATE, ContainerUtilAction.CONNECT_ALL,
+                         Action.START]                                     # Create, connect, & start
+    SHUTDOWN_CONTAINER = [ContainerUtilAction.SIGNAL_STOP, Action.REMOVE]  # Stop & remove
+    RESET_VOLUME = [ContainerUtilAction.SIGNAL_STOP, Action.REMOVE,
+                    Action.CREATE, Action.START]                           # Stop, remove, create, & start
+    RESET_CONTAINER = [ContainerUtilAction.SIGNAL_STOP, Action.REMOVE,
+                       Action.CREATE, ContainerUtilAction.CONNECT_ALL,
+                       Action.START]                                       # Stop, remove, create, connect, & start
+    RELAUNCH_VOLUME = [Action.REMOVE, Action.CREATE, Action.START]         # Remove, create, & start
+    RELAUNCH_CONTAINER = [Action.REMOVE, Action.CREATE,
+                          ContainerUtilAction.CONNECT_ALL, Action.START]   # Remove, create, connect, & start
+    RESET_NETWORK = [Action.REMOVE, Action.CREATE]                         # Remove & re-create
 
 
 def _action_type_list(value):
+    if isinstance(value, ActionEnum):
+        return [value]
     if isinstance(value, list):
         return value
     elif isinstance(value, tuple):
         return list(value)
-    elif isinstance(value, string_types):
-        return [value]
     elif value:
-        raise ValueError("String or list must be provided for 'action_types'. Found {0}.".format(
+        raise ValueError("ActionEnum or list must be provided for 'action_types'. Found {0}.".format(
                 type(value).__name__))
     return []
 

@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ..input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME, ITEM_TYPE_NETWORK
+from ..input import ItemType
 from ..policy import ConfigFlags
-from ..state import STATE_PRESENT, STATE_ABSENT, STATE_RUNNING, StateFlags
+from ..state import State, StateFlags
+from . import ItemAction, Action, VolumeUtilAction, ContainerUtilAction, DerivedAction
 from .base import AbstractActionGenerator
-from . import (ItemAction, DERIVED_ACTION_STARTUP_CONTAINER, DERIVED_ACTION_STARTUP_VOLUME,
-               DERIVED_ACTION_RELAUNCH_CONTAINER, DERIVED_ACTION_RELAUNCH_VOLUME, ACTION_START, V_UTIL_ACTION_PREPARE,
-               DERIVED_ACTION_RESET_CONTAINER, C_UTIL_ACTION_EXEC_ALL, ACTION_CREATE)
 
 
 class ResumeActionGenerator(AbstractActionGenerator):
@@ -29,50 +27,50 @@ class ResumeActionGenerator(AbstractActionGenerator):
         """
         config_type = state.config_id.config_type
         config_tuple = (state.client_name, state.config_id.map_name, state.config_id.config_name)
-        if config_type == ITEM_TYPE_NETWORK:
-            return [ItemAction(state, ACTION_CREATE)]
-        elif config_type == ITEM_TYPE_VOLUME:
-            if state.base_state == STATE_ABSENT:
-                action = DERIVED_ACTION_STARTUP_VOLUME
+        if config_type == ItemType.NETWORK:
+            return [ItemAction(state, Action.CREATE)]
+        elif config_type == ItemType.VOLUME:
+            if state.base_state == State.ABSENT:
+                action = DerivedAction.STARTUP_VOLUME
                 self.recreated_volumes.add(config_tuple)
             else:
                 if state.state_flags & StateFlags.NONRECOVERABLE:
-                    action = DERIVED_ACTION_RELAUNCH_VOLUME
+                    action = DerivedAction.RELAUNCH_VOLUME
                     self.recreated_volumes.add(config_tuple)
                 elif state.state_flags & StateFlags.INITIAL:
-                    action = ACTION_START
+                    action = Action.START
                 else:
                     return None
             return [
                 ItemAction(state, action),
-                ItemAction(state, V_UTIL_ACTION_PREPARE),
+                ItemAction(state, VolumeUtilAction.PREPARE),
             ]
-        elif config_type == ITEM_TYPE_CONTAINER:
+        elif config_type == ItemType.CONTAINER:
             if config_tuple in self.recreated_volumes:
-                if state.base_state == STATE_ABSENT:
-                    action = DERIVED_ACTION_STARTUP_CONTAINER
-                elif state.base_state == STATE_RUNNING:
-                    action = DERIVED_ACTION_RESET_CONTAINER
-                elif state.base_state == STATE_PRESENT:
+                if state.base_state == State.ABSENT:
+                    action = DerivedAction.STARTUP_CONTAINER
+                elif state.base_state == State.RUNNING:
+                    action = DerivedAction.RESET_CONTAINER
+                elif state.base_state == State.PRESENT:
                     if state.base_state & StateFlags.INITIAL:
-                        action = ACTION_START
+                        action = Action.START
                     else:
-                        action = DERIVED_ACTION_RELAUNCH_CONTAINER
+                        action = DerivedAction.RELAUNCH_CONTAINER
                 else:
                     return None
             else:
-                if state.base_state == STATE_ABSENT:
-                    action = DERIVED_ACTION_STARTUP_CONTAINER
+                if state.base_state == State.ABSENT:
+                    action = DerivedAction.STARTUP_CONTAINER
                 else:
                     if state.state_flags & StateFlags.NONRECOVERABLE:
-                        action = DERIVED_ACTION_RESET_CONTAINER
-                    elif (state.base_state != STATE_RUNNING and
+                        action = DerivedAction.RESET_CONTAINER
+                    elif (state.base_state != State.RUNNING and
                           (state.state_flags & StateFlags.INITIAL or
                            not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
-                        action = ACTION_START
+                        action = Action.START
                     else:
                         return None
             return [
                 ItemAction(state, action),
-                ItemAction(state, C_UTIL_ACTION_EXEC_ALL),
+                ItemAction(state, ContainerUtilAction.EXEC_ALL),
             ]

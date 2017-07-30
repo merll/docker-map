@@ -7,10 +7,10 @@ import shlex
 import six
 
 from ...functional import resolve_value
-from ..input import EXEC_POLICY_INITIAL, NetworkEndpoint
+from ..input import ExecPolicy, NetworkEndpoint
 from ..policy import ConfigFlags
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
-from . import STATE_RUNNING, STATE_ABSENT, StateFlags
+from . import State, StateFlags
 from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
 
 log = logging.getLogger(__name__)
@@ -361,7 +361,7 @@ class UpdateContainerState(ContainerBaseState):
             log.debug("Invalid check mode %s - skipping.", check_option)
             return None
         return [exec_cmd for exec_cmd in self.config.exec_commands
-                if not _cmd_running(exec_cmd.cmd, exec_cmd.user) and exec_cmd.policy != EXEC_POLICY_INITIAL]
+                if not _cmd_running(exec_cmd.cmd, exec_cmd.user) and exec_cmd.policy != ExecPolicy.INITIAL]
 
     def _check_volumes(self):
         return self.volume_checker.check(self.config_id, self.container_map, self.config, self.detail)
@@ -409,7 +409,7 @@ class UpdateContainerState(ContainerBaseState):
 
     def get_state(self):
         base_state, state_flags, extra = super(UpdateContainerState, self).get_state()
-        if base_state == STATE_ABSENT or state_flags & StateFlags.NEEDS_RESET:
+        if base_state == State.ABSENT or state_flags & StateFlags.NEEDS_RESET:
             return base_state, state_flags, extra
 
         config_id = self.config_id
@@ -439,7 +439,7 @@ class UpdateContainerState(ContainerBaseState):
             if not (_check_environment(self.config, self.detail) and _check_cmd(self.config, self.detail) and
                     _check_container_network_ports(self.config, self.client_config, self.detail)):
                 state_flags |= StateFlags.MISC_MISMATCH
-            if base_state == STATE_RUNNING:
+            if base_state == State.RUNNING:
                 check_exec_option = self.options['check_exec_commands']
                 if check_exec_option:
                     missing_exec_cmds = self._check_commands(check_exec_option)
@@ -462,7 +462,7 @@ class UpdateNetworkState(NetworkBaseState):
 
     def get_state(self):
         base_state, state_flags, extra = super(UpdateNetworkState, self).get_state()
-        if base_state == STATE_ABSENT or state_flags & StateFlags.NEEDS_RESET:
+        if base_state == State.ABSENT or state_flags & StateFlags.NEEDS_RESET:
             return base_state, state_flags, extra
 
         self.endpoint_registry.register_network(self.detail)

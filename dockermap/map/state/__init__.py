@@ -3,13 +3,15 @@ from __future__ import unicode_literals
 
 from collections import namedtuple
 
-from ...map import Flags
+from ...map import Flags, SimpleEnum
 
 INITIAL_START_TIME = '0001-01-01T00:00:00Z'
 
-STATE_ABSENT = 'absent'     # Does not exist.
-STATE_PRESENT = 'present'   # Exists but is not running.
-STATE_RUNNING = 'running'   # Exists and is running.
+
+class State(SimpleEnum):
+    ABSENT = 'absent'     # Does not exist.
+    PRESENT = 'present'   # Exists but is not running.
+    RUNNING = 'running'   # Exists and is running.
 
 
 class StateFlags(Flags):

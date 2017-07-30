@@ -5,7 +5,7 @@ import unittest
 import six
 
 from dockermap.api import ContainerMap
-from dockermap.map.input import ITEM_TYPE_CONTAINER, ITEM_TYPE_VOLUME
+from dockermap.map.input import ItemType
 from dockermap.dep import SingleDependencyResolver
 from dockermap.map.policy.dep import ContainerDependencyResolver
 
@@ -49,45 +49,45 @@ class ContainerDependencyTest(unittest.TestCase):
                 self.fail("{0} found before {1}, should be later.".format(item, last_item))
 
     def test_forward_resolution_order(self):
-        a_dep = self.f_res.get_dependencies((ITEM_TYPE_CONTAINER, 'test_map', 'a', None))
+        a_dep = self.f_res.get_dependencies((ItemType.CONTAINER, 'test_map', 'a', None))
         self.assertOrder(a_dep,
-                         (ITEM_TYPE_VOLUME, 'test_map', 'd', 'dv'),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'd', '1'),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'd', '2'),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'b', None))
+                         (ItemType.VOLUME, 'test_map', 'd', 'dv'),
+                         (ItemType.CONTAINER, 'test_map', 'd', '1'),
+                         (ItemType.CONTAINER, 'test_map', 'd', '2'),
+                         (ItemType.CONTAINER, 'test_map', 'b', None))
         self.assertOrder(a_dep,
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'e', '1'),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'e', '2'),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'd', '1'),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'd', '2'))
+                         (ItemType.CONTAINER, 'test_map', 'e', '1'),
+                         (ItemType.CONTAINER, 'test_map', 'e', '2'),
+                         (ItemType.CONTAINER, 'test_map', 'd', '1'),
+                         (ItemType.CONTAINER, 'test_map', 'd', '2'))
         self.assertOrder(a_dep,
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'e', '1'),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'e', '2'),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'b', None))
+                         (ItemType.CONTAINER, 'test_map', 'e', '1'),
+                         (ItemType.CONTAINER, 'test_map', 'e', '2'),
+                         (ItemType.CONTAINER, 'test_map', 'b', None))
         self.assertOrder(a_dep,
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'f', None),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'b', None))
-        l_dep = self.f_res.get_dependencies((ITEM_TYPE_CONTAINER, 'test_map', 'l', None))
-        self.assertListEqual(l_dep, [(ITEM_TYPE_CONTAINER, 'test_map', 'e', '1')])
-        x_dep = self.f_res.get_dependencies((ITEM_TYPE_CONTAINER, 'test_map', 'x', None))
+                         (ItemType.CONTAINER, 'test_map', 'f', None),
+                         (ItemType.CONTAINER, 'test_map', 'b', None))
+        l_dep = self.f_res.get_dependencies((ItemType.CONTAINER, 'test_map', 'l', None))
+        self.assertListEqual(l_dep, [(ItemType.CONTAINER, 'test_map', 'e', '1')])
+        x_dep = self.f_res.get_dependencies((ItemType.CONTAINER, 'test_map', 'x', None))
         self.assertOrder(x_dep,
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'f', None),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'b', None))
+                         (ItemType.CONTAINER, 'test_map', 'f', None),
+                         (ItemType.CONTAINER, 'test_map', 'b', None))
 
     def test_backward_resolution_order(self):
-        f_dep = self.r_res.get_dependencies((ITEM_TYPE_CONTAINER, 'test_map', 'f', None))
+        f_dep = self.r_res.get_dependencies((ItemType.CONTAINER, 'test_map', 'f', None))
         self.assertOrder(f_dep,
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'x', None),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'b', None))
+                         (ItemType.CONTAINER, 'test_map', 'x', None),
+                         (ItemType.CONTAINER, 'test_map', 'b', None))
         self.assertOrder(f_dep,
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'a', None),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'b', None))
-        e_dep = self.r_res.get_dependencies((ITEM_TYPE_CONTAINER, 'test_map', 'e', '1'))
+                         (ItemType.CONTAINER, 'test_map', 'a', None),
+                         (ItemType.CONTAINER, 'test_map', 'b', None))
+        e_dep = self.r_res.get_dependencies((ItemType.CONTAINER, 'test_map', 'e', '1'))
         self.assertOrder(e_dep,
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'a', None),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'b', None),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'd', '1'),
-                         (ITEM_TYPE_CONTAINER, 'test_map', 'd', '2'))
+                         (ItemType.CONTAINER, 'test_map', 'a', None),
+                         (ItemType.CONTAINER, 'test_map', 'b', None),
+                         (ItemType.CONTAINER, 'test_map', 'd', '1'),
+                         (ItemType.CONTAINER, 'test_map', 'd', '2'))
 
 
 class SingleDependencyTest(unittest.TestCase):
