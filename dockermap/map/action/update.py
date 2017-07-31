@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 import logging
 
+import six
+
 from ..input import ItemType
 from ..policy import ConfigFlags
 from ..state import State, StateFlags
@@ -39,7 +41,7 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 log.debug("Found to be outdated - resetting %s.", config_id)
                 connected_containers = state.extra_data.get('containers')
                 if connected_containers:
-                    cc_names = [c.get('Name', c['Id']) for c in connected_containers]
+                    cc_names = [c_info.get('Name', c_id) for c_id, c_info in six.iteritems(connected_containers)]
                     log.debug("Disconnecting containers from %s: %s.", config_id, cc_names)
                     actions = [ItemAction(state, NetworkUtilAction.DISCONNECT_ALL, containers=cc_names)]
                 else:
@@ -95,7 +97,7 @@ class UpdateActionGenerator(AbstractActionGenerator):
                     ])
                 if state.state_flags & StateFlags.NETWORK_LEFT:
                     ln = state.extra_data['left']
-                    log.debug("Container is disconnecting to the following networks: %s.", ln)
+                    log.debug("Container is disconnecting from the following networks: %s.", ln)
                     actions.append(ItemAction(state, Action.DISCONNECT, networks=ln))
                 if (state.base_state != State.RUNNING and
                         (ci_initial or not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
