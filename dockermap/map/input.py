@@ -28,8 +28,6 @@ PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface
 PortBinding.__new__.__defaults__ = None, None, False
 EXEC_POLICY_RESTART = ExecPolicy.RESTART  # For backwards compatibility.
 EXEC_POLICY_INITIAL = ExecPolicy.INITIAL  # For backwards compatibility.
-ExecCommand = namedtuple('ExecCommand', ('cmd', 'user', 'policy'))
-ExecCommand.__new__.__defaults__ = None, ExecPolicy.RESTART
 MapConfigId = namedtuple('MapConfigId', ('config_type', 'map_name', 'config_name', 'instance_name'))
 MapConfigId.__new__.__defaults__ = None,
 
@@ -77,6 +75,13 @@ class NetworkEndpoint(namedtuple('NetworkEndpoint', ('network_name', 'aliases', 
     def __new__(cls, network_name, aliases=None, links=None, ipv4_address=None, ipv6_address=None, link_local_ips=None):
         return super(NetworkEndpoint, cls).__new__(cls, network_name, _get_list(aliases), _get_list(links),
                                                    ipv4_address, ipv6_address, _get_list(link_local_ips))
+
+
+class ExecCommand(namedtuple('ExecCommand', ('cmd', 'user', 'policy'))):
+    def __new__(cls, cmd, user=None, policy=ExecPolicy.RESTART):
+        if isinstance(policy, six.string_types):
+            policy = ExecPolicy(policy)
+        return super(ExecCommand, cls).__new__(cls, cmd, user, policy)
 
 
 def _get_listed_tuples(value, element_type, conversion_func, **kwargs):
