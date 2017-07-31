@@ -10,14 +10,21 @@ from ...functional import resolve_value
 from ..input import ExecPolicy, NetworkEndpoint
 from ..policy import ConfigFlags
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
-from . import State, StateFlags
+from . import State, StateFlags, SimpleEnum
 from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
 
 log = logging.getLogger(__name__)
 
-CMD_CHECK_FULL = 'full'
-CMD_CHECK_PARTIAL = 'partial'
-CMD_CHECK_NONE = 'none'
+
+class CmdCheck(SimpleEnum):
+    FULL = 'full'
+    PARTIAL = 'partial'
+    NONE = 'none'
+
+# For backwards compatibility.
+CMD_CHECK_FULL = CmdCheck.FULL
+CMD_CHECK_PARTIAL = CmdCheck.PARTIAL
+CMD_CHECK_NONE = CmdCheck.NONE
 
 
 def _check_environment(c_config, instance_detail):
@@ -353,9 +360,9 @@ class UpdateContainerState(ContainerBaseState):
             log.debug("No running exec commands found for container.")
             return self.config.exec_commands
         log.debug("Checking commands for container %s.", self.container_name)
-        if check_option == CMD_CHECK_FULL:
+        if check_option == CmdCheck.FULL:
             cmd_exists = _find_full_command
-        elif check_option == CMD_CHECK_PARTIAL:
+        elif check_option == CmdCheck.PARTIAL:
             cmd_exists = _find_partial_command
         else:
             log.debug("Invalid check mode %s - skipping.", check_option)
@@ -404,7 +411,7 @@ class UpdateContainerState(ContainerBaseState):
         super(UpdateContainerState, self).inspect()
         if self.detail and self.detail['State']['Running'] and not self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
             check_exec_option = self.options['check_exec_commands']
-            if check_exec_option and check_exec_option != CMD_CHECK_NONE and self.config.exec_commands:
+            if check_exec_option and check_exec_option != CmdCheck.NONE and self.config.exec_commands:
                 self.current_commands = self.client.top(self.detail['Id'], ps_args='-eo pid,user,args')['Processes']
 
     def get_state(self):
@@ -498,7 +505,7 @@ class UpdateStateGenerator(DependencyStateGenerator):
     pull_before_update = False
     pull_insecure_registry = False
     update_persistent = False
-    check_exec_commands = CMD_CHECK_FULL
+    check_exec_commands = CmdCheck.FULL
     policy_options = ['pull_before_update', 'pull_insecure_registry', 'update_persistent', 'check_exec_commands']
 
     def __init__(self, policy, kwargs):
