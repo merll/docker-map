@@ -73,7 +73,7 @@ def _get_list(value):
 class NetworkEndpoint(namedtuple('NetworkEndpoint', ('network_name', 'aliases', 'links', 'ipv4_address', 'ipv6_address',
                                                      'link_local_ips'))):
     def __new__(cls, network_name, aliases=None, links=None, ipv4_address=None, ipv6_address=None, link_local_ips=None):
-        return super(NetworkEndpoint, cls).__new__(cls, network_name, _get_list(aliases), _get_list(links),
+        return super(NetworkEndpoint, cls).__new__(cls, network_name, _get_list(aliases), get_container_links(links),
                                                    ipv4_address, ipv6_address, _get_list(link_local_ips))
 
 

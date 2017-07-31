@@ -226,10 +226,11 @@ class ContainerVolumeChecker(object):
         return True
 
 
-class NetworkEndpointRegisty(object):
-    def __init__(self, n_name_func, c_name_func, default_networks):
-        self._n_name_func = n_name_func
-        self._c_name_func = c_name_func
+class NetworkEndpointRegistry(object):
+    def __init__(self, nname_func, cname_func, hostname_func, default_networks):
+        self._nname = nname_func
+        self._cname = cname_func
+        self._hostname = hostname_func
         self._default_networks = list(default_networks.keys())
         self._endpoints = defaultdict(set)
         for network_detail in six.itervalues(default_networks):
@@ -248,7 +249,7 @@ class NetworkEndpointRegisty(object):
         network_endpoints = self._endpoints.get(detail['Id'], set())
         reset_networks = []
         if c_config.networks:
-            named_endpoints = [(self._n_name_func(config_id.map_name, cn_config.network_name), cn_config)
+            named_endpoints = [(self._nname(config_id.map_name, cn_config.network_name), cn_config)
                                for cn_config in c_config.networks]
         else:
             named_endpoints = [(d_name, NetworkEndpoint(d_name))
@@ -270,8 +271,9 @@ class NetworkEndpointRegisty(object):
                 reset_networks.append((ref_n_name, cn_config))
                 continue
             if cn_config.links:
-                linked_names = {self._c_name_func(config_id.map_name, lc_name)
-                                for lc_name in cn_config.links}
+                linked_names = {'{0}:{1}'.format(self._cname(config_id.map_name, lc_name),
+                                                 lc_alias or self._hostname(lc_name))
+                                for lc_name, lc_alias in cn_config.links}
             else:
                 linked_names = set()
             if set(network_detail.get('Links', []) or ()) != linked_names:
@@ -530,7 +532,8 @@ class UpdateStateGenerator(DependencyStateGenerator):
             if client_config.supports_networks
         }
         self._network_registries = {
-            client_name: NetworkEndpointRegisty(policy.nname, policy.cname, default_network_details[client_name])
+            client_name: NetworkEndpointRegistry(policy.nname, policy.cname, policy.get_hostname,
+                                                 default_network_details[client_name])
             for client_name, network_details in six.iteritems(default_network_details)
         }
 

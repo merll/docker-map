@@ -399,8 +399,8 @@ class DockerConfigMixin(object):
             if endpoint_config.aliases:
                 c_kwargs['aliases'] = list(map(resolve_value, endpoint_config.aliases))
             if endpoint_config.links:
-                c_kwargs['links'] = [policy.cname(map_name, l_name)
-                                     for l_name in endpoint_config.links]
+                c_kwargs['links'] = [(policy.cname(map_name, l_name), alias or policy.get_hostname(l_name))
+                                     for l_name, alias in endpoint_config.links]
             if endpoint_config.link_local_ips:
                 c_kwargs['link_local_ips'] = list(map(resolve_value, endpoint_config.link_local_ips))
         update_kwargs(c_kwargs, kwargs)

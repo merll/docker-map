@@ -405,7 +405,7 @@ class ContainerMap(ConfigurationObject):
         def _get_network_items(n):
             net_items = [MapConfigId(ItemType.NETWORK, self._name, n.network_name)]
             if n.links:
-                net_items.extend(itertools.chain.from_iterable(map(_get_linked_items, n.links)))
+                net_items.extend(itertools.chain.from_iterable(_get_linked_items(l.container) for l in n.links))
             return net_items
 
         if self._extended:
