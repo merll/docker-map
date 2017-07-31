@@ -8,4 +8,7 @@ from .map.client import MappingDockerClient
 from .map.config.client import ClientConfiguration, USE_HC_MERGE
 from .map.config.host_volume import HostVolumeConfiguration
 from .map.config.container import ContainerConfiguration
+from .map.config.network import NetworkConfiguration
 from .map.config.main import ContainerMap
+from .map.input import (ContainerLink, ExecPolicy, ExecCommand, ItemType, MapConfigId, NetworkEndpoint, PortBinding,
+                        SharedVolume)
