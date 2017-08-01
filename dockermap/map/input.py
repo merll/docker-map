@@ -5,6 +5,7 @@ import posixpath
 from collections import namedtuple
 import six
 
+from .. import DEFAULT_PRESET_NETWORKS
 from ..functional import lazy_type, uses_type_registry
 from . import SimpleEnum
 
@@ -499,7 +500,7 @@ def get_network_mode(value):
         if len(value) == 2:
             return tuple(value)
         return ValueError("Tuples or lists need to have length 2 for container network references.")
-    if value in ('bridge', 'host'):
+    if value in DEFAULT_PRESET_NETWORKS:
         return value
     if value.startswith('container:'):
         return value

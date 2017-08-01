@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from ... import DEFAULT_PRESET_NETWORKS
 from ..action import Action, ContainerUtilAction, NetworkUtilAction
 from ..input import ItemType
 
@@ -79,7 +80,7 @@ class NetworkUtilMixin(object):
         map_name = action.config_id.map_name
         nname = self._policy.nname
         for network_endpoint in endpoints:
-            if network_endpoint.network_name not in ('host', 'bridge', 'none'):
+            if network_endpoint.network_name not in DEFAULT_PRESET_NETWORKS:
                 network_name = nname(map_name, network_endpoint.network_name)
             else:
                 network_name = network_endpoint.network_name
