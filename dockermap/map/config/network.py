@@ -6,7 +6,7 @@ from ..config import ConfigurationObject, CP
 
 
 class NetworkConfiguration(ConfigurationObject):
-    driver = CP()
+    driver = CP(default='bridge')
     driver_options = CP(dict)
     internal = CP(default=False, input_func=bool_if_set)
     create_options = CP(dict)
