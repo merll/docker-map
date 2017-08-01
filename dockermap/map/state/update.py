@@ -116,11 +116,12 @@ def _check_container_network_ports(container_config, client_config, instance_det
 
 
 def _check_network_driver_opts(network_config, instance_detail):
-    if not network_config.driver_options:
+    driver_opts = init_options(network_config.driver_options)
+    if not driver_opts:
         return True
-    opts = {option_key.rpartition('.')[2]: option_value
+    opts = {option_key: option_value
             for option_key, option_value in six.iteritems(instance_detail['Options'])}
-    for c_key, c_val in six.iteritems(network_config.driver_options):
+    for c_key, c_val in six.iteritems(driver_opts):
         if resolve_value(c_val) != opts.get(c_key):
             return False
     return True

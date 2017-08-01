@@ -5,7 +5,7 @@ import logging
 
 from docker.utils import create_host_config
 from requests import Timeout
-from six import text_type
+from six import text_type, iteritems
 from six.moves import map
 
 from ...functional import resolve_value
@@ -348,7 +348,11 @@ class DockerConfigMixin(object):
         )
         if config.internal:
             c_kwargs['internal'] = True
-        update_kwargs(c_kwargs, kwargs)
+        driver_opts = init_options(config.driver_options)
+        if driver_opts:
+            c_kwargs['options'] = {option_name: resolve_value(option_value)
+                                   for option_name, option_value in iteritems(driver_opts)}
+        update_kwargs(c_kwargs, init_options(config.create_options), kwargs)
         return c_kwargs
 
     def get_network_remove_kwargs(self, action, network_name, kwargs=None):
