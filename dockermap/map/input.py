@@ -495,7 +495,7 @@ def get_network_mode(value):
     :rtype: unicode | str | tuple | NoneType
     """
     if not value or value == 'disabled':
-        return None
+        return 'none'
     if isinstance(value, (tuple, list)):
         if len(value) == 2:
             return tuple(value)

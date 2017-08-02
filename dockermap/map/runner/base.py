@@ -120,7 +120,7 @@ class DockerConfigMixin(object):
             hostname=policy.get_hostname(container_name, action.client_name) if container_map.set_hostname else None,
             domainname=resolve_value(client_config.get('domainname', container_map.default_domain)) or None,
         )
-        if container_config.network_mode == 'disabled':
+        if container_config.network_mode == 'none':
             c_kwargs['network_disabled'] = True
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         use_host_config = client_config.get('use_host_config')
