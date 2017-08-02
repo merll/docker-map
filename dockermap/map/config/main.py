@@ -397,7 +397,7 @@ class ContainerMap(ConfigurationObject):
                 if net_instance and net_instance in network_ref_config.instances:
                     network_instances = (net_instance, )
                 else:
-                    network_instances = network_ref_config.instances
+                    network_instances = network_ref_config.instances or (None, )
                 return [MapConfigId(ItemType.CONTAINER, self._name, net_config_name, ni)
                         for ni in network_instances]
             return []
