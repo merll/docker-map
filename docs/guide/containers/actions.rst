@@ -49,13 +49,19 @@ applies:
   * Exposed ports of the container are checked against :attr:`~dockermap.map.config.container.ContainerConfiguration.exposes`.
     If any ports are missing or configured differently, this also causes a container update.
 
+The keyword argument ``force_update`` takes a single name or list of container configuration names to force the update
+on. This can be useful in cases where the need for re-creating a container cannot be detected automatically.
+
 Post-start commands in :attr:`~dockermap.map.config.container.ContainerConfiguration.exec_commands` are checked if they can
 be found on a running container, matching command line and user. If not, the configured command is executed, unless
 :const:`dockermap.map.input.ExecPolicy.INITIAL` has been set for the command. By default
 the entire command line is matched. For considering partial matches (i.e. if the command in the process overview gets
 modified), you can set :attr:`~dockermap.map.update.ContainerUpdateMixin.check_exec_commands` to
-:const:`dockermap.map.update.CMD_CHECK_PARTIAL`. Setting it to :const:`dockermap.map.update.CMD_CHECK_NONE`
+:const:`dockermap.map.update.CmdCheck.PARTIAL`. Setting it to :const:`dockermap.map.update.CmdCheck.NONE`
 deactivates this check entirely.
+
+Networks in :attr:`~dockermap.map.config.container.ContainerConfiguration.networks` are tested if they exist and if
+the endpoint id matches. (Re-)connecting as necessary does not require a container restart.
 
 For ensuring the integrity, all missing containers are created and started along the dependency path.
 In order to see what defines a dependency, see :ref:`shared-volumes-containers` and :ref:`linked-containers`.

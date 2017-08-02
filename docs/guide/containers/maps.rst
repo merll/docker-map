@@ -38,7 +38,11 @@ A :class:`~dockermap.map.config.main.ContainerMap` carries the following main el
 
 * :attr:`~dockermap.map.config.main.ContainerMap.containers`: A set of container configurations.
 * :attr:`~dockermap.map.config.main.ContainerMap.volumes`: Shared volume aliases to be used by the container configurations.
-* :attr:`~dockermap.map.config.main.ContainerMap.host`: Host volume paths, if they are mapped from the host's file system
+* :attr:`~dockermap.map.config.main.ContainerMap.host`: Host volume paths, if they are mapped from the host's file system.
+* :attr:`~dockermap.map.config.main.ContainerMap.networks`: If the Docker version used supports it, allows for
+  configuration of additional networks.
+* :attr:`~dockermap.map.config.main.ContainerMap.groups`: Container configurations can be grouped together, so that
+  actions can be performed in common.
 
 Their contents can be accessed like regular attributes, e.g.::
 
@@ -98,6 +102,21 @@ different host-path assignments, you can however also differentiate them as a di
         'instance1': 'config/instance1',
         'instance2': 'config/instance2',
     }
+
+
+
+Networks
+^^^^^^^^
+Networks can be configured with the properties as specified in the Docker API docs. The ``driver`` is usually set to
+``bridge`` for custom networks (and is therefore the default). Driver options can be added in ``driver_options``.
+For any parameters not supported by this configuration, ``create_options`` can be used::
+
+    from dockermap.api import NetworkConfiguration
+
+    container_map.networks.network1 = NetworkConfiguration(internal=True,
+                                                           driver_options={
+                                                               'com.docker.network.bridge.enable_icc': 'false'
+                                                           })
 
 
 .. _map_clients:
@@ -407,7 +426,8 @@ Networking
 """"""""""
 Docker offers further options for controlling how containers communicate with each other. By default, it creates a new
 network stack of each, but it is also possible to re-use the stack of an existing container or disable networking
-entirely. The following syntax is supported:
+entirely. The following syntax is supported by
+:attr:`~dockermap.map.config.container.ContainerConfiguration.network_mode`:
 
 * ``bridge`` or ``host`` have the same effect as when used inside ``host_config``. The former is the default, and
   creates a network interface connected to ``docker0``, whereas the latter uses the Docker host's network stack.
@@ -418,6 +438,35 @@ entirely. The following syntax is supported:
   This declares a dependency, i.e. the container referred to will be created and started before the container that is
   re-using its network. Note that if there are multiple instances, you need to specify which instance the container
   is supposed to connect to in the pattern ``<container name>.<instance name>``.
+* ``disabled`` turns off networking for the container.
+
+Starting with Docker API 1.21, there is also an additional
+:attr:`~dockermap.map.config.container.ContainerConfiguration.networks` property . Configured networks can be created
+and containers can be connected and disconnected during creation as well as at runtime.
+
+For example, two containers can be connected in a network using the following setup::
+
+    from dockermap.api import ContainerConfiguration, NetworkConfiguration
+    container_map.networks.network1 = NetworkConfiguration(driver='bridge')
+    container_map.container1.networks = 'network1'
+    container_map.container2.networks = 'network2'
+
+
+Starting either of the containers will automatically create the network before. Endpoints can also be configured in
+more detail. The argument order of parameters is
+* Network name,
+* a list of alias names on the network: ``aliases``,
+* a list of linked containers: ``links``,
+* the IPv4 address to use: ``ipv4_address``,
+* the IPv6 address ``ipv6_address``,
+* and a list of link-local IPs ``link_local_ips``.
+
+However, as all of the above are optional, they can also be declared explicitly:
+
+    container_map.container1.networks = {'network1': {'ipv4': '172.17.0.5'}}
+
+Lists as mentioned above are also accepted as single values on input and converted to a list automatically.
+
 
 Commands
 """"""""
@@ -591,8 +640,9 @@ and::
 Additional conversions are made for :attr:`~dockermap.map.config.container.ContainerConfiguration.binds`,
 :attr:`~dockermap.map.config.container.ContainerConfiguration.uses`,
 :attr:`~dockermap.map.config.container.ContainerConfiguration.links`,
-:attr:`~dockermap.map.config.container.ContainerConfiguration.exposes`, and
-:attr:`~dockermap.map.config.container.ContainerConfiguration.exec_commands`; each element in an input list or tuple is converted
+:attr:`~dockermap.map.config.container.ContainerConfiguration.exposes`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.exec_commands`, and
+:attr:`~dockermap.map.config.container.ContainerConfiguration.networks`; each element in an input list or tuple is converted
 to :attr:`~dockermap.map.config.SharedVolume`, :attr:`~dockermap.map.config.ContainerLink`,
 :attr:`~dockermap.map.config.PortBinding` or :attr:`~dockermap.map.config.ExecCommand`. Keep this in mind when
 modifying existing elements, since no automated conversion is done then. For example, for adding a host-shared volume
