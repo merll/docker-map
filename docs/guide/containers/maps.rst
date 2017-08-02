@@ -467,6 +467,16 @@ However, as all of the above are optional, they can also be declared explicitly:
 
 Lists as mentioned above are also accepted as single values on input and converted to a list automatically.
 
+.. note::
+    The default network ``bridge`` is only implied if nothing is set for the container. This means that a container that
+    has configured networks will **not** connect to ``bridge`` by default. This means that you need to add it if
+    you would like a container to use it, e.g.::
+
+        container_map.container1.networks = {
+            'network1': {'ipv4': '172.17.0.5'},
+            'bridge': None,  # But it does not need explicit configuration.
+        }
+
 
 Commands
 """"""""
