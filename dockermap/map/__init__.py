@@ -106,25 +106,30 @@ class DefaultDictMap(AttributeMixin, defaultdict):
 
 class FlagsMeta(type):
     def __new__(mcs, name, bases, dct):
-        fields = {field_name: field_value
-                  for field_name, field_value in six.iteritems(dct)
-                  if isinstance(field_value, int)}
+        fields = {}
+        for base in bases:
+            if hasattr(base, 'fields'):
+                fields.update(base.fields)
+        fields.update((field_name, field_value)
+                      for field_name, field_value in six.iteritems(dct)
+                      if isinstance(field_value, int))
         dct['fields'] = fields
         new_cls = type.__new__(mcs, name, bases, dct)
         for field_name, field_value in six.iteritems(fields):
             setattr(new_cls, field_name, new_cls(field_value))
+
+        def _get_fields(self):
+            set_fields = [field_name
+                          for field_name, field_value in six.iteritems(fields)
+                          if self & field_value]
+            return '{0}({1})'.format(name, ', '.join(set_fields))
+        new_cls.__repr__ = _get_fields
+
         return new_cls
 
 
 class Flags(six.with_metaclass(FlagsMeta, int)):
     NONE = 0
-
-    def __repr__(self):
-        cls = self.__class__
-        set_fields = [field_name
-                      for field_name, field_value in six.iteritems(cls.fields)
-                      if self & field_value]
-        return '{0}({1})'.format(cls.__name__, ', '.join(set_fields))
 
     def __contains__(self, other):
         return self & other > 0
@@ -132,8 +137,12 @@ class Flags(six.with_metaclass(FlagsMeta, int)):
     def __or__(self, other):
         return self.__class__(int.__or__(self, other))
 
+    __add__ = __or__
+
     def __xor__(self, other):
         return self.__class__(int.__xor__(self, other))
+
+    __sub__ = __xor__
 
 
 class SimpleEnum(Enum):
