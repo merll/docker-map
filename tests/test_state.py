@@ -201,7 +201,7 @@ def _add_container_inspect(rsps, config_id, container_name, container_map, c_con
         networks = {}
         network_ep_func = get_endpoint_id if network_ep_valid else get_invalid_endpoint_id
         default_aliases = ['{0}_alias'.format(config_id.config_name)]
-        if c_config.network_mode != 'disabled':  # TODO: Vary.
+        if c_config.network_mode != 'none':  # TODO: Vary.
             for n in c_config.networks:
                 if n.network_name == skip_network:
                     continue
@@ -507,7 +507,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                         self.assertEqual(valid_order[0], config_name)
                         valid_order.pop(0)
                         self.assertEqual(c_state.base_state, State.RUNNING)
-                        self.assertEqual(c_state.state_flags, 0)
+                        self.assertEqual(c_state.state_flags, StateFlags.NONE)
 
     def test_update_states_invalid_attached(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:

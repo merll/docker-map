@@ -243,24 +243,41 @@ class NetworkEndpointRegistry(object):
             self._endpoints[c_id].add((network_id, c_detail['EndpointID']))
 
     def check_container_config(self, config_id, c_config, detail):
-        networks = detail['NetworkSettings'].get('Networks', {})
-        connected_network_names = set(networks.keys())
-        disconnected_networks = []
-        configured_network_names = set()
-        network_endpoints = self._endpoints.get(detail['Id'], set())
-        reset_networks = []
+        if not detail['Config'].get('NetworkDisabled', False):
+            i_networks = detail['NetworkSettings'].get('Networks', {})
+            connected_network_names = set(i_networks.keys())
+        else:
+            i_networks = {}
+            connected_network_names = set()
+        c_net_mode = c_config.network_mode or 'default'
         if c_config.networks:
             named_endpoints = [(self._nname(config_id.map_name, cn_config.network_name), cn_config)
                                for cn_config in c_config.networks]
-        else:
+        elif c_net_mode in ('default', 'bridge'):
             named_endpoints = [(d_name, NetworkEndpoint(d_name))
                                for d_name in self._default_networks]
+        elif c_net_mode == 'none':
+            named_endpoints = []
+        else:
+            if isinstance(c_net_mode, tuple):
+                cn_name = 'container:{0}'.format(self._cname(config_id.map_name, *c_net_mode))
+            else:
+                cn_name = c_net_mode
+            if cn_name not in connected_network_names:
+                return (StateFlags.NETWORK_LEFT | StateFlags.NETWORK_DISCONNECTED), {
+                    'left': connected_network_names,
+                    'disconnected': [NetworkEndpoint(cn_name)]
+                }
+            return StateFlags.NONE, {}
+        disconnected_networks = []
+        configured_network_names = {ce[0] for ce in named_endpoints}
+        network_endpoints = self._endpoints.get(detail['Id'], set())
+        reset_networks = []
         for ref_n_name, cn_config in named_endpoints:
-            configured_network_names.add(ref_n_name)
             if ref_n_name not in connected_network_names:
                 disconnected_networks.append(cn_config)
                 continue
-            network_detail = networks[ref_n_name]
+            network_detail = i_networks[ref_n_name]
             c_alias_set = set(cn_config.aliases or ())
             if c_alias_set and not c_alias_set.issubset(network_detail.get('Aliases')):
                 log.debug("Aliases in network %s differ or are not present.", ref_n_name)
@@ -377,34 +394,15 @@ class UpdateContainerState(ContainerBaseState):
         return self.volume_checker.check(self.config_id, self.container_map, self.config, self.detail)
 
     def _check_container_network_mode(self):
-        net_mode = self.config.network_mode
-        has_nw_support = self.client_config.supports_networks
-        if (net_mode == 'disabled') != self.detail['Config'].get('NetworkDisabled', False):
-            if has_nw_support:
-                if self.config.networks:
-                    return StateFlags.NETWORK_DISCONNECTED, {'disconnected': self.config.networks}
-                return 0, {}
-            return StateFlags.MISC_MISMATCH, {}
+        net_mode = self.config.network_mode or 'default'
+        if (net_mode == 'none') != self.detail['Config'].get('NetworkDisabled', False):
+            return False
         instance_mode = self.detail['HostConfig'].get('NetworkMode') or 'default'
         if isinstance(net_mode, tuple):
             ref_mode = 'container:{0}'.format(self.policy.cname(self.config_id.map_name, *net_mode))
-        elif net_mode is None:
-            ref_mode = 'default'
         else:
             ref_mode = net_mode
-        if ref_mode != instance_mode:
-            if has_nw_support:
-                state_flag = StateFlags.NONE
-                extra_data = {}
-                if instance_mode != 'default':
-                    state_flag |= StateFlags.NETWORK_LEFT
-                    extra_data['left'] = [instance_mode]
-                if ref_mode == 'bridge':
-                    state_flag |= StateFlags.NETWORK_DISCONNECTED
-                    extra_data['disconnected'] = self.config.networks
-                return state_flag, extra_data
-            return StateFlags.MISC_MISMATCH, {}
-        return 0, {}
+        return ref_mode == instance_mode
 
     def set_defaults(self):
         super(UpdateContainerState, self).set_defaults()
@@ -456,12 +454,13 @@ class UpdateContainerState(ContainerBaseState):
                     if missing_exec_cmds is not None:
                         state_flags |= StateFlags.EXEC_COMMANDS
                         extra['exec_commands'] = missing_exec_cmds
-            net_s_flags, net_extra = self._check_container_network_mode()
-            if net_s_flags == StateFlags.NONE and self.endpoint_registry:
+            if self.endpoint_registry:  # Client supports networking.
                 net_s_flags, net_extra = self.endpoint_registry.check_container_config(config_id, self.config,
                                                                                        self.detail)
-            state_flags |= net_s_flags
-            extra.update(net_extra)
+                state_flags |= net_s_flags
+                extra.update(net_extra)
+            elif not self._check_container_network_mode():
+                state_flags |= StateFlags.MISC_MISMATCH
         return base_state, state_flags, extra
 
 
