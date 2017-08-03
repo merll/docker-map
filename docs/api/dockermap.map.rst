@@ -1,5 +1,5 @@
-dockermap.map package
-=====================
+dockermap\.map package
+======================
 
 Subpackages
 -----------
@@ -15,28 +15,25 @@ Subpackages
 Submodules
 ----------
 
-dockermap.map.client module
----------------------------
+dockermap\.map\.client module
+-----------------------------
 
 .. automodule:: dockermap.map.client
     :members:
-    :undoc-members:
     :show-inheritance:
 
-dockermap.map.input module
---------------------------
+dockermap\.map\.input module
+----------------------------
 
 .. automodule:: dockermap.map.input
     :members:
-    :undoc-members:
     :show-inheritance:
 
-dockermap.map.yaml module
--------------------------
+dockermap\.map\.yaml module
+---------------------------
 
 .. automodule:: dockermap.map.yaml
     :members:
-    :undoc-members:
     :show-inheritance:
 
 
@@ -45,5 +42,4 @@ Module contents
 
 .. automodule:: dockermap.map
     :members:
-    :undoc-members:
     :show-inheritance:
