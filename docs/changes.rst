@@ -14,6 +14,13 @@ Change History
   from one or multiple container configurations will create them automatically. The former ``network`` setting has been
   renamed to :attr:`~dockermap.map.config.container.ContainerConfiguration.network_mode` for disambiguation.
 
+Known issues
+""""""""""""
+* Networks are not yet implemented for the CLI.
+* The containers are not yet checked if their endpoint configuration details match the running instance.
+* Volumes will be re-implemented to make use of Docker's built-in functionality as found in more recent Docker versions.
+  The current implementation however still works for all versions.
+
 0.7.6
 -----
 * More sensible solution of `Issue #15 <https://github.com/merll/docker-map/issues/15>`_, not changing user-defined
