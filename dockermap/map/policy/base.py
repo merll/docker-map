@@ -5,7 +5,7 @@ import logging
 
 from six import iteritems
 
-from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT
+from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT, DEFAULT_PRESET_NETWORKS
 from ...functional import resolve_value
 from .cache import ContainerCache, ImageCache, NetworkCache
 from .dep import ContainerDependencyResolver
@@ -103,6 +103,8 @@ class BasePolicy(object):
         :return: Network name.
         :rtype: unicode | str
         """
+        if network_name in DEFAULT_PRESET_NETWORKS:
+            return network_name
         return '{0}.{1}'.format(map_name, network_name)
 
     @classmethod

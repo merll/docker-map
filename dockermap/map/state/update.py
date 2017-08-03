@@ -264,6 +264,8 @@ class NetworkEndpointRegistry(object):
             else:
                 cn_name = c_net_mode
             if cn_name not in connected_network_names:
+                log.debug("Configurations network mode %s not set in available connections: %s.", cn_name,
+                          connected_network_names)
                 return (StateFlags.NETWORK_LEFT | StateFlags.NETWORK_DISCONNECTED), {
                     'left': connected_network_names,
                     'disconnected': [NetworkEndpoint(cn_name)]
@@ -274,7 +276,9 @@ class NetworkEndpointRegistry(object):
         network_endpoints = self._endpoints.get(detail['Id'], set())
         reset_networks = []
         for ref_n_name, cn_config in named_endpoints:
+            log.debug("Checking network %s.", ref_n_name)
             if ref_n_name not in connected_network_names:
+                log.debug("Network %s not found in container connections.", ref_n_name)
                 disconnected_networks.append(cn_config)
                 continue
             network_detail = i_networks[ref_n_name]

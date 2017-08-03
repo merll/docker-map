@@ -8,6 +8,7 @@ from operator import itemgetter
 import six
 from six.moves import map
 
+from ... import DEFAULT_PRESET_NETWORKS
 from ...utils import merge_list
 from .. import DictMap, DefaultDictMap
 from ..input import ItemType, bool_if_set, MapConfigId
@@ -403,6 +404,8 @@ class ContainerMap(ConfigurationObject):
             return []
 
         def _get_network_items(n):
+            if n.network_name in DEFAULT_PRESET_NETWORKS:
+                return []
             net_items = [MapConfigId(ItemType.NETWORK, self._name, n.network_name)]
             if n.links:
                 net_items.extend(itertools.chain.from_iterable(_get_linked_items(l.container) for l in n.links))
@@ -550,7 +553,7 @@ class ContainerMap(ConfigurationObject):
             bind = [b.volume for b in c_config.binds if not isinstance(b.volume, tuple)]
             link = [l.container for l in c_config.links]
             uses = [u.volume for u in c_config.uses]
-            networks = [n.network_name for n in c_config.networks]
+            networks = [n.network_name for n in c_config.networks if not n.network_name in DEFAULT_PRESET_NETWORKS]
             network_mode = c_config.network_mode
             if isinstance(network_mode, tuple):
                 if network_mode[1]:
@@ -566,7 +569,7 @@ class ContainerMap(ConfigurationObject):
             return instance_names, group_ref_names, uses, attaches, shared, bind, link, networks, net_containers
 
         (all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links,
-         all_connected, all_net_containers) = zip(*[
+         all_networks, all_net_containers) = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
          ])
         if self.use_attached_parent_name:
@@ -623,7 +626,7 @@ class ContainerMap(ConfigurationObject):
         if missing_links:
             missing_links_str = ', '.join(missing_links)
             raise MapIntegrityError("No container instance found for link(s): {0}.".format(missing_links_str))
-        used_network_set = set(itertools.chain.from_iterable(all_connected))
+        used_network_set = set(itertools.chain.from_iterable(all_networks))
         used_net_container_set = set(itertools.chain.from_iterable(all_net_containers))
         available_network_set = set(self.networks.keys())
         missing_networks = used_network_set - available_network_set

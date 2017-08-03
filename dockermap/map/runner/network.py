@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ... import DEFAULT_PRESET_NETWORKS
 from ..action import Action, ContainerUtilAction, NetworkUtilAction
 from ..input import ItemType
 
@@ -80,10 +79,7 @@ class NetworkUtilMixin(object):
         map_name = action.config_id.map_name
         nname = self._policy.nname
         for network_endpoint in endpoints:
-            if network_endpoint.network_name not in DEFAULT_PRESET_NETWORKS:
-                network_name = nname(map_name, network_endpoint.network_name)
-            else:
-                network_name = network_endpoint.network_name
+            network_name = nname(map_name, network_endpoint.network_name)
             connect_kwargs = self.get_network_connect_kwargs(action, network_name, container_name, network_endpoint,
                                                              kwargs=kwargs)
             client.connect_container_to_network(**connect_kwargs)
