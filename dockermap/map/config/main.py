@@ -6,19 +6,23 @@ import itertools
 from operator import itemgetter
 
 import six
+from six.moves import map
 
-from . import ConfigurationObject, CP
+from ... import DEFAULT_PRESET_NETWORKS
+from ...utils import merge_list
 from .. import DictMap, DefaultDictMap
-from ..input import bool_if_set, MapConfigId
+from ..input import ItemType, bool_if_set, MapConfigId
+from . import ConfigurationObject, CP
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
+from .network import NetworkConfiguration
 
 
-get_map_config = itemgetter(0, 1)
+get_map_config = itemgetter(0, 1, 2)
 
 
 def _get_single_instances(group_items):
-    return tuple(di[2] for di in group_items)
+    return tuple(di[3] for di in group_items)
 
 
 def _get_nested_instances(group_items):
@@ -26,8 +30,27 @@ def _get_nested_instances(group_items):
     instance_add = instance_set.add
     return tuple(ni
                  for di in group_items
-                 for ni in di[2] or (None, )
+                 for ni in di[3] or (None, )
                  if ni not in instance_set or instance_add(ni))
+
+
+def _get_config_instances(config_type, c_map, config_name):
+    if config_type == ItemType.CONTAINER:
+        config = c_map.get_existing(config_name)
+        if not config:
+            raise KeyError(config_name)
+        return config.instances
+    elif config_type == ItemType.VOLUME:
+        config = c_map.get_existing(config_name)
+        if not config:
+            raise KeyError(config_name)
+        return config.attaches
+    elif config_type == ItemType.NETWORK:
+        config = c_map.get_existing_network(config_name)
+        if not config:
+            raise KeyError(config_name)
+        return None,
+    raise ValueError("Invalid configuration type.", config_type)
 
 
 def expand_groups(config_ids, groups):
@@ -49,7 +72,8 @@ def expand_groups(config_ids, groups):
                     yield group_item
                 elif isinstance(group_item, six.string_types):
                     config_name, __, instance = group_item.partition('.')
-                    yield MapConfigId(config_id.map_name, config_name, (instance, ) if instance else config_id.instances)
+                    yield MapConfigId(config_id.config_type, config_id.map_name, config_name,
+                                      (instance, ) if instance else config_id.instance_name)
                 else:
                     raise ValueError("Invalid group item. Must be string or MapConfigId tuple; found {0}.".format(
                         type(group_item).__name__))
@@ -79,22 +103,23 @@ def group_instances(config_ids, single_instances=True, ext_map=None, ext_maps=No
         raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
     _get_instances = _get_single_instances if single_instances else _get_nested_instances
 
-    for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
-        map_name, config_name = map_config
+    for type_map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
+        config_type, map_name, config_name = type_map_config
         instances = _get_instances(items)
         c_map = ext_map or ext_maps[map_name]
-        config = c_map.get_existing(config_name)
-        if not config:
-            raise KeyError((map_name, config_name))
-        if config.instances and (None in instances or len(instances) == len(config.instances)):
-            yield MapConfigId(map_name, config_name, (None, ))
+        try:
+            c_instances = _get_config_instances(config_type, c_map, config_name)
+        except KeyError:
+            raise KeyError("Configuration not found.", type_map_config)
+        if c_instances and (None in instances or len(instances) == len(c_instances)):
+            yield MapConfigId(config_type, map_name, config_name, (None, ))
         else:
-            yield MapConfigId(map_name, config_name, instances)
+            yield MapConfigId(config_type, map_name, config_name, instances)
 
 
 def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=None):
     """
-    Iterates over a list of container configuration ids, expanding configured instances if ``None`` is specified.
+    Iterates over a list of configuration ids, expanding configured instances if ``None`` is specified.
 
     :param config_ids: Iterable of container configuration ids or (map, config, instance) tuples.
     :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId] |
@@ -106,26 +131,27 @@ def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=N
     :type ext_map: ContainerMap
     :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
     :type ext_maps: dict[unicode | str, ContainerMap]
-    :return: Tuples of map name, container configuration name, and a single instance name (or ``None``).
-    :rtype: collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
+    :return: MapConfigId tuples.
+    :rtype: collections.Iterable[dockermap.map.input.MapConfigId]
     """
     if not (ext_map or ext_maps):
         raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
     _get_instances = _get_single_instances if single_instances else _get_nested_instances
 
-    for map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
-        map_name, config_name = map_config
+    for type_map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
+        config_type, map_name, config_name = type_map_config
         instances = _get_instances(items)
         c_map = ext_map or ext_maps[map_name]
-        config = c_map.get_existing(config_name)
-        if not config:
-            raise KeyError(map_name, config_name)
-        if config.instances and None in instances:
-            for i in config.instances:
-                yield map_name, config_name, i
+        try:
+            c_instances = _get_config_instances(config_type, c_map, config_name)
+        except KeyError:
+            raise KeyError("Configuration not found.", type_map_config)
+        if c_instances and None in instances:
+            for i in c_instances:
+                yield MapConfigId(config_type, map_name, config_name, i)
         else:
             for i in instances:
-                yield map_name, config_name, i
+                yield MapConfigId(config_type, map_name, config_name, i)
 
 
 class MapIntegrityError(Exception):
@@ -172,7 +198,7 @@ class ContainerMap(ConfigurationObject):
         'clients': "Alias names of clients associated with this container map.",
         'groups': "Groups of configured containers.",
         'default_domain': "Value to use as domain name for new containers, unless the client specifies otherwise.",
-        'set_hostname': "Whether to set the hostname for new containers. When set to ``False``, uses Docker's default"
+        'set_hostname': "Whether to set the hostname for new containers. When set to ``False``, uses Docker's default "
                         "autogeneration of hostnames instead.",
         'use_attached_parent_name': "Whether to include the parent name of an attached volume in the attached "
                                     "container name for disambiguation.",
@@ -182,9 +208,10 @@ class ContainerMap(ConfigurationObject):
     def __init__(self, name, initial=None, check_integrity=True, check_duplicates=True, **kwargs):
         self._name = name
         self._extended = False
-        self._containers = DefaultDictMap(ContainerConfiguration)
+        self._containers = containers = DefaultDictMap(ContainerConfiguration)
+        self._networks = DefaultDictMap(NetworkConfiguration)
         super(ContainerMap, self).__init__(initial, **kwargs)
-        if self._containers and check_integrity:
+        if containers and check_integrity:
             self.check_integrity(check_duplicates=check_duplicates)
 
     def __iter__(self):
@@ -196,6 +223,9 @@ class ContainerMap(ConfigurationObject):
         elif key == 'containers':
             for c_name, c_value in six.iteritems(value):
                 self._containers[c_name].update_from_dict(c_value)
+        elif key == 'networks':
+            for n_name, n_value in six.iteritems(value):
+                self._networks[n_name].update_from_dict(n_value)
         else:
             self._containers[key].update_from_dict(value)
 
@@ -209,6 +239,12 @@ class ContainerMap(ConfigurationObject):
                     self._containers[c_name].merge_from_dict(c_value, lists_only=lists_only)
                 else:
                     self._containers[c_name].update_from_dict(c_value)
+        elif key == 'networks':
+            for n_name, n_value in six.iteritems(value):
+                if n_name in self._networks:
+                    self._networks[n_name].merge_from_dict(n_value, lists_only=lists_only)
+                else:
+                    self._networks[n_name].update_from_dict(n_value)
         elif key in self._containers:
             self._containers[key].merge_from_dict(value, lists_only=lists_only)
         else:
@@ -222,6 +258,10 @@ class ContainerMap(ConfigurationObject):
         if containers:
             self._config['containers'] = containers = DefaultDictMap(ContainerConfiguration)
             containers.update(containers)
+        networks = dct.get('networks')
+        if networks:
+            self._config['networks'] = networks = DefaultDictMap(NetworkConfiguration)
+            networks.update(networks)
         super(ContainerMap, self).update_from_dict(dct)
 
     def update_from_obj(self, obj, copy=False, update_containers=True):
@@ -229,6 +269,8 @@ class ContainerMap(ConfigurationObject):
         if update_containers:
             for key, value in obj.containers:
                 self._containers[key].update_from_obj(value, copy=copy)
+        for key, value in obj.networks:
+            self._networks[key].update_from_obj(value, copy=copy)
         super(ContainerMap, self).update_from_obj(obj, copy=copy)
 
     def merge_from_obj(self, obj, lists_only=False):
@@ -237,6 +279,11 @@ class ContainerMap(ConfigurationObject):
                 self._containers[key].merge_from_obj(value, lists_only=lists_only)
             else:
                 self._containers[key].update_from_obj(value)
+        for key, value in obj.networks:
+            if key in self._networks:
+                self._networks[key].merge_from_obj(value, lists_only=lists_only)
+            else:
+                self._networks[key].update_from_obj(value)
         super(ContainerMap, self).merge_from_obj(obj, lists_only=lists_only)
 
     def get_persistent_items(self):
@@ -283,72 +330,118 @@ class ContainerMap(ConfigurationObject):
             self._containers.clear()
             self._containers.update(value)
 
-    def dependency_items(self, reverse=False):
+    @property
+    def networks(self):
+        """
+        Network configurations on the map.
+
+        :return: Network configurations.
+        :rtype: dict[unicode | str, dockermap.map.config.network.NetworkConfiguration]
+        """
+        return self._networks
+
+    @networks.setter
+    def networks(self, value):
+        if isinstance(value, DefaultDictMap) and value.default_factory is NetworkConfiguration:
+            self._networks = value
+        else:
+            self._networks.clear()
+            self._networks.update(value)
+
+    def dependency_items(self):
         """
         Generates all containers' dependencies, i.e. an iterator on tuples in the format
         ``(container_name, used_containers)``, whereas the used containers are a set, and can be empty.
 
         :return: Container dependencies.
-        :rtype: iterator
+        :rtype: collections.Iterable
         """
-        def _get_used_item_np(u):
-            v = u.volume
-            c, __, i = v.partition('.')
-            a = attached.get(c)
-            if a:
-                return self._name, a, None
-            return self._name, c, i or None
+        def _get_used_items_np(u):
+            volume_config_name, __, volume_instance = u.volume.partition('.')
+            attaching_config_name = attaching.get(volume_config_name)
+            if attaching_config_name:
+                used_c_name = attaching_config_name
+                used_instances = instances.get(attaching_config_name)
+            else:
+                used_c_name = volume_config_name
+                if volume_instance:
+                    used_instances = (volume_instance, )
+                else:
+                    used_instances = instances.get(volume_config_name)
+            return [MapConfigId(ItemType.CONTAINER, self._name, used_c_name, ai)
+                    for ai in used_instances or (None, )]
 
-        def _get_used_item_ap(u):
-            v = u.volume
-            c, __, i = v.partition('.')
-            a = ext_map.get_existing(c)
-            if i in a.attaches:
-                return self._name, c, None
-            return self._name, c, i or None
+        def _get_used_items_ap(u):
+            volume_config_name, __, volume_instance = u.volume.partition('.')
+            attaching_config = ext_map.get_existing(volume_config_name)
+            attaching_instances = instances.get(volume_config_name)
+            if not volume_instance or volume_instance in attaching_config.attaches:
+                used_instances = attaching_instances
+            else:
+                used_instances = (volume_instance, )
+            return [MapConfigId(ItemType.CONTAINER, self._name, volume_config_name, ai)
+                    for ai in used_instances or (None, )]
 
-        def _get_linked_item(l):
-            c, __, i = l.container.partition('.')
-            if i:
-                return self._name, c, i
-            return self._name, c, None
+        def _get_linked_items(lc):
+            linked_config_name, __, linked_instance = lc.partition('.')
+            if linked_instance:
+                linked_instances = (linked_instance, )
+            else:
+                linked_instances = instances.get(linked_config_name)
+            return [MapConfigId(ItemType.CONTAINER, self._name, linked_config_name, li)
+                    for li in linked_instances or (None, )]
+
+        def _get_network_mode_items(n):
+            net_config_name, net_instance = n
+            network_ref_config = ext_map.get_existing(net_config_name)
+            if network_ref_config:
+                if net_instance and net_instance in network_ref_config.instances:
+                    network_instances = (net_instance, )
+                else:
+                    network_instances = network_ref_config.instances or (None, )
+                return [MapConfigId(ItemType.CONTAINER, self._name, net_config_name, ni)
+                        for ni in network_instances]
+            return []
+
+        def _get_network_items(n):
+            if n.network_name in DEFAULT_PRESET_NETWORKS:
+                return []
+            net_items = [MapConfigId(ItemType.NETWORK, self._name, n.network_name)]
+            if n.links:
+                net_items.extend(itertools.chain.from_iterable(_get_linked_items(l.container) for l in n.links))
+            return net_items
 
         if self._extended:
             ext_map = self
         else:
             ext_map = self.get_extended_map()
 
+        instances = {c_name: c_config.instances
+                     for c_name, c_config in ext_map}
         if not self.use_attached_parent_name:
-            attached = {attaches: c_name
-                        for c_name, c_config in ext_map
-                        for attaches in c_config.attaches}
-            used_func = _get_used_item_np
+            attaching = {attaches: c_name
+                         for c_name, c_config in ext_map
+                         for attaches in c_config.attaches}
+            used_func = _get_used_items_np
         else:
-            used_func = _get_used_item_ap
+            used_func = _get_used_items_ap
 
-        def _get_dep_set(config):
-            used_set = set(map(used_func, config.uses))
-            linked_set = set(map(_get_linked_item, config.links))
-            d_set = used_set | linked_set
-            nw = config.network
+        def _get_dep_list(name, config):
+            d = []
+            nw = config.network_mode
             if isinstance(nw, tuple):
-                d_set.add((self._name, ) + nw)
-            return d_set
+                merge_list(d, _get_network_mode_items(nw))
+            merge_list(d, itertools.chain.from_iterable(map(_get_network_items, config.networks)))
+            merge_list(d, itertools.chain.from_iterable(map(used_func, config.uses)))
+            merge_list(d, itertools.chain.from_iterable(_get_linked_items(l.container) for l in config.links))
+            merge_list(d, [MapConfigId(ItemType.VOLUME, self._name, name, a)
+                           for a in config.attaches])
+            return d
 
-        if reverse:
-            # Consolidate dependents.
-            for c_name, c_config in ext_map:
-                dep_set = set(map(get_map_config, _get_dep_set(c_config)))
-                yield (self._name, c_name, (None, )), dep_set
-        else:
-            # Group instances, or replace with None where all of them are used.
-            for c_name, c_config in ext_map:
-                dep_set = _get_dep_set(c_config)
-                try:
-                    instance_set = set(group_instances(dep_set, ext_map=ext_map))
-                except KeyError as e:
-                    raise KeyError("Dependency {0[0]}.{0[1]} for {1}.{2} not found.".format(e.args[0], self._name, c_name))
-                yield (self._name, c_name), instance_set
+        for c_name, c_config in ext_map:
+            dep_list = _get_dep_list(c_name, c_config)
+            for c_instance in c_config.instances or (None, ):
+                yield MapConfigId(ItemType.CONTAINER, self._name, c_name, c_instance), dep_list
 
     def get(self, item):
         """
@@ -373,6 +466,30 @@ class ContainerMap(ConfigurationObject):
         :rtype: ContainerConfiguration
         """
         return self._containers.get(item)
+
+    def get_network(self, name):
+        """
+        Returns a network configuration from the map; if it does not yet exist, an initial config is created and
+        returned (to avoid this, use :meth:`get_existing_network` instead). `name` can be any valid network name.
+
+        :param name: Network name.
+        :type name: unicode | str
+        :return: A network configuration.
+        :rtype: NetworkConfiguration
+        """
+        return self._networks[name]
+
+    def get_existing_network(self, name):
+        """
+        Same as :meth:`get_network`, except for that non-existing network configurations will not be created; ``None``
+        is returned instead in this case.
+
+        :param name: Network name.
+        :type name: unicode | str
+        :return: A network configuration.
+        :rtype: NetworkConfiguration
+        """
+        return self._networks.get(name)
 
     def get_extended(self, config):
         """
@@ -436,22 +553,25 @@ class ContainerMap(ConfigurationObject):
             bind = [b.volume for b in c_config.binds if not isinstance(b.volume, tuple)]
             link = [l.container for l in c_config.links]
             uses = [u.volume for u in c_config.uses]
-            if isinstance(c_config.network, tuple):
-                if c_config.network[1]:
-                    network = '{0}.{1}'.format(*c_config.network)
+            networks = [n.network_name for n in c_config.networks if not n.network_name in DEFAULT_PRESET_NETWORKS]
+            network_mode = c_config.network_mode
+            if isinstance(network_mode, tuple):
+                if network_mode[1]:
+                    net_containers = ['{0[0]}.{0[1]}'.format(network_mode)]
                 else:
-                    network = c_config.network[0]
+                    net_containers = [network_mode[0]]
             else:
-                network = None
+                net_containers = []
             if self.use_attached_parent_name:
                 attaches = [(c_name, a) for a in c_config.attaches]
             else:
                 attaches = c_config.attaches
-            return instance_names, group_ref_names, uses, attaches, shared, bind, link, network
+            return instance_names, group_ref_names, uses, attaches, shared, bind, link, networks, net_containers
 
-        all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links, all_networks = zip(*[
+        (all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links,
+         all_networks, all_net_containers) = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
-        ])
+         ])
         if self.use_attached_parent_name:
             all_attached_names = tuple('{0}.{1}'.format(c_name, a)
                                        for c_name, a in itertools.chain.from_iterable(all_attached))
@@ -482,7 +602,8 @@ class ContainerMap(ConfigurationObject):
         missing_shares = used_set - shared_set
         if missing_shares:
             missing_share_str = ', '.join(missing_shares)
-            raise MapIntegrityError("No shared or attached volumes found for used volume(s): {0}.".format(missing_share_str))
+            raise MapIntegrityError("No shared or attached volumes found for used volume(s): "
+                                    "{0}.".format(missing_share_str))
         binds_set = set(itertools.chain.from_iterable(all_binds))
         host_set = set(self.host.keys())
         missing_binds = binds_set - host_set
@@ -497,15 +618,24 @@ class ContainerMap(ConfigurationObject):
         missing_names = volume_set - named_set
         if missing_names:
             missing_names_str = ', '.join(missing_names)
-            raise MapIntegrityError("No volume name-path-assignments found for volume(s): {0}.".format(missing_names_str))
+            raise MapIntegrityError("No volume name-path-assignments found for volume(s): "
+                                    "{0}.".format(missing_names_str))
         instance_set = set(itertools.chain.from_iterable(all_instances))
         linked_set = set(itertools.chain.from_iterable(all_links))
         missing_links = linked_set - instance_set
         if missing_links:
             missing_links_str = ', '.join(missing_links)
             raise MapIntegrityError("No container instance found for link(s): {0}.".format(missing_links_str))
-        network_set = set(filter(None, all_networks))
-        missing_networks = network_set - instance_set
+        used_network_set = set(itertools.chain.from_iterable(all_networks))
+        used_net_container_set = set(itertools.chain.from_iterable(all_net_containers))
+        available_network_set = set(self.networks.keys())
+        missing_networks = used_network_set - available_network_set
         if missing_networks:
             missing_networks_str = ', '.join(missing_networks)
-            raise MapIntegrityError("No container instance found for the following network reference(s): {0}".format(missing_networks_str))
+            raise MapIntegrityError("No network configuration found for the following network reference(s): "
+                                    "{0}".format(missing_networks_str))
+        missing_net_containers = used_net_container_set - instance_set
+        if missing_net_containers:
+            missing_net_cnt_str = ', '.join(missing_net_containers)
+            raise MapIntegrityError("No container instance found for the following network mode reference(s): "
+                                    "{0}".format(missing_net_cnt_str))

@@ -2,6 +2,18 @@
 
 Change History
 ==============
+0.8.0b1
+-------
+* Added :attr:`~dockermap.map.config.main.ContainerMap.groups`: Generally an action (e.g. startup of containers) can
+  now be run at once on multiple items. In order to make input easier, groups can be added to a map that refers to
+  multiple configurations. Dependencies that multiple items have in common will only be followed once.
+* Added forced update: Not all differences between the container configuration and an existing instance can be detected
+  automatically. A parameter ``force_update`` can now trigger an update of particular containers.
+* Added :attr:`~dockermap.map.config.main.ContainerMap.networks`: Docker networks can now be configured
+  on a map. Referring to them in the property :attr:`~dockermap.map.config.container.ContainerConfiguration.networks`
+  from one or multiple container configurations will create them automatically. The former ``network`` setting has been
+  renamed to :attr:`~dockermap.map.config.container.ContainerConfiguration.network_mode` for disambiguation.
+
 0.7.6
 -----
 * More sensible solution of `Issue #15 <https://github.com/merll/docker-map/issues/15>`_, not changing user-defined

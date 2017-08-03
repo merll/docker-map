@@ -12,8 +12,9 @@ from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume
                                  get_shared_host_volume, get_shared_host_volumes, SharedVolume,
                                  get_container_link, get_container_links, ContainerLink,
                                  get_port_binding, get_port_bindings, PortBinding,
-                                 get_exec_command, get_exec_commands, ExecCommand, EXEC_POLICY_RESTART,
-                                 EXEC_POLICY_INITIAL, get_map_config_id, get_map_config_ids, MapConfigId)
+                                 get_exec_command, get_exec_commands, ExecCommand, ExecPolicy,
+                                 get_map_config_id, get_map_config_ids, MapConfigId,
+                                 ItemType, NetworkEndpoint, get_network_endpoint, get_network_endpoints)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -152,17 +153,17 @@ class InputConversionTest(unittest.TestCase):
 
     def test_get_exec_command(self):
         assert_a = lambda a: self.assertEqual(get_exec_command(a),
-                                              ExecCommand('a b c', None, EXEC_POLICY_RESTART))
+                                              ExecCommand('a b c', None, ExecPolicy.RESTART))
         assert_b = lambda b: self.assertEqual(get_exec_command(b),
-                                              ExecCommand(['a', 'b', 'c'], None, EXEC_POLICY_RESTART))
+                                              ExecCommand(['a', 'b', 'c'], None, ExecPolicy.RESTART))
         assert_c = lambda c: self.assertEqual(get_exec_command(c),
-                                              ExecCommand('a b c', 'user', EXEC_POLICY_RESTART))
+                                              ExecCommand('a b c', 'user', ExecPolicy.RESTART))
         assert_d = lambda d: self.assertEqual(get_exec_command(d),
-                                              ExecCommand(['a', 'b', 'c'], 'user', EXEC_POLICY_RESTART))
+                                              ExecCommand(['a', 'b', 'c'], 'user', ExecPolicy.RESTART))
         assert_e = lambda e: self.assertEqual(get_exec_command(e),
-                                              ExecCommand('a b c', 'user', EXEC_POLICY_INITIAL))
+                                              ExecCommand('a b c', 'user', ExecPolicy.INITIAL))
         assert_f = lambda f: self.assertEqual(get_exec_command(f),
-                                              ExecCommand(['a', 'b', 'c'], 'user', EXEC_POLICY_INITIAL))
+                                              ExecCommand(['a', 'b', 'c'], 'user', ExecPolicy.INITIAL))
 
         assert_a('a b c')
         assert_a(('a b c', ))
@@ -174,32 +175,74 @@ class InputConversionTest(unittest.TestCase):
         assert_c([lazy_once(lambda: 'a b c'), lazy_once(lambda: 'user')])
         assert_d((['a', 'b', 'c'], 'user'))
         assert_d([lazy_once(lambda: ['a', 'b', 'c']), lazy_once(lambda: 'user')])
-        assert_e(('a b c', 'user', EXEC_POLICY_INITIAL))
-        assert_e([lazy_once(lambda: 'a b c'), lazy_once(lambda: 'user'), EXEC_POLICY_INITIAL])
-        assert_f((['a', 'b', 'c'], 'user', EXEC_POLICY_INITIAL))
-        assert_f([lazy_once(lambda: ['a', 'b', 'c']), lazy_once(lambda: 'user'), EXEC_POLICY_INITIAL])
+        assert_e(('a b c', 'user', ExecPolicy.INITIAL))
+        assert_e([lazy_once(lambda: 'a b c'), lazy_once(lambda: 'user'), ExecPolicy.INITIAL])
+        assert_f((['a', 'b', 'c'], 'user', ExecPolicy.INITIAL))
+        assert_f([lazy_once(lambda: ['a', 'b', 'c']), lazy_once(lambda: 'user'), ExecPolicy.INITIAL])
 
     def test_get_exec_commmands(self):
-        assert_a = lambda a: self.assertEqual(get_exec_commands(a), [ExecCommand('a b c', None, EXEC_POLICY_RESTART)])
+        assert_a = lambda a: self.assertEqual(get_exec_commands(a), [ExecCommand('a b c', None, ExecPolicy.RESTART)])
         assert_b = lambda b: six.assertCountEqual(self, get_exec_commands(b),
-                                                  [ExecCommand(['a', 'b', 'c'], None, EXEC_POLICY_RESTART),
-                                                   ExecCommand('a b c', 'user', EXEC_POLICY_RESTART),
-                                                   ExecCommand(['a', 'b', 'c'], 'root', EXEC_POLICY_INITIAL)])
+                                                  [ExecCommand(['a', 'b', 'c'], None, ExecPolicy.RESTART),
+                                                   ExecCommand('a b c', 'user', ExecPolicy.RESTART),
+                                                   ExecCommand(['a', 'b', 'c'], 'root', ExecPolicy.INITIAL)])
         assert_a('a b c')
-        assert_a([ExecCommand('a b c', None, EXEC_POLICY_RESTART)])
+        assert_a([ExecCommand('a b c', None, ExecPolicy.RESTART)])
         assert_a(['a b c'])
-        assert_b([(['a', 'b', 'c', ],), ('a b c', 'user'), [['a', 'b', 'c', ], 'root', EXEC_POLICY_INITIAL]])
+        assert_b([(['a', 'b', 'c', ],), ('a b c', 'user'), [['a', 'b', 'c', ], 'root', ExecPolicy.INITIAL]])
         assert_b([(['a', 'b', 'c'], None),
-                  ExecCommand('a b c', 'user', EXEC_POLICY_RESTART),
-                  [['a', 'b', 'c'], 'root', EXEC_POLICY_INITIAL]])
+                  ExecCommand('a b c', 'user', ExecPolicy.RESTART),
+                  [['a', 'b', 'c'], 'root', ExecPolicy.INITIAL]])
+
+    def test_get_network_endpoint(self):
+        assert_e1 = lambda v: self.assertEqual(get_network_endpoint(v), NetworkEndpoint('endpoint1'))
+        assert_e2 = lambda v: self.assertEqual(get_network_endpoint(v), NetworkEndpoint('endpoint2', ['alias1']))
+        assert_e3 = lambda v: self.assertEqual(get_network_endpoint(v),
+                                               NetworkEndpoint('endpoint3', ['alias1'], ipv4_address='0.0.0.0'))
+        assert_e1('endpoint1')
+        assert_e1(['endpoint1'])
+        assert_e1({'endpoint1': ''})
+        assert_e2(['endpoint2', 'alias1'])
+        assert_e2({'endpoint2': 'alias1'})
+        assert_e2(['endpoint2', dict(aliases='alias1')])
+        assert_e2(['endpoint2', ('alias1', )])
+        assert_e2({'endpoint2': 'alias1'})
+        assert_e2({'endpoint2': ('alias1', )})
+        assert_e2({'endpoint2': dict(aliases='alias1')})
+        assert_e2({'endpoint2': dict(aliases=('alias1', ))})
+        assert_e3(['endpoint3', 'alias1', None, '0.0.0.0'])
+        assert_e3({'endpoint3': ('alias1', None, '0.0.0.0')})
+        assert_e3(['endpoint3', dict(aliases='alias1', ipv4_address='0.0.0.0')])
+        assert_e3({'endpoint3': dict(aliases='alias1', ipv4_address='0.0.0.0')})
+
+    def test_get_network_endpoints(self):
+        assert_e1 = lambda v: self.assertEqual(get_network_endpoints(v), [NetworkEndpoint('endpoint1')])
+        assert_e2 = lambda v: six.assertCountEqual(self, get_network_endpoints(v),
+                                                   [NetworkEndpoint('endpoint2', ['alias1']),
+                                                    NetworkEndpoint('endpoint3', ['alias1'], ipv4_address='0.0.0.0')])
+        assert_e1('endpoint1')
+        assert_e1(['endpoint1'])
+        assert_e1({'endpoint1': None})
+        assert_e2([
+            ('endpoint2', 'alias1'),
+            ['endpoint3', 'alias1', None, '0.0.0.0'],
+        ])
+        assert_e2([
+            ('endpoint2', 'alias1'),
+            ['endpoint3', 'alias1', None, '0.0.0.0'],
+        ])
+        assert_e2([
+            ('endpoint2', dict(aliases='alias1')),
+            ['endpoint3', dict(aliases=('alias1', ), ipv4_address='0.0.0.0')],
+        ])
 
     def test_get_map_config_id(self):
         assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
-                                                              MapConfigId('m', 'c'))
+                                                              MapConfigId(ItemType.CONTAINER, 'm', 'c'))
         assert_b = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
-                                                              MapConfigId('m', 'c', ('i', )))
+                                                              MapConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )))
         assert_c = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
-                                                              MapConfigId('m', 'c', ('i', 'j')))
+                                                              MapConfigId(ItemType.CONTAINER, 'm', 'c', ('i', 'j')))
         assert_a('m.c')
         assert_a('m.c', 'x')
         assert_a('m.c.')
@@ -226,20 +269,20 @@ class InputConversionTest(unittest.TestCase):
     def test_get_map_config_ids(self):
         groups = {'m': DictMap(default=['c.i', 'd.i']), 'n': DictMap(default=['e'])}
         assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_ids(v, map_name=m, instances=i),
-                                                              [MapConfigId('m', 'c')])
+                                                              [MapConfigId(ItemType.CONTAINER, 'm', 'c')])
         assert_b = lambda v, m=None, i=None: six.assertCountEqual(self, get_map_config_ids(v, map_name=m, instances=i),
-                                                                  [MapConfigId('m', 'c', ('i', )),
-                                                                   MapConfigId('m', 'd', ('i', )),
-                                                                   MapConfigId('n', 'e', ('i', 'j'))])
+                                                                  [MapConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )),
+                                                                   MapConfigId(ItemType.CONTAINER, 'm', 'd', ('i', )),
+                                                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', ('i', 'j'))])
         assert_c = lambda v, m=None, i=None: six.assertCountEqual(self,
                                                                   expand_groups(
                                                                       get_map_config_ids(v, map_name=m, instances=i),
                                                                       groups
                                                                   ),
-                                                                  [MapConfigId('m', 'c', ('i', )),
-                                                                   MapConfigId('m', 'd', ('i', )),
-                                                                   MapConfigId('n', 'e', ('i', )),
-                                                                   MapConfigId('n', 'e', ('j', ))])
+                                                                  [MapConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )),
+                                                                   MapConfigId(ItemType.CONTAINER, 'm', 'd', ('i', )),
+                                                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', ('i', )),
+                                                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', ('j', ))])
         assert_a('m.c')
         assert_a('c', 'm')
         assert_a('c', 'm', [])

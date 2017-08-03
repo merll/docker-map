@@ -1,107 +1,89 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ..action import DERIVED_ACTION_STARTUP, DERIVED_ACTION_SHUTDOWN
-from ..policy import CONFIG_FLAG_PERSISTENT
-from ..state import STATE_ABSENT, STATE_PRESENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_RESTARTING
+from ..input import ItemType
+from ..policy import ConfigFlags
+from ..state import State, StateFlags
+from . import ItemAction, Action, ContainerUtilAction, VolumeUtilAction, NetworkUtilAction, DerivedAction
 from .base import AbstractActionGenerator
-from . import (InstanceAction, ACTION_CREATE, ACTION_START, UTIL_ACTION_PREPARE_CONTAINER,
-               ACTION_RESTART, UTIL_ACTION_SIGNAL_STOP, ACTION_REMOVE, UTIL_ACTION_EXEC_ALL)
 
 
 class CreateActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states, **kwargs):
+    def get_state_actions(self, state, **kwargs):
         """
-        Creates all missing containers.
+        Creates all missing containers, networks, and volumes.
 
-        :param states: Configuration states.
-        :type states: dockermap.map.state.ContainerConfigStates
+        :param state: Configuration state.
+        :type state: dockermap.map.state.ConfigState
         :param kwargs: Additional keyword arguments.
-        :return: List of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: list[dockermap.map.action.ItemAction]
         """
-        new_action = InstanceAction.config_partial(states.client, states.map, states.config)
-        attached_actions = [
-            new_action(attached_state.instance, ACTION_CREATE)
-            for attached_state in states.attached
-            if attached_state.base_state == STATE_ABSENT
-        ]
-        instance_actions = [
-            new_action(instance_state.instance, ACTION_CREATE, extra_data=kwargs)
-            for instance_state in states.instances
-            if instance_state.base_state == STATE_ABSENT
-        ]
-        return attached_actions, instance_actions
+        if state.base_state == State.ABSENT:
+            actions = [ItemAction(state, Action.CREATE, extra_data=kwargs)]
+            if state.config_id.config_type == ItemType.CONTAINER:
+                actions.append(ItemAction(state, ContainerUtilAction.CONNECT_ALL))
+            return actions
 
 
 class StartActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states, **kwargs):
+    def get_state_actions(self, state, **kwargs):
         """
         Generally starts containers that are not running. Attached containers are skipped unless they are initial.
         Attached containers are also prepared with permissions. Where applicable, exec commands are run in started
         instance containers.
 
-        :param states: Configuration states.
-        :type states: dockermap.map.state.ContainerConfigStates
+        :param state: Configuration state.
+        :type state: dockermap.map.state.ConfigState
         :param kwargs: Additional keyword arguments.
-        :return: List of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: list[dockermap.map.action.ItemAction]
         """
-        new_action = InstanceAction.config_partial(states.client, states.map, states.config)
-        attached_actions = []
-        for attached_state in states.attached:
-            if attached_state.base_state == STATE_PRESENT and attached_state.flags & STATE_FLAG_INITIAL:
-                attached_actions.append(new_action(attached_state.instance, ACTION_START))
-                attached_actions.append(new_action(attached_state.instance, UTIL_ACTION_PREPARE_CONTAINER))
-
-        instance_actions = []
-        for instance_state in states.instances:
-            if instance_state.base_state == STATE_PRESENT:
-                instance_actions.append(new_action(instance_state.instance, ACTION_START, extra_data=kwargs))
-                instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
-
-        return attached_actions, instance_actions
+        config_type = state.config_id.config_type
+        if (config_type == ItemType.VOLUME and state.base_state == State.PRESENT and
+                state.state_flags & StateFlags.INITIAL):
+            return [
+                ItemAction(state, Action.START),
+                ItemAction(state, VolumeUtilAction.PREPARE),
+            ]
+        elif config_type == ItemType.CONTAINER and state.base_state == State.PRESENT:
+            return [
+                ItemAction(state, Action.START, extra_data=kwargs),
+                ItemAction(state, ContainerUtilAction.EXEC_ALL),
+            ]
 
 
 class RestartActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states, **kwargs):
+    def get_state_actions(self, state, **kwargs):
         """
         Restarts instance containers.
 
-        :param states: Configuration states.
-        :type states: dockermap.map.state.ContainerConfigStates
+        :param state: Configuration state.
+        :type state: dockermap.map.state.ConfigState
         :param kwargs: Additional keyword arguments.
-        :return: List of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: list[dockermap.map.action.ItemAction]
         """
-        new_action = InstanceAction.config_partial(states.client, states.map, states.config)
-        instance_actions = [
-            new_action(instance_state.instance, ACTION_RESTART, extra_data=kwargs)
-            for instance_state in states.instances
-            if instance_state.base_state != STATE_ABSENT and not instance_state.flags & STATE_FLAG_INITIAL
-        ]
-        return [], instance_actions
+        if (state.config_id.config_type == ItemType.CONTAINER and state.base_state != State.ABSENT and
+                not state.state_flags & StateFlags.INITIAL):
+            return [ItemAction(state, Action.RESTART, extra_data=kwargs)]
 
 
 class StopActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states, **kwargs):
+    def get_state_actions(self, state, **kwargs):
         """
         Stops containers that are running. Does not check attached containers. Considers using the pre-configured
         ``stop_signal``.
 
-        :param states: Configuration states.
-        :type states: dockermap.map.state.ContainerConfigStates
+        :param state: Configuration state.
+        :type state: dockermap.map.state.ConfigState
         :param kwargs: Additional keyword arguments.
-        :return: List of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: list[dockermap.map.action.ItemAction]
         """
-        new_action = InstanceAction.config_partial(states.client, states.map, states.config)
-        instance_actions = [
-            new_action(instance_state.instance, UTIL_ACTION_SIGNAL_STOP, extra_data=kwargs)
-            for instance_state in states.instances
-            if instance_state.base_state != STATE_ABSENT and not instance_state.flags & STATE_FLAG_INITIAL
-        ]
-        return [], instance_actions
+        if (state.config_id.config_type == ItemType.CONTAINER and state.base_state != State.ABSENT and
+                not state.state_flags & StateFlags.INITIAL):
+            return [ItemAction(state, ContainerUtilAction.SIGNAL_STOP, extra_data=kwargs)]
 
 
 class RemoveActionGenerator(AbstractActionGenerator):
@@ -109,107 +91,107 @@ class RemoveActionGenerator(AbstractActionGenerator):
     remove_attached = False
     policy_options = ['remove_persistent', 'remove_attached']
 
-    def get_state_actions(self, states, **kwargs):
+    def get_state_actions(self, state, **kwargs):
         """
         Removes containers that are stopped. Optionally skips persistent containers. Attached containers are skipped
         by default from removal but can optionally be included.
 
-        :param states: Configuration states.
-        :type states: dockermap.map.state.ContainerConfigStates
+        :param state: Configuration state.
+        :type state: dockermap.map.state.ConfigState
         :param kwargs: Additional keyword arguments.
-        :return: List of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: list[dockermap.map.action.ItemAction]
         """
-        new_action = InstanceAction.config_partial(states.client, states.map, states.config)
-        if self.remove_attached:
-            attached_actions = [
-                new_action(attached_state.instance, ACTION_REMOVE)
-                for attached_state in states.attached
-                if attached_state.base_state == STATE_PRESENT
-            ]
+        config_type = state.config_id.config_type
+        if config_type == ItemType.CONTAINER:
+            extra_data = kwargs
         else:
-            attached_actions = []
-
-        if self.remove_persistent:
-            instance_actions = [
-                new_action(instance_state.instance, ACTION_REMOVE, extra_data=kwargs)
-                for instance_state in states.instances
-                if instance_state.base_state == STATE_PRESENT
-            ]
-        else:
-            instance_actions = [
-                new_action(instance_state.instance, ACTION_REMOVE, extra_data=kwargs)
-                for instance_state in states.instances
-                if instance_state.base_state == STATE_PRESENT and not states.flags & CONFIG_FLAG_PERSISTENT
-            ]
-
-        return attached_actions, instance_actions
+            extra_data = None
+        if state.base_state == State.PRESENT:
+            if ((config_type == ItemType.VOLUME and self.remove_attached) or
+                    (config_type == ItemType.CONTAINER and
+                     self.remove_persistent or not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
+                return [ItemAction(state, Action.REMOVE, extra_data=extra_data)]
+            elif config_type == ItemType.NETWORK:
+                connected_containers = state.extra_data.get('containers')
+                if connected_containers:
+                    actions = [ItemAction(state, NetworkUtilAction.DISCONNECT_ALL, {'containers': connected_containers})]
+                else:
+                    actions = []
+                actions.append(ItemAction(state, Action.REMOVE, extra_data=kwargs))
+                return actions
 
 
 class StartupActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states, **kwargs):
+    def get_state_actions(self, state, **kwargs):
         """
         A combination of CreateActionGenerator and StartActionGenerator - creates and starts containers where
         appropriate.
 
-        :param states: Configuration states.
-        :type states: dockermap.map.state.ContainerConfigStates
+        :param state: Configuration state.
+        :type state: dockermap.map.state.ConfigState
         :param kwargs: Additional keyword arguments.
-        :return: List of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: list[dockermap.map.action.ItemAction]
         """
-        new_action = InstanceAction.config_partial(states.client, states.map, states.config)
-
-        attached_actions = []
-        for attached_state in states.attached:
-            if attached_state.base_state == STATE_ABSENT:
-                attached_actions.append(new_action(attached_state.instance, DERIVED_ACTION_STARTUP))
-                attached_actions.append(new_action(attached_state.instance, UTIL_ACTION_PREPARE_CONTAINER))
-            elif attached_state.base_state == STATE_PRESENT and attached_state.flags & STATE_FLAG_INITIAL:
-                attached_actions.append(new_action(attached_state.instance, ACTION_START))
-                attached_actions.append(new_action(attached_state.instance, UTIL_ACTION_PREPARE_CONTAINER))
-
-        instance_actions = []
-        for instance_state in states.instances:
-            if instance_state.base_state == STATE_ABSENT:
-                instance_actions.append(new_action(instance_state.instance, DERIVED_ACTION_STARTUP))
-                instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
-            elif instance_state.base_state == STATE_PRESENT:
-                instance_actions.append(new_action(instance_state.instance, ACTION_START))
-                instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
-
-        return attached_actions, instance_actions
+        config_type = state.config_id.config_type
+        if config_type == ItemType.NETWORK:
+            return [ItemAction(state, Action.CREATE)]
+        elif config_type == ItemType.VOLUME:
+            if state.base_state == State.ABSENT:
+                return [
+                    ItemAction(state, DerivedAction.STARTUP_VOLUME),
+                    ItemAction(state, VolumeUtilAction.PREPARE),
+                ]
+            elif state.base_state == State.PRESENT and state.state_flags & StateFlags.INITIAL:
+                return [
+                    ItemAction(state, Action.START),
+                    ItemAction(state, VolumeUtilAction.PREPARE),
+                ]
+        elif config_type == ItemType.CONTAINER:
+            if state.base_state == State.ABSENT:
+                return [
+                    ItemAction(state, DerivedAction.STARTUP_CONTAINER),
+                    ItemAction(state, ContainerUtilAction.EXEC_ALL),
+                ]
+            elif state.base_state == State.PRESENT:
+                return [
+                    ItemAction(state, Action.START),
+                    ItemAction(state, ContainerUtilAction.EXEC_ALL),
+                ]
 
 
 class ShutdownActionGenerator(RemoveActionGenerator):
-    def get_state_actions(self, states, **kwargs):
+    def get_state_actions(self, state, **kwargs):
         """
         A combination of StopActionGenerator and RemoveActionGenerator - stops and removes containers where
         appropriate.
 
-        :param states: Configuration states.
-        :type states: dockermap.map.state.ContainerConfigStates
+        :param state: Configuration state.
+        :type state: dockermap.map.state.ConfigState
         :param kwargs: Additional keyword arguments.
-        :return: List of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: list[dockermap.map.action.ItemAction]
         """
-        new_action = InstanceAction.config_partial(states.client, states.map, states.config)
-
-        if self.remove_attached:
-            attached_actions = [
-                new_action(attached_state.instance, ACTION_REMOVE)
-                for attached_state in states.attached
-                if attached_state.base_state == STATE_PRESENT
-            ]
-        else:
-            attached_actions = []
-
-        instance_actions = []
-        if self.remove_persistent or not states.flags & CONFIG_FLAG_PERSISTENT:
-            for instance_state in states.instances:
-                if instance_state.base_state == STATE_RUNNING or instance_state.flags & STATE_FLAG_RESTARTING:
-                    instance_actions.append(new_action(instance_state.instance, DERIVED_ACTION_SHUTDOWN))
-                elif instance_state.base_state == STATE_PRESENT:
-                    instance_actions.append(new_action(instance_state.instance, ACTION_REMOVE))
-
-        return attached_actions, instance_actions
+        config_type = state.config_id.config_type
+        if config_type == ItemType.NETWORK:
+            if state.base_state == State.PRESENT:
+                connected_containers = state.extra_data.get('containers')
+                if connected_containers:
+                    cc_names = [c.get('Name', c['Id']) for c in connected_containers]
+                    actions = [ItemAction(state, NetworkUtilAction.DISCONNECT_ALL,
+                                          extra_data={'containers': cc_names})]
+                else:
+                    actions = []
+                actions.append(ItemAction(state, Action.REMOVE, extra_data=kwargs))
+                return actions
+        elif config_type == ItemType.VOLUME and self.remove_attached:
+            return [ItemAction(state, Action.REMOVE)]
+        elif config_type == ItemType.CONTAINER:
+            if self.remove_persistent or not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT:
+                if state.base_state == State.RUNNING or state.state_flags & StateFlags.RESTARTING:
+                    return [ItemAction(state, DerivedAction.SHUTDOWN_CONTAINER)]
+                elif state.base_state == State.PRESENT:
+                    return [ItemAction(state, Action.REMOVE)]
+            elif state.base_state == State.RUNNING or state.state_flags & StateFlags.RESTARTING:
+                return [ItemAction(state, Action.REMOVE)]

@@ -10,3 +10,4 @@ DEFAULT_HOSTNAME_REPLACEMENT = [
     ('_', '-'),
     ('.', '-'),
 ]
+DEFAULT_PRESET_NETWORKS = 'host', 'bridge', 'none'

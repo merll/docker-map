@@ -3,9 +3,13 @@ from abc import ABCMeta
 
 from six import with_metaclass
 
-CONFIG_FLAG_ATTACHED = 1               # Container is an attached volume.
-CONFIG_FLAG_DEPENDENT = 1 << 1         # Container is checked in a relation to a dependent / dependency container.
-CONFIG_FLAG_PERSISTENT = 1 << 2        # Container is persistent.
+from ...map import Flags
+
+
+class ConfigFlags(Flags):
+    DEPENDENT = 1                   # Configuration is checked in a relation to a dependent / dependency container.
+    CONTAINER_ATTACHED = 1 << 1     # Container is an attached volume.
+    CONTAINER_PERSISTENT = 1 << 2   # Container is persistent.
 
 
 class PolicyUtilMeta(type):
@@ -38,3 +42,9 @@ class PolicyUtil(with_metaclass(PolicyUtilMeta)):
             if option_name in kwargs:
                 setattr(self, option_name, kwargs.pop(option_name))
         self._policy = policy
+
+    def get_options(self):
+        return {
+            option_name: getattr(self, option_name)
+            for option_name in self.__class__.policy_options
+        }

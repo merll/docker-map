@@ -7,7 +7,8 @@ import posixpath
 from requests import Timeout
 import six
 
-from ..action import UTIL_ACTION_SCRIPT
+from ..action import ContainerUtilAction
+from ..input import ItemType
 
 
 class ScriptRunException(Exception):
@@ -15,13 +16,13 @@ class ScriptRunException(Exception):
 
 
 class ScriptMixin(object):
-    instance_action_method_names = [
-        (UTIL_ACTION_SCRIPT, 'run_script'),
+    action_method_names = [
+        (ItemType.CONTAINER, ContainerUtilAction.SCRIPT, 'run_script'),
     ]
     remove_created_after = True
     policy_options = ['remove_created_after']
 
-    def run_script(self, config, c_name, script_path=None, entrypoint=None, command_format=None,
+    def run_script(self, action, c_name, script_path=None, entrypoint=None, command_format=None,
                    wait_timeout=None, container_script_dir='/tmp/script_run', timestamps=None, tail='all'):
         """
         Creates a container from its configuration to run a script or single command. The container is specifically
@@ -30,8 +31,8 @@ class ScriptMixin(object):
         mounting the directory containing the script to the new container. After the script run, the container is
         destroyed (excluding its dependencies), unless :attr:`remove_created_after` is set to ``False``.
 
-        :param config: Configuration.
-        :type config: dockermap.map.runner.ActionConfig
+        :param action: Action configuration.
+        :type action: dockermap.map.runner.ActionConfig
         :param c_name: Container name.
         :type c_name: unicode | str
         :param script_path: Path to the script on the Docker host. Note that this needs to have the executable bit
@@ -60,8 +61,8 @@ class ScriptMixin(object):
          key ``error``.
         :rtype: dict[unicode | str, dict]
         """
-        client = config.client
-        client_config = config.client_config
+        client = action.client
+        client_config = action.client_config
         use_host_config = client_config.get('use_host_config')
         if script_path:
             if os.path.isdir(script_path):
@@ -92,19 +93,19 @@ class ScriptMixin(object):
         else:
             create_extra_kwargs = {}
             start_extra_kwargs = {'binds': binds}
-        created = self.create_instance(config, c_name, entrypoint=entrypoint, command=command,
-                                       volumes=volumes, **create_extra_kwargs)
+        created = self.create_container(action, c_name, entrypoint=entrypoint, command=command,
+                                        volumes=volumes, **create_extra_kwargs)
         if not created:
             raise ScriptRunException("No new containers were created.")
-        result = {'id': created['Id'], 'client': config.client_name}
+        result = {'id': created['Id'], 'client': action.client_name}
         stopped = True
         try:
-            self.start_instance(config, c_name, **start_extra_kwargs)
+            self.start_container(action, c_name, **start_extra_kwargs)
             stopped = False
-            timeout = wait_timeout or config.container_config.stop_timeout or client_config.get('timeout')
+            timeout = wait_timeout or action.config.stop_timeout or client_config.get('timeout')
             container_id = created['Id']
             try:
-                self.wait(config, c_name, timeout=timeout)
+                self.wait(action, c_name, timeout=timeout)
             except Timeout:
                 result['error'] = "Timed out while waiting for the container to finish."
             else:
@@ -115,6 +116,6 @@ class ScriptMixin(object):
         finally:
             if self.remove_created_after:
                 if not stopped:
-                    self.stop(config, c_name, timeout=3)
-                self.remove(config, c_name)
+                    self.stop(action, c_name, timeout=3)
+                self.remove_container(action, c_name)
         return result

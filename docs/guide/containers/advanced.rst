@@ -20,6 +20,7 @@ guidelines, such as how containers are named, how image names are resolved, and 
   :meth:`~dockermap.map.policy.base.BasePolicy.get_dependents` return the dependency path of
   containers for deciding in which order to create, start, stop, and remove containers;
 * :meth:`~dockermap.map.policy.base.BasePolicy.cname`,
+  :meth:`~dockermap.map.policy.base.BasePolicy.nname`,
   :meth:`~dockermap.map.policy.base.BasePolicy.image_name`,
   :meth:`~dockermap.map.policy.base.BasePolicy.get_hostname` generate inputs for aforementioned functions. They can
   be overridden separately.
@@ -148,7 +149,7 @@ Lazy value resolution is available at the following points:
 
   * the main :attr:`~dockermap.map.config.main.ContainerMap.repository` prefix;
   * paths for all :attr:`~dockermap.map.config.main.ContainerMap.volumes` aliases;
-  * the host volume :attr:`~dockermap.map.config.HostVolumeConfiguration.root` path;
+  * the host volume :attr:`~dockermap.map.config.host_volume.HostVolumeConfiguration.root` path;
   * and all :attr:`~dockermap.map.config.main.ContainerMap.host` volume paths.
 * Within container configurations:
 
@@ -160,7 +161,12 @@ Lazy value resolution is available at the following points:
   * items of :attr:`~dockermap.map.config.container.ContainerConfiguration.binds`, if they are not volume aliases, i.e. they
     directly describe container volume and host path.
   * command line and user defined in each element of :attr:`~dockermap.map.config.container.ContainerConfiguration.exec_commands`;
-  * and elements listed in :attr:`~dockermap.map.config.container.ContainerConfiguration.shares`.
+  * elements listed in :attr:`~dockermap.map.config.container.ContainerConfiguration.shares`;
+  * and on the network endpoint configurations in :attr:`~dockermap.map.config.container.ContainerConfiguration.networks`.
+* On network configurations:
+
+  * the values of :attr:`~dockermap.map.config.network.driver_options`,
+  * and the values of :attr:`~dockermap.map.config.network.create_options`.
 * On client configuration: For addresses in :attr:`~dockermap.map.config.client.ClientConfiguration.interfaces`.
 
 .. _Docker-Fabric: https://pypi.python.org/pypi/docker-fabric

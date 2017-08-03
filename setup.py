@@ -1,5 +1,6 @@
 from distutils.spawn import find_executable
 import os
+import sys
 from setuptools import setup, find_packages
 
 from dockermap import __version__
@@ -18,11 +19,16 @@ def include_readme():
         return doc.rst
 
 
+REQURED_PACKAGES = ['six', 'docker-py>=1.9.0']
+if sys.version_info[:2] < (3, 4):
+    REQURED_PACKAGES.append('enum34')
+
+
 setup(
     name='docker-map',
     version=__version__,
     packages=find_packages(),
-    install_requires=['six', 'docker-py>=1.1.0'],
+    install_requires=REQURED_PACKAGES,
     extras_require={
         'yaml': ['PyYAML'],
     },

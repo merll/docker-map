@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from collections import OrderedDict
-
-from six import iteritems
-
 from ...dep import MultiDependencyResolver, CircularDependency
+from ...utils import merge_list
+from ..input import ItemType
 
 
 class ContainerDependencyResolver(MultiDependencyResolver):
@@ -15,39 +13,25 @@ class ContainerDependencyResolver(MultiDependencyResolver):
     """
     def merge_dependency(self, item, resolve_parent, parents):
         """
-        Merge dependencies of current container with further dependencies; in this instance, it means that first parent
-        dependencies are checked, and then immediate dependencies of the current container should be added to the list,
-        but without duplicating any entries.
+        Merge dependencies of current configuration with further dependencies; in this instance, it means that in case
+        of container configuration first parent dependencies are checked, and then immediate dependencies of the current
+        configuration should be added to the list, but without duplicating any entries.
 
-        :param item: Container name.
-        :type item: tuple[unicode | str]
+        :param item: Configuration item.
+        :type item: (unicode | str, unicode | str, unicode | str, unicode | str)
         :param resolve_parent: Function to resolve parent dependencies.
         :type resolve_parent: function
-        :type parents: collections.Iterable[unicode | str]
+        :type parents: collections.Iterable[(unicode | str, unicode | str, unicode | str, unicode | str)]
         :return: List of recursively resolved dependencies of this container.
-        :rtype: list
+        :rtype: list[(unicode | str, unicode | str, unicode | str, unicode | str)]
         :raise CircularDependency: If the current element depends on one found deeper in the hierarchy.
         """
-        def _merge_instances(merge_deps):
-            for mm, mc, mi in merge_deps:
-                key = mm, mc
-                dep_instances = dep.get(key)
-                if dep_instances is None:
-                    dep[key] = list(mi)
-                elif None not in dep_instances:
-                    if None in mi:
-                        dep[key] = [None]
-                    else:
-                        new_instances = [ni for ni in mi if ni not in dep_instances]
-                        dep_instances.extend(new_instances)
-
-        dep = OrderedDict()
-        for p_map, p_config, __ in parents:
-            parent_dep = resolve_parent((p_map, p_config))
-            if parent_dep:
-                _merge_instances(parent_dep)
-        _merge_instances(parents)
+        dep = []
+        for parent_key in parents:
+            if parent_key.config_type == ItemType.CONTAINER:
+                parent_dep = resolve_parent(parent_key)
+                merge_list(dep, parent_dep)
+        merge_list(dep, parents)
         if item in dep:
             raise CircularDependency("Circular dependency found for item '{0}'.".format(item))
-        return [(d_map, d_config, d_instances)
-                for (d_map, d_config), d_instances in iteritems(dep)]
+        return dep

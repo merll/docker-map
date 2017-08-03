@@ -3,20 +3,20 @@ from __future__ import unicode_literals
 
 import logging
 
-from ..input import EXEC_POLICY_INITIAL
-from ..policy import CONFIG_FLAG_PERSISTENT
-from ..state import (STATE_FLAG_NONRECOVERABLE, STATE_ABSENT, STATE_FLAG_INITIAL, STATE_RUNNING, STATE_FLAG_OUTDATED,
-                     STATE_FLAG_RESTARTING)
+import six
+
+from ..input import ItemType
+from ..policy import ConfigFlags
+from ..state import State, StateFlags
+from . import ItemAction, Action, ContainerUtilAction, VolumeUtilAction, NetworkUtilAction, DerivedAction
 from .base import AbstractActionGenerator
-from . import (ACTION_START, UTIL_ACTION_EXEC_ALL, UTIL_ACTION_EXEC_COMMANDS, DERIVED_ACTION_RESET,
-               DERIVED_ACTION_STARTUP, DERIVED_ACTION_RELAUNCH, UTIL_ACTION_PREPARE_CONTAINER, InstanceAction)
 
 
 log = logging.getLogger(__name__)
 
 
 class UpdateActionGenerator(AbstractActionGenerator):
-    def get_state_actions(self, states, **kwargs):
+    def get_state_actions(self, state, **kwargs):
         """
         For attached volumes, missing containers are created and initial containers are started and prepared with
         permissions. Outdated containers or containers with errors are recreated. The latter also applies to instance
@@ -25,67 +25,95 @@ class UpdateActionGenerator(AbstractActionGenerator):
         On running instance containers missing exec commands are run; if the container needs to be started, all exec
         commands are launched.
 
-        :param states: Configuration states.
-        :type states: dockermap.map.state.ContainerConfigStates
+        :param state: Configuration state.
+        :type state: dockermap.map.state.ConfigState
         :param kwargs: Additional keyword arguments.
-        :return: List of attached actions and list of instance actions.
-        :rtype: (list[dockermap.map.action.InstanceAction], list[dockermap.map.action.InstanceAction])
+        :return: Actions on the client, map, and configurations.
+        :rtype: list[dockermap.map.action.ItemAction]
         """
-        new_action = InstanceAction.config_partial(states.client, states.map, states.config)
-        log.debug("Evaluating containers for client: %s, map: %s, config: %s.", states.client, states.map,
-                  states.config)
-        attached_actions = []
-        for attached_state in states.attached:
-            log.debug("Evaluating attached container %s.", attached_state.instance)
-            if attached_state.base_state == STATE_ABSENT:
-                log.debug("Not found - creating and starting attached container %s.", attached_state.instance)
-                action_type = DERIVED_ACTION_STARTUP
-            elif attached_state.flags & (STATE_FLAG_NONRECOVERABLE | STATE_FLAG_OUTDATED):
-                if attached_state.base_state == STATE_RUNNING:
-                    log.debug("Found to be outdated or non-recoverable - resetting %s.", attached_state.instance)
-                    action_type = DERIVED_ACTION_RESET
+        config_id = state.config_id
+        config_type = config_id.config_type
+        if config_type == ItemType.NETWORK:
+            if state.base_state == State.ABSENT:
+                log.debug("Not found - creating network %s.", config_id)
+                return [ItemAction(state, Action.CREATE)]
+            elif state.state_flags & StateFlags.NEEDS_RESET:
+                log.debug("Found to be outdated - resetting %s.", config_id)
+                connected_containers = state.extra_data.get('containers')
+                if connected_containers:
+                    cc_names = [c_info.get('Name', c_id) for c_id, c_info in six.iteritems(connected_containers)]
+                    log.debug("Disconnecting containers from %s: %s.", config_id, cc_names)
+                    actions = [ItemAction(state, NetworkUtilAction.DISCONNECT_ALL, containers=cc_names)]
                 else:
-                    log.debug("Found to be outdated or non-recoverable - relaunching %s.", attached_state.instance)
-                    action_type = DERIVED_ACTION_RELAUNCH
-            elif attached_state.flags & STATE_FLAG_INITIAL:
-                log.debug("Container found but initial, starting %s.", attached_state.instance)
-                action_type = ACTION_START
-            else:
-                continue
-            attached_actions.append(new_action(attached_state.instance, action_type))
-            attached_actions.append(new_action(attached_state.instance, UTIL_ACTION_PREPARE_CONTAINER))
-
-        instance_actions = []
-        for instance_state in states.instances:
-            instance_name = instance_state.instance or '<default>'
-            log.debug("Evaluating container instance %s.", instance_name)
-            ci_initial = instance_state.flags & STATE_FLAG_INITIAL
-            if instance_state.base_state == STATE_ABSENT:
-                log.debug("Not found - creating and starting instance container %s.", instance_name)
-                action_type = DERIVED_ACTION_STARTUP
-            elif instance_state.flags & (STATE_FLAG_NONRECOVERABLE | STATE_FLAG_OUTDATED):
-                if instance_state.base_state == STATE_RUNNING or instance_state.flags & STATE_FLAG_RESTARTING:
-                    log.debug("Found to be outdated or non-recoverable - resetting %s.", instance_name)
-                    action_type = DERIVED_ACTION_RESET
+                    actions = []
+                actions.append(ItemAction(state, DerivedAction.RESET_NETWORK))
+                return actions
+        elif config_type == ItemType.VOLUME:
+            # TODO: To be changed for Docker volumes.
+            if state.base_state == State.ABSENT:
+                log.debug("Not found - creating and starting attached container %s.", config_id)
+                action_type = DerivedAction.STARTUP_VOLUME
+            elif state.state_flags & StateFlags.NEEDS_RESET:
+                if state.base_state == State.RUNNING:
+                    log.debug("Found to be outdated or non-recoverable - resetting %s.", config_id)
+                    action_type = DerivedAction.RESET_VOLUME
                 else:
-                    log.debug("Found to be outdated or non-recoverable - relaunching %s.", instance_name)
-                    action_type = DERIVED_ACTION_RELAUNCH
-            elif (instance_state.base_state != STATE_RUNNING and
-                  (ci_initial or not states.flags & CONFIG_FLAG_PERSISTENT)):
-                log.debug("Container found but not running, starting %s.", instance_name)
-                action_type = ACTION_START
+                    log.debug("Found to be outdated or non-recoverable - relaunching %s.", config_id)
+                    action_type = DerivedAction.RELAUNCH_VOLUME
+            elif state.state_flags & StateFlags.INITIAL:
+                log.debug("Container found but initial, starting %s.", config_id)
+                action_type = Action.START
             else:
-                run_cmds = [
-                    exec_cmd
-                    for exec_cmd, running in instance_state.extra_data.get('exec_commands', [])
-                    if not running and (ci_initial or exec_cmd.policy != EXEC_POLICY_INITIAL)
-                ]
-                if run_cmds:
-                    log.debug("Container %s up-to-date, but with missing commands %s.", instance_name, run_cmds)
-                    instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_COMMANDS,
-                                                       run_cmds=run_cmds))
-                continue
-            instance_actions.append(new_action(instance_state.instance, action_type))
-            instance_actions.append(new_action(instance_state.instance, UTIL_ACTION_EXEC_ALL))
-
-        return attached_actions, instance_actions
+                return None
+            return [
+                ItemAction(state, action_type),
+                ItemAction(state, VolumeUtilAction.PREPARE),
+            ]
+        elif config_type == ItemType.CONTAINER:
+            ci_initial = state.state_flags & StateFlags.INITIAL
+            if state.base_state == State.ABSENT:
+                log.debug("Not found - creating and starting instance container %s.", config_id)
+                action_type = DerivedAction.STARTUP_CONTAINER
+            elif state.state_flags & StateFlags.NEEDS_RESET:
+                if state.base_state == State.RUNNING or state.state_flags & StateFlags.RESTARTING:
+                    log.debug("Found to be outdated or non-recoverable - resetting %s.", config_id)
+                    action_type = DerivedAction.RESET_CONTAINER
+                else:
+                    log.debug("Found to be outdated or non-recoverable - relaunching %s.", config_id)
+                    action_type = DerivedAction.RELAUNCH_CONTAINER
+            else:
+                actions = []
+                if state.state_flags & StateFlags.NETWORK_DISCONNECTED:
+                    dn = state.extra_data['disconnected']
+                    log.debug("Container is connecting to the following networks: %s.", dn)
+                    actions.append(ItemAction(state, Action.CONNECT, endpoints=dn))
+                if state.state_flags & StateFlags.NETWORK_MISMATCH:
+                    rn = state.extra_data['reconnect']
+                    n_names, n_ep = zip(*rn)
+                    log.debug("Container is reconnecting to the following networks: %s.", n_names)
+                    actions.extend([
+                        ItemAction(state, Action.DISCONNECT, networks=n_names),
+                        ItemAction(state, Action.CONNECT, endpoints=n_ep),
+                    ])
+                if state.state_flags & StateFlags.NETWORK_LEFT:
+                    ln = state.extra_data['left']
+                    log.debug("Container is disconnecting from the following networks: %s.", ln)
+                    actions.append(ItemAction(state, Action.DISCONNECT, networks=ln))
+                if (state.base_state != State.RUNNING and
+                        (ci_initial or not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
+                    log.debug("Container found but not running, starting %s.", config_id)
+                    actions.extend([
+                        ItemAction(state, Action.START),
+                        ItemAction(state, ContainerUtilAction.EXEC_ALL),
+                    ])
+                else:
+                    if state.state_flags & StateFlags.EXEC_COMMANDS:
+                        run_cmds = state.extra_data['exec_commands']
+                        if run_cmds:
+                            log.debug("Container %s up-to-date, but with missing commands %s.", config_id, run_cmds)
+                            actions.append(ItemAction(state, ContainerUtilAction.EXEC_COMMANDS, run_cmds=run_cmds))
+                return actions
+            return [
+                ItemAction(state, action_type),
+                ItemAction(state, ContainerUtilAction.EXEC_ALL),
+            ]

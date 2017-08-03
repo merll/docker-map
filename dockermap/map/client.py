@@ -7,7 +7,7 @@ import docker
 
 from .action import simple, script, update
 from .config.client import ClientConfiguration
-from .config.main import ContainerMap, expand_instances, expand_groups, group_instances
+from .config.main import ContainerMap, expand_instances, expand_groups
 from .input import get_map_config_ids
 from .policy.base import BasePolicy
 from .runner.base import DockerClientRunner
@@ -30,7 +30,7 @@ def _set_forced_update_ids(kwargs, maps, groups, default_map_name, default_insta
 
 def _get_config_ids(value, maps, groups, default_map_name, default_instances):
     input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
-    return list(group_instances(expand_groups(input_ids, groups), single_instances=False, ext_maps=maps))
+    return list(expand_instances(expand_groups(input_ids, groups), ext_maps=maps))
 
 
 class MappingDockerClient(object):
@@ -125,10 +125,14 @@ class MappingDockerClient(object):
         config_ids = _get_config_ids(config_name, policy.container_maps, groups, map_name or self._default_map,
                                      instances)
         log.debug("Generating states for configurations: %s", config_ids)
-        for states in state_generator.get_states(config_ids):
-            actions = action_generator.get_state_actions(states, **kwargs)
-            log.debug("Running actions: %s", actions)
-            results.extend(runner.run_actions(*actions))
+        for state in state_generator.get_states(config_ids):
+            log.debug("Evaluating state: %s.", state)
+            actions = action_generator.get_state_actions(state, **kwargs)
+            if actions:
+                log.debug("Running actions: %s", actions)
+                results.extend(runner.run_actions(actions))
+            else:
+                log.debug("No actions returned.")
 
         return results
 

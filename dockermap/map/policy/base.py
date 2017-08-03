@@ -5,9 +5,9 @@ import logging
 
 from six import iteritems
 
-from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT
+from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT, DEFAULT_PRESET_NETWORKS
 from ...functional import resolve_value
-from .cache import ContainerCache, ImageCache
+from .cache import ContainerCache, ImageCache, NetworkCache
 from .dep import ContainerDependencyResolver
 
 log = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ class BasePolicy(object):
     base_image = DEFAULT_BASEIMAGE
     default_client_name = '__default__'
     hostname_replace = DEFAULT_HOSTNAME_REPLACEMENT
+    default_network_names = ['bridge']
 
     def __init__(self, container_maps, clients):
         self._maps = {
@@ -34,12 +35,14 @@ class BasePolicy(object):
         }
         self._clients = clients
         self._container_names = ContainerCache(clients)
+        self._network_names = NetworkCache(clients)
         self._images = ImageCache(clients)
         self._f_resolver = ContainerDependencyResolver()
         self._r_resolver = ContainerDependencyResolver()
         for m in self._maps.values():
-            self._f_resolver.update(m.dependency_items())
-            self._r_resolver.update_backward(m.dependency_items(reverse=True))
+            depdendency_items = m.dependency_items()
+            self._f_resolver.update(depdendency_items)
+            self._r_resolver.update_backward(depdendency_items)
 
     @classmethod
     def cname(cls, map_name, container, instance=None):
@@ -47,7 +50,7 @@ class BasePolicy(object):
         Generates a container name that should be used for creating new containers and checking the status of existing
         containers.
 
-        In this implementation, the format will be ``<map name>.<container name>.<instance>`` name. If no instance is
+        In this implementation, the format will be ``<map name>.<container name>.<instance>``. If no instance is
         provided, it is just ``<map name>.<container name>``.
 
         :param map_name: Container map name.
@@ -84,6 +87,25 @@ class BasePolicy(object):
         if parent_name:
             return '{0}.{1}.{2}'.format(map_name, parent_name, attached_name)
         return '{0}.{1}'.format(map_name, attached_name)
+
+    @classmethod
+    def nname(cls, map_name, network_name):
+        """
+        Generates a network name that should be used for creating new networks and checking the status of existing
+        networks on the client.
+
+        In this implementation, the format will be ``<map name>.<network name>``.
+
+        :param map_name: Container map name.
+        :type map_name: unicode | str
+        :param network_name: Network configuration name.
+        :type network_name: unicode | str
+        :return: Network name.
+        :rtype: unicode | str
+        """
+        if network_name in DEFAULT_PRESET_NETWORKS:
+            return network_name
+        return '{0}.{1}'.format(map_name, network_name)
 
     @classmethod
     def image_name(cls, image, container_map=None):
@@ -149,51 +171,46 @@ class BasePolicy(object):
             client_suffix = client_suffix.replace(old, new)
         return '{0}-{1}'.format(base_name, client_suffix)
 
-    def get_clients(self, c_config, c_map):
+    def get_clients(self, c_map, c_config=None):
         """
-        Returns the Docker client objects for a given container configuration or map. If there are no clients specified
+        Returns the client configuration names for a given item configuration or map. If there are no clients specified
         for the configuration, the list defaults to the one globally specified for the given map. If that is not defined
         either, the default client is returned.
 
-        :param c_config: Container configuration object.
-        :type c_config: dockermap.map.config.container.ContainerConfiguration
         :param c_map: Container map instance.
         :type c_map: dockermap.map.config.main.ContainerMap
-        :return: Docker client objects.
-        :rtype: list[(unicode | str, dockermap.map.config.client.ClientConfiguration)]
+        :param c_config: Optional container configuration object.
+        :type c_config: dockermap.map.config.ContainerConfiguration
+        :return: Client configuration names.
+        :rtype: list[unicode | str]
         """
-        if c_config.clients:
-            return [(client_name, self._clients[client_name]) for client_name in c_config.clients]
+        if c_config and c_config.clients:
+            return c_config.clients
         if c_map.clients:
-            return [(client_name, self._clients[client_name]) for client_name in c_map.clients]
-        default_name = self.default_client_name
-        return [(default_name, self._clients[default_name])]
+            return c_map.clients
+        return [self.default_client_name]
 
-    def get_dependencies(self, map_name, container):
+    def get_dependencies(self, config_id):
         """
         Generates the list of dependency containers, in reverse order (i.e. the last dependency coming first).
 
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param container: Container configuration name.
-        :type container: unicode | str
-        :return: Dependency container map names, container configuration names, and instances.
-        :rtype: iterator[(unicode | str, unicode | str, list[unicode | str | NoneType])]
+        :param config_id: MapConfigId tuple.
+        :type config_id: dockermap.map.input.MapConfigId
+        :return: Dependency configuration types, container map names, configuration names, and instances.
+        :rtype: collections.Iterable[(unicode | str, unicode | str, unicode | str, unicode | str)]
         """
-        return self._f_resolver.get_dependencies((map_name, container))
+        return self._f_resolver.get_dependencies(config_id)
 
-    def get_dependents(self, map_name, container):
+    def get_dependents(self, config_id):
         """
         Generates the list of dependent containers, in reverse order (i.e. the last dependent coming first).
 
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param container: Container configuration name.
-        :type container: unicode | str
-        :return: Dependent container map names, container configuration names, and instances.
-        :rtype: iterator[(unicode | str, unicode | str, list[unicode | str | NoneType])]
+        :param config_id: MapConfigId tuple.
+        :type config_id: dockermap.map.input.MapConfigId
+        :return: Dependent configuration types, container map names, configuration names, and instances.
+        :rtype: collections.Iterable[(unicode | str, unicode | str, unicode | str, unicode | str)]
         """
-        return self._r_resolver.get_dependencies((map_name, container))
+        return self._r_resolver.get_dependencies(config_id)
 
     @property
     def container_maps(self):
@@ -218,7 +235,7 @@ class BasePolicy(object):
     @property
     def container_names(self):
         """
-        Names of existing containers on each map.
+        Names of existing containers on each client.
 
         :return: Dictionary of container names.
         :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedContainerNames]
@@ -228,9 +245,19 @@ class BasePolicy(object):
     @property
     def images(self):
         """
-        Image information functions.
+        Names of images on each client.
 
         :return: Dictionary of image names per client.
         :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedImages]
         """
         return self._images
+
+    @property
+    def network_names(self):
+        """
+        Name of existing networks on each client.
+
+        :return: Dictionary of network names.
+        :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedNetworkNames]
+        """
+        return self._network_names

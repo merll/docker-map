@@ -22,11 +22,8 @@ def merge_list(merged_list, items):
     """
     if not items:
         return
-    if not merged_list:
-        merged_list.extend(items)
-        return
     merged_set = set(merged_list)
     merged_add = merged_set.add
     merged_list.extend(item
                        for item in items
-                       if item not in merged_set or merged_add(item))
+                       if item not in merged_set and not merged_add(item))

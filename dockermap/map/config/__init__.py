@@ -108,6 +108,8 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
             self._config[key] = value
 
     def update_from_dict(self, dct):
+        if not dct:
+            return
         all_props = self.__class__.CONFIG_PROPERTIES
         for key, value in six.iteritems(dct):
             attr_config = all_props.get(key)
@@ -139,6 +141,8 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
                                  if key in update_props})
 
     def merge_from_dict(self, dct, lists_only=False):
+        if not dct:
+            return
         all_props = self.__class__.CONFIG_PROPERTIES
         for key, value in six.iteritems(dct):
             attr_config = all_props.get(key)

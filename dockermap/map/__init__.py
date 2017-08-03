@@ -2,6 +2,7 @@
 from collections import defaultdict
 import itertools
 import six
+from enum import Enum
 
 from ..utils import merge_list
 
@@ -68,7 +69,7 @@ class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
         return six.iteritems(self)
 
     def __nonzero__(self):
-        return len(self) > 0 and any(getattr(self, p) for p in self.__class__.internal_properties)
+        return len(self) > 0 or any(getattr(self, p) for p in self.__class__.internal_properties)
 
     __bool__ = __nonzero__
 
@@ -101,3 +102,50 @@ class DefaultDictMap(AttributeMixin, defaultdict):
         new_instance = self.__class__(self.default_factory, self)
         _update_instance_from_obj(new_instance, self)
         return new_instance
+
+
+class FlagsMeta(type):
+    def __new__(mcs, name, bases, dct):
+        fields = {}
+        for base in bases:
+            if hasattr(base, 'fields'):
+                fields.update(base.fields)
+        fields.update((field_name, field_value)
+                      for field_name, field_value in six.iteritems(dct)
+                      if isinstance(field_value, int))
+        dct['fields'] = fields
+        new_cls = type.__new__(mcs, name, bases, dct)
+        for field_name, field_value in six.iteritems(fields):
+            setattr(new_cls, field_name, new_cls(field_value))
+
+        def _get_fields(self):
+            set_fields = [field_name
+                          for field_name, field_value in six.iteritems(fields)
+                          if self & field_value]
+            return '{0}({1})'.format(name, ', '.join(set_fields))
+        new_cls.__repr__ = _get_fields
+
+        return new_cls
+
+
+class Flags(six.with_metaclass(FlagsMeta, int)):
+    NONE = 0
+
+    def __contains__(self, other):
+        return self & other > 0
+
+    def __or__(self, other):
+        return self.__class__(int.__or__(self, other))
+
+    __add__ = __or__
+
+    def __xor__(self, other):
+        return self.__class__(int.__xor__(self, other))
+
+    __sub__ = __xor__
+
+
+class SimpleEnum(Enum):
+    # Just like regular enum, but less verbose.
+    def __repr__(self):
+        return '{0.__class__.__name__}.{0.name}'.format(self)

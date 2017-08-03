@@ -6,17 +6,25 @@ import logging
 import shlex
 import six
 
-from dockermap.map.policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
-from .base import DependencyStateGenerator
 from ...functional import resolve_value
-from ..policy import CONFIG_FLAG_ATTACHED
-from . import STATE_FLAG_OUTDATED, STATE_ABSENT
+from ..input import ExecPolicy, NetworkEndpoint
+from ..policy import ConfigFlags
+from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
+from . import State, StateFlags, SimpleEnum
+from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
 
 log = logging.getLogger(__name__)
 
-CMD_CHECK_FULL = 'full'
-CMD_CHECK_PARTIAL = 'partial'
-CMD_CHECK_NONE = 'none'
+
+class CmdCheck(SimpleEnum):
+    FULL = 'full'
+    PARTIAL = 'partial'
+    NONE = 'none'
+
+# For backwards compatibility.
+CMD_CHECK_FULL = CmdCheck.FULL
+CMD_CHECK_PARTIAL = CmdCheck.PARTIAL
+CMD_CHECK_NONE = CmdCheck.NONE
 
 
 def _check_environment(c_config, instance_detail):
@@ -78,7 +86,7 @@ def _check_cmd(c_config, instance_detail):
     return True
 
 
-def _check_network(container_config, client_config, instance_detail):
+def _check_container_network_ports(container_config, client_config, instance_detail):
     if not container_config.exposes:
         return True
     instance_ports = instance_detail['NetworkSettings']['Ports'] or {}
@@ -107,34 +115,46 @@ def _check_network(container_config, client_config, instance_detail):
     return True
 
 
+def _check_network_driver_opts(network_config, instance_detail):
+    driver_opts = init_options(network_config.driver_options)
+    if not driver_opts:
+        return True
+    opts = {option_key: option_value
+            for option_key, option_value in six.iteritems(instance_detail['Options'])}
+    for c_key, c_val in six.iteritems(driver_opts):
+        if resolve_value(c_val) != opts.get(c_key):
+            return False
+    return True
+
+
 class SingleContainerVfsCheck(object):
     """
     :type vfs_paths: dict[tuple, unicode | str]
+    :type config_id: dockermap.map.input.MapConfigId
     :type container_map: dockermap.map.config.main.ContainerMap
-    :type config_name: unicode | str
-    :type instance_name: unicode | str
     :type instance_volumes: dict[unicode | str, unicode | str]
     """
-    def __init__(self, vfs_paths, container_map, config_name, instance_name, instance_volumes):
+    def __init__(self, vfs_paths, config_id, container_map, instance_volumes):
         self._vfs_paths = vfs_paths
         self._instance_volumes = instance_volumes
+        self._config_id = config_id
         self._container_map = container_map
-        self._config_name = config_name
-        self._instance_name = instance_name
         self._use_parent_name = container_map.use_attached_parent_name
         self._volumes = container_map.volumes
 
     def check_bind(self, config, instance):
+        config_id = self._config_id
         for shared_volume in config.binds:
             bind_path, host_path = get_shared_volume_path(self._container_map, shared_volume.volume, instance)
             instance_vfs = self._instance_volumes.get(bind_path)
             log.debug("Checking host bind. Config / container instance:\n%s\n%s", host_path, instance_vfs)
             if not (instance_vfs and host_path == instance_vfs):
                 return False
-            self._vfs_paths[self._config_name, self._instance_name, bind_path] = instance_vfs
+            self._vfs_paths[config_id.config_name, config_id.instance_name, bind_path] = instance_vfs
         return True
 
     def check_attached(self, config, parent_name):
+        config_id = self._config_id
         for attached in config.attaches:
             a_name = '{0}.{1}'.format(parent_name, attached) if self._use_parent_name else attached
             attached_path = resolve_value(self._volumes[attached])
@@ -144,10 +164,11 @@ class SingleContainerVfsCheck(object):
                       attached, attached_vfs, instance_vfs)
             if not (instance_vfs and attached_vfs == instance_vfs):
                 return False
-            self._vfs_paths[self._config_name, self._instance_name, attached_path] = instance_vfs
+            self._vfs_paths[config_id.config_name, config_id.instance_name, attached_path] = instance_vfs
         return True
 
     def check_used(self, config):
+        config_id = self._config_id
         for used in config.uses:
             used_volume = used.volume
             if self._use_parent_name:
@@ -175,7 +196,7 @@ class SingleContainerVfsCheck(object):
                               share, shared_vfs, i_shared_path)
                     if shared_vfs != i_shared_path:
                         return False
-                    self._vfs_paths[(self._config_name, self._instance_name, ref_shared_path)] = i_shared_path
+                    self._vfs_paths[(config_id.config_name, config_id.instance_name, ref_shared_path)] = i_shared_path
                 self.check_bind(ref_config, ref_i_name)
                 self.check_attached(ref_config, ref_c_name)
             else:
@@ -191,19 +212,278 @@ class ContainerVolumeChecker(object):
         alias = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
         self._vfs_paths[alias, None, mapped_path] = path
 
-    def check(self, container_map, container_config, config_name, instance_name, instance_detail):
+    def check(self, config_id, container_map, container_config, instance_detail):
         instance_volumes = get_instance_volumes(instance_detail)
-        vfs = SingleContainerVfsCheck(self._vfs_paths, container_map, container_config, instance_name, instance_volumes)
+        vfs = SingleContainerVfsCheck(self._vfs_paths, config_id, container_map, instance_volumes)
         for share in container_config.shares:
             cr_shared_path = resolve_value(share)
-            self._vfs_paths[config_name, instance_name, cr_shared_path] = instance_volumes.get(share)
-        if not vfs.check_bind(container_config, instance_name):
+            self._vfs_paths[config_id.config_name, config_id.instance_name, cr_shared_path] = instance_volumes.get(share)
+        if not vfs.check_bind(container_config, config_id.instance_name):
             return False
-        if not vfs.check_attached(container_config, config_name):
+        if not vfs.check_attached(container_config, config_id.config_name):
             return False
         if not vfs.check_used(container_config):
             return False
         return True
+
+
+class NetworkEndpointRegistry(object):
+    def __init__(self, nname_func, cname_func, hostname_func, default_networks):
+        self._nname = nname_func
+        self._cname = cname_func
+        self._hostname = hostname_func
+        self._default_networks = list(default_networks.keys())
+        self._endpoints = defaultdict(set)
+        for network_detail in six.itervalues(default_networks):
+            self.register_network(network_detail)
+
+    def register_network(self, detail):
+        network_id = detail['Id']
+        for c_id, c_detail in six.iteritems(detail.get('Containers') or {}):
+            self._endpoints[c_id].add((network_id, c_detail['EndpointID']))
+
+    def check_container_config(self, config_id, c_config, detail):
+        if not detail['Config'].get('NetworkDisabled', False):
+            i_networks = detail['NetworkSettings'].get('Networks', {})
+            connected_network_names = set(i_networks.keys())
+        else:
+            i_networks = {}
+            connected_network_names = set()
+        c_net_mode = c_config.network_mode or 'default'
+        if c_config.networks:
+            named_endpoints = [(self._nname(config_id.map_name, cn_config.network_name), cn_config)
+                               for cn_config in c_config.networks]
+        elif c_net_mode in ('default', 'bridge'):
+            named_endpoints = [(d_name, NetworkEndpoint(d_name))
+                               for d_name in self._default_networks]
+        elif c_net_mode == 'none':
+            named_endpoints = []
+        else:
+            if isinstance(c_net_mode, tuple):
+                cn_name = 'container:{0}'.format(self._cname(config_id.map_name, *c_net_mode))
+            else:
+                cn_name = c_net_mode
+            if cn_name not in connected_network_names:
+                log.debug("Configurations network mode %s not set in available connections: %s.", cn_name,
+                          connected_network_names)
+                return (StateFlags.NETWORK_LEFT | StateFlags.NETWORK_DISCONNECTED), {
+                    'left': connected_network_names,
+                    'disconnected': [NetworkEndpoint(cn_name)]
+                }
+            return StateFlags.NONE, {}
+        disconnected_networks = []
+        configured_network_names = {ce[0] for ce in named_endpoints}
+        network_endpoints = self._endpoints.get(detail['Id'], set())
+        reset_networks = []
+        for ref_n_name, cn_config in named_endpoints:
+            log.debug("Checking network %s.", ref_n_name)
+            if ref_n_name not in connected_network_names:
+                log.debug("Network %s not found in container connections.", ref_n_name)
+                disconnected_networks.append(cn_config)
+                continue
+            network_detail = i_networks[ref_n_name]
+            c_alias_set = set(cn_config.aliases or ())
+            if c_alias_set and not c_alias_set.issubset(network_detail.get('Aliases')):
+                log.debug("Aliases in network %s differ or are not present.", ref_n_name)
+                reset_networks.append((ref_n_name, cn_config))
+                continue
+            if (network_detail['NetworkID'], network_detail['EndpointID']) not in network_endpoints:
+                log.debug("Network endpoint not found in %s (%s): %s", ref_n_name, network_detail['NetworkID'],
+                          network_detail['EndpointID'])
+                reset_networks.append((ref_n_name, cn_config))
+                continue
+            if cn_config.links:
+                linked_names = {'{0}:{1}'.format(self._cname(config_id.map_name, lc_name),
+                                                 lc_alias or self._hostname(lc_name))
+                                for lc_name, lc_alias in cn_config.links}
+            else:
+                linked_names = set()
+            if set(network_detail.get('Links', []) or ()) != linked_names:
+                log.debug("Links in %s differ from configuration: %s.", ref_n_name, network_detail.get('Links', []))
+                reset_networks.append((ref_n_name, cn_config))
+                continue
+        s_flags = StateFlags.NONE
+        extra = {}
+        if disconnected_networks:
+            log.debug("Container is not connected to configured networks: %s.", disconnected_networks)
+            s_flags |= StateFlags.NETWORK_DISCONNECTED
+            extra['disconnected'] = disconnected_networks
+        if reset_networks:
+            log.debug("Container is connected, but with different settings from the configuration: %s.", reset_networks)
+            s_flags |= StateFlags.NETWORK_MISMATCH
+            extra['reconnect'] = reset_networks
+        left_networks = connected_network_names - configured_network_names
+        if left_networks:
+            log.debug("Container is connected to the following networks that it is not configured for: %s.",
+                      left_networks)
+            s_flags |= StateFlags.NETWORK_LEFT
+            extra['left'] = left_networks
+        return s_flags, extra
+
+
+class UpdateContainerState(ContainerBaseState):
+    """
+    Extends the base state by checking the current instance detail against the container configuration and volumes
+    other containers. Also checks if the container image matches the configured image's id.
+    """
+    def __init__(self, *args, **kwargs):
+        super(UpdateContainerState, self).__init__(*args, **kwargs)
+        self.base_image_id = None
+        self.volume_checker = None
+        self.endpoint_registry = None
+        self.current_commands = None
+
+    def _check_links(self):
+        instance_links = self.detail['HostConfig']['Links'] or []
+        link_dict = defaultdict(set)
+        for host_link in instance_links:
+            link_name, __, link_alias = host_link.partition(':')
+            link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
+        for link in self.config.links:
+            instance_aliases = link_dict.get(self.policy.cname(self.config_id.map_name, link.container))
+            config_alias = link.alias or self.policy.get_hostname(link.container)
+            if not instance_aliases or config_alias not in instance_aliases:
+                log.debug("Checked link %s - could not find alias %s", link.container, config_alias)
+                return False
+            log.debug("Checked link %s - found alias %s", link.container, config_alias)
+        return True
+
+    def _check_commands(self, check_option):
+        def _find_full_command(f_cmd, f_user):
+            for __, c_user, c_cmd in self.current_commands:
+                if c_user == f_user and c_cmd == f_cmd:
+                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
+                    return True
+            log.debug("Command for user %s not found: %s.", f_user, f_cmd)
+            return False
+
+        def _find_partial_command(f_cmd, f_user):
+            for __, c_user, c_cmd in self.current_commands:
+                if c_user == f_user and f_cmd in c_cmd:
+                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
+                    return True
+            log.debug("Command for user %s not found: %s.", f_user, f_cmd)
+            return False
+
+        def _cmd_running(cmd, cmd_user):
+            res_cmd = resolve_value(cmd)
+            if isinstance(res_cmd, (list, tuple)):
+                res_cmd = ' '.join(res_cmd)
+            if cmd_user is not None:
+                res_user = resolve_value(cmd_user)
+            else:
+                res_user = extract_user(self.config.user)
+            if res_user is None:
+                res_user = 'root'
+            log.debug("Looking up %s command for user %s: %s", check_option, res_user, res_cmd)
+            return cmd_exists(res_cmd, res_user)
+
+        if not self.config.exec_commands:
+            return None
+        if not self.current_commands:
+            log.debug("No running exec commands found for container.")
+            return self.config.exec_commands
+        log.debug("Checking commands for container %s.", self.container_name)
+        if check_option == CmdCheck.FULL:
+            cmd_exists = _find_full_command
+        elif check_option == CmdCheck.PARTIAL:
+            cmd_exists = _find_partial_command
+        else:
+            log.debug("Invalid check mode %s - skipping.", check_option)
+            return None
+        return [exec_cmd for exec_cmd in self.config.exec_commands
+                if not _cmd_running(exec_cmd.cmd, exec_cmd.user) and exec_cmd.policy != ExecPolicy.INITIAL]
+
+    def _check_volumes(self):
+        return self.volume_checker.check(self.config_id, self.container_map, self.config, self.detail)
+
+    def _check_container_network_mode(self):
+        net_mode = self.config.network_mode or 'default'
+        if (net_mode == 'none') != self.detail['Config'].get('NetworkDisabled', False):
+            return False
+        instance_mode = self.detail['HostConfig'].get('NetworkMode') or 'default'
+        if isinstance(net_mode, tuple):
+            ref_mode = 'container:{0}'.format(self.policy.cname(self.config_id.map_name, *net_mode))
+        else:
+            ref_mode = net_mode
+        return ref_mode == instance_mode
+
+    def set_defaults(self):
+        super(UpdateContainerState, self).set_defaults()
+        self.current_commands = None
+
+    def inspect(self):
+        super(UpdateContainerState, self).inspect()
+        if self.detail and self.detail['State']['Running'] and not self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
+            check_exec_option = self.options['check_exec_commands']
+            if check_exec_option and check_exec_option != CmdCheck.NONE and self.config.exec_commands:
+                self.current_commands = self.client.top(self.detail['Id'], ps_args='-eo pid,user,args')['Processes']
+
+    def get_state(self):
+        base_state, state_flags, extra = super(UpdateContainerState, self).get_state()
+        if base_state == State.ABSENT or state_flags & StateFlags.NEEDS_RESET:
+            return base_state, state_flags, extra
+
+        config_id = self.config_id
+        c_image_id = self.detail['Image']
+        if self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
+            if self.options['update_persistent'] and c_image_id != self.base_image_id:
+                return base_state, state_flags | StateFlags.IMAGE_MISMATCH, extra
+            volumes = get_instance_volumes(self.detail)
+            if volumes:
+                mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name])
+                if self.container_map.use_attached_parent_name:
+                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), config_id.instance_name,
+                                                          config_id.config_name)
+                else:
+                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), config_id.instance_name)
+        else:
+            image_name = self.policy.image_name(self.config.image or config_id.config_name, self.container_map)
+            images = self.policy.images[self.client_name]
+            ref_image_id = images.ensure_image(image_name, pull=self.options['pull_before_update'],
+                                               insecure_registry=self.options['pull_insecure_registry'])
+            if c_image_id != ref_image_id and (not self.config.persistent or self.options['update_persistent']):
+                state_flags |= StateFlags.IMAGE_MISMATCH
+            if not self._check_volumes():
+                state_flags |= StateFlags.VOLUME_MISMATCH
+            if not self._check_links():
+                state_flags |= StateFlags.MISSING_LINK
+            if not (_check_environment(self.config, self.detail) and _check_cmd(self.config, self.detail) and
+                    _check_container_network_ports(self.config, self.client_config, self.detail)):
+                state_flags |= StateFlags.MISC_MISMATCH
+            if base_state == State.RUNNING:
+                check_exec_option = self.options['check_exec_commands']
+                if check_exec_option:
+                    missing_exec_cmds = self._check_commands(check_exec_option)
+                    if missing_exec_cmds is not None:
+                        state_flags |= StateFlags.EXEC_COMMANDS
+                        extra['exec_commands'] = missing_exec_cmds
+            if self.endpoint_registry:  # Client supports networking.
+                net_s_flags, net_extra = self.endpoint_registry.check_container_config(config_id, self.config,
+                                                                                       self.detail)
+                state_flags |= net_s_flags
+                extra.update(net_extra)
+            elif not self._check_container_network_mode():
+                state_flags |= StateFlags.MISC_MISMATCH
+        return base_state, state_flags, extra
+
+
+class UpdateNetworkState(NetworkBaseState):
+    def __init__(self, *args, **kwargs):
+        super(UpdateNetworkState, self).__init__(*args, **kwargs)
+        self.endpoint_registry = None
+
+    def get_state(self):
+        base_state, state_flags, extra = super(UpdateNetworkState, self).get_state()
+        if base_state == State.ABSENT or state_flags & StateFlags.NEEDS_RESET:
+            return base_state, state_flags, extra
+
+        self.endpoint_registry.register_network(self.detail)
+        if (self.detail['Driver'] != resolve_value(self.config.driver) or
+                not _check_network_driver_opts(self.config, self.detail) or
+                self.detail['Internal'] != resolve_value(self.config.internal)):
+            state_flags |= StateFlags.MISC_MISMATCH
+        return base_state, state_flags, extra
 
 
 class UpdateStateGenerator(DependencyStateGenerator):
@@ -225,10 +505,13 @@ class UpdateStateGenerator(DependencyStateGenerator):
     In addition, the default state implementation applies, considering nonexistent containers or containers that
     cannot be restarted.
     """
+    container_state_class = UpdateContainerState
+    network_state_class = UpdateNetworkState
+
     pull_before_update = False
     pull_insecure_registry = False
     update_persistent = False
-    check_exec_commands = CMD_CHECK_FULL
+    check_exec_commands = CmdCheck.FULL
     policy_options = ['pull_before_update', 'pull_insecure_registry', 'update_persistent', 'check_exec_commands']
 
     def __init__(self, policy, kwargs):
@@ -239,123 +522,33 @@ class UpdateStateGenerator(DependencyStateGenerator):
                 insecure_registry=self.pull_insecure_registry)
             for client_name in policy.clients.keys()
         }
-        self._volume_checker = ContainerVolumeChecker()
+        self._volume_checkers = {
+            client_name: ContainerVolumeChecker()
+            for client_name in policy.clients.keys()
+        }
+        default_network_details = {
+            client_name: {
+                n_name: client_config.get_client().inspect_network(n_name)
+                for n_name in policy.default_network_names
+                if n_name in policy.network_names[client_name]
+            }
+            for client_name, client_config in six.iteritems(policy.clients)
+            if client_config.supports_networks
+        }
+        self._network_registries = {
+            client_name: NetworkEndpointRegistry(policy.nname, policy.cname, policy.get_hostname,
+                                                 default_network_details[client_name])
+            for client_name, network_details in six.iteritems(default_network_details)
+        }
 
-    def _check_links(self, map_name, c_config, instance_detail):
-        instance_links = instance_detail['HostConfig']['Links'] or []
-        link_dict = defaultdict(set)
-        for host_link in instance_links:
-            link_name, __, link_alias = host_link.partition(':')
-            link_dict[link_name[1:]].add(link_alias.rpartition('/')[2])
-        for link in c_config.links:
-            instance_aliases = link_dict.get(self._policy.cname(map_name, link.container))
-            config_alias = link.alias or self._policy.get_hostname(link.container)
-            if not instance_aliases or config_alias not in instance_aliases:
-                log.debug("Checked link %s - could not find alias %s", link.container, config_alias)
-                return False
-            log.debug("Checked link %s - found alias %s", link.container, config_alias)
-        return True
+    def get_container_state(self, client_name, *args, **kwargs):
+        c_state = super(UpdateStateGenerator, self).get_container_state(client_name, *args, **kwargs)
+        c_state.base_image_ids = self._base_image_ids[client_name]
+        c_state.volume_checker = self._volume_checkers[client_name]
+        c_state.endpoint_registry = self._network_registries.get(client_name)
+        return c_state
 
-    def _check_commands(self, container_config, client, container_name):
-        def _find_full_command(f_cmd, f_user):
-            for __, c_user, c_cmd in current_commands:
-                if c_user == f_user and c_cmd == f_cmd:
-                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
-                    return True
-            return False
-
-        def _find_partial_command(f_cmd, f_user):
-            for __, c_user, c_cmd in current_commands:
-                if c_user == f_user and f_cmd in c_cmd:
-                    log.debug("Command for user %s found: %s.", c_user, c_cmd)
-                    return True
-            return False
-
-        def _cmd_state(cmd, cmd_user):
-            res_cmd = resolve_value(cmd)
-            if isinstance(res_cmd, (list, tuple)):
-                res_cmd = ' '.join(res_cmd)
-            if cmd_user is not None:
-                res_user = resolve_value(cmd_user)
-            else:
-                res_user = extract_user(container_config.user)
-            if res_user is None:
-                res_user = 'root'
-            log.debug("Looking up %s command for user %s: %s", self.check_exec_commands, res_user, res_cmd)
-            return cmd_exists(res_cmd, res_user)
-
-        log.debug("Checking commands for container %s.", container_name)
-        current_commands = client.top(container_name, ps_args='-eo pid,user,args')['Processes']
-        if self.check_exec_commands == CMD_CHECK_FULL:
-            cmd_exists = _find_full_command
-        elif self.check_exec_commands == CMD_CHECK_PARTIAL:
-            cmd_exists = _find_partial_command
-        else:
-            log.debug("Invalid check mode %s - skipping.", self.check_exec_commands)
-            return None
-        return [(exec_cmd, _cmd_state(exec_cmd[0], exec_cmd[1])) for exec_cmd in container_config.exec_commands]
-
-    def get_container_state(self, map_name, container_map, config_name, container_config, client_name, client_config,
-                            client, instance_alias, config_flags=0):
-        """
-        Extends the base state by checking the current instance detail against the container configuration and volumes
-        other containers. Also checks if the container image matches the configured image's id.
-
-        :param map_name: Container map name.
-        :type map_name: unicode | str
-        :param container_map: Container map instance.
-        :type container_map: dockermap.map.config.main.ContainerMap
-        :param config_name: Container configuration name.
-        :type config_name: unicode | str
-        :param container_config: Container configuration object.
-        :type container_config: dockermap.map.config.container.ContainerConfiguration
-        :param client_name: Client name.
-        :type client_name: unicode | str
-        :param client_config: Client configuration object.
-        :type client_config: dockermap.map.config.client.ClientConfiguration
-        :param client: Docker client.
-        :type client: docker.client.Client
-        :param instance_alias: Container instance name or attached alias.
-        :type instance_alias: unicode | str
-        :param config_flags: Config flags on the container.
-        :type config_flags: bool
-        :return: Tuple of container inspection detail, and the base state information derived from that.
-        :rtype: (dict | NoneType, unicode | str, int, dict | NoneType)
-        """
-        detail, base_state, state_flags, extra = super(
-            UpdateStateGenerator, self).get_container_state(map_name, container_map, config_name, container_config,
-                                                            client_name, client_config, client, instance_alias,
-                                                            config_flags=config_flags)
-        if base_state == STATE_ABSENT or state_flags & STATE_FLAG_OUTDATED:
-            return detail, base_state, state_flags, extra
-
-        c_image_id = detail['Image']
-        if config_flags & CONFIG_FLAG_ATTACHED:
-            if self.update_persistent and c_image_id != self._base_image_ids[client_name]:
-                return detail, base_state, state_flags | STATE_FLAG_OUTDATED, extra
-            volumes = get_instance_volumes(detail)
-            if volumes:
-                mapped_path = resolve_value(container_map.volumes[instance_alias])
-                if container_map.use_attached_parent_name:
-                    self._volume_checker.register_attached(mapped_path, volumes.get(mapped_path), instance_alias,
-                                                           config_name)
-                else:
-                    self._volume_checker.register_attached(mapped_path, volumes.get(mapped_path), instance_alias)
-        else:
-            image_name = self._policy.image_name(container_config.image or config_name, container_map)
-            images = self._policy.images[client_name]
-            ref_image_id = images.ensure_image(image_name, pull=self.pull_before_update,
-                                               insecure_registry=self.pull_insecure_registry)
-            if not (((container_config.persistent and not self.update_persistent) or c_image_id == ref_image_id) and
-                    self._volume_checker.check(container_map, container_config, config_name, instance_alias, detail) and
-                    self._check_links(map_name, container_config, detail) and
-                    _check_environment(container_config, detail) and
-                    _check_cmd(container_config, detail) and
-                    _check_network(container_config, client_config, detail)):
-                return detail, base_state, state_flags | STATE_FLAG_OUTDATED, extra
-            if (self.check_exec_commands and self.check_exec_commands != CMD_CHECK_NONE and
-                    container_config.exec_commands):
-                exec_results = self._check_commands(container_config, client, detail['Id'])
-                if exec_results is not None:
-                    extra.update(exec_commands=exec_results)
-        return detail, base_state, state_flags, extra
+    def get_network_state(self, client_name, *args, **kwargs):
+        n_state = super(UpdateStateGenerator, self).get_network_state(client_name, *args, **kwargs)
+        n_state.endpoint_registry = self._network_registries.get(client_name)
+        return n_state
