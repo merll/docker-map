@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 import logging
 
-from docker.utils import create_host_config
+from docker.utils.utils import create_host_config, create_networking_config, create_endpoint_config
 from requests import Timeout
 from six import text_type, iteritems
 from six.moves import map
@@ -122,6 +122,13 @@ class DockerConfigMixin(object):
         )
         if container_config.network_mode == 'none':
             c_kwargs['network_disabled'] = True
+        elif client_config.supports_networks and container_config.networks:
+            first_network = container_config.networks[0]
+            c_kwargs['networking_config'] = create_networking_config({
+                policy.nname(action.config_id.map_name, first_network.network_name): create_endpoint_config(
+                    client_config.version, **self.get_network_create_endpoint_kwargs(action, first_network)
+                )
+            })
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         use_host_config = client_config.get('use_host_config')
         if use_host_config:
@@ -372,6 +379,36 @@ class DockerConfigMixin(object):
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
+    def get_network_create_endpoint_kwargs(self, action, endpoint_config, kwargs=None):
+        """
+        Generates keyword arguments for Docker's ``create_endpoint_config`` utility as well as for
+        ``connect_container_to_network``.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param endpoint_config: Network endpoint configuration.
+        :type endpoint_config: dockermap.map.input.NetworkEndpoint
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        map_name = action.config_id.map_name
+        policy = self._policy
+        c_kwargs = dict(
+            ipv4_address=resolve_value(endpoint_config.ipv4_address),
+            ipv6_address=resolve_value(endpoint_config.ipv6_address),
+        )
+        if endpoint_config.aliases:
+            c_kwargs['aliases'] = list(map(resolve_value, endpoint_config.aliases))
+        if endpoint_config.links:
+            c_kwargs['links'] = [(policy.cname(map_name, l_name), alias or policy.get_hostname(l_name))
+                                 for l_name, alias in endpoint_config.links]
+        if endpoint_config.link_local_ips:
+            c_kwargs['link_local_ips'] = list(map(resolve_value, endpoint_config.link_local_ips))
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
     def get_network_connect_kwargs(self, action, network_name, container_name, endpoint_config=None, kwargs=None):
         """
         Generates keyword arguments for the Docker client to add a container to a network.
@@ -389,24 +426,12 @@ class DockerConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        policy = self._policy
-        map_name = action.config_id.map_name
         c_kwargs = dict(
             container=container_name,
             net_id=network_name,
         )
         if endpoint_config:
-            c_kwargs.update(
-                ipv4_address=resolve_value(endpoint_config.ipv4_address),
-                ipv6_address=resolve_value(endpoint_config.ipv6_address),
-            )
-            if endpoint_config.aliases:
-                c_kwargs['aliases'] = list(map(resolve_value, endpoint_config.aliases))
-            if endpoint_config.links:
-                c_kwargs['links'] = [(policy.cname(map_name, l_name), alias or policy.get_hostname(l_name))
-                                     for l_name, alias in endpoint_config.links]
-            if endpoint_config.link_local_ips:
-                c_kwargs['link_local_ips'] = list(map(resolve_value, endpoint_config.link_local_ips))
+            c_kwargs.update(self.get_network_create_endpoint_kwargs(action, endpoint_config))
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 

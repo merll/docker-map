@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from itertools import islice
+
 from ..action import Action, ContainerUtilAction, NetworkUtilAction
 from ..input import ItemType
 
@@ -62,22 +64,29 @@ class NetworkUtilMixin(object):
             disconnect_kwargs = self.get_network_disconnect_kwargs(action, network_name, c_name, kwargs=kwargs)
             client.disconnect_container_from_network(**disconnect_kwargs)
 
-    def connect_networks(self, action, container_name, endpoints, **kwargs):
+    def connect_networks(self, action, container_name, endpoints, skip_first=True, **kwargs):
         """
-        Connects a container to a set of configured networks.
+        Connects a container to a set of configured networks. By default this assumes the container has just been
+        created, so it will skip the first network that is already considered during creation.
 
         :param action: Action configuration.
         :type action: dockermap.map.runner.ActionConfig
         :param container_name: Container names or id.
         :type container_name: unicode | str
         :param endpoints: Network endpoint configurations.
-        :type endpoints: collections.Iterable[dockermap.map.input.NetworkEndpoint]
+        :type endpoints: list[dockermap.map.input.NetworkEndpoint]
+        :param skip_first: Skip the first network. Set to ``False``, if the default behavior is not applicable.
+        :type skip_first: bool
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         """
+        if not endpoints or (skip_first and len(endpoints) <= 1):
+            return
         client = action.client
         map_name = action.config_id.map_name
         nname = self._policy.nname
+        if skip_first:
+            endpoints = islice(endpoints, 1, None)
         for network_endpoint in endpoints:
             network_name = nname(map_name, network_endpoint.network_name)
             connect_kwargs = self.get_network_connect_kwargs(action, network_name, container_name, network_endpoint,
@@ -86,14 +95,14 @@ class NetworkUtilMixin(object):
 
     def disconnect_networks(self, action, container_name, networks, **kwargs):
         """
-        Connects a container to a set of networks.
+        Disconnects a container from a set of networks.
 
         :param action: Action configuration.
         :type action: dockermap.map.runner.ActionConfig
         :param container_name: Container names or id.
         :type container_name: unicode | str
         :param networks: List of network names or ids.
-        :type networks: list[unicode | str]
+        :type networks: collections.Iterable[unicode | str]
         :param kwargs: Additional keyword arguments.
         :type kwargs: dict
         """
