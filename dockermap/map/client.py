@@ -68,6 +68,7 @@ class MappingDockerClient(object):
         'shutdown': (DependentStateGenerator, simple.ShutdownActionGenerator),
         'update': (UpdateStateGenerator, update.UpdateActionGenerator),
         'script': (DependencyStateGenerator, script.ScriptActionGenerator),
+        'signal': (SingleStateGenerator, simple.SignalActionGenerator),
     }
     runner_class = DockerClientRunner
 

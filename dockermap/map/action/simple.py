@@ -195,3 +195,18 @@ class ShutdownActionGenerator(RemoveActionGenerator):
                     return [ItemAction(state, Action.REMOVE)]
             elif state.base_state == State.RUNNING or state.state_flags & StateFlags.RESTARTING:
                 return [ItemAction(state, Action.REMOVE)]
+
+
+class SignalActionGenerator(AbstractActionGenerator):
+    def get_state_actions(self, state, **kwargs):
+        """
+        Sends kill signals to running containers.
+
+        :param state: Configuration state.
+        :type state: dockermap.map.state.ConfigState
+        :param kwargs: Additional keyword arguments.
+        :return: Actions on the client, map, and configurations.
+        :rtype: list[dockermap.map.action.ItemAction]
+        """
+        if state.config_id.config_type == ItemType.CONTAINER and state.base_state == State.RUNNING:
+            return [ItemAction(state, Action.KILL, extra_data=kwargs)]

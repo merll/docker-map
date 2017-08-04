@@ -85,7 +85,8 @@ class DockerBaseRunnerMixin(object):
         return action.client.remove_container(**c_kwargs)
 
     def kill(self, action, c_name, **kwargs):
-        return action.client.kill(c_name, **kwargs)
+        c_kwargs = self.get_container_kill_kwargs(action, c_name, kwargs=kwargs)
+        return action.client.kill(c_name, **c_kwargs)
 
     def wait(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_wait_kwargs(action, c_name, kwargs=kwargs)
@@ -501,6 +502,11 @@ class DockerConfigMixin(object):
         :rtype: dict
         """
         c_kwargs = dict(exec_id=exec_id)
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
+    def get_container_kill_kwargs(self, action, container_name, kwargs=None):
+        c_kwargs = dict(container=container_name)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
