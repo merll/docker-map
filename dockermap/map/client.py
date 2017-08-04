@@ -112,14 +112,43 @@ class MappingDockerClient(object):
             self._policy = self.policy_class(self._maps, self._clients)
         return self._policy
 
+    def get_generators(self, action_name, policy, kwargs):
+        """
+        Returns the generators to be used for the given action.
+
+        :param action_name: Action identifier name.
+        :type action_name: unicode | str
+        :param policy: An instance of the current policy class.
+        :type policy: dockermap.map.policy.base.BasePolicy
+        :param kwargs: Keyword arguments. Can be modified by the initialization of the state and action generators.
+        :type kwargs: dict
+        :return: Tuple with new instances of state generator and action generator.
+        :rtype: (dockermap.map.state.base.AbstractStateGenerator, dockermap.map.action.base.AbstractActionGenerator)
+        """
+        state_generator_cls, action_generator_cls = self.generators[action_name]
+        state_generator = state_generator_cls(policy, kwargs)
+        action_generator = action_generator_cls(policy, kwargs)
+        return state_generator, action_generator
+
+    def get_runner(self, policy, kwargs):
+        """
+        Returns a runner for running actions.
+
+        :param policy: An instance of the current policy class.
+        :type policy: dockermap.map.policy.base.BasePolicy
+        :param kwargs: Keyword arguments. Can be modified by the initialization of the runner.
+        :type kwargs: dict
+        :return: Runner instance.
+        :rtype: dockermap.map.runner.AbstractRunner
+        """
+        return self.runner_class(policy, kwargs)
+
     def run_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
         policy = self.get_policy()
         groups = {m.name: m.groups for m in self._maps.values()}
-        state_generator_cls, action_generator_cls = self.generators[action_name]
         _set_forced_update_ids(kwargs, policy.container_maps, groups, map_name or self._default_map, instances)
-        state_generator = state_generator_cls(policy, kwargs)
-        action_generator = action_generator_cls(policy, kwargs)
-        runner = self.runner_class(policy, kwargs)
+        state_generator, action_generator = self.get_generators(action_name, policy, kwargs)
+        runner = self.get_runner(policy, kwargs)
         log.debug("Passing kwargs to client actions: %s", kwargs)
         results = []
 
