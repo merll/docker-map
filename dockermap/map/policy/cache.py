@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from .utils import get_full_image_name_tag
+
 
 class CachedItems(object):
     """
@@ -62,15 +64,9 @@ class CachedImages(CachedItems, dict):
         :return: Image id associated with the image name.
         :rtype: unicode | str
         """
-        image, __, tag = image_name.rpartition(':')
-        if image:
-            full_name = image_name
-        else:
-            full_name = '{0}:latest'.format(image_name)
-            image = image_name
-            tag = 'latest'
+        full_name, image, i_tag = get_full_image_name_tag(image_name)
         if (pull and full_name not in self._updated) or full_name not in self:
-            self._client.pull(repository=image, tag=tag, insecure_registry=insecure_registry)
+            self._client.pull(repository=image, tag=i_tag, insecure_registry=insecure_registry)
             images = self._client.images(name=image)
             for new_image in images:
                 tags = new_image.get('RepoTags')
