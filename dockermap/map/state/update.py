@@ -328,7 +328,6 @@ class UpdateContainerState(ContainerBaseState):
     """
     def __init__(self, *args, **kwargs):
         super(UpdateContainerState, self).__init__(*args, **kwargs)
-        self.base_image_id = None
         self.volume_checker = None
         self.endpoint_registry = None
         self.current_commands = None
@@ -427,8 +426,6 @@ class UpdateContainerState(ContainerBaseState):
         config_id = self.config_id
         c_image_id = self.detail['Image']
         if self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
-            if self.options['update_persistent'] and c_image_id != self.base_image_id:
-                return base_state, state_flags | StateFlags.IMAGE_MISMATCH, extra
             volumes = get_instance_volumes(self.detail)
             if volumes:
                 mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name])
@@ -516,12 +513,6 @@ class UpdateStateGenerator(DependencyStateGenerator):
 
     def __init__(self, policy, kwargs):
         super(UpdateStateGenerator, self).__init__(policy, kwargs)
-        self._base_image_ids = {
-            client_name: policy.images[client_name].ensure_image(
-                policy.image_name(policy.base_image), pull=self.pull_before_update,
-                insecure_registry=self.pull_insecure_registry)
-            for client_name in policy.clients.keys()
-        }
         self._volume_checkers = {
             client_name: ContainerVolumeChecker()
             for client_name in policy.clients.keys()
@@ -543,7 +534,6 @@ class UpdateStateGenerator(DependencyStateGenerator):
 
     def get_container_state(self, client_name, *args, **kwargs):
         c_state = super(UpdateStateGenerator, self).get_container_state(client_name, *args, **kwargs)
-        c_state.base_image_ids = self._base_image_ids[client_name]
         c_state.volume_checker = self._volume_checkers[client_name]
         c_state.endpoint_registry = self._network_registries.get(client_name)
         return c_state
