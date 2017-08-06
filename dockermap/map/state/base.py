@@ -7,6 +7,7 @@ import logging
 
 from six import with_metaclass
 
+from ...utils import format_image_tag
 from ..input import ItemType
 from ..policy import ConfigFlags, ABCPolicyUtilMeta, PolicyUtil
 from . import INITIAL_START_TIME, State, StateFlags, ConfigState
@@ -111,7 +112,6 @@ class ContainerBaseState(AbstractState):
         """
         Fetches information about the container from the client.
         """
-        super(ContainerBaseState, self).inspect()
         policy = self.policy
         config_id = self.config_id
         if self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
@@ -204,12 +204,40 @@ class NetworkBaseState(AbstractState):
         return State.PRESENT, state_flag, {'containers': connected_containers}
 
 
+class ImageBaseState(AbstractState):
+    """
+    Base implementation for determining the current state of an image. There is no configuration object passed to
+    this inspection. The image name is represented in the ``config_name`` of the configuration id, and the tag in
+    ``instance_name``.
+    """
+    def inspect(self):
+        """
+        Fetches image information from the client.
+        """
+        policy = self.policy
+        image_name = format_image_tag((self.config_id.config_name, self.config_id.instance_name))
+        image_id = policy.images[self.client_name].get(image_name)
+        if image_name is not None:
+            self.detail = {'Id': image_id}   # Currently there is no need for actually inspecting the image.
+        else:
+            self.detail = NOT_FOUND
+
+    def get_state(self):
+        c_detail = self.detail
+        if c_detail is NOT_FOUND:
+            base_state = State.ABSENT
+        else:
+            base_state = State.PRESENT
+        return base_state, StateFlags.NONE, {}
+
+
 class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
     """
     Abstract base implementation for an state generator, which determines the current state of containers on the client.
     """
     container_state_class = ContainerBaseState
     network_state_class = NetworkBaseState
+    image_state_class = ImageBaseState
 
     nonrecoverable_exit_codes = (-127, -1)
     force_update = None
@@ -220,6 +248,9 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
 
     def get_network_state(self, *args, **kwargs):
         return self.network_state_class(self._policy, self.get_options(), *args, **kwargs)
+
+    def get_image_state(self, *args, **kwargs):
+        return self.image_state_class(self._policy, self.get_options(), *args, **kwargs)
 
     def generate_config_states(self, config_id, is_dependency=False):
         """
@@ -263,6 +294,10 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                                "".format(config_id))
             clients = self._policy.get_clients(c_map)
             state_func = self.get_network_state
+        elif config_type == ItemType.IMAGE:
+            config = None
+            clients = self._policy.get_clients(c_map)
+            state_func = self.get_image_state
         else:
             raise ValueError("Invalid configuration type.", config_type)
 
@@ -363,6 +398,11 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
 class DependencyStateGenerator(AbstractDependencyStateGenerator):
     def get_dependency_path(self, config_id):
         return self._policy.get_dependencies(config_id)
+
+
+class ImageDependencyStateGenerator(AbstractDependencyStateGenerator):
+    def get_dependency_path(self, config_id):
+        return [d for d in self._policy.get_dependencies(config_id) if d.config_id.item_type == ItemType.IMAGE]
 
 
 class DependentStateGenerator(AbstractDependencyStateGenerator):

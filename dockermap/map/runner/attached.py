@@ -119,8 +119,6 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         apc_kwargs = self.get_attached_preparation_create_kwargs(action, volume_container)
         if not apc_kwargs:
             return
-        images = self._policy.images[action.client_name]
-        images.ensure_image(apc_kwargs['image'])
         a_wait_kwargs = self.get_attached_preparation_wait_kwargs(action, volume_container)
         client.wait(volume_container, **a_wait_kwargs)
         temp_container = client.create_container(**apc_kwargs)

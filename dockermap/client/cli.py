@@ -12,6 +12,8 @@ from six import iteritems, text_type
 
 from docker.errors import NotFound
 
+from ..utils import format_image_tag
+
 
 KWARG_MAP = {
     'timeout': 'time',
@@ -22,7 +24,6 @@ KWARG_MAP = {
 NONE_TAG = '<none>'
 _arg_format = '--{0}={1}'.format
 _mapping_format = '--{0}={1}:{2}'.format
-_format_tag = '{0[0]}:{0[1]}'.format
 _get_image_id = itemgetter(2)
 
 
@@ -37,8 +38,8 @@ VERSION_FORMAT_ARG = _quoted_arg_format('format', '{{json .}}')
 
 def _summarize_tags(image_id, image_lines):
     first_line = next(image_lines)
-    image_tags = [_format_tag(first_line)] if first_line[0] != NONE_TAG else []
-    image_tags.extend(_format_tag(image) for image in image_lines if image[0] != NONE_TAG)
+    image_tags = [format_image_tag(first_line)] if first_line[0] != NONE_TAG else []
+    image_tags.extend(format_image_tag(image) for image in image_lines if image[0] != NONE_TAG)
     return {
         'Id': image_id,
         'RepoTags': image_tags or NONE_TAG,

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from .utils import get_full_image_name_tag
-
 
 class CachedItems(object):
     """
@@ -27,10 +25,6 @@ class CachedImages(CachedItems, dict):
     """
     Dictionary of image names and ids, which also keeps track of the client object to pull images if necessary.
     """
-    def __init__(self, *args, **kwargs):
-        self._updated = set()
-        super(CachedImages, self).__init__(*args, **kwargs)
-
     def refresh(self):
         """
         Fetches image and their ids from the client.
@@ -43,40 +37,6 @@ class CachedImages(CachedItems, dict):
             tags = image.get('RepoTags')
             if tags:
                 self.update({tag: image['Id'] for tag in tags})
-
-    def reset_updated(self):
-        """
-        Resets the cache which images have been pulled (i.e. updated on the default tag.)
-        """
-        self._updated = set()
-
-    def ensure_image(self, image_name, pull=False, insecure_registry=False):
-        """
-        Ensures that a particular image is present on the client. If it is not, a new copy is pulled from the server.
-
-        :param image_name: Image name. If it does not include a specific tag, ``latest`` is assumed.
-        :type image_name: unicode | str
-        :param pull: If the image includes a tag, pull it from the server even if it exists. This is is done only once
-          in for the lifecycle of the cache, or unless `:meth:reset_updated` is called.
-        :type pull: bool
-        :param insecure_registry: Pull from an insecure registry where necessary.
-        :type insecure_registry: bool
-        :return: Image id associated with the image name.
-        :rtype: unicode | str
-        """
-        full_name, image, i_tag = get_full_image_name_tag(image_name)
-        if (pull and full_name not in self._updated) or full_name not in self:
-            self._client.pull(repository=image, tag=i_tag, insecure_registry=insecure_registry)
-            images = self._client.images(name=image)
-            for new_image in images:
-                tags = new_image.get('RepoTags')
-                if tags:
-                    self._updated.update(tags)
-                    self.update({tag: new_image['Id'] for tag in tags})
-        try:
-            return self[full_name]
-        except KeyError:
-            raise KeyError("Image not found.", full_name)
 
 
 class CachedContainerNames(CachedItems, set):

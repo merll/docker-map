@@ -108,46 +108,6 @@ class BasePolicy(object):
         return '{0}.{1}'.format(map_name, network_name)
 
     @classmethod
-    def image_name(cls, image, container_map=None):
-        """
-        Generates the full image name that should be used when creating a new container.
-
-        This implementation applies the following rules:
-
-        * If the image name starts with ``/``, the following image name is returned.
-        * If ``/`` is found anywhere else in the image name, it is assumed to be a repository-prefixed image and
-          returned as it is.
-        * Otherwise, if the given container map has a repository prefix set, this is prepended to the image name.
-        * In any other case, the image name is not modified.
-
-        Where there is a tag included in the ``image`` name, it is not modified. If it is not, the default tag from the
-        container map, or ``latest`` is used.
-
-        :param image: Image name.
-        :type image: unicode | str
-        :param container_map: Container map object, defining a default tag and repository if not specified by the
-          ``image``.
-        :type container_map: dockermap.map.config.main.ContainerMap
-        :return: Image name, where applicable prefixed with a repository.
-        :rtype: unicode | str
-        """
-        if '/' in image:
-            if image[0] == '/':
-                image_tag = image[1:]
-            else:
-                image_tag = image
-        else:
-            default_prefix = resolve_value(container_map.repository) if container_map else None
-            if default_prefix:
-                image_tag = '{0}/{1}'.format(default_prefix, image)
-            else:
-                image_tag = image
-        if ':' in image:
-            return image_tag
-        default_tag = resolve_value(container_map.default_tag) if container_map else None
-        return '{0}:{1}'.format(image_tag, default_tag or 'latest')
-
-    @classmethod
     def get_hostname(cls, container_name, client_name=None):
         """
         Determines the host name of a container. In this implementation, replaces all dots and underscores of a

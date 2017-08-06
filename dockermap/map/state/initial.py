@@ -21,3 +21,4 @@ class InitialState(AbstractState):
 class InitialStateGenerator(DependencyStateGenerator):
     container_state_class = InitialState
     network_state_class = InitialState
+    image_state_class = InitialState

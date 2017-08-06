@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from ..input import ItemType
 from ..policy import ConfigFlags
 from ..state import State, StateFlags
-from . import ItemAction, Action, ContainerUtilAction, VolumeUtilAction, NetworkUtilAction, DerivedAction
+from . import ItemAction, Action, ContainerUtilAction, VolumeUtilAction, NetworkUtilAction, DerivedAction, ImageAction
 from .base import AbstractActionGenerator
 
 
@@ -20,6 +20,8 @@ class CreateActionGenerator(AbstractActionGenerator):
         :rtype: list[dockermap.map.action.ItemAction]
         """
         if state.base_state == State.ABSENT:
+            if state.config_id.config_type == ItemType.IMAGE:
+                return [ItemAction(state, ImageAction.PULL)]
             actions = [ItemAction(state, Action.CREATE, extra_data=kwargs)]
             if state.config_id.config_type == ItemType.CONTAINER:
                 actions.append(ItemAction(state, ContainerUtilAction.CONNECT_ALL))
@@ -159,6 +161,8 @@ class StartupActionGenerator(AbstractActionGenerator):
                     ItemAction(state, Action.START),
                     ItemAction(state, ContainerUtilAction.EXEC_ALL),
                 ]
+        elif config_type == ItemType.IMAGE and state.base_state == State.ABSENT:
+            return [ItemAction(state, ImageAction.PULL)]
 
 
 class ShutdownActionGenerator(RemoveActionGenerator):
@@ -210,3 +214,13 @@ class SignalActionGenerator(AbstractActionGenerator):
         """
         if state.config_id.config_type == ItemType.CONTAINER and state.base_state == State.RUNNING:
             return [ItemAction(state, Action.KILL, extra_data=kwargs)]
+
+
+class ImagePullActionGenerator(AbstractActionGenerator):
+    pull_insecure_registry = False
+    policy_options = ['pull_insecure_regsitry']
+
+    def get_state_actions(self, state, **kwargs):
+        if state.config_id.config_type == ItemType.IMAGE and state.base_state == State.ABSENT:
+            return [ItemAction(state, ImageAction.PULL,
+                    insecure_registry=self.pull_insecure_registry)]

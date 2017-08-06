@@ -9,6 +9,7 @@ from six import text_type, iteritems
 from six.moves import map
 
 from ...functional import resolve_value
+from ...utils import format_image_tag
 from ..action import Action
 from ..config.client import USE_HC_MERGE
 from ..input import ItemType, NotSet
@@ -111,9 +112,10 @@ class DockerConfigMixin(object):
         client_config = action.client_config
         container_map = action.container_map
         container_config = action.config
+        image_tag = container_map.get_image(container_config.image or action.config_id.config_name)
         c_kwargs = dict(
             name=container_name,
-            image=policy.image_name(container_config.image or action.config_id.config_name, container_map),
+            image=format_image_tag(image_tag),
             volumes=get_volumes(container_map, container_config),
             user=extract_user(container_config.user),
             ports=[resolve_value(port_binding.exposed_port)

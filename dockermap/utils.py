@@ -27,3 +27,6 @@ def merge_list(merged_list, items):
     merged_list.extend(item
                        for item in items
                        if item not in merged_set and not merged_add(item))
+
+
+format_image_tag = '{0[0]}:{0[1]}'.format

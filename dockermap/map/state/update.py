@@ -7,6 +7,7 @@ import shlex
 import six
 
 from ...functional import resolve_value
+from ...utils import format_image_tag
 from ..input import ExecPolicy, NetworkEndpoint
 from ..policy import ConfigFlags
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
@@ -435,10 +436,9 @@ class UpdateContainerState(ContainerBaseState):
                 else:
                     self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), config_id.instance_name)
         else:
-            image_name = self.policy.image_name(self.config.image or config_id.config_name, self.container_map)
+            image_name = format_image_tag(self.container_map.get_image(self.config.image or config_id.config_name))
             images = self.policy.images[self.client_name]
-            ref_image_id = images.ensure_image(image_name, pull=self.options['pull_before_update'],
-                                               insecure_registry=self.options['pull_insecure_registry'])
+            ref_image_id = images.get(image_name)
             if c_image_id != ref_image_id and (not self.config.persistent or self.options['update_persistent']):
                 state_flags |= StateFlags.IMAGE_MISMATCH
             if not self._check_volumes():
@@ -505,11 +505,9 @@ class UpdateStateGenerator(DependencyStateGenerator):
     container_state_class = UpdateContainerState
     network_state_class = UpdateNetworkState
 
-    pull_before_update = False
-    pull_insecure_registry = False
     update_persistent = False
     check_exec_commands = CmdCheck.FULL
-    policy_options = ['pull_before_update', 'pull_insecure_registry', 'update_persistent', 'check_exec_commands']
+    policy_options = ['update_persistent', 'check_exec_commands']
 
     def __init__(self, policy, kwargs):
         super(UpdateStateGenerator, self).__init__(policy, kwargs)

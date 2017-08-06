@@ -169,23 +169,3 @@ def get_instance_volumes(instance_detail):
         return {m['Destination']: m['Source']
                 for m in instance_detail['Mounts']}
     return instance_detail.get('Volumes') or {}
-
-
-def get_full_image_name_tag(image_name):
-    """
-    Converts an image name, possibly including a repository and tag into a full image name and a separated image name
-    and tag. If the tag is not specified, ``latest`` is appended.
-
-    :param image_name: Input image name.
-    :type image_name: unicode | str
-    :return: Tuple of full image name, image name without tag, and image tag.
-    :rtype: (unicode | str, unicode | str, unicode | str)
-    """
-    image, __, tag = image_name.rpartition(':')
-    if image:
-        full_name = image_name
-    else:
-        full_name = '{0}:latest'.format(image_name)
-        image = image_name
-        tag = 'latest'
-    return full_name, image, tag

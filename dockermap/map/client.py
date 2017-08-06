@@ -11,7 +11,8 @@ from .config.main import ContainerMap, expand_instances, expand_groups
 from .input import get_map_config_ids
 from .policy.base import BasePolicy
 from .runner.base import DockerClientRunner
-from .state.base import SingleStateGenerator, DependencyStateGenerator, DependentStateGenerator
+from .state.base import (SingleStateGenerator, DependencyStateGenerator, DependentStateGenerator,
+                         ImageDependencyStateGenerator)
 from .state.update import UpdateStateGenerator
 
 
@@ -69,6 +70,8 @@ class MappingDockerClient(object):
         'update': (UpdateStateGenerator, update.UpdateActionGenerator),
         'script': (DependencyStateGenerator, script.ScriptActionGenerator),
         'signal': (SingleStateGenerator, simple.SignalActionGenerator),
+        'pull_image': (ImageDependencyStateGenerator, simple.ImagePullActionGenerator),
+        'update_image': (ImageDependencyStateGenerator, update.UpdateActionGenerator),
     }
     runner_class = DockerClientRunner
 

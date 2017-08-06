@@ -68,7 +68,11 @@ class ContainerDependencyTest(unittest.TestCase):
                          (ItemType.CONTAINER, 'test_map', 'f', None),
                          (ItemType.CONTAINER, 'test_map', 'b', None))
         l_dep = self.f_res.get_dependencies((ItemType.CONTAINER, 'test_map', 'l', None))
-        self.assertListEqual(l_dep, [(ItemType.CONTAINER, 'test_map', 'e', '1')])
+        self.assertListEqual(l_dep, [
+            (ItemType.IMAGE, 'test_map', 'e', 'latest'),
+            (ItemType.CONTAINER, 'test_map', 'e', '1'),
+            (ItemType.IMAGE, 'test_map', 'l', 'latest'),
+        ])
         x_dep = self.f_res.get_dependencies((ItemType.CONTAINER, 'test_map', 'x', None))
         self.assertOrder(x_dep,
                          (ItemType.CONTAINER, 'test_map', 'f', None),

@@ -9,6 +9,7 @@ import six
 from six.moves import map
 
 from ... import DEFAULT_PRESET_NETWORKS
+from ...functional import resolve_value
 from ...utils import merge_list
 from .. import DictMap, DefaultDictMap
 from ..input import ItemType, bool_if_set, MapConfigId
@@ -348,6 +349,45 @@ class ContainerMap(ConfigurationObject):
             self._networks.clear()
             self._networks.update(value)
 
+    def get_image(self, image):
+        """
+        Generates a tuple of the full image name and tag, that should be used when creating a new container.
+
+        This implementation applies the following rules:
+
+        * If the image name starts with ``/``, the following image name is returned.
+        * If ``/`` is found anywhere else in the image name, it is assumed to be a repository-prefixed image and
+          returned as it is.
+        * Otherwise, if the given container map has a repository prefix set, this is prepended to the image name.
+        * In any other case, the image name is not modified.
+
+        Where there is a tag included in the ``image`` name, it is not modified. If it is not, the default tag from the
+        container map, or ``latest`` is used.
+
+        :param image: Image name.
+        :type image: unicode | str
+        :return: Image name, where applicable prefixed with a repository, and tag.
+        :rtype: (unicode | str, unicode | str)
+        """
+        name, __, tag = image.rpartition(':')
+        if not name:
+            name, tag = tag, name
+        if '/' in name:
+            if name[0] == '/':
+                repo_name = name[1:]
+            else:
+                repo_name = name
+        else:
+            default_prefix = resolve_value(self.repository)
+            if default_prefix:
+                repo_name = '{0}/{1}'.format(default_prefix, name)
+            else:
+                repo_name = name
+        if tag:
+            return repo_name, tag
+        default_tag = resolve_value(self.default_tag)
+        return repo_name, default_tag or 'latest'
+
     def dependency_items(self):
         """
         Generates all containers' dependencies, i.e. an iterator on tuples in the format
@@ -427,6 +467,7 @@ class ContainerMap(ConfigurationObject):
             used_func = _get_used_items_ap
 
         def _get_dep_list(name, config):
+            image, tag = self.get_image(config.image or name)
             d = []
             nw = config.network_mode
             if isinstance(nw, tuple):
@@ -434,8 +475,9 @@ class ContainerMap(ConfigurationObject):
             merge_list(d, itertools.chain.from_iterable(map(_get_network_items, config.networks)))
             merge_list(d, itertools.chain.from_iterable(map(used_func, config.uses)))
             merge_list(d, itertools.chain.from_iterable(_get_linked_items(l.container) for l in config.links))
-            merge_list(d, [MapConfigId(ItemType.VOLUME, self._name, name, a)
-                           for a in config.attaches])
+            d.extend(MapConfigId(ItemType.VOLUME, self._name, name, a)
+                     for a in config.attaches)
+            d.append(MapConfigId(ItemType.IMAGE, self._name, image, tag))
             return d
 
         for c_name, c_config in ext_map:

@@ -19,6 +19,7 @@ from dockermap.map.state import INITIAL_START_TIME, State, StateFlags
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
 from dockermap.map.state.utils import merge_dependency_paths
+from dockermap.utils import format_image_tag
 
 from tests import MAP_DATA_2, CLIENT_DATA_1
 
@@ -120,11 +121,15 @@ def _add_image_list(rsps, image_names):
     image_list = [
         {
             'RepoTags': ['{0}:latest'.format(i_name), '{0}:1.0'.format(i_name)] if ':' not in i_name else [i_name],
-            'Id': '{0}'.format(i_id),
+            'Id': i_id,
         }
         for i_id, i_name in image_names
     ]
     rsps.add('GET', '{0}/images/json'.format(URL_PREFIX), content_type='application/json', json=image_list)
+    for image in image_list:
+        for r_tag in image['RepoTags']:
+            rsps.add('GET', '{0}/images/{1}/json'.format(URL_PREFIX, r_tag), content_type='application/json',
+                     json=image)
     rsps.add('POST', '{0}/images/create'.format(URL_PREFIX), content_type='application/json')
 
 
@@ -307,6 +312,7 @@ def _get_states_dict(sl):
     cd = {}
     nd = {}
     vd = {}
+    imd = {}
     for s in sl:
         config_id = s.config_id
         if config_id.config_type == ItemType.CONTAINER:
@@ -315,12 +321,15 @@ def _get_states_dict(sl):
             vd[(config_id.config_name, config_id.instance_name)] = s
         elif config_id.config_type == ItemType.NETWORK:
             nd[config_id.config_name] = s
+        elif config_id.config_type == ItemType.IMAGE:
+            imd[(config_id.config_name, config_id.instance_name)] = s
         else:
-            raise ValueError("Invalid configuration type.", s.config_type)
+            raise ValueError("Invalid configuration type.", config_id.config_type)
     return {
         'containers': cd,
         'volumes': vd,
         'networks': nd,
+        'images': imd,
     }
 
 
@@ -333,7 +342,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
         self.sample_client_config = client_config = ClientConfiguration(**CLIENT_DATA_1)
         self.policy = BasePolicy({map_name: sample_map}, {'__default__': client_config})
         self.server_config_id = self._config_id('server')
-        all_images = set(c_config.image or c_name for c_name, c_config in sample_map)
+        all_images = set(format_image_tag(sample_map.get_image(c_config.image or c_name))
+                         for c_name, c_config in sample_map)
         all_images.add(DEFAULT_COREIMAGE)
         all_images.add(DEFAULT_BASEIMAGE)
         self.images = [(get_image_id(image_name), image_name)
@@ -360,7 +370,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _add_container_inspect(rsps, config_id, container_name, self.sample_map, c_config,
                                        P_STATE_EXITED_0, base_image_id, attached_valid)
                 container_names.append(container_name)
-            image_id = image_dict[c_config.image or name]
+            image_name = format_image_tag(self.sample_map.get_image(c_config.image or name))
+            image_id = image_dict[image_name]
             for i in instances or c_config.instances or [None]:
                 config_id = MapConfigId(ItemType.CONTAINER, self.map_name, name, i)
                 if config_id.instance_name:
@@ -616,7 +627,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             ])
             svc_id = self._config_id('server3')
             states = list(UpdateStateGenerator(self.policy, {}).get_states(svc_id))
-            self.assertTrue(all(((cs.config_id.config_type in (ItemType.NETWORK, ItemType.VOLUME) and
+            self.assertTrue(all(((cs.config_id.config_type in (ItemType.NETWORK, ItemType.VOLUME, ItemType.IMAGE) and
                                   cs.base_state == State.PRESENT) or
                                  (cs.config_id.config_type == ItemType.CONTAINER and
                                   cs.base_state == State.RUNNING)) and
@@ -715,21 +726,29 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.policy = policy = BasePolicy({map_name: sample_map}, {'__default__': client_config})
         self.state_gen = DependencyStateGenerator(policy, {})
         self.server_dependencies = [
+            (ItemType.IMAGE, map_name, 'registry.example.com/sub_sub_svc', 'latest'),
             (ItemType.CONTAINER, map_name, 'sub_sub_svc', None),
+            (ItemType.IMAGE, map_name, 'registry.example.com/sub_svc', 'latest'),
             (ItemType.CONTAINER, map_name, 'sub_svc', None),
             (ItemType.VOLUME, map_name, 'redis', 'redis_socket'),
             (ItemType.VOLUME, map_name, 'redis', 'redis_log'),
+            (ItemType.IMAGE, map_name, 'registry.example.com/redis', 'latest'),
+            (ItemType.IMAGE, map_name, 'registry.example.com/svc', 'latest'),
             (ItemType.CONTAINER, map_name, 'redis', 'queue'),
             (ItemType.CONTAINER, map_name, 'redis', 'cache'),
             (ItemType.CONTAINER, map_name, 'svc', None),
             (ItemType.VOLUME, map_name, 'server', 'app_log'),
             (ItemType.VOLUME, map_name, 'server', 'server_log'),
+            (ItemType.IMAGE, map_name, 'registry.example.com/server', 'latest'),
         ]
         self.redis_dependencies = [
+            (ItemType.IMAGE, map_name, 'registry.example.com/sub_sub_svc', 'latest'),
             (ItemType.CONTAINER, self.map_name, 'sub_sub_svc', None),
+            (ItemType.IMAGE, map_name, 'registry.example.com/sub_svc', 'latest'),
             (ItemType.CONTAINER, self.map_name, 'sub_svc', None),
             (ItemType.VOLUME, map_name, 'redis', 'redis_socket'),
             (ItemType.VOLUME, map_name, 'redis', 'redis_log'),
+            (ItemType.IMAGE, map_name, 'registry.example.com/redis', 'latest'),
         ]
 
     def test_merge_single(self):
@@ -744,7 +763,7 @@ class TestPolicyStateUtils(unittest.TestCase):
     def test_merge_empty(self):
         svc_config = self._config_id('sub_sub_svc')
         merged_paths = merge_dependency_paths([
-            (svc_config, self.state_gen.get_dependency_path(svc_config))
+            (svc_config, [])
         ])
         self.assertItemsEqual([(svc_config, [])], merged_paths)
 
@@ -799,16 +818,22 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.assertEqual(merged_paths[1][0], server2_config)
         self.assertEqual(merged_paths[2][0], worker_q2_config)
         self.assertListEqual([
+            (ItemType.IMAGE, self.map_name, 'registry.example.com/sub_sub_svc', 'latest'),
             (ItemType.CONTAINER, self.map_name, 'sub_sub_svc', None),
+            (ItemType.IMAGE, self.map_name, 'registry.example.com/sub_svc', 'latest'),
             (ItemType.CONTAINER, self.map_name, 'sub_svc', None),
             (ItemType.VOLUME, self.map_name, 'redis', 'redis_socket'),
             (ItemType.VOLUME, self.map_name, 'redis', 'redis_log'),
+            (ItemType.IMAGE, self.map_name, 'registry.example.com/redis', 'latest'),
+            (ItemType.IMAGE, self.map_name, 'registry.example.com/svc', 'latest'),
             (ItemType.CONTAINER, self.map_name, 'redis', 'queue'),
             (ItemType.CONTAINER, self.map_name, 'redis', 'cache'),
             (ItemType.CONTAINER, self.map_name, 'svc', None),
             (ItemType.VOLUME, self.map_name, 'worker', 'app_log'),
+            (ItemType.IMAGE, self.map_name, 'registry.example.com/server', 'latest'),
         ], merged_paths[0][1])
         self.assertListEqual([
+            (ItemType.IMAGE, self.map_name, 'registry.example.com/svc2', 'latest'),
             (ItemType.CONTAINER, self.map_name, 'svc2', None),
             (ItemType.VOLUME, self.map_name, 'server2', 'app_log'),
             (ItemType.VOLUME, self.map_name, 'server2', 'server_log'),
@@ -855,6 +880,7 @@ class TestPolicyStateUtils(unittest.TestCase):
         self.assertEqual(merged_paths[1][0], server2_config)
         self.assertListEqual(self.server_dependencies, merged_paths[0][1])
         self.assertListEqual([
+            (ItemType.IMAGE, self.map_name, 'registry.example.com/svc2', 'latest'),
             (ItemType.CONTAINER, self.map_name, 'svc2', None),
             (ItemType.VOLUME, self.map_name, 'server2', 'app_log'),
             (ItemType.VOLUME, self.map_name, 'server2', 'server_log'),

@@ -8,7 +8,7 @@ import six
 from ..input import ItemType
 from ..policy import ConfigFlags
 from ..state import State, StateFlags
-from . import ItemAction, Action, ContainerUtilAction, VolumeUtilAction, NetworkUtilAction, DerivedAction
+from . import ItemAction, Action, ContainerUtilAction, VolumeUtilAction, NetworkUtilAction, ImageAction, DerivedAction
 from .base import AbstractActionGenerator
 
 
@@ -16,6 +16,10 @@ log = logging.getLogger(__name__)
 
 
 class UpdateActionGenerator(AbstractActionGenerator):
+    pull_before_update = False
+    pull_insecure_registry = False
+    policy_options = ['pull_before_update', 'pull_insecure_registry']
+
     def get_state_actions(self, state, **kwargs):
         """
         For attached volumes, missing containers are created and initial containers are started and prepared with
@@ -48,6 +52,10 @@ class UpdateActionGenerator(AbstractActionGenerator):
                     actions = []
                 actions.append(ItemAction(state, DerivedAction.RESET_NETWORK))
                 return actions
+        elif config_type == ItemType.IMAGE:
+            if state.base_state == State.ABSENT or self.pull_before_update:
+                return [ItemAction(state, ImageAction.PULL,
+                                   insecure_registry=self.pull_insecure_registry)]
         elif config_type == ItemType.VOLUME:
             # TODO: To be changed for Docker volumes.
             if state.base_state == State.ABSENT:

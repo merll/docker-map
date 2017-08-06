@@ -40,6 +40,10 @@ class NetworkUtilAction(ActionEnum):
     DISCONNECT_ALL = 'disconnect_all_containers'    # Disconnect all containers from a network.
 
 
+class ImageAction(ActionEnum):
+    PULL = 'pull_image'
+
+
 class DerivedAction(object):
     STARTUP_VOLUME = [Action.CREATE, Action.START]                         # Create & start
     STARTUP_CONTAINER = [Action.CREATE, ContainerUtilAction.CONNECT_ALL,

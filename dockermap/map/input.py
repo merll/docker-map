@@ -19,6 +19,7 @@ class ItemType(SimpleEnum):
     CONTAINER = 'container'
     VOLUME = 'volume'
     NETWORK = 'network'
+    IMAGE = 'image'
 
 
 SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
