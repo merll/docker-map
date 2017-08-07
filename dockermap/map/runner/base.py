@@ -17,6 +17,7 @@ from ..policy.utils import extract_user, update_kwargs, init_options, get_volume
 from . import AbstractRunner
 from .attached import AttachedPreparationMixin
 from .cmd import ExecMixin
+from .image import ImageMixin
 from .network import NetworkUtilMixin
 from .script import ScriptMixin
 from .signal_stop import SignalMixin
@@ -514,7 +515,7 @@ class DockerConfigMixin(object):
 
 
 class DockerClientRunner(DockerBaseRunnerMixin, DockerConfigMixin, AttachedPreparationMixin, ExecMixin, SignalMixin,
-                         ScriptMixin, NetworkUtilMixin, AbstractRunner):
+                         ScriptMixin, NetworkUtilMixin, ImageMixin, AbstractRunner):
     """
     Runs actions on a Docker client and returns results from the API.
     """

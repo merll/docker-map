@@ -3,6 +3,7 @@ from collections import namedtuple
 
 from six import with_metaclass
 
+from ...utils import format_image_tag
 from ..input import ItemType
 from ..action import Action
 from ..policy import PolicyUtilMeta, PolicyUtil
@@ -64,8 +65,12 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                 config = c_map.get_existing_network(config_id.config_name)
                 item_name = policy.nname(config_id.map_name, config_id.config_name)
                 existing_items = policy.network_names[action.client_name]
+            elif config_type == ItemType.IMAGE:
+                config = None
+                item_name = format_image_tag(config_id.config_name, config_id.instance_name)
+                existing_items = policy.images[action.client_name]
             else:
-                raise ValueError("Invalid configuration type.", action.config_type)
+                raise ValueError("Invalid configuration type.", config_id.config_type)
 
             for action_type in action.action_types:
                 try:

@@ -42,6 +42,7 @@ class ClientConfiguration(DictMap):
             self._interfaces_ipv6 = DictMap(kwargs.pop('interfaces_ipv6'))
         else:
             self._interfaces_ipv6 = DictMap()
+        self._auth_configs = kwargs.pop('auth_configs', None) or {}
         self._client = kwargs.pop('client', None)
         super(ClientConfiguration, self).__init__(*args, **kwargs)
         self.update_settings(version=version)
@@ -184,6 +185,20 @@ class ClientConfiguration(DictMap):
     @interfaces_ipv6.setter
     def interfaces_ipv6(self, value):
         self._interfaces_ipv6 = DictMap(value)
+
+    @property
+    def auth_configs(self):
+        """
+        Authentication to use for access to Docker Registry servers.
+
+        :return: Dictionary of authentication info per registry to use.
+        :rtype: dict[unicode | str, dict]
+        """
+        return self._auth_configs
+
+    @auth_configs.setter
+    def auth_configs(self, value):
+        self._auth_configs = value
 
     @property
     def client(self):
