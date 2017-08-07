@@ -27,9 +27,7 @@ class ResumeActionGenerator(AbstractActionGenerator):
         """
         config_type = state.config_id.config_type
         config_tuple = (state.client_name, state.config_id.map_name, state.config_id.config_name)
-        if config_type == ItemType.NETWORK:
-            return [ItemAction(state, Action.CREATE)]
-        elif config_type == ItemType.VOLUME:
+        if config_type == ItemType.VOLUME:
             if state.base_state == State.ABSENT:
                 action = DerivedAction.STARTUP_VOLUME
                 self.recreated_volumes.add(config_tuple)
@@ -74,3 +72,5 @@ class ResumeActionGenerator(AbstractActionGenerator):
                 ItemAction(state, action),
                 ItemAction(state, ContainerUtilAction.EXEC_ALL),
             ]
+        elif config_type == ItemType.NETWORK and state.base_state == State.ABSENT:
+            return [ItemAction(state, Action.CREATE)]

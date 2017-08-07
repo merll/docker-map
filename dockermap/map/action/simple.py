@@ -137,9 +137,7 @@ class StartupActionGenerator(AbstractActionGenerator):
         :rtype: list[dockermap.map.action.ItemAction]
         """
         config_type = state.config_id.config_type
-        if config_type == ItemType.NETWORK:
-            return [ItemAction(state, Action.CREATE)]
-        elif config_type == ItemType.VOLUME:
+        if config_type == ItemType.VOLUME:
             if state.base_state == State.ABSENT:
                 return [
                     ItemAction(state, DerivedAction.STARTUP_VOLUME),
@@ -161,8 +159,11 @@ class StartupActionGenerator(AbstractActionGenerator):
                     ItemAction(state, Action.START),
                     ItemAction(state, ContainerUtilAction.EXEC_ALL),
                 ]
-        elif config_type == ItemType.IMAGE and state.base_state == State.ABSENT:
-            return [ItemAction(state, ImageAction.PULL)]
+        else:
+            if config_type == ItemType.NETWORK:
+                return [ItemAction(state, Action.CREATE)]
+            elif config_type == ItemType.IMAGE:
+                return [ItemAction(state, ImageAction.PULL)]
 
 
 class ShutdownActionGenerator(RemoveActionGenerator):
