@@ -452,7 +452,7 @@ class UpdateContainerState(ContainerBaseState):
                 check_exec_option = self.options['check_exec_commands']
                 if check_exec_option:
                     missing_exec_cmds = self._check_commands(check_exec_option)
-                    if missing_exec_cmds is not None:
+                    if missing_exec_cmds:
                         state_flags |= StateFlags.EXEC_COMMANDS
                         extra['exec_commands'] = missing_exec_cmds
             if self.endpoint_registry:  # Client supports networking.
