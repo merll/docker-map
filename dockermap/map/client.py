@@ -25,13 +25,12 @@ def _set_forced_update_ids(kwargs, maps, groups, default_map_name, default_insta
         return
     input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
     if input_ids:
-        kwargs['force_update'] = set(expand_instances(expand_groups(input_ids, groups), single_instances=False,
-                                                      ext_maps=maps))
+        kwargs['force_update'] = set(expand_instances(expand_groups(input_ids, groups), maps, single_instances=False))
 
 
 def _get_config_ids(value, maps, groups, default_map_name, default_instances):
     input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
-    return list(expand_instances(expand_groups(input_ids, groups), ext_maps=maps))
+    return list(expand_instances(expand_groups(input_ids, groups), maps))
 
 
 class MappingDockerClient(object):

@@ -457,8 +457,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self._setup_containers(rsps, [
                 _container('redis', instances=['cache', 'queue']),
             ])
-            force_update = set(expand_instances(self._config_id('redis'),
-                                                ext_map=self.sample_map))
+            force_update = set(expand_instances(self._config_id('redis'), {self.map_name: self.sample_map}))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
             self.assertEqual(cache_state.state_flags & StateFlags.FORCED_RESET, StateFlags.FORCED_RESET)
@@ -470,8 +469,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self._setup_containers(rsps, [
                 _container('redis', instances=['cache', 'queue']),
             ])
-            force_update = set(expand_instances(self._config_id('redis', 'cache'),
-                                                ext_map=self.sample_map))
+            force_update = set(expand_instances(self._config_id('redis', 'cache'), {self.map_name: self.sample_map}))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
             self.assertEqual(cache_state.state_flags & StateFlags.FORCED_RESET, StateFlags.FORCED_RESET)

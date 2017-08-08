@@ -118,31 +118,26 @@ def group_instances(config_ids, single_instances=True, ext_map=None, ext_maps=No
             yield MapConfigId(config_type, map_name, config_name, instances)
 
 
-def expand_instances(config_ids, single_instances=True, ext_map=None, ext_maps=None):
+def expand_instances(config_ids, ext_maps, single_instances=True):
     """
     Iterates over a list of configuration ids, expanding configured instances if ``None`` is specified.
 
     :param config_ids: Iterable of container configuration ids or (map, config, instance) tuples.
     :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId] |
       collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
-    :param single_instances: Whether the instances are a passed as a tuple or as a single string.
-    :type single_instances: bool
-    :param ext_map: Extended ContainerMap instance for looking up container configurations. Use this only if all
-     elements of ``config_ids`` are from the same map.
-    :type ext_map: ContainerMap
     :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
     :type ext_maps: dict[unicode | str, ContainerMap]
+    :param single_instances: Whether the instances are a passed as a tuple or as a single string.
+    :type single_instances: bool
     :return: MapConfigId tuples.
     :rtype: collections.Iterable[dockermap.map.input.MapConfigId]
     """
-    if not (ext_map or ext_maps):
-        raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
     _get_instances = _get_single_instances if single_instances else _get_nested_instances
 
     for type_map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
         config_type, map_name, config_name = type_map_config
         instances = _get_instances(items)
-        c_map = ext_map or ext_maps[map_name]
+        c_map = ext_maps[map_name]
         try:
             c_instances = _get_config_instances(config_type, c_map, config_name)
         except KeyError:
