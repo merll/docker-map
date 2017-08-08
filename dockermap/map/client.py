@@ -2,8 +2,11 @@
 from __future__ import unicode_literals
 
 import logging
+import traceback
+import sys
 
 import docker
+import six
 
 from .action import simple, script, update
 from .config.client import ClientConfiguration
@@ -31,6 +34,27 @@ def _set_forced_update_ids(kwargs, maps, groups, default_map_name, default_insta
 def _get_config_ids(value, maps, groups, default_map_name, default_instances):
     input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
     return list(expand_instances(expand_groups(input_ids, groups), maps))
+
+
+class RunnerException(Exception):
+    def __init__(self, src_exc, results):
+        self._src_exc = src_exc
+        self._results = results
+
+    @property
+    def source_exception(self):
+        return self._src_exc
+
+    @property
+    def source_message(self):
+        return ''.join(traceback.format_exception_only(self._src_exc[0], self._src_exc[1]))
+
+    def reraise(self):
+        six.reraise(*self._src_exc)
+
+    @property
+    def results(self):
+        return self._results
 
 
 class MappingDockerClient(object):
@@ -186,7 +210,12 @@ class MappingDockerClient(object):
         results = []
         runner = self.get_runner(policy, kwargs)
         for action_list in self.get_actions(action_name, config_name, instances, map_name, **kwargs):
-            results.extend(runner.run_actions(action_list))
+            try:
+                for res in runner.run_actions(action_list):
+                    results.append(res)
+            except Exception:
+                exc_info = sys.exc_info()
+                raise RunnerException(exc_info, results)
         return results
 
     def create(self, container, instances=None, map_name=None, **kwargs):
