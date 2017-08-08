@@ -115,23 +115,39 @@ class MappingDockerClient(object):
             self._policy = self.policy_class(self._maps, self._clients)
         return self._policy
 
-    def get_generators(self, action_name, policy, kwargs):
+    def get_state_generator(self, action_name, policy, kwargs):
         """
-        Returns the generators to be used for the given action.
+        Returns the state generator to be used for the given action.
 
         :param action_name: Action identifier name.
         :type action_name: unicode | str
         :param policy: An instance of the current policy class.
         :type policy: dockermap.map.policy.base.BasePolicy
-        :param kwargs: Keyword arguments. Can be modified by the initialization of the state and action generators.
+        :param kwargs: Keyword arguments. Can be modified by the initialization of the state generator.
         :type kwargs: dict
-        :return: Tuple with new instances of state generator and action generator.
-        :rtype: (dockermap.map.state.base.AbstractStateGenerator, dockermap.map.action.base.AbstractActionGenerator)
+        :return: State generator object.
+        :rtype: dockermap.map.state.base.AbstractStateGenerator
         """
-        state_generator_cls, action_generator_cls = self.generators[action_name]
+        state_generator_cls = self.generators[action_name][0]
         state_generator = state_generator_cls(policy, kwargs)
+        return state_generator
+
+    def get_action_generator(self, action_name, policy, kwargs):
+        """
+        Returns the action generator to be used for the given action.
+
+        :param action_name: Action identifier name.
+        :type action_name: unicode | str
+        :param policy: An instance of the current policy class.
+        :type policy: dockermap.map.policy.base.BasePolicy
+        :param kwargs: Keyword arguments. Can be modified by the initialization of the action generator.
+        :type kwargs: dict
+        :return: Action generator object.
+        :rtype: dockermap.map.action.base.AbstractActionGenerator
+        """
+        action_generator_cls = self.generators[action_name][1]
         action_generator = action_generator_cls(policy, kwargs)
-        return state_generator, action_generator
+        return action_generator
 
     def get_runner(self, policy, kwargs):
         """
@@ -146,14 +162,13 @@ class MappingDockerClient(object):
         """
         return self.runner_class(policy, kwargs)
 
-    def run_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
+    def get_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
         policy = self.get_policy()
         groups = {m.name: m.groups for m in self._maps.values()}
         _set_forced_update_ids(kwargs, policy.container_maps, groups, map_name or self._default_map, instances)
-        state_generator, action_generator = self.get_generators(action_name, policy, kwargs)
-        runner = self.get_runner(policy, kwargs)
+        state_generator = self.get_state_generator(action_name, policy, kwargs)
+        action_generator = self.get_action_generator(action_name, policy, kwargs)
         log.debug("Passing kwargs to client actions: %s", kwargs)
-        results = []
 
         config_ids = _get_config_ids(config_name, policy.container_maps, groups, map_name or self._default_map,
                                      instances)
@@ -163,10 +178,16 @@ class MappingDockerClient(object):
             actions = action_generator.get_state_actions(state, **kwargs)
             if actions:
                 log.debug("Running actions: %s", actions)
-                results.extend(runner.run_actions(actions))
+                yield actions
             else:
                 log.debug("No actions returned.")
 
+    def run_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
+        policy = self.get_policy()
+        results = []
+        runner = self.get_runner(policy, kwargs)
+        for action_list in self.get_actions(action_name, config_name, instances, map_name, **kwargs):
+            results.extend(runner.run_actions(action_list))
         return results
 
     def create(self, container, instances=None, map_name=None, **kwargs):
