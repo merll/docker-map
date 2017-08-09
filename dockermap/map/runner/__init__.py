@@ -85,4 +85,4 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                 elif action_type == Action.REMOVE:
                     existing_items.discard(item_name)
                 if res is not None:
-                    yield res
+                    yield (action.client_name, config_id, action_type, res)
