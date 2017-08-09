@@ -3,10 +3,9 @@ from __future__ import unicode_literals
 
 import logging
 
-from six import iteritems
+from six import iteritems, itervalues
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT, DEFAULT_PRESET_NETWORKS
-from ...functional import resolve_value
 from .cache import ContainerCache, ImageCache, NetworkCache
 from .dep import ContainerDependencyResolver
 
@@ -29,7 +28,7 @@ class BasePolicy(object):
     default_network_names = ['bridge']
 
     def __init__(self, container_maps, clients):
-        self._maps = {
+        self._maps = maps = {
             map_name: map_contents.get_extended_map()
             for map_name, map_contents in iteritems(container_maps)
         }
@@ -39,8 +38,8 @@ class BasePolicy(object):
         self._images = ImageCache(clients)
         self._f_resolver = ContainerDependencyResolver()
         self._r_resolver = ContainerDependencyResolver()
-        for m in self._maps.values():
-            depdendency_items = m.dependency_items()
+        for m in itervalues(maps):
+            depdendency_items = list(m.dependency_items())
             self._f_resolver.update(depdendency_items)
             self._r_resolver.update_backward(depdendency_items)
 
