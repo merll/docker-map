@@ -32,7 +32,7 @@ def _get_nested_instances(group_items):
     return tuple(ni
                  for di in group_items
                  for ni in di[3] or (None, )
-                 if ni not in instance_set or instance_add(ni))
+                 if ni not in instance_set and not instance_add(ni))
 
 
 def _get_config_instances(config_type, c_map, config_name):
@@ -54,60 +54,63 @@ def _get_config_instances(config_type, c_map, config_name):
     raise ValueError("Invalid configuration type.", config_type)
 
 
-def expand_groups(config_ids, groups):
+def expand_groups(config_ids, maps):
     """
     Iterates over a list of container configuration ids, expanding groups of container configurations.
 
     :param config_ids: List of container configuration ids.
     :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId]
-    :param groups: Dictionary of container configuration groups per map.
-    :type groups: dict[unicode | str, dockermap.map.DictMap]
+    :param maps: Extended container maps.
+    :type maps: dict[unicode | str, dockermap.map.config.main.ContainerMap]
     :return: Expanded MapConfigId tuples.
     :rtype: collections.Iterable[dockermap.map.input.MapConfigId]
     """
     for config_id in config_ids:
-        group = groups[config_id.map_name].get(config_id.config_name)
-        if group is not None:
-            for group_item in group:
-                if isinstance(group_item, MapConfigId):
-                    yield group_item
-                elif isinstance(group_item, six.string_types):
-                    config_name, __, instance = group_item.partition('.')
-                    yield MapConfigId(config_id.config_type, config_id.map_name, config_name,
-                                      (instance, ) if instance else config_id.instance_name)
-                else:
-                    raise ValueError("Invalid group item. Must be string or MapConfigId tuple; found {0}.".format(
-                        type(group_item).__name__))
+        if config_id.map_name == '__all__':
+            c_maps = six.iteritems(maps)
         else:
-            yield config_id
+            c_maps = (config_id.map_name, maps[config_id.map_name]),
+        for map_name, c_map in c_maps:
+            if config_id.config_name == '__all__' and config_id.config_type == ItemType.CONTAINER:
+                for config_name in six.iterkeys(c_map.containers):
+                    yield MapConfigId(config_id.config_type, map_name, config_name, config_id.instance_name)
+            else:
+                group = c_map.groups.get(config_id.config_name)
+                if group is not None:
+                    for group_item in group:
+                        if isinstance(group_item, MapConfigId):
+                            yield group_item
+                        elif isinstance(group_item, six.string_types):
+                            config_name, __, instance = group_item.partition('.')
+                            yield MapConfigId(config_id.config_type, map_name, config_name,
+                                              (instance, ) if instance else config_id.instance_name)
+                        else:
+                            raise ValueError("Invalid group item. Must be string or MapConfigId tuple; found {0}.".format(
+                                type(group_item).__name__))
+                else:
+                    yield MapConfigId(config_id.config_type, map_name, config_id.config_name, config_id.instance_name)
 
 
-def group_instances(config_ids, single_instances=True, ext_map=None, ext_maps=None):
+def group_instances(config_ids, ext_maps, single_instances=True):
     """
     Iterates over a list of container configuration ids, grouping instances together. A tuple of instances that matches
     the list of instances in a configuration is replaced with a tuple only containing ``None``.
 
     :param config_ids: Iterable of container configuration ids or (map, config, instance) tuples.
-    :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId] |
-      collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
-    :param single_instances: Whether the instances are a passed as a tuple or as a single string.
-    :type single_instances: bool
-    :param ext_map: Extended ContainerMap instance for looking up container configurations. Use this only if all
-     elements of ``config_ids`` are from the same map.
-    :type ext_map: ContainerMap
+    :type config_ids: collections.Iterable[dockermap.map.input.MapConfigId] | collections.Iterable[tuple[unicode | str, unicode | str, unicode | str]]
     :param ext_maps: Dictionary of extended ContainerMap instances for looking up container configurations.
     :type ext_maps: dict[unicode | str, ContainerMap]
+    :param single_instances: Whether the instances are a passed as a tuple or as a single string.
+    :type single_instances: bool
     :return: MapConfigId tuples.
     :rtype: collections.Iterable[dockermap.map.input.MapConfigId]
     """
-    if not (ext_map or ext_maps):
-        raise ValueError("Either a single ContainerMap or a dictionary of them must be provided.")
     _get_instances = _get_single_instances if single_instances else _get_nested_instances
 
     for type_map_config, items in itertools.groupby(sorted(config_ids, key=get_map_config), get_map_config):
         config_type, map_name, config_name = type_map_config
         instances = _get_instances(items)
-        c_map = ext_map or ext_maps[map_name]
+        c_map = ext_maps[map_name]
         try:
             c_instances = _get_config_instances(config_type, c_map, config_name)
         except KeyError:

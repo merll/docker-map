@@ -22,18 +22,18 @@ from .state.update import UpdateStateGenerator
 log = logging.getLogger(__name__)
 
 
-def _set_forced_update_ids(kwargs, maps, groups, default_map_name, default_instances):
+def _set_forced_update_ids(kwargs, maps, default_map_name, default_instances):
     value = kwargs.pop('force_update', None)
     if not value:
         return
     input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
     if input_ids:
-        kwargs['force_update'] = set(expand_instances(expand_groups(input_ids, groups), maps, single_instances=False))
+        kwargs['force_update'] = set(expand_instances(expand_groups(input_ids, maps), maps, single_instances=False))
 
 
-def _get_config_ids(value, maps, groups, default_map_name, default_instances):
+def _get_config_ids(value, maps, default_map_name, default_instances):
     input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
-    return list(expand_instances(expand_groups(input_ids, groups), maps))
+    return list(expand_instances(expand_groups(input_ids, maps), maps))
 
 
 class RunnerException(Exception):
@@ -187,13 +187,12 @@ class MappingDockerClient(object):
 
     def get_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
         policy = self.get_policy()
-        groups = {m.name: m.groups for m in self._maps.values()}
-        _set_forced_update_ids(kwargs, policy.container_maps, groups, map_name or self._default_map, instances)
+        _set_forced_update_ids(kwargs, policy.container_maps, map_name or self._default_map, instances)
         state_generator = self.get_state_generator(action_name, policy, kwargs)
         action_generator = self.get_action_generator(action_name, policy, kwargs)
         log.debug("Passing kwargs to client actions: %s", kwargs)
 
-        config_ids = _get_config_ids(config_name, policy.container_maps, groups, map_name or self._default_map,
+        config_ids = _get_config_ids(config_name, policy.container_maps, map_name or self._default_map,
                                      instances)
         log.debug("Generating states for configurations: %s", config_ids)
         for state in state_generator.get_states(config_ids):
