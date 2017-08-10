@@ -133,6 +133,7 @@ class ContainerBaseState(AbstractState):
         if c_detail is NOT_FOUND:
             return State.ABSENT, StateFlags.NONE, {}
 
+        c_id = c_detail['Id']
         c_status = c_detail['State']
         if c_status['Running']:
             base_state = State.RUNNING
@@ -150,7 +151,7 @@ class ContainerBaseState(AbstractState):
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
             state_flag |= StateFlags.FORCED_RESET
-        return base_state, state_flag, {}
+        return base_state, state_flag, {'id': c_id}
 
 
 class NetworkBaseState(AbstractState):
@@ -195,13 +196,15 @@ class NetworkBaseState(AbstractState):
     def get_state(self):
         if self.detail is NOT_FOUND:
             return State.ABSENT, StateFlags.NONE, {}
-        connected_containers = self.detail.get('Containers', {})
+        n_detail = self.detail
+        n_id = n_detail['Id']
+        connected_containers = n_detail.get('Containers', {})
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
             state_flag = StateFlags.FORCED_RESET
         else:
             state_flag = StateFlags.NONE
-        return State.PRESENT, state_flag, {'containers': connected_containers}
+        return State.PRESENT, state_flag, {'id': n_id, 'containers': connected_containers}
 
 
 class ImageBaseState(AbstractState):
@@ -223,12 +226,13 @@ class ImageBaseState(AbstractState):
             self.detail = NOT_FOUND
 
     def get_state(self):
-        c_detail = self.detail
-        if c_detail is NOT_FOUND:
+        i_detail = self.detail
+        i_id = i_detail['Id']
+        if i_detail is NOT_FOUND:
             base_state = State.ABSENT
         else:
             base_state = State.PRESENT
-        return base_state, StateFlags.NONE, {}
+        return base_state, StateFlags.NONE, {'id': i_id}
 
 
 class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
