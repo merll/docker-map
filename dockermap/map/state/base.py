@@ -220,19 +220,17 @@ class ImageBaseState(AbstractState):
         policy = self.policy
         image_name = format_image_tag((self.config_id.config_name, self.config_id.instance_name))
         image_id = policy.images[self.client_name].get(image_name)
-        if image_name is not None:
+        if image_id:
             self.detail = {'Id': image_id}   # Currently there is no need for actually inspecting the image.
         else:
             self.detail = NOT_FOUND
 
     def get_state(self):
         i_detail = self.detail
-        i_id = i_detail['Id']
         if i_detail is NOT_FOUND:
-            base_state = State.ABSENT
-        else:
-            base_state = State.PRESENT
-        return base_state, StateFlags.NONE, {'id': i_id}
+            return State.ABSENT, StateFlags.NONE, {}
+        i_id = i_detail['Id']
+        return State.PRESENT, StateFlags.NONE, {'id': i_id}
 
 
 class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
@@ -406,7 +404,7 @@ class DependencyStateGenerator(AbstractDependencyStateGenerator):
 
 class ImageDependencyStateGenerator(AbstractDependencyStateGenerator):
     def get_dependency_path(self, config_id):
-        return [d for d in self._policy.get_dependencies(config_id) if d.config_id.item_type == ItemType.IMAGE]
+        return [d for d in self._policy.get_dependencies(config_id) if d.config_type == ItemType.IMAGE]
 
 
 class DependentStateGenerator(AbstractDependencyStateGenerator):

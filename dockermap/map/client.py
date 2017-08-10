@@ -93,8 +93,7 @@ class MappingDockerClient(object):
         'update': (UpdateStateGenerator, update.UpdateActionGenerator),
         'script': (DependencyStateGenerator, script.ScriptActionGenerator),
         'signal': (SingleStateGenerator, simple.SignalActionGenerator),
-        'pull_image': (ImageDependencyStateGenerator, simple.ImagePullActionGenerator),
-        'update_image': (ImageDependencyStateGenerator, update.UpdateActionGenerator),
+        'pull_images': (ImageDependencyStateGenerator, simple.ImagePullActionGenerator),
     }
     runner_class = DockerClientRunner
 
