@@ -185,17 +185,48 @@ class MappingDockerClient(object):
         """
         return self.runner_class(policy, kwargs)
 
-    def get_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
+    def get_states(self, action_name, config_name, instances=None, map_name=None, **kwargs):
+        """
+        Returns a generator of states in relation to the indicated action.
+
+        :param action_name: Action name.
+        :type action_name: unicode | str
+        :param config_name: Name(s) of container configuration(s) or MapConfigId tuple(s).
+        :type config_name: unicode | str | collections.Iterable[unicode | str] | dockermap.map.input.MapConfigId | collections.Iterable[dockermap.map.input.MapConfigId]
+        :param instances: Optional instance names, where applicable but not included in ``config_name``.
+        :type instances: unicode | str | collections.Iterable[unicode | str]
+        :param map_name: Optional map name, where not inlcuded in ``config_name``.
+        :param kwargs: Additional kwargs for state generation, action generation, runner, or the client action.
+        :return: Resulting states of the configurations.
+        :rtype: collections.Iterable[dockermap.map.state.ConfigState]
+        """
         policy = self.get_policy()
         _set_forced_update_ids(kwargs, policy.container_maps, map_name or self._default_map, instances)
         state_generator = self.get_state_generator(action_name, policy, kwargs)
-        action_generator = self.get_action_generator(action_name, policy, kwargs)
-        log.debug("Passing kwargs to client actions: %s", kwargs)
-
+        log.debug("Remaining kwargs passed to client actions: %s", kwargs)
         config_ids = _get_config_ids(config_name, policy.container_maps, map_name or self._default_map,
                                      instances)
         log.debug("Generating states for configurations: %s", config_ids)
-        for state in state_generator.get_states(config_ids):
+        return state_generator.get_states(config_ids)
+
+    def get_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
+        """
+        Returns the entire set of actions performed for the indicated action name.
+
+        :param action_name: Action name.
+        :type action_name: unicode | str
+        :param config_name: Name(s) of container configuration(s) or MapConfigId tuple(s).
+        :type config_name: unicode | str | collections.Iterable[unicode | str] | dockermap.map.input.MapConfigId | collections.Iterable[dockermap.map.input.MapConfigId]
+        :param instances: Optional instance names, where applicable but not included in ``config_name``.
+        :type instances: unicode | str | collections.Iterable[unicode | str]
+        :param map_name: Optional map name, where not inlcuded in ``config_name``.
+        :param kwargs: Additional kwargs for state generation, action generation, runner, or the client action.
+        :return: Resulting actions of the configurations.
+        :rtype: collections.Iterable[list[dockermap.map.action.ItemAction]]
+        """
+        policy = self.get_policy()
+        action_generator = self.get_action_generator(action_name, policy, kwargs)
+        for state in self.get_states(action_name, config_name, instances=instances, map_name=map_name, **kwargs):
             log.debug("Evaluating state: %s.", state)
             actions = action_generator.get_state_actions(state, **kwargs)
             if actions:
@@ -205,6 +236,21 @@ class MappingDockerClient(object):
                 log.debug("No actions returned.")
 
     def run_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
+        """
+        Runs the entire set of actions performed for the indicated action name. On any client failure this raises a
+        :class:`~RunnerException`, where partial results can be reviewed in the property ``results``.
+
+        :param action_name: Action name.
+        :type action_name: unicode | str
+        :param config_name: Name(s) of container configuration(s) or MapConfigId tuple(s).
+        :type config_name: unicode | str | collections.Iterable[unicode | str] | dockermap.map.input.MapConfigId | collections.Iterable[dockermap.map.input.MapConfigId]
+        :param instances: Optional instance names, where applicable but not included in ``config_name``.
+        :type instances: unicode | str | collections.Iterable[unicode | str]
+        :param map_name: Optional map name, where not inlcuded in ``config_name``.
+        :param kwargs: Additional kwargs for state generation, action generation, runner, or the client action.
+        :return: Client output of actions of the configurations.
+        :rtype: list[dockermap.map.runner.ActionOutput]
+        """
         policy = self.get_policy()
         results = []
         runner = self.get_runner(policy, kwargs)

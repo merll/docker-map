@@ -10,6 +10,7 @@ from ..policy import PolicyUtilMeta, PolicyUtil
 
 ActionConfig = namedtuple('ActionConfig', ['client_name', 'config_id', 'client_config', 'client',
                                            'container_map', 'config'])
+ActionOutput = namedtuple('ActionOutput', ['client_name', 'config_id', 'action_type', 'result'])
 
 
 class RunnerMeta(PolicyUtilMeta):
@@ -85,4 +86,4 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                 elif action_type == Action.REMOVE:
                     existing_items.discard(item_name)
                 if res is not None:
-                    yield (action.client_name, config_id, action_type, res)
+                    yield ActionOutput(action.client_name, config_id, action_type, res)
