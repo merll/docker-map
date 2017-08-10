@@ -275,8 +275,8 @@ class MappingDockerClient(object):
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container creation.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
+        :return: Return values of created containers.
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions('create', container, instances=instances, map_name=map_name, **kwargs)
 
@@ -293,8 +293,8 @@ class MappingDockerClient(object):
         :type instances: collections.Iterable[unicode | str | NoneType]
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container start.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
+        :return: Return values of started containers.
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions('start', container, instances=instances, map_name=map_name, **kwargs)
 
@@ -311,8 +311,8 @@ class MappingDockerClient(object):
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container restart.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
+        :return: Return values of restarted containers.
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions('restart', container, instances=instances, map_name=map_name, **kwargs)
 
@@ -333,8 +333,8 @@ class MappingDockerClient(object):
         :type raise_on_error: bool
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container stop.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
+        :return: Return values of stopped containers.
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions('stop', container, instances=instances, map_name=map_name, **kwargs)
 
@@ -351,8 +351,8 @@ class MappingDockerClient(object):
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. If multiple actions are resulting from this, they will only be applied to
           the main container removal.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
+        :return: Return values of removed containers.
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions('remove', container, instances=instances, map_name=map_name, **kwargs)
 
@@ -369,8 +369,8 @@ class MappingDockerClient(object):
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. Only options controlling policy behavior are considered.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
+        :return: Return values of created containers.
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions('startup', container, instances=instances, map_name=map_name, **kwargs)
 
@@ -387,8 +387,8 @@ class MappingDockerClient(object):
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. Only options controlling policy behavior are considered.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
+        :return: Return values of removed containers.
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions('shutdown', container, instances=instances, map_name=map_name, **kwargs)
 
@@ -406,8 +406,8 @@ class MappingDockerClient(object):
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs. Only options controlling policy behavior are considered.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
+        :return: Return values of actions.
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions('update', container, instances=instances, map_name=map_name, **kwargs)
 
@@ -425,8 +425,8 @@ class MappingDockerClient(object):
         :param map_name: Container map name. Optional - if not provided the default map is used.
         :type map_name: unicode | str
         :param kwargs: Additional kwargs for the policy method.
-        :return: Return values of created main containers.
-        :rtype: list[(unicode | str, dict)]
+        :return: Return values of actions.
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions(action_name, container, instances=instances, map_name=map_name, **kwargs)
 
@@ -437,17 +437,52 @@ class MappingDockerClient(object):
         is recorded in a dictionary per client, before the container is removed. Dependencies are not removed. For
         details, see :meth:`dockermap.map.runner.script.ScriptMixin.run_script`.
 
+        :param container: Container configuration name.
+        :type container: unicode | str
         :param map_name: Container map name.
         :type map_name: unicode | str
         :param instance: Instance name. Optional, if not specified runs the default instance.
         :type instance: unicode | str
-        :param container: Container configuration name.
-        :type container: unicode | str
         :param kwargs: Keyword arguments to the script runner function.
+        :return: Return values of the script actions with their log output and exit codes.
         :return: A dictionary of client names with their log output and exit codes.
-        :rtype: list[dict[unicode | str, unicode | str]]
+        :rtype: list[dockermap.map.runner.ActionOutput]
         """
         return self.run_actions('script', container, instances=instance, map_name=map_name, **kwargs)
+
+    def signal(self, container, instances=None, map_name=None, **kwargs):
+        """
+        Sends a signal to a single running container configuration (but possibly multiple instances). If not specified
+        with ``signal``, this signal is ``SIGKILL``.
+
+        :param container: Container configuration name.
+        :type container: unicode | str
+        :param map_name: Container map name.
+        :type map_name: unicode | str
+        :param instances: Instance name. Optional, if not specified sends the signal to all configured instances, or
+          the default.
+        :type instances: unicode | str
+        :param kwargs: Keyword arguments to the script runner function.
+        :return: Return values of actions.
+        :rtype: list[dockermap.map.runner.ActionOutput]
+        """
+        return self.run_actions('signal', container, instances=instances, map_name=map_name, **kwargs)
+
+    def pull_images(self, container, instances=None, map_name=None, **kwargs):
+        """
+        Pulls images for container configurations along their dependency path.
+
+        :param container: Container configuration name.
+        :type container: unicode | str
+        :param map_name: Container map name.
+        :type map_name: unicode | str
+        :param instances: Not applicable for images.
+        :type instances: unicode | str
+        :param kwargs: Keyword arguments to the script runner function.
+        :return: Return values of actions.
+        :rtype: list[dockermap.map.runner.ActionOutput]
+        """
+        return self.run_actions('pull_images', container, map_name=map_name, **kwargs)
 
     def refresh_names(self):
         """
