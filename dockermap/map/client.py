@@ -238,7 +238,7 @@ class MappingDockerClient(object):
                     results.append(res)
             except ActionException as ae:
                 raise ActionRunnerException.from_action_exception(ae, results)
-            except Exception:
+            except:
                 exc_info = sys.exc_info()
                 raise PartialResultsError(exc_info, results)
         return results

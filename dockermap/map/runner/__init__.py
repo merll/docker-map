@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from collections import namedtuple
+import sys
 
 from six import with_metaclass
 
@@ -83,8 +84,9 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                                              c_map, config)
                 try:
                     res = a_method(action_config, item_name, **action.extra_data)
-                except Exception as e:
-                    raise ActionException(e, action.client_name, config_id, action_type)
+                except:
+                    exc_info = sys.exc_info()
+                    raise ActionException(exc_info, action.client_name, config_id, action_type)
                 if action_type == Action.CREATE:
                     existing_items.add(item_name)
                 elif action_type == Action.REMOVE:
