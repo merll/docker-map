@@ -110,7 +110,7 @@ class DockerClientWrapper(DockerUtilityMixin, docker.Client):
         """
         pass
 
-    def build(self, tag, add_latest_tag=False, add_tags=None, raise_on_error=False, **kwargs):
+    def build(self, tag, add_latest_tag=False, add_tags=None, raise_on_error=True, **kwargs):
         """
         Overrides the superclass `build()` and filters the output. Messages are deferred to `push_log`, whereas the
         final message is checked for a success message. If the latter is found, only the new image id is returned.
@@ -167,7 +167,7 @@ class DockerClientWrapper(DockerUtilityMixin, docker.Client):
         response = super(DockerClientWrapper, self).login(username, password, email, registry, reauth=reauth, **kwargs)
         return response.get('Status') == 'Login Succeeded' or response.get('username') == username
 
-    def pull(self, repository, tag=None, stream=False, raise_on_error=False, **kwargs):
+    def pull(self, repository, tag=None, stream=False, raise_on_error=True, **kwargs):
         """
         Pulls an image repository from the registry.
 
@@ -191,7 +191,7 @@ class DockerClientWrapper(DockerUtilityMixin, docker.Client):
             result = self._docker_status_stream(response.split('\r\n') if response else (), raise_on_error)
         return result and not result.get('error')
 
-    def push(self, repository, stream=False, raise_on_error=False, **kwargs):
+    def push(self, repository, stream=False, raise_on_error=True, **kwargs):
         """
         Pushes an image repository to the registry.
 
@@ -228,64 +228,77 @@ class DockerClientWrapper(DockerUtilityMixin, docker.Client):
         for line in log_lines:
             self.push_log(LOG_CONTAINER_FORMAT, logging.INFO, container, line)
 
-    def remove_container(self, container, raise_on_error=False, **kwargs):
+    def remove_container(self, container, raise_on_error=True, raise_not_found=False, **kwargs):
         """
         Removes a container. For convenience optionally ignores API errors.
 
         :param container: Container name or id.
         :type container: unicode | str
-        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
-          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
-          ``True``. Please note that 404 errors (on non-existing containers) are always ignored.
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that may not
+          affect further actions. Such errors are always logged, but do not raise an exception if this is set to
+          ``True``.
         :type raise_on_error: bool
+        :param raise_not_found: Whether to raise 404 errors, i.e. that the container to be removed was not
+          found. Default is ``False``.
+        :type raise_not_found: bool
         :param kwargs: Additional keyword args for :meth:`docker.client.Client.remove_container`.
         """
         try:
             super(DockerClientWrapper, self).remove_container(container, **kwargs)
         except APIError as e:
-            if e.response.status_code != 404:
+            exc_info = sys.exc_info()
+            if e.response.status_code == 404:
+                if raise_not_found:
+                    six.reraise(*exc_info)
+            else:
                 self.push_log("Failed to remove container '%s': %s", logging.ERROR, container, e.explanation)
                 if raise_on_error:
-                    six.reraise(*sys.exc_info())
+                    six.reraise(*exc_info)
 
-    def remove_image(self, image, raise_on_error=False, **kwargs):
+    def remove_image(self, image, raise_on_error=True, raise_not_found=False, **kwargs):
         """
         Removes a container. For convenience optionally ignores API errors.
 
         :param image: Image name or id.
         :type image: unicode | str
-        :param raise_on_error: Errors on image removal may not further affect further actions. Such errors are always
-          logged, but do not raise an exception unless this is set to ``True``. Please note that 404 errors (on
-          non-existing images) are always ignored.
+        :param raise_on_error: Errors on image removal may not affect further actions. Such errors are always
+          logged, but do not raise an exception if this is set to ``True``.
+        :param raise_not_found: Whether to raise 404 errors, i.e. that the image to be removed was not
+          found. Default is ``False``.
+        :type raise_not_found: bool
         :param kwargs: Additional keyword args for :meth:`docker.client.Client.remove_image`.
         """
         try:
             super(DockerClientWrapper, self).remove_image(image, **kwargs)
         except APIError as e:
-            if e.response.status_code != 404:
+            exc_info = sys.exc_info()
+            if e.response.status_code == 404:
+                if raise_not_found:
+                    six.reraise(*exc_info)
+            else:
                 self.push_log("Failed to remove image '%s': %s", logging.ERROR, image, e.explanation)
                 if raise_on_error:
-                    six.reraise(*sys.exc_info())
+                    six.reraise(*exc_info)
 
-    def stop(self, container, raise_on_error=False, **kwargs):
+    def stop(self, container, raise_on_error=True, **kwargs):
         """
         Stops a container. For convenience optionally ignores API errors.
 
         :param container: Container name.
         :type container: unicode | str
-        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that do not further
-          affect further actions. Such errors are always logged, but do not raise an exception unless this is set to
-          ``True``. Please note that 404 errors (on non-existing containers) are always ignored.
+        :param raise_on_error: Errors on stop and removal may result from Docker volume problems, that may not
+          affect further actions. Such errors are always logged, but do not raise an exception if this is set to
+          ``True``.
         :type raise_on_error: bool
         :param kwargs: Additional keyword args for :meth:`docker.client.Client.stop`.
         """
         try:
             super(DockerClientWrapper, self).stop(container, **kwargs)
         except APIError as e:
-            if e.response.status_code != 404:
-                self.push_log("Failed to stop container '%s': %s", logging.ERROR, container, e.explanation)
-                if raise_on_error:
-                    six.reraise(*sys.exc_info())
+            exc_info = sys.exc_info()
+            self.push_log("Failed to stop container '%s': %s", logging.ERROR, container, e.explanation)
+            if raise_on_error:
+                six.reraise(*exc_info)
 
     def copy_resource(self, container, resource, local_filename):
         """

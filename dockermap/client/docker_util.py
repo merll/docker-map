@@ -3,10 +3,12 @@ from __future__ import unicode_literals
 
 import logging
 
+import sys
 from requests import Timeout
 
 from ..build.context import DockerContext
 from ..dep import SingleDependencyResolver
+from ..exceptions import PartialResultsError
 from ..utils import merge_list
 
 
@@ -92,9 +94,17 @@ class DockerUtilityMixin(object):
         if add_latest:
             tag_set.add('latest')
         tag_set.discard(i_tag)
+        added_tags = []
         if repo and tag_set:
             for t in tag_set:
-                self.tag(image_id, repo, t, force=True)
+                try:
+                    self.tag(image_id, repo, t, force=True)
+                except:
+                    exc_info = sys.exc_info()
+                    raise PartialResultsError(exc_info, added_tags)
+                else:
+                    added_tags.append(t)
+        return added_tags
 
     def push_log(self, info, level, *args, **kwargs):
         """
@@ -150,9 +160,12 @@ class DockerUtilityMixin(object):
         :type exclude: collections.Iterable[unicode | str]
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
+        :return: List of removed containers.
+        :rtype: list[unicode | str]
         """
+        exclude_names = set(exclude or ())
+
         def _stopped_containers():
-            exclude_names = set(exclude or ())
             for container in self.containers(all=True):
                 c_names = [name[1:] for name in container['Names'] or () if name.find('/', 2)]
                 c_status = container['Status']
@@ -162,8 +175,17 @@ class DockerUtilityMixin(object):
                     c_name = primary_container_name(c_names, default=c_id, strip_trailing_slash=False)
                     yield c_id, c_name
 
+        removed_containers = []
         for cid, cn in _stopped_containers():
-            self.remove_container(cn, raise_on_error=raise_on_error)
+            try:
+                self.remove_container(cn)
+            except:
+                exc_info = sys.exc_info()
+                if raise_on_error:
+                    raise PartialResultsError(exc_info, removed_containers)
+            else:
+                removed_containers.append(cn)
+        return removed_containers
 
     def cleanup_images(self, remove_old=False, keep_tags=None, raise_on_error=False):
         """
@@ -176,6 +198,8 @@ class DockerUtilityMixin(object):
         :type keep_tags: list[unicode | str]
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
+        :return: List of removed image ids.
+        :rtype: list[unicode | str]
         """
         used_images = set(self.inspect_container(container['Id'])['Image']
                           for container in self.containers(all=True))
@@ -204,8 +228,17 @@ class DockerUtilityMixin(object):
             image_deps = resolver.get_dependencies(image_id)
             if not keep_images.intersection(image_deps):
                 merge_list(unused_images, image_deps)
+        removed_images = []
         for iid in reversed(unused_images):
-            self.remove_image(iid, raise_on_error=raise_on_error)
+            try:
+                self.remove_image(iid)
+            except:
+                exc_info = sys.exc_info()
+                if raise_on_error:
+                    raise PartialResultsError(exc_info, removed_images)
+            else:
+                removed_images.append(iid)
+        return removed_images
 
     def remove_all_containers(self, stop_timeout=10):
         """
@@ -213,17 +246,34 @@ class DockerUtilityMixin(object):
 
         :param stop_timeout: Timeout to stopping each container.
         :type stop_timeout: int
+        :return: A tuple of two lists: Stopped container ids, and removed container ids.
+        :rtype: (list[unicode | str], list[unicode | str])
         """
-        containers = [(container['Id'], container['Status'].startswith('Exited'))
+        containers = [(container['Id'], container['Status'])
                       for container in self.containers(all=True)]
-        for c_id, stopped in containers:
+        stopped_containers = []
+        for c_id, status in containers:
+            stopped = status.startswith('Exited') or status == 'Dead'
             if not stopped:
                 try:
                     self.stop(c_id, timeout=stop_timeout)
                 except Timeout:
                     log.warning("Container did not stop in time - sent SIGKILL.")
+                except:
+                    exc_info = sys.exc_info()
+                    raise PartialResultsError(exc_info, (stopped_containers, []))
+                else:
+                    stopped_containers.append(c_id)
+        removed_containers = []
         for c_id, __ in containers:
-            self.remove_container(c_id)
+            try:
+                self.remove_container(c_id)
+            except:
+                exc_info = sys.exc_info()
+                raise PartialResultsError(exc_info, (stopped_containers, removed_containers))
+            else:
+                removed_containers.append(c_id)
+        return stopped_containers, removed_containers
 
     def get_container_names(self):
         """
