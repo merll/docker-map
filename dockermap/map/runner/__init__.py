@@ -3,10 +3,11 @@ from collections import namedtuple
 
 from six import with_metaclass
 
-from ...utils import format_image_tag
-from ..input import ItemType
 from ..action import Action
+from ..exceptions import ActionTypeException, ActionException
+from ..input import ItemType
 from ..policy import PolicyUtilMeta, PolicyUtil
+from ...utils import format_image_tag
 
 ActionConfig = namedtuple('ActionConfig', ['client_name', 'config_id', 'client_config', 'client',
                                            'container_map', 'config'])
@@ -77,10 +78,13 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                 try:
                     a_method = self.action_methods[(config_type, action_type)]
                 except KeyError:
-                    raise ValueError("Invalid action.", config_type, action_type)
+                    raise ActionTypeException(config_id, action_type)
                 action_config = ActionConfig(action.client_name, action.config_id, client_config, client,
                                              c_map, config)
-                res = a_method(action_config, item_name, **action.extra_data)
+                try:
+                    res = a_method(action_config, item_name, **action.extra_data)
+                except Exception as e:
+                    raise ActionException(e, action.client_name, config_id, action_type)
                 if action_type == Action.CREATE:
                     existing_items.add(item_name)
                 elif action_type == Action.REMOVE:

@@ -2,22 +2,21 @@
 from __future__ import unicode_literals
 
 import logging
-import traceback
 import sys
 
 import docker
-import six
 
+from ..exceptions import PartialResultsError
 from .action import simple, script, update
 from .config.client import ClientConfiguration
 from .config.main import ContainerMap, expand_instances, expand_groups
+from .exceptions import ActionException, ActionRunnerException
 from .input import get_map_config_ids
 from .policy.base import BasePolicy
 from .runner.base import DockerClientRunner
 from .state.base import (SingleStateGenerator, DependencyStateGenerator, DependentStateGenerator,
                          ImageDependencyStateGenerator)
 from .state.update import UpdateStateGenerator
-
 
 log = logging.getLogger(__name__)
 
@@ -34,27 +33,6 @@ def _set_forced_update_ids(kwargs, maps, default_map_name, default_instances):
 def _get_config_ids(value, maps, default_map_name, default_instances):
     input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
     return list(expand_instances(expand_groups(input_ids, maps), maps))
-
-
-class RunnerException(Exception):
-    def __init__(self, src_exc, results):
-        self._src_exc = src_exc
-        self._results = results
-
-    @property
-    def source_exception(self):
-        return self._src_exc
-
-    @property
-    def source_message(self):
-        return ''.join(traceback.format_exception_only(self._src_exc[0], self._src_exc[1]))
-
-    def reraise(self):
-        six.reraise(*self._src_exc)
-
-    @property
-    def results(self):
-        return self._results
 
 
 class MappingDockerClient(object):
@@ -237,7 +215,8 @@ class MappingDockerClient(object):
     def run_actions(self, action_name, config_name, instances=None, map_name=None, **kwargs):
         """
         Runs the entire set of actions performed for the indicated action name. On any client failure this raises a
-        :class:`~RunnerException`, where partial results can be reviewed in the property ``results``.
+        :class:`~dockermap.map.exceptions.ActionRunnerException`, where partial results can be reviewed in the property
+        ``results``, or :class:`~dockermap.exceptions.MiscInvocationError` if no particular action was performed.
 
         :param action_name: Action name.
         :type action_name: unicode | str
@@ -257,9 +236,11 @@ class MappingDockerClient(object):
             try:
                 for res in runner.run_actions(action_list):
                     results.append(res)
+            except ActionException as ae:
+                raise ActionRunnerException.from_action_exception(ae, results)
             except Exception:
                 exc_info = sys.exc_info()
-                raise RunnerException(exc_info, results)
+                raise PartialResultsError(exc_info, results)
         return results
 
     def create(self, container, instances=None, map_name=None, **kwargs):
