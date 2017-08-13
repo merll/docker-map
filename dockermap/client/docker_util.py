@@ -249,30 +249,35 @@ class DockerUtilityMixin(object):
                 removed_images.append(iid)
         return removed_images
 
-    def remove_all_containers(self, stop_timeout=10):
+    def remove_all_containers(self, stop_timeout=10, list_only=False):
         """
         First stops (if necessary) and them removes all containers present on the Docker instance.
 
         :param stop_timeout: Timeout to stopping each container.
         :type stop_timeout: int
+        :param list_only: When set to ``True`` only lists containers, but does not actually stop or remove them.
+        :type list_only: bool
         :return: A tuple of two lists: Stopped container ids, and removed container ids.
         :rtype: (list[unicode | str], list[unicode | str])
         """
         containers = [(container['Id'], container['Status'])
                       for container in self.containers(all=True)]
+        running_containers = [c_id
+                              for c_id, status in containers
+                              if not (status.startswith('Exited') or status == 'Dead')]
+        if list_only:
+            return running_containers, [c[0] for c in containers]
         stopped_containers = []
-        for c_id, status in containers:
-            stopped = status.startswith('Exited') or status == 'Dead'
-            if not stopped:
-                try:
-                    self.stop(c_id, timeout=stop_timeout)
-                except Timeout:
-                    log.warning("Container did not stop in time - sent SIGKILL.")
-                except:
-                    exc_info = sys.exc_info()
-                    raise PartialResultsError(exc_info, (stopped_containers, []))
-                else:
-                    stopped_containers.append(c_id)
+        for c_id in running_containers:
+            try:
+                self.stop(c_id, timeout=stop_timeout)
+            except Timeout:
+                log.warning("Container did not stop in time - sent SIGKILL.")
+            except:
+                exc_info = sys.exc_info()
+                raise PartialResultsError(exc_info, (stopped_containers, []))
+            else:
+                stopped_containers.append(c_id)
         removed_containers = []
         for c_id, __ in containers:
             try:
