@@ -149,7 +149,7 @@ class DockerUtilityMixin(object):
         with DockerContext(dockerfile, finalize=True) as ctx:
             return self.build_from_context(ctx, tag, **kwargs)
 
-    def cleanup_containers(self, include_initial=False, exclude=None, raise_on_error=False):
+    def cleanup_containers(self, include_initial=False, exclude=None, raise_on_error=False, list_only=False):
         """
         Finds all stopped containers and removes them; by default does not remove containers that have never been
         started.
@@ -160,6 +160,8 @@ class DockerUtilityMixin(object):
         :type exclude: collections.Iterable[unicode | str]
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
+        :param list_only: When set to ``True``, only lists containers, but does not actually remove them.
+        :type list_only: bool
         :return: List of removed containers.
         :rtype: list[unicode | str]
         """
@@ -169,14 +171,17 @@ class DockerUtilityMixin(object):
             for container in self.containers(all=True):
                 c_names = [name[1:] for name in container['Names'] or () if name.find('/', 2)]
                 c_status = container['Status']
-                if (((include_initial and c_status == '') or c_status.startswith('Exited')) and
+                if (((include_initial and c_status == '') or c_status.startswith('Exited') or c_status == 'Dead') and
                         exclude_names.isdisjoint(c_names)):
                     c_id = container['Id']
                     c_name = primary_container_name(c_names, default=c_id, strip_trailing_slash=False)
                     yield c_id, c_name
 
+        stopped_containers = list(_stopped_containers())
+        if list_only:
+            return stopped_containers
         removed_containers = []
-        for cid, cn in _stopped_containers():
+        for cid, cn in stopped_containers:
             try:
                 self.remove_container(cn)
             except:
@@ -187,7 +192,7 @@ class DockerUtilityMixin(object):
                 removed_containers.append(cn)
         return removed_containers
 
-    def cleanup_images(self, remove_old=False, keep_tags=None, raise_on_error=False):
+    def cleanup_images(self, remove_old=False, keep_tags=None, raise_on_error=False, list_only=False):
         """
         Finds all images that are neither used by any container nor another image, and removes them; by default does not
         remove repository images.
@@ -198,6 +203,8 @@ class DockerUtilityMixin(object):
         :type keep_tags: list[unicode | str]
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
+        :param list_only: When set to ``True`` only lists images, but does not actually remove them.
+        :type list_only: bool
         :return: List of removed image ids.
         :rtype: list[unicode | str]
         """
@@ -228,6 +235,8 @@ class DockerUtilityMixin(object):
             image_deps = resolver.get_dependencies(image_id)
             if not keep_images.intersection(image_deps):
                 merge_list(unused_images, image_deps)
+        if list_only:
+            return unused_images
         removed_images = []
         for iid in reversed(unused_images):
             try:
