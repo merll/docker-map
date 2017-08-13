@@ -714,7 +714,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.assertEqual(server_state.state_flags & StateFlags.EXEC_COMMANDS, StateFlags.EXEC_COMMANDS)
             self.assertDictEqual(server_state.extra_data, {
                 'exec_commands': [cmd3],
-                'id': get_container_id('{0}.server'.format(self.map_name, 'server')
+                'id': get_container_id('{0}.server'.format(self.map_name, 'server')),
             })
 
 
