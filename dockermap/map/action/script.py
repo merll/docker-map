@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 import logging
 
+from ..exceptions import ScriptActionException
 from ..input import ItemType
 from ..policy import ConfigFlags
 from ..state import State, StateFlags
@@ -11,10 +12,6 @@ from .resume import ResumeActionGenerator
 
 
 log = logging.getLogger(__name__)
-
-
-class ScriptActionException(Exception):
-    pass
 
 
 class ScriptActionGenerator(ResumeActionGenerator):

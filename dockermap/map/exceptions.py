@@ -106,3 +106,27 @@ class ActionRunnerException(SourceExceptionMixin, ClientExceptionMixin, ActionEx
 
     def __str__(self):
         return "Error while running action {0._action_type} on {0._config_id}: {0.source_message}".format(self)
+
+
+@six.python_2_unicode_compatible
+class MapIntegrityError(Exception):
+    """
+    Exception for cases where the configurations are not consistent (e.g. a volume alias is missing on the map).
+    """
+    def __init__(self, message):
+        self._message = message
+
+    @property
+    def message(self):
+        return self._message
+
+    def __str__(self):
+        return self._message
+
+
+class ScriptRunException(Exception):
+    pass
+
+
+class ScriptActionException(Exception):
+    pass

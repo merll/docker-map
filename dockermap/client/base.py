@@ -9,6 +9,7 @@ import six
 import docker
 from docker.errors import APIError
 
+from ..exceptions import DockerStatusError
 from .docker_util import DockerUtilityMixin
 
 log = logging.getLogger(__name__)
@@ -34,24 +35,6 @@ def parse_response(response):
     except ValueError:
         return {}
     return obj
-
-
-class DockerStatusError(Exception):
-    def __init__(self, *args):
-        detail = args[1]
-        if isinstance(detail, dict):
-            detail.pop('message', None)
-            if not detail:
-                args = args[:1]
-        super(DockerStatusError, self).__init__(*args)
-
-    @property
-    def message(self):
-        return self.args[0]
-
-    @property
-    def detail(self):
-        return self.args[1] if len(self.args) > 1 else None
 
 
 class DockerClientWrapper(DockerUtilityMixin, docker.Client):

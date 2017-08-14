@@ -13,6 +13,7 @@ from ...functional import resolve_value
 from ...utils import merge_list
 from .. import DictMap, DefaultDictMap
 from ..input import ItemType, bool_if_set, MapConfigId
+from ..exceptions import MapIntegrityError
 from . import ConfigurationObject, CP
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
@@ -151,17 +152,6 @@ def expand_instances(config_ids, ext_maps, single_instances=True):
         else:
             for i in instances:
                 yield MapConfigId(config_type, map_name, config_name, i)
-
-
-class MapIntegrityError(Exception):
-    """
-    Exception for cases where the configurations are not consistent (e.g. a volume alias is missing on the map).
-    """
-    @property
-    def message(self):
-        if self.args:
-            return self.args[0]
-        return None
 
 
 class ContainerMap(ConfigurationObject):

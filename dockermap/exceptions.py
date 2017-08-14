@@ -54,9 +54,35 @@ class PartialResultsMixin(object):
         return self._results
 
 
+@six.python_2_unicode_compatible
 class PartialResultsError(SourceExceptionMixin, PartialResultsMixin, Exception):
     """
     Exception where partial results might be available.
     """
     def __str__(self):
         return self.source_message
+
+
+@six.python_2_unicode_compatible
+class DockerStatusError(Exception):
+    def __init__(self, message, detail):
+        self._message = message
+        if isinstance(detail, dict):
+            detail.pop('message', None)
+            if not detail:
+                self._detail = None
+            else:
+                self._detail = detail
+        elif detail:
+            self._detail = detail
+
+    @property
+    def message(self):
+        return self._message
+
+    @property
+    def detail(self):
+        return self._detail
+
+    def __str__(self):
+        return self._message

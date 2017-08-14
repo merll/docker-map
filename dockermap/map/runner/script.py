@@ -8,11 +8,8 @@ from requests import Timeout
 import six
 
 from ..action import ContainerUtilAction
+from ..exceptions import ScriptRunException
 from ..input import ItemType
-
-
-class ScriptRunException(Exception):
-    pass
 
 
 class ScriptMixin(object):
