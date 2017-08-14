@@ -272,7 +272,7 @@ class DockerUtilityMixin(object):
             try:
                 self.stop(c_id, timeout=stop_timeout)
             except Timeout:
-                log.warning("Container did not stop in time - sent SIGKILL.")
+                log.warning("Container %s did not stop in time - sent SIGKILL.", c_id)
             except:
                 exc_info = sys.exc_info()
                 raise PartialResultsError(exc_info, (stopped_containers, []))
