@@ -2,6 +2,27 @@
 
 Change History
 ==============
+0.8.0b2
+-------
+* :class:`~dockermap.map.client.MappingDockerClient` now wraps all exceptions so that partial results, i.e. actions that
+  already have been performed on clients. It raises a :class:`~dockermap.map.exceptions.ActionRunnerException`, which
+  provides information about the client and action performed, partial results through
+  :meth:`~dockermap.exceptions.PartialResultsMixin.results`, but also the possibility to re-trigger the original
+  traceback using :meth:`~dockermap.exceptions.SourceExceptionMixin.reraise`.
+* Similarly, direct calls to the utility client :class:`~dockermap.client.base.DockerClientWrapper`, such as
+  :meth:`~dockermap.client.docker_util.DockerUtilityMixin.cleanup_containers` now return a
+  :class:`~dockermap.exceptions.PartialResultsError`.
+* Added :meth:`~dockermap.map.client.MappingDockerClient.signal` method to client.
+* Images have been integrated into the dependency resolution. Images of a container and all of its dependencies can
+  now be pulled with the new command :meth:`~dockermap.map.client.MappingDockerClient.pull_images`.
+* Authentication information for the Docker registry can now be added to
+  :attr:`dockermap.map.config.client.ClientConfiguration.auth_configs` and are considered during login and image pull
+  actions.
+* Added a built-in group ``__all__``, that applies to all containers or even all configured maps on
+  :class:`~dockermap.map.client.MappingDockerClient`.
+* Several adaptions which makes it easier for programs and libraries using the API to evaluate changes.
+* Various bugfixes from 0.8.0b1.
+
 0.8.0b1
 -------
 * Added :attr:`~dockermap.map.config.main.ContainerMap.groups`: Generally an action (e.g. startup of containers) can
