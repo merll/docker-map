@@ -191,7 +191,7 @@ class DockerUtilityMixin(object):
                 removed_containers.append(cn)
         return removed_containers
 
-    def cleanup_images(self, remove_old=False, keep_tags=None, raise_on_error=False, list_only=False):
+    def cleanup_images(self, remove_old=False, keep_tags=None, force=False, raise_on_error=False, list_only=False):
         """
         Finds all images that are neither used by any container nor another image, and removes them; by default does not
         remove repository images.
@@ -200,6 +200,9 @@ class DockerUtilityMixin(object):
         :type remove_old: bool
         :param keep_tags: List of tags to not remove.
         :type keep_tags: list[unicode | str]
+        :param force: If an image is referenced by multiple repositories, Docker by default will not remove the image.
+          Setting this to ``True`` forces the removal.
+        :type force: bool
         :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
         :type raise_on_error: bool
         :param list_only: When set to ``True`` only lists images, but does not actually remove them.
@@ -237,7 +240,7 @@ class DockerUtilityMixin(object):
         removed_images = []
         for iid in unused_images:
             try:
-                self.remove_image(iid)
+                self.remove_image(iid, force=force)
             except:
                 exc_info = sys.exc_info()
                 if raise_on_error:
