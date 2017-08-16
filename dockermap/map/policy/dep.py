@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from ...dep import MultiDependencyResolver, CircularDependency
+from ...dep import MultiForwardDependencyResolver, MultiReverseDependencyResolver, CircularDependency
 from ...utils import merge_list
 from ..input import ItemType
 
 
-class ContainerDependencyResolver(MultiDependencyResolver):
+class ContainerDependencyMergeMixin(object):
     """
     Resolves dependencies between :class:`~dockermap.map.config.container.ContainerConfiguration` instances, based on
     shared and used volumes.
@@ -35,3 +35,11 @@ class ContainerDependencyResolver(MultiDependencyResolver):
         if item in dep:
             raise CircularDependency("Circular dependency found for item '{0}'.".format(item))
         return dep
+
+
+class ContainerDependencyResolver(ContainerDependencyMergeMixin, MultiForwardDependencyResolver):
+    pass
+
+
+class ContainerDependentsResolver(ContainerDependencyMergeMixin, MultiReverseDependencyResolver):
+    pass

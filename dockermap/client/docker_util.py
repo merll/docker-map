@@ -7,9 +7,8 @@ import sys
 from requests import Timeout
 
 from ..build.context import DockerContext
-from ..dep import SingleDependencyResolver
+from ..dep import ImageDependentsResolver
 from ..exceptions import PartialResultsError
-from ..utils import merge_list
 
 
 log = logging.getLogger(__name__)
@@ -229,16 +228,14 @@ class DockerUtilityMixin(object):
         test_images = [image['Id']
                        for image in all_images
                        if image['Id'] not in keep_images]
-        resolver = SingleDependencyResolver(image_dependencies)
-        unused_images = []
-        for image_id in test_images:
-            image_deps = resolver.get_dependencies(image_id)
-            if not keep_images.intersection(image_deps):
-                merge_list(unused_images, image_deps)
+        resolver = ImageDependentsResolver(image_dependencies)
+        unused_images = [image_id
+                         for image_id in test_images
+                         if keep_images.isdisjoint(resolver.get_dependencies(image_id))]
         if list_only:
             return unused_images
         removed_images = []
-        for iid in reversed(unused_images):
+        for iid in unused_images:
             try:
                 self.remove_image(iid)
             except:

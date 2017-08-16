@@ -7,7 +7,7 @@ from six import iteritems, itervalues
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT, DEFAULT_PRESET_NETWORKS
 from .cache import ContainerCache, ImageCache, NetworkCache
-from .dep import ContainerDependencyResolver
+from .dep import ContainerDependencyResolver, ContainerDependentsResolver
 
 log = logging.getLogger(__name__)
 
@@ -37,11 +37,11 @@ class BasePolicy(object):
         self._network_names = NetworkCache(clients)
         self._images = ImageCache(clients)
         self._f_resolver = ContainerDependencyResolver()
-        self._r_resolver = ContainerDependencyResolver()
+        self._r_resolver = ContainerDependentsResolver()
         for m in itervalues(maps):
             depdendency_items = list(m.dependency_items())
             self._f_resolver.update(depdendency_items)
-            self._r_resolver.update_backward(depdendency_items)
+            self._r_resolver.update(depdendency_items)
 
     @classmethod
     def cname(cls, map_name, container, instance=None):

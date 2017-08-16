@@ -6,8 +6,8 @@ import six
 
 from dockermap.api import ContainerMap
 from dockermap.map.input import ItemType
-from dockermap.dep import SingleDependencyResolver
-from dockermap.map.policy.dep import ContainerDependencyResolver
+from dockermap.dep import ImageDependentsResolver
+from dockermap.map.policy.dep import ContainerDependencyResolver, ContainerDependentsResolver
 
 
 TEST_MAP_DATA = {
@@ -33,11 +33,9 @@ TEST_IMG_DATA = [
 class ContainerDependencyTest(unittest.TestCase):
     def setUp(self):
         test_map = ContainerMap('test_map', initial=TEST_MAP_DATA, check_integrity=False)
-        self.f_res = ContainerDependencyResolver()
         dependency_items = list(test_map.dependency_items())
-        self.f_res.update(dependency_items)
-        self.r_res = ContainerDependencyResolver()
-        self.r_res.update_backward(dependency_items)
+        self.f_res = ContainerDependencyResolver(dependency_items)
+        self.r_res = ContainerDependentsResolver(dependency_items)
 
     def assertOrder(self, dependency_list, *items):
         iterator = iter(items)
@@ -94,16 +92,16 @@ class ContainerDependencyTest(unittest.TestCase):
                          (ItemType.CONTAINER, 'test_map', 'd', '2'))
 
 
-class SingleDependencyTest(unittest.TestCase):
+class ImageDependenceTest(unittest.TestCase):
     def setUp(self):
-        self.res = SingleDependencyResolver(TEST_IMG_DATA)
+        self.res = ImageDependentsResolver(TEST_IMG_DATA)
 
     def test_image_dependencies(self):
-        self.assertListEqual(['b', 'c', 'e'], self.res.get_dependencies('a'))
-        self.assertListEqual(['c', 'e'], self.res.get_dependencies('b'))
-        self.assertListEqual(['e'], self.res.get_dependencies('c'))
-        self.assertListEqual([], self.res.get_dependencies('e'))
-        self.assertListEqual(['x'], self.res.get_dependencies('f'))
+        self.assertListEqual([], self.res.get_dependencies('a'))
+        self.assertListEqual(['a'], self.res.get_dependencies('b'))
+        self.assertListEqual(['a', 'b'], self.res.get_dependencies('c'))
+        self.assertListEqual(['a', 'b', 'c', 'd'], self.res.get_dependencies('e'))
+        self.assertListEqual(['f'], self.res.get_dependencies('x'))
 
 
 if __name__ == '__main__':

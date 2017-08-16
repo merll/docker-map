@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from abc import ABCMeta
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from six import iteritems, with_metaclass
 
@@ -76,13 +76,7 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
     """
     Base class for resolving dependencies of hierarchical nodes. Not each node has to be relevant, and on each level
     parent dependencies can be merged with the current node.
-
-    :param initial: Optional: Iterable or dictionary in the format `(dependent_item, dependence)`.
-    :type initial: collections.Iterable
     """
-    def __init__(self, initial=None):
-        self._deps = _dependency_dict(initial)
-
     def __contains__(self, item):
         return item in self._deps
 
@@ -93,33 +87,6 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         :return: Default value.
         """
         return []
-
-    def merge_dependency(self, item, resolve_parent, parent):
-        """
-        Called by :meth:`~BaseDependencyResolver.get_dependencies` once on each node. The result is cached for
-        re-occurring checks. This method determines the relevancy (and potentially additional dependencies) of the
-        current node `item`, and how the result is merged with dependencies from the deeper hierarchy. The latter are
-        resolved by calling `resolve_parent(parent)`.
-
-        By default, this function will always return a list only containing the parent itself (or an empty list, if
-        there is none).
-
-        This function should, if applicable, also check for potential infinite recursions and in that case raise
-        a :class:`~CircularDependency` exception.
-
-        :param item: Current node.
-        :param resolve_parent: Function to check on dependencies deeper in the hierarchy.
-        :type resolve_parent: function
-        :param parent: Parent node(s).
-        :return: Result of the dependency merge. May be boolean, a list, a set, or anything else that represents all
-         dependencies.
-        :rtype: collections.Iterable
-        """
-        if parent is None:
-            return self.get_default()
-        dependencies = [parent]
-        dependencies.extend(resolve_parent(parent))
-        return dependencies
 
     def get_dependencies(self, item):
         """
@@ -158,23 +125,43 @@ class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
         for value in self._deps.values():
             value.dependencies = NotInitialized
 
+    @abstractmethod
+    def merge_dependency(self, item, resolve_parent, parent):
+        pass
+
+    @abstractmethod
     def update(self, items):
+        pass
+
+
+class ImageDependentsResolver(BaseDependencyResolver):
+    def __init__(self, initial=None):
+        self._deps = defaultdict(lambda: CachedDependency([]))
+        self.update(initial)
+
+    def merge_dependency(self, item, resolve_parent, parents):
         """
-        Updates the dependencies with the given items. Note that this may not reset all previously-evaluated and cached
-        nodes.
+        Merge dependencies of element with further dependencies. First parent dependencies are checked, and then
+        immediate dependencies of the current element should be added to the list, but without duplicating any entries.
 
-        :param items: Iterable or dictionary in the format `(dependent_item, dependence)`.
-        :type items: collections.Iterable
+        :param item: Item.
+        :param resolve_parent: Function to resolve parent dependencies.
+        :type resolve_parent: function
+        :type parents: collections.Iterable
+        :return: List of recursively resolved dependencies of this container.
+        :rtype: list
+        :raise CircularDependency: If the current element depends on one found deeper in the hierarchy.
         """
-        self._deps.update(_dependency_dict(items))
+        dep = []
+        for parent_key in parents:
+            parent_dep = resolve_parent(parent_key)
+            merge_list(dep, parent_dep)
+        merge_list(dep, parents)
+        if item in dep:
+            raise CircularDependency("Circular dependency found for item '{0}'.".format(item))
+        return dep
 
-
-class SingleDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
-    """
-    Abstract, partial implementation of a dependency resolver for nodes in a 1:n relationship, i.e. that each node
-    depends on exactly one item.
-    """
-    def update_backward(self, items):
+    def update(self, items):
         """
         Updates the dependencies in the inverse relationship format, i.e. from an iterable or dict that is structured
         as `(item, dependent_items)`. Note that this implementation is only valid for 1:1 relationships, i.e. that each
@@ -183,34 +170,19 @@ class SingleDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
         :param items: Iterable or dictionary in the format `(item, dependent_items)`.
         :type items: collections.Iterable
         """
-        for parent, sub_items in items:
-            for si in sub_items:
-                self._deps[si] = CachedDependency(parent)
+        for parent, sub_item in _iterate_dependencies(items):
+            dep = self._deps[sub_item]
+            if parent not in dep.parent:
+                dep.parent.append(parent)
 
 
-class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
+class MultiForwardDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
     """
     Abstract, partial implementation of a dependency resolver for nodes in a m:n relationship, i.e. that each node
     depends on one or multiple items.
     """
     def __init__(self, initial=None):
         self._deps = defaultdict(lambda: CachedDependency([]), _dependency_dict(initial))
-
-    def merge_dependency(self, item, resolve_parent, parents):
-        """
-        Performs the same operation as :meth:`~BaseDependencyResolver.merge_dependency`, but considering that the node
-        `item` may have multiple dependencies `parent`.
-
-        :param item: Current node.
-        :param resolve_parent: Function to check on dependencies deeper in the hierarchy.
-        :type resolve_parent: function
-        :param parents: Parent nodes.
-        :type parents: collections.Iterable
-        :return: Result of the dependency merge. May be boolean, a set, or anything else that represents all
-         dependencies.
-        :rtype: bool
-        """
-        return parents is not None and any(resolve_parent(parent) for parent in parents)
 
     def update(self, items):
         """
@@ -224,7 +196,13 @@ class MultiDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
             dep = self._deps[item]
             merge_list(dep.parent, parents)
 
-    def update_backward(self, items):
+
+class MultiReverseDependencyResolver(with_metaclass(ABCMeta, BaseDependencyResolver)):
+    def __init__(self, initial=None):
+        self._deps = defaultdict(lambda: CachedDependency([]))
+        self.update(initial)
+
+    def update(self, items):
         """
         Updates the dependencies in the inverse relationship format, i.e. from an iterable or dict that is structured
         as `(item, dependent_items)`. The parent element `item` may occur multiple times.
