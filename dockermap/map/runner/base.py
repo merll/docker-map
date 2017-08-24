@@ -88,11 +88,11 @@ class DockerBaseRunnerMixin(object):
 
     def kill(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_kill_kwargs(action, c_name, kwargs=kwargs)
-        return action.client.kill(c_name, **c_kwargs)
+        return action.client.kill(**c_kwargs)
 
     def wait(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_wait_kwargs(action, c_name, kwargs=kwargs)
-        return action.client.wait(c_name, **c_kwargs)
+        return action.client.wait(**c_kwargs)
 
 
 class DockerConfigMixin(object):
