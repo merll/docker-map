@@ -64,7 +64,7 @@ class NetworkUtilMixin(object):
             disconnect_kwargs = self.get_network_disconnect_kwargs(action, network_name, c_name, kwargs=kwargs)
             client.disconnect_container_from_network(**disconnect_kwargs)
 
-    def connect_networks(self, action, container_name, endpoints, skip_first=True, **kwargs):
+    def connect_networks(self, action, container_name, endpoints, skip_first=False, **kwargs):
         """
         Connects a container to a set of configured networks. By default this assumes the container has just been
         created, so it will skip the first network that is already considered during creation.
@@ -75,7 +75,8 @@ class NetworkUtilMixin(object):
         :type container_name: unicode | str
         :param endpoints: Network endpoint configurations.
         :type endpoints: list[dockermap.map.input.NetworkEndpoint]
-        :param skip_first: Skip the first network. Set to ``False``, if the default behavior is not applicable.
+        :param skip_first: Skip the first network passed in ``endpoints``. Defaults to ``False``, but should be set
+          to ``True`` when the container has just been created and the first network has been set up there.
         :type skip_first: bool
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
@@ -113,7 +114,9 @@ class NetworkUtilMixin(object):
 
     def connect_all_networks(self, action, container_name, **kwargs):
         """
-        Connects a container to all of its configured networks.
+        Connects a container to all of its configured networks. Assuming that this is typically used after container
+        creation, where teh first endpoint is already defined, this skips the first configuration. Pass ``skip_first``
+        as ``False`` to change this.
 
         :param action: Action configuration.
         :type action: dockermap.map.runner.ActionConfig
@@ -122,4 +125,5 @@ class NetworkUtilMixin(object):
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict
         """
+        kwargs.setdefault('skip_first', True)
         self.connect_networks(action, container_name, action.config.networks, **kwargs)
