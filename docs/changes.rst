@@ -21,7 +21,17 @@ Change History
 * Added a built-in group ``__all__``, that applies to all containers or even all configured maps on
   :class:`~dockermap.map.client.MappingDockerClient`.
 * Several adaptions which makes it easier for programs and libraries using the API to evaluate changes.
+* More fixes to image dependency check, so that
+  :meth:`~dockermap.client.docker_util.DockerUtilityMixin.cleanup_images` now works reliably. Removals can also be
+  forced where applicable.
+* Implemented CLI, missing from 0.8.0b1.
 * Various bugfixes from 0.8.0b1.
+
+Known issues
+""""""""""""
+* The containers are not yet checked if their endpoint configuration details match the running instance.
+* Volumes will be re-implemented to make use of Docker's built-in functionality as found in more recent Docker versions.
+  The current implementation however still works for all versions.
 
 0.8.0b1
 -------
@@ -34,13 +44,6 @@ Change History
   on a map. Referring to them in the property :attr:`~dockermap.map.config.container.ContainerConfiguration.networks`
   from one or multiple container configurations will create them automatically. The former ``network`` setting has been
   renamed to :attr:`~dockermap.map.config.container.ContainerConfiguration.network_mode` for disambiguation.
-
-Known issues
-""""""""""""
-* Networks are not yet implemented for the CLI.
-* The containers are not yet checked if their endpoint configuration details match the running instance.
-* Volumes will be re-implemented to make use of Docker's built-in functionality as found in more recent Docker versions.
-  The current implementation however still works for all versions.
 
 0.7.6
 -----
