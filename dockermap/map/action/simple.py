@@ -218,10 +218,11 @@ class SignalActionGenerator(AbstractActionGenerator):
 
 
 class ImagePullActionGenerator(AbstractActionGenerator):
+    pull_all_images = False
     pull_insecure_registry = False
-    policy_options = ['pull_insecure_regsitry']
+    policy_options = ['pull_all_images', 'pull_insecure_regsitry']
 
     def get_state_actions(self, state, **kwargs):
-        if state.config_id.config_type == ItemType.IMAGE and state.base_state == State.ABSENT:
+        if state.config_id.config_type == ItemType.IMAGE and (self.pull_all_images or state.base_state == State.ABSENT):
             return [ItemAction(state, ImageAction.PULL,
                     insecure_registry=self.pull_insecure_registry)]
