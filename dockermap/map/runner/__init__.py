@@ -4,7 +4,7 @@ import sys
 
 from six import with_metaclass
 
-from ..action import Action
+from ..action import Action, ImageAction
 from ..exceptions import ActionTypeException, ActionException
 from ..input import ItemType
 from ..policy import PolicyUtilMeta, PolicyUtil
@@ -71,7 +71,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
             elif config_type == ItemType.IMAGE:
                 config = None
                 item_name = format_image_tag(config_id.config_name, config_id.instance_name)
-                existing_items = policy.images[action.client_name]
+                existing_items = None
             else:
                 raise ValueError("Invalid configuration type.", config_id.config_type)
 
@@ -91,5 +91,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                     existing_items.add(item_name)
                 elif action_type == Action.REMOVE:
                     existing_items.discard(item_name)
+                elif action_type == ImageAction.PULL:
+                    policy.images[action.client_name].refresh_repo(config_id.config_name)
                 if res is not None:
                     yield ActionOutput(action.client_name, config_id, action_type, res)

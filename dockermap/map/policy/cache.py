@@ -25,6 +25,12 @@ class CachedImages(CachedItems, dict):
     """
     Dictionary of image names and ids, which also keeps track of the client object to pull images if necessary.
     """
+    def _update(self, image_list):
+        for image in image_list:
+            tags = image.get('RepoTags')
+            if tags:
+                self.update({tag: image['Id'] for tag in tags})
+
     def refresh(self):
         """
         Fetches image and their ids from the client.
@@ -33,10 +39,16 @@ class CachedImages(CachedItems, dict):
             return
         current_images = self._client.images()
         self.clear()
+        self._update(current_images)
         for image in current_images:
             tags = image.get('RepoTags')
             if tags:
                 self.update({tag: image['Id'] for tag in tags})
+
+    def refresh_repo(self, name):
+        if not self._client:
+            return
+        self._update(self._client.images(name=name))
 
 
 class CachedContainerNames(CachedItems, set):
