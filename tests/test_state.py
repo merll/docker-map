@@ -140,7 +140,13 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
         path_prefix = '/invalid_{0}'.format(config_id.config_name)
     for a in c_config.attaches:
         c_path = container_map.volumes[a]
-        yield {'Source': posixpath.join(path_prefix, 'attached', a), 'Destination': c_path, 'RW': True}
+        yield {
+            'Type': 'volume',
+            'Source': posixpath.join(path_prefix, 'attached', a),
+            'Destination': c_path,
+            'Name': _get_hash('attached-volume', path_prefix, a),
+            'RW': True
+        }
     if config_id.config_type == ItemType.CONTAINER:
         for vol, ro in c_config.binds:
             if isinstance(vol, tuple):
@@ -149,15 +155,32 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
             else:
                 c_path = container_map.volumes[vol]
                 h_path = container_map.host.get_path(vol, config_id.instance_name)
-            yield {'Source': posixpath.join(path_prefix, h_path), 'Destination': c_path, 'RW': not ro}
+            yield {
+                'Type': 'bind',
+                'Source': posixpath.join(path_prefix, h_path),
+                'Destination': c_path,
+                'RW': not ro,
+            }
         for s in c_config.shares:
-            yield {'Source': posixpath.join(path_prefix, 'shared', s), 'Destination': s, 'RW': True}
+            yield {
+                'Type': 'volume',
+                'Source': posixpath.join(path_prefix, 'shared', s),
+                'Destination': s,
+                'Name': _get_hash('shared-volume', path_prefix, s),
+                'RW': True,
+            }
         for vol, ro in c_config.uses:
             c, __, i = vol.partition('.')
             c_ref = container_map.get_existing(c)
             if i in c_ref.attaches:
                 c_path = container_map.volumes[i]
-                yield {'Source': posixpath.join(path_prefix, 'attached', i), 'Destination': c_path, 'RW': not ro}
+                yield {
+                    'Type': 'volume',
+                    'Source': posixpath.join(path_prefix, 'attached', i),
+                    'Destination': c_path,
+                    'Name': _get_hash('attached-volume', path_prefix, i),
+                    'RW': not ro,
+                }
             elif c_ref and (not i or i in c_ref.instances):
                 for r_mount in _get_container_mounts(MapConfigId(config_id.config_type, config_id.map_name, c, i),
                                                      container_map, c_ref, valid):
