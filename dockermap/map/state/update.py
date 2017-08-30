@@ -209,9 +209,9 @@ class ContainerVolumeChecker(object):
     def __init__(self):
         self._vfs_paths = {}
 
-    def register_attached(self, mapped_path, path, alias, parent_name=None):
-        alias = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
-        self._vfs_paths[alias, None, mapped_path] = path
+    def register_attached(self, alias, parent_name, mapped_path, path):
+        volume_name = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
+        self._vfs_paths[volume_name, None, mapped_path] = path
 
     def check(self, config_id, container_map, container_config, instance_detail):
         instance_volumes = get_instance_volumes(instance_detail)
@@ -430,11 +430,9 @@ class UpdateContainerState(ContainerBaseState):
             volumes = get_instance_volumes(self.detail)
             if volumes:
                 mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name])
-                if self.container_map.use_attached_parent_name:
-                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), config_id.instance_name,
-                                                          config_id.config_name)
-                else:
-                    self.volume_checker.register_attached(mapped_path, volumes.get(mapped_path), config_id.instance_name)
+                parent_name = config_id.config_name if self.container_map.use_attached_parent_name else None
+                self.volume_checker.register_attached(config_id.instance_name, parent_name,
+                                                      mapped_path, volumes.get(mapped_path))
         else:
             image_name = format_image_tag(self.container_map.get_image(self.config.image or config_id.config_name))
             images = self.policy.images[self.client_name]
