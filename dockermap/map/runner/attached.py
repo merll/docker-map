@@ -146,13 +146,17 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         client = action.client
         if not (self.prepare_local and hasattr(client, 'run_cmd')):
             return self._prepare_container(client, action, a_name)
-        instance_detail = client.inspect_container(a_name)
-        volumes = get_instance_volumes(instance_detail)
-        path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
-        local_path = volumes.get(path)
-        if not local_path:
-            raise ValueError("Could not locate local path of volume alias '{0}' / "
-                             "path '{1}' in container {2}.".format(action.config_id.instance_name, path, a_name))
+        if action.client_config.supports_volumes:
+            volume_detail = client.inspect_volume(a_name)
+            local_path = volume_detail['Mountpoint']
+        else:
+            instance_detail = client.inspect_container(a_name)
+            volumes = get_instance_volumes(instance_detail)
+            path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
+            local_path = volumes.get(path)
+            if not local_path:
+                raise ValueError("Could not locate local path of volume alias '{0}' / "
+                                 "path '{1}' in container {2}.".format(action.config_id.instance_name, path, a_name))
         return [
             client.run_cmd(cmd)
             for cmd in get_preparation_cmd(action.config, local_path)
