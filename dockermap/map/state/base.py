@@ -207,6 +207,58 @@ class NetworkBaseState(AbstractState):
         return State.PRESENT, state_flag, {'id': n_id, 'containers': connected_containers}
 
 
+class VolumeBaseState(AbstractState):
+    """
+    Base implementation for determining the current state of a single volume on the client.
+
+    :param policy: Policy object.
+    :type policy: dockermap.map.policy.base.BasePolicy
+    :param options: Dictionary of options passed to the state generator.
+    :type options: dict
+    :param client_name: Client name.
+    :type client_name: unicode | str
+    :param config_id: Configuration id tuple.
+    :type config_id: dockermap.map.input.MapConfigId
+    :param container_map: Container map instance.
+    :type container_map: dockermap.map.config.main.ContainerMap
+    :param config: Network configuration object.
+    :type config: dockermap.map.config.network.NetworkConfiguration
+    :param config_flags: Config flags on the container.
+    :type config_flags: int
+    """
+    def __init__(self, *args, **kwargs):
+        super(VolumeBaseState, self).__init__(*args, **kwargs)
+        self.volume_name = None
+
+    def set_defaults(self, *args, **kwargs):
+        self.volume_name = None
+
+    def inspect(self):
+        """
+        Inspects the network state.
+        """
+        if not self.client_config.supports_volumes:
+            raise ValueError("Client does not support volume configuration.", self.client_name)
+        config_id = self.config_id
+        parent_name = config_id.config_name if self.container_map.use_attached_parent_name else None
+        volume_name = self.volume_name = self.policy.aname(config_id.map_name, config_id.instance_name,
+                                                           parent_name=parent_name)
+        if volume_name in self.policy.volume_names[self.client_name]:
+            self.detail = self.client.inspect_volume(volume_name)
+        else:
+            self.detail = NOT_FOUND
+
+    def get_state(self):
+        if self.detail is NOT_FOUND:
+            return State.ABSENT, StateFlags.NONE, {}
+        force_update = self.options['force_update']
+        if force_update and self.config_id in force_update:
+            state_flag = StateFlags.FORCED_RESET
+        else:
+            state_flag = StateFlags.NONE
+        return State.PRESENT, state_flag, {}
+
+
 class ImageBaseState(AbstractState):
     """
     Base implementation for determining the current state of an image. There is no configuration object passed to
