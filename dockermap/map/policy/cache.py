@@ -78,6 +78,18 @@ class CachedNetworkNames(CachedItems, set):
         self.update(net['Name'] for net in current_networks)
 
 
+class CachedVolumeNames(CachedItems, set):
+    def refresh(self):
+        """
+        Fetches all current network names from the client.
+        """
+        if not self._client:
+            return
+        current_volumes = self._client.volumes()
+        self.clear()
+        self.update(vol['Name'] for vol in current_volumes)
+
+
 class DockerHostItemCache(dict):
     """
     Abstract class for implementing caches of items (containers, images) present on the Docker client, so that
@@ -137,3 +149,22 @@ class NetworkCache(DockerHostItemCache):
     Fetches and caches network names from a Docker host.
     """
     item_class = CachedNetworkNames
+
+    def refresh(self, item):
+        client_config = self._clients[item]
+        if client_config.supports_networks:
+            return super(NetworkCache, self).refresh(item)
+        raise ValueError("Client does not support network configuration.", item)
+
+
+class VolumeCache(DockerHostItemCache):
+    """
+    Fetches and caches volume names from a Docker host.
+    """
+    item_class = CachedVolumeNames
+
+    def refresh(self, item):
+        client_config = self._clients[item]
+        if client_config.supports_volumes:
+            return super(VolumeCache, self).refresh(item)
+        raise ValueError("Client does not support volume configuration.", item)
