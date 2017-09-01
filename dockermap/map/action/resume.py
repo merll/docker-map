@@ -29,11 +29,11 @@ class ResumeActionGenerator(AbstractActionGenerator):
         config_tuple = (state.client_name, state.config_id.map_name, state.config_id.config_name)
         if config_type == ItemType.VOLUME:
             if state.base_state == State.ABSENT:
-                action = DerivedAction.STARTUP_VOLUME
+                action = Action.CREATE
                 self.recreated_volumes.add(config_tuple)
             else:
                 if state.state_flags & StateFlags.NONRECOVERABLE:
-                    action = DerivedAction.RELAUNCH_VOLUME
+                    action = DerivedAction.RESET_VOLUME
                     self.recreated_volumes.add(config_tuple)
                 elif state.state_flags & StateFlags.INITIAL:
                     action = Action.START

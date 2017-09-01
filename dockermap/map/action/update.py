@@ -57,19 +57,14 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 return [ItemAction(state, ImageAction.PULL,
                                    insecure_registry=self.pull_insecure_registry)]
         elif config_type == ItemType.VOLUME:
-            # TODO: To be changed for Docker volumes.
             if state.base_state == State.ABSENT:
-                log.debug("Not found - creating and starting attached container %s.", config_id)
-                action_type = DerivedAction.STARTUP_VOLUME
+                log.debug("Not found - creating attached volume %s.", config_id)
+                action_type = Action.CREATE
             elif state.state_flags & StateFlags.NEEDS_RESET:
-                if state.base_state == State.RUNNING:
-                    log.debug("Found to be outdated or non-recoverable - resetting %s.", config_id)
-                    action_type = DerivedAction.RESET_VOLUME
-                else:
-                    log.debug("Found to be outdated or non-recoverable - relaunching %s.", config_id)
-                    action_type = DerivedAction.RELAUNCH_VOLUME
+                log.debug("Found to be outdated or non-recoverable - resetting %s.", config_id)
+                action_type = DerivedAction.RESET_VOLUME
             elif state.state_flags & StateFlags.INITIAL:
-                log.debug("Container found but initial, starting %s.", config_id)
+                log.debug("Container for attached volume found but initial, starting %s.", config_id)
                 action_type = Action.START
             else:
                 return None

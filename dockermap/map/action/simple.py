@@ -140,7 +140,7 @@ class StartupActionGenerator(AbstractActionGenerator):
         if config_type == ItemType.VOLUME:
             if state.base_state == State.ABSENT:
                 return [
-                    ItemAction(state, DerivedAction.STARTUP_VOLUME),
+                    ItemAction(state, Action.CREATE),
                     ItemAction(state, VolumeUtilAction.PREPARE),
                 ]
             elif state.base_state == State.PRESENT and state.state_flags & StateFlags.INITIAL:

@@ -45,16 +45,13 @@ class ImageAction(ActionEnum):
 
 
 class DerivedAction(object):
-    STARTUP_VOLUME = [Action.CREATE, Action.START]                         # Create & start
     STARTUP_CONTAINER = [Action.CREATE, ContainerUtilAction.CONNECT_ALL,
                          Action.START]                                     # Create, connect, & start
     SHUTDOWN_CONTAINER = [ContainerUtilAction.SIGNAL_STOP, Action.REMOVE]  # Stop & remove
-    RESET_VOLUME = [ContainerUtilAction.SIGNAL_STOP, Action.REMOVE,
-                    Action.CREATE, Action.START]                           # Stop, remove, create, & start
     RESET_CONTAINER = [ContainerUtilAction.SIGNAL_STOP, Action.REMOVE,
                        Action.CREATE, ContainerUtilAction.CONNECT_ALL,
                        Action.START]                                       # Stop, remove, create, connect, & start
-    RELAUNCH_VOLUME = [Action.REMOVE, Action.CREATE, Action.START]         # Remove, create, & start
+    RESET_VOLUME = [Action.REMOVE, Action.CREATE]                          # Remove, create, & start
     RELAUNCH_CONTAINER = [Action.REMOVE, Action.CREATE,
                           ContainerUtilAction.CONNECT_ALL, Action.START]   # Remove, create, connect, & start
     RESET_NETWORK = [Action.REMOVE, Action.CREATE]                         # Remove & re-create

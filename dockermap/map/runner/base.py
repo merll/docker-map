@@ -30,7 +30,6 @@ log = logging.getLogger(__name__)
 class DockerBaseRunnerMixin(object):
     action_method_names = [
         (ItemType.VOLUME, Action.CREATE, 'create_volume'),
-        (ItemType.VOLUME, Action.START, 'start_volume'),
         (ItemType.VOLUME, Action.REMOVE, 'remove_volume'),
 
         (ItemType.CONTAINER, Action.CREATE, 'create_container'),
@@ -43,22 +42,26 @@ class DockerBaseRunnerMixin(object):
     ]
 
     def create_volume(self, action, v_name, **kwargs):
-        c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
-        return action.client.create_container(**c_kwargs)
-
-    def start_volume(self, action, v_name, **kwargs):
-        # TODO: Merge with create.
-        if action.client_config.get('use_host_config'):
-            res = action.client.start(v_name)
+        if action.client_config.supports_volumes:
+            # TODO Implement for volumes.
+            pass
         else:
-            c_kwargs = self.get_attached_container_host_config_kwargs(action, v_name, kwargs=kwargs)
-            res = action.client.start(**c_kwargs)
-        return res
+            c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
+            res = action.client.create_container(**c_kwargs)
+            if action.client_config.get('use_host_config'):
+                action.client.start(v_name)
+            else:
+                c_kwargs = self.get_attached_container_host_config_kwargs(action, v_name, kwargs=kwargs)
+                action.client.start(**c_kwargs)
+            return res
 
     def remove_volume(self, action, c_name, **kwargs):
-        # TODO: Currently this is a copy of remove_container. Vary implementation for directly using Docker volumes.
-        c_kwargs = self.get_container_remove_kwargs(action, c_name, kwargs=kwargs)
-        return action.client.remove_container(**c_kwargs)
+        if action.client_config.supports_volumes:
+            # TODO Implement for volumes.
+            pass
+        else:
+            c_kwargs = self.get_container_remove_kwargs(action, c_name, kwargs=kwargs)
+            return action.client.remove_container(**c_kwargs)
 
     def create_container(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_create_kwargs(action, c_name, kwargs=kwargs)
