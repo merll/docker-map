@@ -8,6 +8,7 @@ from .. import DictMap
 
 HOST_CONFIG_VERSION = StrictVersion(str('1.15'))
 NETWORKS_VERSION = StrictVersion(str('1.21'))
+VOLUMES_VERSION = StrictVersion(str('1.21'))
 USE_HC_MERGE = 'merge'
 
 
@@ -33,6 +34,7 @@ class ClientConfiguration(DictMap):
         self._version = version
         self.use_host_config = kwargs.pop('use_host_config', False)
         self.supports_networks = False
+        self.supports_volumes = False
         self._timeout = timeout
         if 'interfaces' in kwargs:
             self._interfaces = DictMap(kwargs.pop('interfaces'))
@@ -73,6 +75,7 @@ class ClientConfiguration(DictMap):
             version_str = str(version)
             self.use_host_config = version_str >= HOST_CONFIG_VERSION
             self.supports_networks = version_str >= NETWORKS_VERSION
+            self.supports_volumes = version_str >= VOLUMES_VERSION
 
     def get_init_kwargs(self):
         """
