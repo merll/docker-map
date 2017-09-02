@@ -14,12 +14,11 @@ Before version 0.7.0, policies compared container maps to the current state on t
 directly. In later versions, implementations of :class:`~dockermap.map.policy.base.BasePolicy` only define a few
 guidelines, such as how containers are named, how image names are resolved, and which client objects to use:
 
-* :meth:`~dockermap.map.policy.base.BasePolicy.get_clients` provides the clients, that a client configuration should be
-  applied to;
 * :meth:`~dockermap.map.policy.base.BasePolicy.get_dependencies` and
   :meth:`~dockermap.map.policy.base.BasePolicy.get_dependents` return the dependency path of
   containers for deciding in which order to create, start, stop, and remove containers;
 * :meth:`~dockermap.map.policy.base.BasePolicy.cname`,
+  :meth:`~dockermap.map.policy.base.BasePolicy.aname`,
   :meth:`~dockermap.map.policy.base.BasePolicy.nname`,
   :meth:`~dockermap.map.policy.base.BasePolicy.image_name`,
   :meth:`~dockermap.map.policy.base.BasePolicy.get_hostname` generate inputs for aforementioned functions. They can

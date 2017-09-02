@@ -131,25 +131,6 @@ class BasePolicy(object):
             client_suffix = client_suffix.replace(old, new)
         return '{0}-{1}'.format(base_name, client_suffix)
 
-    def get_clients(self, c_map, c_config=None):
-        """
-        Returns the client configuration names for a given item configuration or map. If there are no clients specified
-        for the configuration, the list defaults to the one globally specified for the given map. If that is not defined
-        either, the default client is returned.
-
-        :param c_map: Container map instance.
-        :type c_map: dockermap.map.config.main.ContainerMap
-        :param c_config: Optional container configuration object.
-        :type c_config: dockermap.map.config.ContainerConfiguration
-        :return: Client configuration names.
-        :rtype: list[unicode | str]
-        """
-        if c_config and c_config.clients:
-            return c_config.clients
-        if c_map.clients:
-            return c_map.clients
-        return [self.default_client_name]
-
     def get_dependencies(self, config_id):
         """
         Generates the list of dependency containers, in reverse order (i.e. the last dependency coming first).
