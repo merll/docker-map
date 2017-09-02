@@ -148,6 +148,8 @@ class ContainerBaseState(AbstractState):
                 state_flag = StateFlags.NONE
             if c_status['Restarting']:
                 state_flag |= StateFlags.RESTARTING
+        if self.config.persistent:
+            state_flag |= StateFlags.PERSISTENT
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
             state_flag |= StateFlags.FORCED_RESET
@@ -331,8 +333,6 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                 raise KeyError("Container configuration '{0.config_name}' not found on map '{0.map_name}'."
                                "".format(config_id))
             clients = self._policy.get_clients(c_map, config)
-            if config.persistent:
-                c_flags |= ConfigFlags.CONTAINER_PERSISTENT
             state_func = self.get_container_state
         elif config_type == ItemType.VOLUME:
             config = c_map.get_existing(config_name)

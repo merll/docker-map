@@ -2,7 +2,6 @@
 from __future__ import unicode_literals
 
 from ..input import ItemType
-from ..policy import ConfigFlags
 from ..state import State, StateFlags
 from . import ItemAction, Action, VolumeUtilAction, ContainerUtilAction, DerivedAction
 from .base import AbstractActionGenerator
@@ -64,7 +63,7 @@ class ResumeActionGenerator(AbstractActionGenerator):
                         action = DerivedAction.RESET_CONTAINER
                     elif (state.base_state != State.RUNNING and
                           (state.state_flags & StateFlags.INITIAL or
-                           not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
+                           not state.state_flags & StateFlags.PERSISTENT)):
                         action = Action.START
                     else:
                         return None

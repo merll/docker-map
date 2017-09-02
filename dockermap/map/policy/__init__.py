@@ -8,7 +8,6 @@ from ...map import Flags
 
 class ConfigFlags(Flags):
     DEPENDENT = 1                   # Configuration is checked in a relation to a dependent / dependency container.
-    CONTAINER_PERSISTENT = 1 << 2   # Container is persistent.
 
 
 class PolicyUtilMeta(type):

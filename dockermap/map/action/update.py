@@ -6,7 +6,6 @@ import logging
 import six
 
 from ..input import ItemType
-from ..policy import ConfigFlags
 from ..state import State, StateFlags
 from . import ItemAction, Action, ContainerUtilAction, VolumeUtilAction, NetworkUtilAction, ImageAction, DerivedAction
 from .base import AbstractActionGenerator
@@ -103,7 +102,7 @@ class UpdateActionGenerator(AbstractActionGenerator):
                     log.debug("Container is disconnecting from the following networks: %s.", ln)
                     actions.append(ItemAction(state, Action.DISCONNECT, networks=ln))
                 if (state.base_state != State.RUNNING and
-                        (ci_initial or not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
+                        (ci_initial or not state.state_flags & StateFlags.PERSISTENT)):
                     log.debug("Container found but not running, starting %s.", config_id)
                     actions.extend([
                         ItemAction(state, Action.START),

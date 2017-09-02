@@ -2,7 +2,6 @@
 from __future__ import unicode_literals
 
 from ..input import ItemType
-from ..policy import ConfigFlags
 from ..state import State, StateFlags
 from . import ItemAction, Action, ContainerUtilAction, VolumeUtilAction, NetworkUtilAction, DerivedAction, ImageAction
 from .base import AbstractActionGenerator
@@ -112,7 +111,7 @@ class RemoveActionGenerator(AbstractActionGenerator):
         if state.base_state == State.PRESENT:
             if ((config_type == ItemType.VOLUME and self.remove_attached) or
                     (config_type == ItemType.CONTAINER and
-                     self.remove_persistent or not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
+                     self.remove_persistent or not state.state_flags & StateFlags.PERSISTENT)):
                 return [ItemAction(state, Action.REMOVE, extra_data=extra_data)]
             elif config_type == ItemType.NETWORK:
                 connected_containers = state.extra_data.get('containers')
@@ -193,7 +192,7 @@ class ShutdownActionGenerator(RemoveActionGenerator):
         elif config_type == ItemType.VOLUME and self.remove_attached:
             return [ItemAction(state, Action.REMOVE)]
         elif config_type == ItemType.CONTAINER:
-            if self.remove_persistent or not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT:
+            if self.remove_persistent or not state.state_flags & StateFlags.PERSISTENT:
                 if state.base_state == State.RUNNING or state.state_flags & StateFlags.RESTARTING:
                     return [ItemAction(state, DerivedAction.SHUTDOWN_CONTAINER)]
                 elif state.base_state == State.PRESENT:

@@ -17,6 +17,7 @@ class State(SimpleEnum):
 class StateFlags(Flags):
     INITIAL = 1                # Container is present but has never been started.
     RESTARTING = 1 << 1        # Container is not running, but in the process of restarting.
+    PERSISTENT = 1 << 5        # Container is configured as persistent.
     NONRECOVERABLE = 1 << 10   # Container is stopped with an error that cannot be solved through restarting.
     IMAGE_MISMATCH = 1 << 12   # Container does not correspond with configured image.
     MISSING_LINK = 1 << 13     # A configured linked container cannot be found.
