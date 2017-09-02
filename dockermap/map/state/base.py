@@ -58,7 +58,7 @@ class AbstractState(object):
         self.config_flags = config_flags
         self.detail = None
 
-    def set_defaults(self, *args, **kwargs):
+    def set_defaults(self):
         """
         Resets the state, so that with adjustments of input parameters the object can be reused without side-effects
         to other objects on the client.
@@ -104,8 +104,8 @@ class ContainerBaseState(AbstractState):
         super(ContainerBaseState, self).__init__(*args, **kwargs)
         self.container_name = None
 
-    def set_defaults(self, *args, **kwargs):
-        super(ContainerBaseState, self).set_defaults(*args, **kwargs)
+    def set_defaults(self):
+        super(ContainerBaseState, self).set_defaults()
         self.container_name = None
 
     def inspect(self):
@@ -177,7 +177,8 @@ class NetworkBaseState(AbstractState):
         super(NetworkBaseState, self).__init__(*args, **kwargs)
         self.network_name = None
 
-    def set_defaults(self, *args, **kwargs):
+    def set_defaults(self):
+        super(NetworkBaseState, self).set_defaults()
         self.network_name = None
 
     def inspect(self):
@@ -230,7 +231,8 @@ class VolumeBaseState(AbstractState):
         super(VolumeBaseState, self).__init__(*args, **kwargs)
         self.volume_name = None
 
-    def set_defaults(self, *args, **kwargs):
+    def set_defaults(self):
+        super(VolumeBaseState, self).set_defaults()
         self.volume_name = None
 
     def inspect(self):
