@@ -114,7 +114,7 @@ class ContainerBaseState(AbstractState):
         """
         policy = self.policy
         config_id = self.config_id
-        if self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
+        if self.config_id.config_type == ItemType.VOLUME:
             if self.container_map.use_attached_parent_name:
                 container_name = policy.aname(config_id.map_name, config_id.instance_name, config_id.config_name)
             else:
@@ -341,7 +341,6 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                                "".format(config_id))
             clients = self._policy.get_clients(c_map, config)
             # TODO: Change for actual volumes.
-            c_flags |= ConfigFlags.CONTAINER_ATTACHED
             state_func = self.get_container_state
         elif config_type == ItemType.NETWORK:
             config = c_map.get_existing_network(config_name)

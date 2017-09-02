@@ -8,8 +8,7 @@ import six
 
 from ...functional import resolve_value
 from ...utils import format_image_tag
-from ..input import ExecPolicy, NetworkEndpoint
-from ..policy import ConfigFlags
+from ..input import ExecPolicy, NetworkEndpoint, ItemType
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
 from . import State, StateFlags, SimpleEnum
 from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
@@ -414,7 +413,7 @@ class UpdateContainerState(ContainerBaseState):
 
     def inspect(self):
         super(UpdateContainerState, self).inspect()
-        if self.detail and self.detail['State']['Running'] and not self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
+        if self.detail and self.detail['State']['Running'] and self.config_id.config_type == ItemType.CONTAINER:
             check_exec_option = self.options['check_exec_commands']
             if check_exec_option and check_exec_option != CmdCheck.NONE and self.config.exec_commands:
                 self.current_commands = self.client.top(self.detail['Id'], ps_args='-eo pid,user,args')['Processes']
@@ -426,7 +425,7 @@ class UpdateContainerState(ContainerBaseState):
 
         config_id = self.config_id
         c_image_id = self.detail['Image']
-        if self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
+        if config_id.config_type == ItemType.VOLUME:
             volumes = get_instance_volumes(self.detail)
             if volumes:
                 mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name])
