@@ -215,9 +215,19 @@ class BasePolicy(object):
     @property
     def network_names(self):
         """
-        Name of existing networks on each client.
+        Names of existing networks on each client.
 
         :return: Dictionary of network names.
         :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedNetworkNames]
         """
         return self._network_names
+
+    @property
+    def volume_names(self):
+        """
+        Names of existing volumes on each client.
+
+        :return: Dictionary of volume names.
+        :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedVolumeNames]
+        """
+        return self._volume_names
