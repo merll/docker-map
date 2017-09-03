@@ -519,7 +519,7 @@ class UpdateStateGenerator(DependencyStateGenerator):
                 if n_name in policy.network_names[client_name]
             }
             for client_name, client_config in six.iteritems(policy.clients)
-            if client_config.get_client() and client_config.supports_networks
+            if client_config.supports_networks
         }
         self._network_registries = {
             client_name: NetworkEndpointRegistry(policy.nname, policy.cname, policy.get_hostname,

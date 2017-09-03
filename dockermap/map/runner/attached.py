@@ -38,7 +38,7 @@ class AttachedConfigMixin(object):
             network_disabled=True,
         )
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        use_host_config = client_config.get('use_host_config')
+        use_host_config = client_config.use_host_config
         if use_host_config:
             hc_kwargs = self.get_attached_preparation_host_config_kwargs(action, None, volume_container,
                                                                          kwargs=hc_extra_kwargs)
@@ -124,7 +124,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         temp_container = client.create_container(**apc_kwargs)
         temp_id = temp_container['Id']
         try:
-            if action.client_config.get('use_host_config'):
+            if action.client_config.use_host_config:
                 client.start(temp_id)
             else:
                 aps_kwargs = self.get_attached_preparation_host_config_kwargs(action, temp_id, volume_container)

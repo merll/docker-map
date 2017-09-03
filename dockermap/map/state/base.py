@@ -331,7 +331,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                 c_state = self.get_container_state(client_name, config_id, config_flags)
             elif config_type == ItemType.VOLUME:
                 client_config = self._policy.clients[client_name]
-                if client_config.get_client() and client_config.supports_volumes:
+                if client_config.supports_volumes:
                     c_state = self.get_container_state(client_name, config_id, config_flags)
                     # TODO c_state = self.get_volume_state(client_name, config_id, config_flags)
                 else:

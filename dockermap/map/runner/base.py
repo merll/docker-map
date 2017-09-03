@@ -48,7 +48,7 @@ class DockerBaseRunnerMixin(object):
         else:
             c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
             res = action.client.create_container(**c_kwargs)
-            if action.client_config.get('use_host_config'):
+            if action.client_config.use_host_config:
                 action.client.start(v_name)
             else:
                 c_kwargs = self.get_attached_container_host_config_kwargs(action, v_name, kwargs=kwargs)
@@ -68,7 +68,7 @@ class DockerBaseRunnerMixin(object):
         return action.client.create_container(**c_kwargs)
 
     def start_container(self, action, c_name, **kwargs):
-        if action.client_config.get('use_host_config'):
+        if action.client_config.use_host_config:
             return action.client.start(c_name)
         c_kwargs = self.get_container_host_config_kwargs(action, c_name, kwargs=kwargs)
         return action.client.start(**c_kwargs)
@@ -137,7 +137,7 @@ class DockerConfigMixin(object):
                 )
             })
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        use_host_config = client_config.get('use_host_config')
+        use_host_config = client_config.use_host_config
         if use_host_config:
             hc_kwargs = self.get_container_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:
@@ -222,7 +222,7 @@ class DockerConfigMixin(object):
             network_disabled=True,
         )
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        use_host_config = client_config.get('use_host_config')
+        use_host_config = client_config.use_host_config
         if use_host_config:
             hc_kwargs = self.get_attached_container_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:

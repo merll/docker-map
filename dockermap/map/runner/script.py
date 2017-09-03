@@ -60,7 +60,6 @@ class ScriptMixin(object):
         """
         client = action.client
         client_config = action.client_config
-        use_host_config = client_config.get('use_host_config')
         if script_path:
             if os.path.isdir(script_path):
                 script_dir = script_path
@@ -84,7 +83,7 @@ class ScriptMixin(object):
             binds = None
             command = command_format
 
-        if use_host_config:
+        if client_config.use_host_config:
             create_extra_kwargs = {'host_config': dict(binds=binds)}
             start_extra_kwargs = {}
         else:
