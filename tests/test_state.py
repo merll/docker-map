@@ -10,11 +10,11 @@ import responses
 
 from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from dockermap.map.config.client import ClientConfiguration
-from dockermap.map.config.host_volume import get_host_path
 from dockermap.map.config.main import ContainerMap, expand_instances
-from dockermap.map.input import ExecCommand, ExecPolicy, MapConfigId, ItemType
+from dockermap.map.input import ExecCommand, ExecPolicy, MapConfigId, ItemType, UsedVolume
 from dockermap.map.policy import ConfigFlags
 from dockermap.map.policy.base import BasePolicy
+from dockermap.map.policy.utils import get_shared_volume_path
 from dockermap.map.state import INITIAL_START_TIME, State, StateFlags
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
@@ -139,27 +139,25 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
     else:
         path_prefix = '/invalid_{0}'.format(config_id.config_name)
     for a in c_config.attaches:
-        c_path = container_map.volumes[a]
+        if isinstance(a, UsedVolume):
+            c_path = a.mount_path
+        else:
+            c_path = container_map.volumes[a.volume]
         yield {
             'Type': 'volume',
-            'Source': posixpath.join(path_prefix, 'attached', a),
+            'Source': posixpath.join(path_prefix, 'attached', a.volume),
             'Destination': c_path,
-            'Name': _get_hash('attached-volume', path_prefix, a),
+            'Name': _get_hash('attached-volume', path_prefix, a.volume),
             'RW': True
         }
     if config_id.config_type == ItemType.CONTAINER:
-        for vol, ro in c_config.binds:
-            if isinstance(vol, tuple):
-                c_path, h_r_path = vol
-                h_path = get_host_path(container_map.host.root, h_r_path, config_id.instance_name)
-            else:
-                c_path = container_map.volumes[vol]
-                h_path = container_map.host.get_path(vol, config_id.instance_name)
+        for vol in c_config.binds:
+            c_path, h_path = get_shared_volume_path(container_map, vol, config_id.instance_name)
             yield {
                 'Type': 'bind',
                 'Source': posixpath.join(path_prefix, h_path),
                 'Destination': c_path,
-                'RW': not ro,
+                'RW': not vol.readonly,
             }
         for s in c_config.shares:
             yield {
@@ -169,24 +167,32 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
                 'Name': _get_hash('shared-volume', path_prefix, s),
                 'RW': True,
             }
-        for vol, ro in c_config.uses:
-            c, __, i = vol.partition('.')
+        for vol in c_config.uses:
+            c, __, i = vol.volume.partition('.')
             c_ref = container_map.get_existing(c)
-            if i in c_ref.attaches:
-                c_path = container_map.volumes[i]
-                yield {
-                    'Type': 'volume',
-                    'Source': posixpath.join(path_prefix, 'attached', i),
-                    'Destination': c_path,
-                    'Name': _get_hash('attached-volume', path_prefix, i),
-                    'RW': not ro,
-                }
-            elif c_ref and (not i or i in c_ref.instances):
-                for r_mount in _get_container_mounts(MapConfigId(config_id.config_type, config_id.map_name, c, i),
-                                                     container_map, c_ref, valid):
-                    yield r_mount
+            if c_ref:
+                attached_volumes = {a.volume: a for a in c_ref.attaches}
+                instance_volume = attached_volumes.get(i)
+                if i and instance_volume is not None:
+                    if isinstance(i, UsedVolume):
+                        c_path = instance_volume.mount_path
+                    else:
+                        c_path = container_map.volumes[i]
+                    yield {
+                        'Type': 'volume',
+                        'Source': posixpath.join(path_prefix, 'attached', i),
+                        'Destination': c_path,
+                        'Name': _get_hash('attached-volume', path_prefix, i),
+                        'RW': not vol.readonly,
+                    }
+                elif not i or i in c_ref.instances:
+                    for r_mount in _get_container_mounts(MapConfigId(config_id.config_type, config_id.map_name, c, i),
+                                                         container_map, c_ref, valid):
+                        yield r_mount
+                else:
+                    raise ValueError("Invalid uses declaration in {0}: volume for {1} not found.".format(config_id.config_name, vol))
             else:
-                raise ValueError("Invalid uses declaration in {0}: {1}".format(config_id.config_name, vol))
+                raise ValueError("Invalid uses declaration in {0}: configuration for {1} not found.".format(config_id.config_name, vol))
 
 
 def _add_container_inspect(rsps, config_id, container_name, container_map, c_config, state, image_id,
@@ -385,7 +391,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
         for name, state, instances, attached_valid, instances_valid, kwargs in containers_states:
             c_config = self.sample_map.get_existing(name)
             for a in c_config.attaches:
-                config_id = MapConfigId(ItemType.VOLUME, self.map_name, name, a)
+                config_id = MapConfigId(ItemType.VOLUME, self.map_name, name, a.volume)
                 if self.sample_map.use_attached_parent_name:
                     container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
                 else:

@@ -21,7 +21,7 @@ def get_host_binds(container_map, config, instance):
     :return: List of shared volumes with host volumes and the read-only flag.
     :rtype: list[unicode | str]
     """
-    return ['{0[1]}:{0[0]}:{1}'.format(get_shared_volume_path(container_map, shared_volume.volume, instance),
+    return ['{0[1]}:{0[0]}:{1}'.format(get_shared_volume_path(container_map, shared_volume, instance),
                                        'ro' if shared_volume.readonly else 'rw')
             for shared_volume in config.binds]
 

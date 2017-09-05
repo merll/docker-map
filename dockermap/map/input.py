@@ -24,6 +24,10 @@ class ItemType(SimpleEnum):
 
 SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
 SharedVolume.__new__.__defaults__ = False,
+HostVolume = namedtuple('HostVolume', ('host_path', 'mount_path', 'readonly'))
+HostVolume.__new__.__defaults__ = False,
+UsedVolume = namedtuple('UsedVolume', ('volume', 'mount_path', 'readonly'))
+UsedVolume.__new__.__defaults__ = None, False
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 ContainerLink.__new__.__defaults__ = None,
 PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface', 'ipv6'))
@@ -159,69 +163,36 @@ def get_list(value):
         type(value).__name__))
 
 
-def get_shared_volume(value):
-    """
-    Converts the given value to a ``SharedVolume`` tuple. It accepts strings, lists, tuples, and dicts as input.
-    For lists and tuples, the first element is used as the volume alias, and the second (if present) as a read-only
-    indicator. Same division goes for dicts, between key and value. Single values (strings, single-value tuples/lists)
-    keep read-write-access.
-
-    :param value: Input value for conversion.
-    :return: SharedVolume tuple.
-    :rtype: SharedVolume
-    """
-    if isinstance(value, SharedVolume):
-        return value
-    elif isinstance(value, six.string_types):
-        return SharedVolume(value)
-    elif isinstance(value, (list, tuple)):
-        v_len = len(value)
-        if v_len == 2:
-            return SharedVolume(value[0], read_only(value[1]))
-        elif v_len == 1:
-            return SharedVolume(value[0])
-        raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
-                         "SharedVolume tuple; found length {0}.".format(v_len))
-    elif isinstance(value, dict):
-        v_len = len(value)
-        if v_len == 1:
-            k, v = list(value.items())[0]
-            return SharedVolume(k, read_only(v))
-        raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
-                         "tuple. Found length {0}.".format(v_len))
-    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
-
-
 def _shared_host_volume_from_tuple(*values):
     v_len = len(values)
     if v_len == 3:
-        return SharedVolume((values[0], values[1]), read_only(values[2]))
+        return HostVolume(values[1], values[0], read_only(values[2]))
     elif v_len == 2:
         v0, v1 = values
         if isinstance(v1, (list, tuple)):
             sv_len = len(v1)
             v1_0 = v1[0]
             if sv_len == 2:
-                return SharedVolume((v0, v1_0), read_only(v1[1]))
+                return HostVolume(v1_0, v0, read_only(v1[1]))
             elif sv_len == 1:
                 if isinstance(v1_0, bool) or v1_0 in ('ro', 'rw'):
                     return SharedVolume(v0, read_only(v1_0))
-                return SharedVolume((v0, v1_0))
+                return HostVolume(v1_0, v0)
             raise ValueError("Nested list in {0} must have exactly one or two entries; found "
                              "{1}.".format(values, sv_len))
         elif isinstance(v1, bool) or v1 in ('ro', 'rw'):
             return SharedVolume(v0, read_only(v1))
-        return SharedVolume(values)
+        return HostVolume(v1, v0)
     elif v_len == 1:
         return SharedVolume(values[0])
     raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
-                     "SharedVolume tuple. Found length {0}.".format(v_len))
+                     "HostVolume or SharedVolume tuple. Found length {0}.".format(v_len))
 
 
 def get_shared_host_volume(value):
     """
-    Converts the input to a ``SharedVolume`` tuple for a host bind. Input can be a single string, a list or tuple, or a
-    single-entry dictionary.
+    Converts the input to a ``SharedVolume`` or ``HostVolume`` tuple for a host bind. Input can be a single string, a
+    list or tuple, or a single-entry dictionary.
     Single values are assumed to be volume aliases for read-write access. Tuples or lists with two elements, can be
     ``(alias, read-only indicator)``, or ``(container path, host path)``. The latter is assumed, unless the second
     element is boolean or a string of either ``ro`` or ``rw``, indicating read-only or read-write access for a volume
@@ -233,7 +204,7 @@ def get_shared_host_volume(value):
     :return: A SharedVolume tuple
     :rtype: SharedVolume
     """
-    if isinstance(value, SharedVolume):
+    if isinstance(value, (HostVolume, SharedVolume)):
         return value
     elif isinstance(value, six.string_types):
         return SharedVolume(value, False)
@@ -247,7 +218,108 @@ def get_shared_host_volume(value):
                 return _shared_host_volume_from_tuple(c_path, *v)
             return _shared_host_volume_from_tuple(c_path, v)
         raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
-                         "tuple. Found length {0}.".format(v_len))
+                         "or HostVolume tuple. Found length {0}.".format(v_len))
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+
+
+def get_attached_volume(value):
+    """
+    Converts the given value to a ``UsedVolume`` or ``SharedVolume` tuple for attached volumes. It accepts strings,
+    lists, tuples, and dicts as input.
+
+    For strings and collections of a single element, the first item is considered to be an alias for lookup on the map.
+    It is converted to a ``SharedVolume` tuple.
+    For two-element collections, the first item defines a new volume alias that can be re-used by other instances and
+    the second item is considered to be the mount point for the volume.
+    All attached volumes are considered as read-write access.
+
+    :param value: Input value for conversion.
+    :return: UsedVolume or SharedVolume tuple.
+    :rtype: UsedVolume | SharedVolume
+    """
+    if isinstance(value, (UsedVolume, SharedVolume)):
+        if value.readonly:
+            raise ValueError("Attached volumes should not be read-only.", value)
+        return value
+    elif isinstance(value, six.string_types):
+        return SharedVolume(value)
+    elif isinstance(value, (list, tuple)):
+        v_len = len(value)
+        if v_len == 2:
+            if value[1]:
+                return UsedVolume(value[0], value[1])
+            return SharedVolume(value[0])
+        elif v_len == 1:
+            return SharedVolume(value[0])
+        raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
+                         "UsedVolume or SharedVolume tuple; found length {0}.".format(v_len))
+    elif isinstance(value, dict):
+        v_len = len(value)
+        if v_len == 1:
+            k, v = list(value.items())[0]
+            return UsedVolume(k, v)
+        raise ValueError("Invalid element length; only dicts with one element can be converted to a UsedVolume or "
+                         "SharedVolume tuple. Found length {0}.".format(v_len))
+    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+
+
+def _shared_used_volume_from_tuple(*values):
+    v_len = len(values)
+    if v_len == 3:
+        return UsedVolume(values[0], values[1], read_only(values[2]))
+    elif v_len == 2:
+        v0, v1 = values
+        if isinstance(v1, (list, tuple)):
+            sv_len = len(v1)
+            v1_0 = v1[0]
+            if sv_len == 2:
+                return UsedVolume(v0, v1_0, read_only(v1[1]))
+            elif sv_len == 1:
+                if isinstance(v1_0, bool) or v1_0 in ('ro', 'rw'):
+                    return SharedVolume(v0, read_only(v1_0))
+                return UsedVolume(v0, v1_0)
+            raise ValueError("Nested list in {0} must have exactly one or two entries; found "
+                             "{1}.".format(values, sv_len))
+        elif isinstance(v1, bool) or v1 in ('ro', 'rw'):
+            return SharedVolume(v0, read_only(v1))
+        return UsedVolume(v0, v1)
+    elif v_len == 1:
+        return SharedVolume(values[0])
+    raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
+                     "HostVolume or SharedVolume tuple. Found length {0}.".format(v_len))
+
+
+def get_used_volume(value):
+    """
+    Converts the given value to a ``UsedVolume`` or ``SharedVolume` tuple for used volumes. It accepts strings, lists,
+    tuples, and dicts as input.
+
+    Single values are assumed to be volume aliases for read-write access. Tuples or lists with two elements, can be
+    ``(alias, read-only indicator)``, or ``(alias, mount path)``. The latter is assumed, unless the second
+    element is boolean or a string of either ``ro`` or ``rw``, indicating read-only or read-write access for a volume
+    alias. Three elements are always used as ``(alias, mount path, read-only indicator)``.
+    Nested values are unpacked, so that valid input formats are also ``{alias: (mount path, read-only)}`` or
+    ``(alias: [mount path, read-only])``.
+
+    :param value: Input value for conversion.
+    :return: UsedVolume or SharedVolume tuple.
+    :rtype: UsedVolume | SharedVolume
+    """
+    if isinstance(value, (UsedVolume, SharedVolume)):
+        return value
+    elif isinstance(value, six.string_types):
+        return SharedVolume(value, False)
+    elif isinstance(value, (list, tuple)):
+        return _shared_used_volume_from_tuple(*value)
+    elif isinstance(value, dict):
+        v_len = len(value)
+        if v_len == 1:
+            alias, v = list(value.items())[0]
+            if isinstance(v, (list, tuple)):
+                return _shared_used_volume_from_tuple(alias, *v)
+            return _shared_used_volume_from_tuple(alias, v)
+        raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
+                         "or UsedVolume tuple. Found length {0}.".format(v_len))
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
@@ -442,26 +514,40 @@ def get_map_config_id(value, map_name=None, instances=None):
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
-def get_shared_volumes(value):
-    """
-    Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume tuples.
-
-    :param value: Input value to convert.
-    :return: List of SharedVolume tuples.
-    :rtype: list[SharedVolume]
-    """
-    return _get_listed_tuples(value, SharedVolume, get_shared_volume)
-
-
 def get_shared_host_volumes(value):
     """
-    Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume tuples for host volumes.
+    Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume or HostVolume tuples for
+    host volumes.
 
     :param value: Input value to convert.
-    :return: List of SharedVolume tuples.
-    :rtype: list[SharedVolume]
+    :return: List of SharedVolume or HostVolume tuples.
+    :rtype: list[SharedVolume | HostVolume]
     """
-    return _get_listed_tuples(value, SharedVolume, get_shared_host_volume)
+    return _get_listed_tuples(value, (SharedVolume, HostVolume), get_shared_host_volume)
+
+
+def get_attached_volumes(value):
+    """
+    Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume or UsedVolume tuples for
+    attached volumes.
+
+    :param value: Input value to convert.
+    :return: List of SharedVolume or UsedVolume tuples.
+    :rtype: list[SharedVolume | UsedVolume]
+    """
+    return _get_listed_tuples(value, (SharedVolume, UsedVolume), get_attached_volume)
+
+
+def get_used_volumes(value):
+    """
+    Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume or UsedVolume tuples for
+    used volumes.
+
+    :param value: Input value to convert.
+    :return: List of SharedVolume or UsedVolume tuples.
+    :rtype: list[SharedVolume | UsedVolume]
+    """
+    return _get_listed_tuples(value, (SharedVolume, UsedVolume), get_used_volume)
 
 
 def get_container_links(value):

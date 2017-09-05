@@ -8,7 +8,7 @@ import six
 
 from ...functional import resolve_value
 from ...utils import format_image_tag
-from ..input import ExecPolicy, NetworkEndpoint, ItemType
+from ..input import ExecPolicy, NetworkEndpoint, ItemType, UsedVolume
 from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
 from . import State, StateFlags, SimpleEnum
 from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
@@ -145,7 +145,7 @@ class SingleContainerVfsCheck(object):
     def check_bind(self, config, instance):
         config_id = self._config_id
         for shared_volume in config.binds:
-            bind_path, host_path = get_shared_volume_path(self._container_map, shared_volume.volume, instance)
+            bind_path, host_path = get_shared_volume_path(self._container_map, shared_volume, instance)
             instance_vfs = self._instance_volumes.get(bind_path)
             log.debug("Checking host bind. Config / container instance:\n%s\n%s", host_path, instance_vfs)
             if not (instance_vfs and host_path == instance_vfs):
@@ -156,10 +156,13 @@ class SingleContainerVfsCheck(object):
     def check_attached(self, config, parent_name):
         config_id = self._config_id
         for attached in config.attaches:
-            a_name = '{0}.{1}'.format(parent_name, attached) if self._use_parent_name else attached
-            attached_path = resolve_value(self._volumes[attached])
-            instance_vfs = self._instance_volumes.get(attached_path)
+            a_name = '{0}.{1}'.format(parent_name, attached.volume) if self._use_parent_name else attached
+            if isinstance(attached, UsedVolume):
+                attached_path = attached.mount_path
+            else:
+                attached_path = resolve_value(self._volumes[attached.volume])
             attached_vfs = self._vfs_paths.get((a_name, None, attached_path))
+            instance_vfs = self._instance_volumes.get(attached_path)
             log.debug("Checking attached %s path. Attached instance / dependent container instance:\n%s\n%s",
                       attached, attached_vfs, instance_vfs)
             if not (instance_vfs and attached_vfs == instance_vfs):
@@ -211,6 +214,10 @@ class ContainerVolumeChecker(object):
     def register_attached(self, alias, parent_name, mapped_path, path):
         volume_name = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
         self._vfs_paths[volume_name, None, mapped_path] = path
+
+    def register_volume(self, alias, parent_name, path):
+        volume_name = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
+        self._vfs_paths[volume_name, None, None] = path
 
     def check(self, config_id, container_map, container_config, instance_detail):
         instance_volumes = get_instance_volumes(instance_detail)

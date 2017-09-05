@@ -7,7 +7,7 @@ from six.moves import map
 from ...functional import resolve_value
 from ...utils import merge_list
 from ..config.host_volume import get_host_path
-from ..input import is_path
+from ..input import is_path, HostVolume
 
 INITIAL_START_TIME = '0001-01-01T00:00:00Z'
 
@@ -103,32 +103,31 @@ def init_options(options):
     return {}
 
 
-def get_shared_volume_path(container_map, volume, instance=None):
+def get_shared_volume_path(container_map, vol, instance=None):
     """
     Resolves a volume alias of a container configuration or a tuple of two paths to the host and container paths.
 
     :param container_map: Container map.
     :type container_map: dockermap.map.config.main.ContainerMap
-    :param volume: Volume alias or tuple of paths.
-    :type volume: unicode | str | AbstractLazyObject | tuple[unicode | str] | tuple[AbstractLazyObject]
+    :param vol: SharedVolume or HostVolume tuple.
+    :type vol: dockermap.map.input.HostVolume | dockermap.map.input.SharedVolume
     :param instance: Optional instance name.
     :type instance: unicode | str
     :return: Tuple of host path and container bind path.
     :rtype: tuple[unicode | str]
     """
-    if isinstance(volume, tuple):
-        v_len = len(volume)
-        if v_len == 2:
-            c_path = resolve_value(volume[0])
-            if is_path(c_path):
-                return c_path, get_host_path(container_map.host.root, volume[1], instance)
-        raise ValueError("Host-container-binding must be described by two paths or one alias name. "
-                         "Found {0}.".format(volume))
-    c_path = resolve_value(container_map.volumes.get(volume))
-    h_path = container_map.host.get_path(volume, instance)
-    if c_path:
+    if isinstance(vol, HostVolume):
+        c_path = resolve_value(vol.mount_path)
+        if is_path(c_path):
+            return c_path, get_host_path(container_map.host.root, vol.host_path, instance)
+        raise ValueError("Host-container-binding must be described by two paths or one alias name.",
+                         vol)
+    alias = vol.volume
+    c_path = resolve_value(container_map.volumes.get(alias))
+    h_path = container_map.host.get_path(alias, instance)
+    if c_path and h_path:
         return c_path, h_path
-    raise KeyError("No host-volume information found for alias {0}.".format(volume))
+    raise KeyError("No host-volume information found for alias {0}.".format(alias))
 
 
 def get_volumes(container_map, config):
@@ -143,15 +142,15 @@ def get_volumes(container_map, config):
     :rtype: list[unicode | str]
     """
     def _volume_path(vol):
-        if isinstance(vol, tuple) and len(vol) == 2:
-            return resolve_value(vol[0])
-        v_path = resolve_value(container_map.volumes.get(vol))
+        if isinstance(vol, HostVolume):
+            return resolve_value(vol.mount_path)
+        v_path = resolve_value(container_map.volumes.get(vol.volume))
         if v_path:
             return v_path
         raise KeyError("No host-volume information found for alias {0}.".format(vol))
 
     volumes = [resolve_value(s) for s in config.shares]
-    volumes.extend([_volume_path(b.volume) for b in config.binds])
+    volumes.extend(_volume_path(b) for b in config.binds)
     return volumes
 
 

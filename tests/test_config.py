@@ -4,7 +4,7 @@ from __future__ import absolute_import, unicode_literals
 import unittest
 
 from dockermap.map.config.main import ContainerMap
-from dockermap.map.input import SharedVolume, PortBinding, NotSet, ContainerLink
+from dockermap.map.input import SharedVolume, PortBinding, ContainerLink
 from tests import MAP_DATA_2, MAP_DATA_3
 
 
@@ -21,7 +21,7 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(cfg.image, 'server')
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True)])
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
-        self.assertEqual(cfg.attaches, ['app_log'])
+        self.assertEqual(cfg.attaches, [SharedVolume('app_log')])
         self.assertEqual(cfg.user, 'app_user')
         self.assertEqual(cfg.permissions, 'u=rwX,g=rX,o=')
 
@@ -31,7 +31,7 @@ class TestConfig(unittest.TestCase):
         cfg.merge(merge_dict)
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
-        self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
+        self.assertEqual(cfg.attaches, [SharedVolume('app_log'), SharedVolume('server_log')])
         self.assertEqual(cfg.user, 'server_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
@@ -52,7 +52,7 @@ class TestConfig(unittest.TestCase):
         cfg.merge(merge_dict, lists_only=True)
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
-        self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
+        self.assertEqual(cfg.attaches, [SharedVolume('app_log'), SharedVolume('server_log')])
         self.assertEqual(cfg.user, 'app_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
@@ -65,7 +65,7 @@ class TestConfig(unittest.TestCase):
         cfg.merge(merge_cfg)
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
-        self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
+        self.assertEqual(cfg.attaches, [SharedVolume('app_log'), SharedVolume('server_log')])
         self.assertEqual(cfg.user, 'server_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
@@ -86,7 +86,7 @@ class TestConfig(unittest.TestCase):
         cfg.merge(merge_cfg, lists_only=True)
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
-        self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
+        self.assertEqual(cfg.attaches, [SharedVolume('app_log'), SharedVolume('server_log')])
         self.assertEqual(cfg.user, 'app_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
@@ -97,7 +97,7 @@ class TestConfig(unittest.TestCase):
         cfg = self.ext_main.get_existing('server')
         self.assertEqual(cfg.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
         self.assertEqual(cfg.uses, [SharedVolume('redis.redis_socket', False)])
-        self.assertEqual(cfg.attaches, ['app_log', 'server_log'])
+        self.assertEqual(cfg.attaches, [SharedVolume('app_log'), SharedVolume('server_log')])
         self.assertEqual(cfg.user, 'server_user')
         self.assertEqual(cfg.exposes, [PortBinding(8443, 8443, 'private', False)])
         self.assertEqual(cfg.links, [ContainerLink('svc', 'svc_alias1'), ContainerLink('svc', 'svc_alias2')])
@@ -117,7 +117,7 @@ class TestConfig(unittest.TestCase):
         cfg1 = self.sample_map.get_extended(cfg1_1)
         self.assertEqual(cfg1.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
         self.assertEqual(cfg1.uses, [SharedVolume('redis.redis_socket', False)])
-        self.assertEqual(cfg1.attaches, ['app_log'])
+        self.assertEqual(cfg1.attaches, [SharedVolume('app_log')])
         self.assertEqual(cfg1.user, 'app_user')
         self.assertEqual(cfg1.create_options, {
             'mem_limit': '2g',
@@ -134,7 +134,7 @@ class TestConfig(unittest.TestCase):
         cfg2 = self.ext_main.get_existing('worker_q2')
         self.assertEqual(cfg2.binds, [SharedVolume('app_config', True), SharedVolume('app_data', False)])
         self.assertEqual(cfg2.uses, [SharedVolume('redis.redis_socket', False)])
-        self.assertEqual(cfg2.attaches, ['app_log'])
+        self.assertEqual(cfg2.attaches, [SharedVolume('app_log')])
         self.assertEqual(cfg2.user, 'app_user')
         self.assertEqual(cfg2.create_options, {
             'mem_limit': '1g',
@@ -154,12 +154,12 @@ class TestConfig(unittest.TestCase):
 
     def test_get_persistent(self):
         attached_items, persistent_items = self.ext_main.get_persistent_items()
-        self.assertItemsEqual(attached_items, [('worker', 'app_log'),
-                                               ('server', 'app_log'),
-                                               ('server', 'server_log'),
-                                               ('server2', 'app_log'),
-                                               ('server2', 'server_log'),
-                                               ('redis', 'redis_socket'),
-                                               ('redis', 'redis_log'),
-                                               ('worker_q2', 'app_log')])
+        self.assertItemsEqual(attached_items, [('worker', SharedVolume('app_log')),
+                                               ('server', SharedVolume('app_log')),
+                                               ('server', SharedVolume('server_log')),
+                                               ('server2', SharedVolume('app_log')),
+                                               ('server2', SharedVolume('server_log')),
+                                               ('redis', SharedVolume('redis_socket')),
+                                               ('redis', SharedVolume('redis_log')),
+                                               ('worker_q2', SharedVolume('app_log'))])
         self.assertItemsEqual(persistent_items, [('persistent_one', None)])
