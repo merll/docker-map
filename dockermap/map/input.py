@@ -22,11 +22,11 @@ class ItemType(SimpleEnum):
     IMAGE = 'image'
 
 
-SharedVolume = namedtuple('SharedVolume', ('volume', 'readonly'))
+SharedVolume = namedtuple('SharedVolume', ('name', 'readonly'))
 SharedVolume.__new__.__defaults__ = False,
-HostVolume = namedtuple('HostVolume', ('host_path', 'mount_path', 'readonly'))
+HostVolume = namedtuple('HostVolume', ('host_path', 'path', 'readonly'))
 HostVolume.__new__.__defaults__ = False,
-UsedVolume = namedtuple('UsedVolume', ('volume', 'mount_path', 'readonly'))
+UsedVolume = namedtuple('UsedVolume', ('name', 'path', 'readonly'))
 UsedVolume.__new__.__defaults__ = None, False
 ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 ContainerLink.__new__.__defaults__ = None,

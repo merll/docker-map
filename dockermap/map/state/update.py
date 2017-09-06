@@ -156,11 +156,11 @@ class SingleContainerVfsCheck(object):
     def check_attached(self, config, parent_name):
         config_id = self._config_id
         for attached in config.attaches:
-            a_name = '{0}.{1}'.format(parent_name, attached.volume) if self._use_parent_name else attached
+            a_name = '{0}.{1}'.format(parent_name, attached.name) if self._use_parent_name else attached.name
             if isinstance(attached, UsedVolume):
-                attached_path = attached.mount_path
+                attached_path = attached.path
             else:
-                attached_path = resolve_value(self._volumes[attached.volume])
+                attached_path = resolve_value(self._volumes[attached.name])
             attached_vfs = self._vfs_paths.get((a_name, None, attached_path))
             instance_vfs = self._instance_volumes.get(attached_path)
             log.debug("Checking attached %s path. Attached instance / dependent container instance:\n%s\n%s",
@@ -173,7 +173,7 @@ class SingleContainerVfsCheck(object):
     def check_used(self, config):
         config_id = self._config_id
         for used in config.uses:
-            used_volume = used.volume
+            used_volume = used.name
             if self._use_parent_name:
                 used_alias = used_volume.partition('.')[2]
             else:

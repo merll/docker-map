@@ -117,12 +117,12 @@ def get_shared_volume_path(container_map, vol, instance=None):
     :rtype: tuple[unicode | str]
     """
     if isinstance(vol, HostVolume):
-        c_path = resolve_value(vol.mount_path)
+        c_path = resolve_value(vol.path)
         if is_path(c_path):
             return c_path, get_host_path(container_map.host.root, vol.host_path, instance)
         raise ValueError("Host-container-binding must be described by two paths or one alias name.",
                          vol)
-    alias = vol.volume
+    alias = vol.name
     c_path = resolve_value(container_map.volumes.get(alias))
     h_path = container_map.host.get_path(alias, instance)
     if c_path and h_path:
@@ -143,8 +143,8 @@ def get_volumes(container_map, config):
     """
     def _volume_path(vol):
         if isinstance(vol, HostVolume):
-            return resolve_value(vol.mount_path)
-        v_path = resolve_value(container_map.volumes.get(vol.volume))
+            return resolve_value(vol.path)
+        v_path = resolve_value(container_map.volumes.get(vol.name))
         if v_path:
             return v_path
         raise KeyError("No host-volume information found for alias {0}.".format(vol))

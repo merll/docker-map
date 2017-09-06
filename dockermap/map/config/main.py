@@ -385,7 +385,7 @@ class ContainerMap(ConfigurationObject):
         :rtype: collections.Iterable
         """
         def _get_used_items_np(u):
-            volume_config_name, __, volume_instance = u.volume.partition('.')
+            volume_config_name, __, volume_instance = u.name.partition('.')
             attaching_config_name = attaching.get(volume_config_name)
             if attaching_config_name:
                 used_c_name = attaching_config_name
@@ -400,10 +400,10 @@ class ContainerMap(ConfigurationObject):
                     for ai in used_instances or (None, )]
 
         def _get_used_items_ap(u):
-            volume_config_name, __, volume_instance = u.volume.partition('.')
+            volume_config_name, __, volume_instance = u.name.partition('.')
             attaching_config = ext_map.get_existing(volume_config_name)
             attaching_instances = instances.get(volume_config_name)
-            config_volumes = {a.volume for a in attaching_config.attaches}
+            config_volumes = {a.name for a in attaching_config.attaches}
             if not volume_instance or volume_instance in config_volumes:
                 used_instances = attaching_instances
             else:
@@ -448,7 +448,7 @@ class ContainerMap(ConfigurationObject):
         instances = {c_name: c_config.instances
                      for c_name, c_config in ext_map}
         if not self.use_attached_parent_name:
-            attaching = {attaches.volume: c_name
+            attaching = {attaches.name: c_name
                          for c_name, c_config in ext_map
                          for attaches in c_config.attaches}
             used_func = _get_used_items_np
@@ -464,7 +464,7 @@ class ContainerMap(ConfigurationObject):
             merge_list(d, itertools.chain.from_iterable(map(_get_network_items, config.networks)))
             merge_list(d, itertools.chain.from_iterable(map(used_func, config.uses)))
             merge_list(d, itertools.chain.from_iterable(_get_linked_items(l.container) for l in config.links))
-            d.extend(MapConfigId(ItemType.VOLUME, self._name, name, a.volume)
+            d.extend(MapConfigId(ItemType.VOLUME, self._name, name, a.name)
                      for a in config.attaches)
             d.append(MapConfigId(ItemType.IMAGE, self._name, image, tag))
             return d
@@ -581,9 +581,9 @@ class ContainerMap(ConfigurationObject):
             if c_config.instances:
                 group_ref_names.append(c_name)
             shared = instance_names[:] if c_config.shares or c_config.binds or c_config.uses else []
-            bind = [b.volume for b in c_config.binds if isinstance(b, SharedVolume)]
+            bind = [b.name for b in c_config.binds if isinstance(b, SharedVolume)]
             link = [l.container for l in c_config.links]
-            uses = [u.volume for u in c_config.uses]
+            uses = [u.name for u in c_config.uses]
             networks = [n.network_name for n in c_config.networks if not n.network_name in DEFAULT_PRESET_NETWORKS]
             network_mode = c_config.network_mode
             if isinstance(network_mode, tuple):
@@ -594,9 +594,9 @@ class ContainerMap(ConfigurationObject):
             else:
                 net_containers = []
             if self.use_attached_parent_name:
-                attaches = [(c_name, a.volume) for a in c_config.attaches]
+                attaches = [(c_name, a.name) for a in c_config.attaches]
             else:
-                attaches = [a.volume for a in c_config.attaches]
+                attaches = [a.name for a in c_config.attaches]
             return instance_names, group_ref_names, uses, attaches, shared, bind, link, networks, net_containers
 
         (all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links,

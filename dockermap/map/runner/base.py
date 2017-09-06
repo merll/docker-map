@@ -162,7 +162,7 @@ class DockerConfigMixin(object):
         :rtype: dict
         """
         def volume_str(u):
-            vol = cname(map_name, u.volume)
+            vol = cname(map_name, u.name)
             if u.readonly:
                 return '{0}:ro'.format(vol)
             return vol
@@ -176,10 +176,10 @@ class DockerConfigMixin(object):
         cname = policy.cname
         volumes_from = list(map(volume_str, action.config.uses))
         if container_map.use_attached_parent_name:
-            volumes_from.extend([aname(map_name, attached.volume, action.config_id.config_name)
+            volumes_from.extend([aname(map_name, attached.name, action.config_id.config_name)
                                  for attached in container_config.attaches])
         else:
-            volumes_from.extend([aname(map_name, attached.volume)
+            volumes_from.extend([aname(map_name, attached.name)
                                  for attached in container_config.attaches])
         c_kwargs = dict(
             links=[(cname(map_name, l_name), alias or policy.get_hostname(l_name))
