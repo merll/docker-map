@@ -9,8 +9,12 @@ from ..input import (get_shared_host_volumes, get_attached_volumes, get_used_vol
 def _merge_first(current, update_list):
     if not update_list:
         return
-    new_keys = set(item[0] for item in update_list) - set(item[0] for item in current)
-    current.extend(u for u in update_list if u[0] in new_keys)
+    update_dict = {item[0]: item for item in update_list}
+    for i, item in enumerate(current):
+        if item[0] in update_dict:
+            current[i] = update_dict.pop(item[0])
+    if update_dict:
+        current.extend(u for u in update_list if u[0] in update_dict)
 
 
 class ContainerConfiguration(ConfigurationObject):
