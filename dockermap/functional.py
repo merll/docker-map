@@ -166,7 +166,7 @@ def expand_type_name(type_):
     return '{0.__module__}.{0.__name__}'.format(type_)
 
 
-def resolve_value(value):
+def resolve_value(value, types=type_registry):
     """
     Returns the actual value for the given object, if it is a late-resolving object type.
     If not, the value itself is simply returned.
@@ -176,10 +176,12 @@ def resolve_value(value):
     :type value: str | unicode | int | AbstractLazyObject | unknown
     :return: Resolved value.
     """
-    if isinstance(value, lazy_type):
+    if value is None:
+        return None
+    elif isinstance(value, lazy_type):
         return value.get()
-    elif type_registry:
-        resolve_func = type_registry.get(expand_type_name(type(value)))
+    elif types:
+        resolve_func = types.get(expand_type_name(type(value)))
         if resolve_func:
             return resolve_func(value)
     return value
@@ -197,23 +199,14 @@ def resolve_deep(values, max_depth=5, types=None):
     :type: dict[unicode | str, function]
     :return: Resolved values.
     """
-    def _resolve_single(value):
-        if isinstance(value, lazy_type):
-            return value.get()
-        elif all_types:
-            resolve_func = all_types.get(expand_type_name(type(value)))
-            if resolve_func:
-                return resolve_func(value)
-        return value
-
     def _resolve_sub(v, level):
         l1 = level + 1
-        res_val = _resolve_single(v)
+        res_val = resolve_value(v, all_types)
         if l1 < max_depth:
             if isinstance(res_val, (list, tuple)):
                 return [_resolve_sub(item, l1) for item in res_val]
             elif isinstance(res_val, dict):
-                return {_resolve_single(rk): _resolve_sub(rv, l1) for rk, rv in iteritems(res_val)}
+                return {resolve_value(rk, all_types): _resolve_sub(rv, l1) for rk, rv in iteritems(res_val)}
         return res_val
 
     if types:
