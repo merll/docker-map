@@ -13,7 +13,7 @@ from ...utils import format_image_tag
 from ..action import Action
 from ..config.client import USE_HC_MERGE
 from ..input import ItemType, NotSet
-from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes, get_volumes_from
+from ..policy.utils import init_options, extract_user
 from . import AbstractRunner
 from .attached import AttachedPreparationMixin
 from .cmd import ExecMixin
@@ -21,8 +21,7 @@ from .image import ImageMixin
 from .network import NetworkUtilMixin
 from .script import ScriptMixin
 from .signal_stop import SignalMixin
-from .utils import get_host_binds, get_port_bindings
-
+from .utils import update_kwargs, get_volumes, get_volumes_from, get_host_binds, get_port_bindings
 
 log = logging.getLogger(__name__)
 

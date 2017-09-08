@@ -5,7 +5,7 @@ import logging
 
 from ..action import ImageAction
 from ..input import ItemType
-from ..policy.utils import update_kwargs
+from .utils import update_kwargs
 
 log = logging.getLogger(__name__)
 

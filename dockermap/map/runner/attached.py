@@ -7,8 +7,8 @@ from ...functional import resolve_value
 from ..action import VolumeUtilAction
 from ..config.client import USE_HC_MERGE
 from ..input import ItemType
-from ..policy.utils import update_kwargs, get_instance_volumes
-from .utils import get_preparation_cmd
+from ..policy.utils import get_instance_volumes
+from .utils import update_kwargs, get_preparation_cmd
 
 
 class AttachedConfigMixin(object):

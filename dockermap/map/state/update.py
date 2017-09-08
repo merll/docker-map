@@ -9,7 +9,7 @@ import six
 from ...functional import resolve_value
 from ...utils import format_image_tag
 from ..input import ExecPolicy, NetworkEndpoint, ItemType, UsedVolume
-from ..policy.utils import init_options, get_shared_volume_path, get_instance_volumes, extract_user
+from ..policy.utils import init_options, extract_user, get_shared_volume_path, get_instance_volumes
 from . import State, StateFlags, SimpleEnum
 from .base import DependencyStateGenerator, ContainerBaseState, NetworkBaseState
 
