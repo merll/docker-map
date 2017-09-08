@@ -6,6 +6,7 @@ import logging
 from six import iteritems, itervalues
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT, DEFAULT_PRESET_NETWORKS
+from ..input import UsedVolume
 from .cache import ContainerCache, ImageCache, NetworkCache, VolumeCache
 from .dep import ContainerDependencyResolver, ContainerDependentsResolver
 
@@ -37,12 +38,25 @@ class BasePolicy(object):
         self._network_names = NetworkCache(clients)
         self._volume_names = VolumeCache(clients)
         self._images = ImageCache(clients)
-        self._f_resolver = ContainerDependencyResolver()
-        self._r_resolver = ContainerDependentsResolver()
+        self._f_resolver = f_resolver = ContainerDependencyResolver()
+        self._r_resolver = r_resolver = ContainerDependentsResolver()
+        self._default_volume_paths = default_paths = {}
         for m in itervalues(maps):
             depdendency_items = list(m.dependency_items())
-            self._f_resolver.update(depdendency_items)
-            self._r_resolver.update(depdendency_items)
+            f_resolver.update(depdendency_items)
+            r_resolver.update(depdendency_items)
+            default_paths[m.name] = map_paths = {}
+            map_paths.update(m.volumes)
+            if m.use_attached_parent_name:
+                map_paths.update(('{0}.{1}'.format(c_name, a.name), a.path)
+                                 for c_name, c_config in m
+                                 for a in c_config.attaches
+                                 if isinstance(a, UsedVolume))
+            else:
+                map_paths.update((a.name, a.path)
+                                 for c_name, c_config in m
+                                 for a in c_config.attaches
+                                 if isinstance(a, UsedVolume))
 
     @classmethod
     def cname(cls, map_name, container, instance=None):
@@ -212,3 +226,13 @@ class BasePolicy(object):
         :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedVolumeNames]
         """
         return self._volume_names
+
+    @property
+    def default_volume_paths(self):
+        """
+        Defined volume names of each map, with a dictionary of default container paths per volume alias.
+
+        :return: Default volume paths.
+        :rtype: dict[unicode | str, dict]
+        """
+        return self._default_volume_paths
