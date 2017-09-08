@@ -142,12 +142,12 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
         if isinstance(a, UsedVolume):
             c_path = a.mount_path
         else:
-            c_path = container_map.volumes[a.volume]
+            c_path = container_map.volumes[a.name]
         yield {
             'Type': 'volume',
-            'Source': posixpath.join(path_prefix, 'attached', a.volume),
+            'Source': posixpath.join(path_prefix, 'attached', a.name),
             'Destination': c_path,
-            'Name': _get_hash('attached-volume', path_prefix, a.volume),
+            'Name': _get_hash('attached-volume', path_prefix, a.name),
             'RW': True
         }
     if config_id.config_type == ItemType.CONTAINER:
@@ -168,14 +168,14 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
                 'RW': True,
             }
         for vol in c_config.uses:
-            c, __, i = vol.volume.partition('.')
+            c, __, i = vol.name.partition('.')
             c_ref = container_map.get_existing(c)
             if c_ref:
-                attached_volumes = {a.volume: a for a in c_ref.attaches}
+                attached_volumes = {a.name: a for a in c_ref.attaches}
                 instance_volume = attached_volumes.get(i)
                 if i and instance_volume is not None:
                     if isinstance(i, UsedVolume):
-                        c_path = instance_volume.mount_path
+                        c_path = instance_volume.path
                     else:
                         c_path = container_map.volumes[i]
                     yield {
@@ -391,7 +391,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
         for name, state, instances, attached_valid, instances_valid, kwargs in containers_states:
             c_config = self.sample_map.get_existing(name)
             for a in c_config.attaches:
-                config_id = MapConfigId(ItemType.VOLUME, self.map_name, name, a.volume)
+                config_id = MapConfigId(ItemType.VOLUME, self.map_name, name, a.name)
                 if self.sample_map.use_attached_parent_name:
                     container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
                 else:
