@@ -31,7 +31,7 @@ class PolicyUtil(with_metaclass(PolicyUtilMeta)):
     Base class for utility objects used by a policy and referring back to it.
 
     :param policy: Policy object instance.
-    :type policy: BasePolicy
+    :type policy: dockermap.map.policy.base.BasePolicy
     """
     policy_options = []
 
