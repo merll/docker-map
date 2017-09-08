@@ -199,7 +199,7 @@ class SingleContainerVfsCheck(object):
                               share, shared_vfs, i_shared_path)
                     if shared_vfs != i_shared_path:
                         return False
-                    self._vfs_paths[(config_id.config_name, config_id.instance_name, ref_shared_path)] = i_shared_path
+                    self._vfs_paths[config_id.config_name, config_id.instance_name, ref_shared_path] = i_shared_path
                 self.check_bind(ref_config, ref_i_name)
                 self.check_attached(ref_config, ref_c_name)
             else:
