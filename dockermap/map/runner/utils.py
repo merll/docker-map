@@ -62,10 +62,12 @@ def update_kwargs(kwargs, *updates):
                 kwargs[key] = u_item
 
 
-def get_volumes(config, default_volume_paths, include_named):
+def get_volumes(container_map, config, default_volume_paths, include_named):
     """
     Generates volume paths for the ``volumes`` argument during container creation.
 
+    :param container_map: Container map.
+    :type container_map: dockermap.map.config.main.ContainerMap
     :param config: Container configuration.
     :type config: dockermap.map.config.container.ContainerConfiguration
     :param default_volume_paths: Dictionary with volume aliases and their default paths.
@@ -95,6 +97,8 @@ def get_volumes(config, default_volume_paths, include_named):
     def _used_volume_path(vol):
         if isinstance(vol, UsedVolume):
             return resolve_value(vol.path)
+        if container_map.use_attached_parent_name:
+            return resolve_value(default_volume_paths.get(vol.name.partition('.')[2]))
         return resolve_value(default_volume_paths.get(vol.name))
 
     volumes = list(map(resolve_value, config.shares))
@@ -105,12 +109,10 @@ def get_volumes(config, default_volume_paths, include_named):
     return volumes
 
 
-def get_volumes_from(map_name, container_map, config_name, config, policy, include_volumes):
+def get_volumes_from(container_map, config_name, config, policy, include_volumes):
     """
     Generates volume paths for the host config ``volumes_from`` argument during container creation.
 
-    :param map_name: Container map name.
-    :type map_name: unicode | str
     :param container_map: Container map.
     :type container_map: dockermap.map.config.main.ContainerMap
     :param config_name: Container configuration name.
@@ -127,6 +129,7 @@ def get_volumes_from(map_name, container_map, config_name, config, policy, inclu
     """
     aname = policy.aname
     cname = policy.cname
+    map_name = container_map.name
     volume_names = set(policy.default_volume_paths[map_name].keys())
 
     def container_name(u_name):
@@ -146,17 +149,22 @@ def get_volumes_from(map_name, container_map, config_name, config, policy, inclu
             return '{0}:ro'.format(name)
         return name
 
+    use_attached_parent_name = container_map.use_attached_parent_name
     if include_volumes:
         volumes_from = [volume_str(volume_or_container_name(u.name), u.readonly)
                         for u in config.uses]
-        a_parent_name = config_name if container_map.use_attached_parent_name else None
+        a_parent_name = config_name if use_attached_parent_name else None
         volumes_from.extend([aname(map_name, attached.name, a_parent_name)
                              for attached in config.attaches])
-    else:
-        volumes_from = [volume_str(container_name(u.name), u.readonly)
-                        for u in config.uses
-                        if u.name not in volume_names]
-    return volumes_from
+        return volumes_from
+
+    if use_attached_parent_name:
+        return [volume_str(container_name(u.name), u.readonly)
+                for u in config.uses
+                if u.name.partition('.')[2] not in volume_names]
+    return [volume_str(container_name(u.name), u.readonly)
+            for u in config.uses
+            if u.name not in volume_names]
 
 
 def get_host_binds(container_map, config, instance):

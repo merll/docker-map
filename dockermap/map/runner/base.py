@@ -120,7 +120,7 @@ class DockerConfigMixin(object):
         c_kwargs = dict(
             name=container_name,
             image=format_image_tag(image_tag),
-            volumes=get_volumes(container_config, default_paths, client_config.supports_volumes),
+            volumes=get_volumes(container_map, container_config, default_paths, client_config.supports_volumes),
             user=extract_user(container_config.user),
             ports=[resolve_value(port_binding.exposed_port)
                    for port_binding in container_config.exposes if port_binding.exposed_port],
@@ -172,7 +172,7 @@ class DockerConfigMixin(object):
             links=[(cname(map_name, l_name), alias or policy.get_hostname(l_name))
                    for l_name, alias in container_config.links],
             binds=get_host_binds(container_map, container_config, action.config_id.instance_name),
-            volumes_from=get_volumes_from(map_name, container_map, action.config_id.config_name, container_config,
+            volumes_from=get_volumes_from(container_map, action.config_id.config_name, container_config,
                                           policy, not client_config.supports_volumes),
             port_bindings=get_port_bindings(container_config, client_config),
         )
