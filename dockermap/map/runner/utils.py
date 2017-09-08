@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import itertools
+import six
 from six.moves import map, filter
 
 from ...functional import resolve_value
