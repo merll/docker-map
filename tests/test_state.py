@@ -140,7 +140,7 @@ def _get_container_mounts(config_id, container_map, c_config, valid):
         path_prefix = '/invalid_{0}'.format(config_id.config_name)
     for a in c_config.attaches:
         if isinstance(a, UsedVolume):
-            c_path = a.mount_path
+            c_path = a.path
         else:
             c_path = container_map.volumes[a.name]
         yield {
