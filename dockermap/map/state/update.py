@@ -21,6 +21,7 @@ class CmdCheck(SimpleEnum):
     PARTIAL = 'partial'
     NONE = 'none'
 
+
 # For backwards compatibility.
 CMD_CHECK_FULL = CmdCheck.FULL
 CMD_CHECK_PARTIAL = CmdCheck.PARTIAL
@@ -127,20 +128,20 @@ def _check_network_driver_opts(network_config, instance_detail):
     return True
 
 
-class SingleContainerVfsCheck(object):
+class AbstractSingleVfsCheck(object):
     """
-    :type vfs_paths: dict[tuple, unicode | str]
     :type config_id: dockermap.map.input.MapConfigId
     :type container_map: dockermap.map.config.main.ContainerMap
+    :type policy: dockermap.map.policy.base.BasePolicy
+    :type vfs_paths: dict[tuple, unicode | str]
     :type instance_volumes: dict[unicode | str, unicode | str]
     """
-    def __init__(self, vfs_paths, config_id, container_map, instance_volumes):
-        self._vfs_paths = vfs_paths
-        self._instance_volumes = instance_volumes
+    def __init__(self, config_id, container_map, policy, vfs_paths, instance_volumes):
         self._config_id = config_id
         self._container_map = container_map
-        self._use_parent_name = container_map.use_attached_parent_name
-        self._volumes = container_map.volumes
+        self._policy = policy
+        self._vfs_paths = vfs_paths
+        self._instance_volumes = instance_volumes
 
     def check_bind(self, config, instance):
         config_id = self._config_id
@@ -154,40 +155,33 @@ class SingleContainerVfsCheck(object):
         return True
 
     def check_attached(self, config, parent_name):
-        config_id = self._config_id
-        for attached in config.attaches:
-            a_name = '{0}.{1}'.format(parent_name, attached.name) if self._use_parent_name else attached.name
-            if isinstance(attached, UsedVolume):
-                attached_path = attached.path
-            else:
-                attached_path = resolve_value(self._volumes[attached.name])
-            attached_vfs = self._vfs_paths.get((a_name, None, attached_path))
-            instance_vfs = self._instance_volumes.get(attached_path)
-            log.debug("Checking attached %s path. Attached instance / dependent container instance:\n%s\n%s",
-                      attached, attached_vfs, instance_vfs)
-            if not (instance_vfs and attached_vfs == instance_vfs):
-                return False
-            self._vfs_paths[config_id.config_name, config_id.instance_name, attached_path] = instance_vfs
-        return True
+        raise NotImplemented("To be implemented by subclasses.")
+
+    def check_used_vfs(self, used, used_alias, parent_name, default_path):
+        raise NotImplemented("To be implemented by subclasses.")
 
     def check_used(self, config):
         config_id = self._config_id
+        default_paths = self._policy.default_volume_paths[config_id.map_name]
+        use_parent_name = self._container_map.use_attached_parent_name
         for used in config.uses:
             used_volume = used.name
-            if self._use_parent_name:
-                used_alias = used_volume.partition('.')[2]
+            ref_c_name, __, ref_i_name = used_volume.partition('.')
+            if use_parent_name:
+                is_volume = ref_i_name and ref_i_name in default_paths
+                used_config, used_alias = ref_c_name, ref_i_name
+            elif not ref_i_name:
+                is_volume = ref_c_name in default_paths
+                used_alias = ref_c_name
+                used_config = None
             else:
-                used_alias = used_volume
-            used_path = resolve_value(self._volumes.get(used_alias))
-            if used_path:
-                used_vfs = self._vfs_paths.get((used_volume, None, used_path))
-                instance_path = self._instance_volumes.get(used_path)
-                log.debug("Checking used %s path. Parent instance / dependent container instance:\n%s\n%s",
-                          used_volume, used_vfs, instance_path)
-                if used_vfs != instance_path:
+                is_volume = False
+                used_config = None
+                used_alias = None
+            if is_volume:
+                if not self.check_used_vfs(used, used_alias, used_config, default_paths[used_alias]):
                     return False
                 continue
-            ref_c_name, __, ref_i_name = used_volume.partition('.')
             log.debug("Looking up dependency %s (instance %s).", ref_c_name, ref_i_name)
             ref_config = self._container_map.get_existing(ref_c_name)
             if ref_config:
@@ -203,25 +197,91 @@ class SingleContainerVfsCheck(object):
                 self.check_bind(ref_config, ref_i_name)
                 self.check_attached(ref_config, ref_c_name)
             else:
-                raise ValueError("Volume alias or container reference could not be resolved: {0}".format(used))
+                raise ValueError("Volume alias or container reference could not be resolved.", used_volume)
         return True
 
 
-class ContainerVolumeChecker(object):
-    def __init__(self):
+class SingleLegacyVfsCheck(AbstractSingleVfsCheck):
+    def check_attached(self, config, parent_name):
+        config_id = self._config_id
+        default_paths = self._policy.default_volume_paths[config_id.map_name]
+        use_parent_name = self._container_map.use_attached_parent_name
+        for attached in config.attaches:
+            a_name = '{0}.{1}'.format(parent_name, attached.name) if use_parent_name else attached.name
+            if isinstance(attached, UsedVolume):
+                attached_path = attached.path
+            else:
+                attached_path = resolve_value(default_paths[attached.name])
+            attached_vfs = self._vfs_paths.get((a_name, None, attached_path))
+            instance_vfs = self._instance_volumes.get(attached_path)
+            log.debug("Checking attached %s path. Attached instance / dependent container instance:\n%s\n%s",
+                      attached, attached_vfs, instance_vfs)
+            if not (instance_vfs and attached_vfs == instance_vfs):
+                return False
+            self._vfs_paths[config_id.config_name, config_id.instance_name, attached_path] = instance_vfs
+        return True
+
+    def check_used_vfs(self, used, used_alias, parent_name, default_path):
+        used_path = resolve_value(default_path)
+        used_vfs = self._vfs_paths.get((used.name, None, used_path))
+        instance_path = self._instance_volumes.get(used_path)
+        log.debug("Checking used %s path. Parent instance / dependent container instance:\n%s\n%s",
+                  used.name, used_vfs, instance_path)
+        if used_vfs and used_vfs == instance_path:
+            return True
+        return False
+
+
+class SingleVolumeVfsCheck(AbstractSingleVfsCheck):
+    def check_attached(self, config, parent_name):
+        config_id = self._config_id
+        parent_name = parent_name if self._container_map.use_attached_parent_name else None
+        policy = self._policy
+        default_paths = policy.default_volume_paths[config_id.map_name]
+        for attached in config.attaches:
+            v_name = policy.aname(config_id.map_name, attached.name, parent_name)
+            log.debug("Checking for attached volume %s.", v_name)
+            if isinstance(attached, UsedVolume):
+                path = resolve_value(attached.path)
+            else:
+                path = resolve_value(default_paths.get(attached.name))
+            if not path:
+                raise ValueError("Reference path for attached volume could be resolved.", attached)
+            instance_volume_name = self._instance_volumes.get(path)
+            log.debug("Checking attached %s volume at %s. Configured name / instance name:\n%s\n%s",
+                      attached.name, path, v_name, instance_volume_name)
+            if not instance_volume_name or instance_volume_name != v_name:
+                log.debug("No volume for destination path %s not found.", path)
+                return False
+        return True
+
+    def check_used_vfs(self, used, used_alias, parent_name, default_path):
+        if isinstance(used, UsedVolume):
+            used_path = resolve_value(used.path)
+        else:
+            used_path = resolve_value(default_path)
+        v_name = self._policy.aname(self._config_id.map_name, used_alias, parent_name)
+        instance_volume_name = self._instance_volumes.get(used_path)
+        log.debug("Checking used %s volume at %s. Configured name / instance name:\n%s\n%s",
+                  used.name, used_path, v_name, instance_volume_name)
+        if instance_volume_name and instance_volume_name == v_name:
+            return True
+        return False
+
+
+class AbstractVolumeChecker(object):
+    def __init__(self, policy):
         self._vfs_paths = {}
+        self._policy = policy
 
     def register_attached(self, alias, parent_name, mapped_path, path):
-        volume_name = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
-        self._vfs_paths[volume_name, None, mapped_path] = path
+        pass
 
-    def register_volume(self, alias, parent_name, path):
-        volume_name = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
-        self._vfs_paths[volume_name, None, None] = path
+    def get_vfs_check(self, config_id, container_map, instance_volumes):
+        raise NotImplemented("To be implemented by subclass.")
 
-    def check(self, config_id, container_map, container_config, instance_detail):
-        instance_volumes = get_instance_volumes(instance_detail)
-        vfs = SingleContainerVfsCheck(self._vfs_paths, config_id, container_map, instance_volumes)
+    def check(self, config_id, container_map, container_config, instance_volumes):
+        vfs = self.get_vfs_check(config_id, container_map, instance_volumes)
         for share in container_config.shares:
             cr_shared_path = resolve_value(share)
             self._vfs_paths[config_id.config_name, config_id.instance_name, cr_shared_path] = instance_volumes.get(share)
@@ -232,6 +292,20 @@ class ContainerVolumeChecker(object):
         if not vfs.check_used(container_config):
             return False
         return True
+
+
+class ContainerLegacyVolumeChecker(AbstractVolumeChecker):
+    def register_attached(self, alias, parent_name, mapped_path, path):
+        volume_name = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
+        self._vfs_paths[volume_name, None, mapped_path] = path
+
+    def get_vfs_check(self, config_id, container_map, instance_volumes):
+        return SingleLegacyVfsCheck(config_id, container_map, self._policy, self._vfs_paths, instance_volumes)
+
+
+class ContainerVolumeChecker(AbstractVolumeChecker):
+    def get_vfs_check(self, config_id, container_map, instance_volumes):
+        return SingleVolumeVfsCheck(config_id, container_map, self._policy, self._vfs_paths, instance_volumes)
 
 
 class NetworkEndpointRegistry(object):
@@ -401,7 +475,8 @@ class UpdateContainerState(ContainerBaseState):
                 if not _cmd_running(exec_cmd.cmd, exec_cmd.user) and exec_cmd.policy != ExecPolicy.INITIAL]
 
     def _check_volumes(self):
-        return self.volume_checker.check(self.config_id, self.container_map, self.config, self.detail)
+        instance_volumes = get_instance_volumes(self.detail, self.client_config.supports_volumes)
+        return self.volume_checker.check(self.config_id, self.container_map, self.config, instance_volumes)
 
     def _check_container_network_mode(self):
         net_mode = self.config.network_mode or 'default'
@@ -433,7 +508,7 @@ class UpdateContainerState(ContainerBaseState):
         config_id = self.config_id
         c_image_id = self.detail['Image']
         if config_id.config_type == ItemType.VOLUME:
-            volumes = get_instance_volumes(self.detail)
+            volumes = get_instance_volumes(self.detail, False)
             if volumes:
                 mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name])
                 parent_name = config_id.config_name if self.container_map.use_attached_parent_name else None
@@ -516,8 +591,10 @@ class UpdateStateGenerator(DependencyStateGenerator):
     def __init__(self, policy, kwargs):
         super(UpdateStateGenerator, self).__init__(policy, kwargs)
         self._volume_checkers = {
-            client_name: ContainerVolumeChecker()
-            for client_name in policy.clients.keys()
+            client_name: ContainerVolumeChecker(policy)
+            if client_config.supports_volumes
+            else ContainerLegacyVolumeChecker(policy)
+            for client_name, client_config in six.iteritems(policy.clients)
         }
         default_network_details = {
             client_name: {

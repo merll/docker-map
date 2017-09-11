@@ -78,17 +78,22 @@ def get_shared_volume_path(container_map, vol, instance=None):
     raise KeyError("No host-volume information found for alias {0}.".format(alias))
 
 
-def get_instance_volumes(instance_detail):
+def get_instance_volumes(instance_detail, check_names):
     """
-    Extracts the mount points and mapped directories of a Docker container.
+    Extracts the mount points and mapped directories or names of a Docker container.
 
     :param instance_detail: Result from a container inspection.
     :type instance_detail: dict
+    :param check_names: Whether to check for named volumes.
+    :type check_names: bool
     :return: Dictionary of volumes, with the destination (inside the container) as a key, and the source (external to
-     the container) as values.
+     the container) as values. If ``check_names`` is ``True``, the value contains the mounted volume name instead.
     :rtype: dict[unicode | str, unicode | str]
     """
     if 'Mounts' in instance_detail:
+        if check_names:
+            return {m['Destination']: m['Source'] or m.get('Name')
+                    for m in instance_detail['Mounts']}
         return {m['Destination']: m['Source']
                 for m in instance_detail['Mounts']}
     return instance_detail.get('Volumes') or {}

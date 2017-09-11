@@ -151,7 +151,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
             local_path = volume_detail['Mountpoint']
         else:
             instance_detail = client.inspect_container(a_name)
-            volumes = get_instance_volumes(instance_detail)
+            volumes = get_instance_volumes(instance_detail, False)
             path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
             local_path = volumes.get(path)
             if not local_path:
