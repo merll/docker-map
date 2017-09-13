@@ -224,9 +224,9 @@ class VolumeBaseState(AbstractState):
     def __init__(self, *args, **kwargs):
         super(VolumeBaseState, self).__init__(*args, **kwargs)
         self.config = config = None  # TODO
-        if not config:
-            raise KeyError("Volume configuration '{0}' not found on map '{1}'."
-                           "".format(self.config_id.config_name, self.config_id.map_name))
+        # if not config:
+        #     raise KeyError("Volume configuration '{0}' not found on map '{1}'."
+        #                    "".format(self.config_id.config_name, self.config_id.map_name))
         self.volume_name = None
 
     def set_defaults(self):
@@ -332,8 +332,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
             elif config_type == ItemType.VOLUME:
                 client_config = self._policy.clients[client_name]
                 if client_config.supports_volumes:
-                    c_state = self.get_container_state(client_name, config_id, config_flags)
-                    # TODO c_state = self.get_volume_state(client_name, config_id, config_flags)
+                    c_state = self.get_volume_state(client_name, config_id, config_flags)
                 else:
                     c_state = self.get_container_state(client_name, config_id, config_flags)
             elif config_type == ItemType.NETWORK:

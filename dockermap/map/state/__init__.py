@@ -29,7 +29,6 @@ class StateFlags(Flags):
     MISC_MISMATCH = 1 << 30    # Container does otherwise not correspond with the configuration.
     FORCED_RESET = 1 << 31     # Container in any state should be reset.
 
-    # TODO: Depends on Docker version
     NEEDS_RESET = (NONRECOVERABLE | FORCED_RESET | IMAGE_MISMATCH | MISSING_LINK | VOLUME_MISMATCH | MISC_MISMATCH)
 
 
