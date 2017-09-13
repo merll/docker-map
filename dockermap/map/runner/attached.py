@@ -11,6 +11,9 @@ from ..policy.utils import get_instance_volumes
 from .utils import update_kwargs, get_preparation_cmd
 
 
+PREPARATION_TMP_PATH = '/volume-tmp'
+
+
 class AttachedConfigMixin(object):
     def get_attached_preparation_create_kwargs(self, action, volume_container, kwargs=None):
         """
@@ -40,6 +43,8 @@ class AttachedConfigMixin(object):
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         use_host_config = client_config.use_host_config
         if use_host_config:
+            if client_config.supports_volumes:
+                c_kwargs['volumes'] = [PREPARATION_TMP_PATH]
             hc_kwargs = self.get_attached_preparation_host_config_kwargs(action, None, volume_container,
                                                                          kwargs=hc_extra_kwargs)
             if hc_kwargs:
@@ -59,14 +64,17 @@ class AttachedConfigMixin(object):
         :type action: dockermap.map.runner.ActionConfig
         :param container_name: Container name or id. Set ``None`` when included in kwargs for ``create_container``.
         :type container_name: unicode | str | NoneType
-        :param volume_container: Name of the container that shares the volume.
+        :param volume_container: Name of the volume or name of the container that shares the volume.
         :type volume_container: unicode | str
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        c_kwargs = dict(volumes_from=[volume_container])
+        if action.client_config.supports_volumes:
+            c_kwargs = dict(binds=['{0}:{1}'.format(volume_container, PREPARATION_TMP_PATH)])
+        else:
+            c_kwargs = dict(volumes_from=[volume_container])
         if container_name:
             c_kwargs['container'] = container_name
         update_kwargs(c_kwargs, kwargs)
