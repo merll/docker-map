@@ -510,7 +510,7 @@ class UpdateContainerState(ContainerBaseState):
         if config_id.config_type == ItemType.VOLUME:
             volumes = get_instance_volumes(self.detail, False)
             if volumes:
-                mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name])
+                mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name].default_path)
                 parent_name = config_id.config_name if self.container_map.use_attached_parent_name else None
                 self.volume_checker.register_attached(config_id.instance_name, parent_name,
                                                       mapped_path, volumes.get(mapped_path))

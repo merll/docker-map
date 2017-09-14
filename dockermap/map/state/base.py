@@ -96,8 +96,8 @@ class ContainerBaseState(AbstractState):
         super(ContainerBaseState, self).__init__(*args, **kwargs)
         self.config = config = self.container_map.get_existing(self.config_id.config_name)
         if not config:
-            raise KeyError("Container configuration '{0}' not found on map '{1}'."
-                           "".format(self.config_id.config_name, self.config_id.map_name))
+            raise KeyError("Container configuration '{0.config_name}' not found on map '{0.map_name}'."
+                           "".format(self.config_id))
         self.container_name = None
 
     def set_defaults(self):
@@ -171,8 +171,8 @@ class NetworkBaseState(AbstractState):
         super(NetworkBaseState, self).__init__(*args, **kwargs)
         self.config = config = self.container_map.get_existing_network(self.config_id.config_name)
         if not config:
-            raise KeyError("Network configuration '{0}' not found on map '{1}'."
-                           "".format(self.config_id.config_name, self.config_id.map_name))
+            raise KeyError("Network configuration '{0.config_name}' not found on map '{0.map_name}'."
+                           "".format(self.config_id))
         self.network_name = None
 
     def set_defaults(self):
@@ -223,10 +223,7 @@ class VolumeBaseState(AbstractState):
     """
     def __init__(self, *args, **kwargs):
         super(VolumeBaseState, self).__init__(*args, **kwargs)
-        self.config = config = None  # TODO
-        # if not config:
-        #     raise KeyError("Volume configuration '{0}' not found on map '{1}'."
-        #                    "".format(self.config_id.config_name, self.config_id.map_name))
+        self.config = self.container_map.get_existing_volume(self.config_id.instance_name)
         self.volume_name = None
 
     def set_defaults(self):

@@ -200,7 +200,7 @@ class DockerConfigMixin(object):
         :rtype: dict
         """
         client_config = action.client_config
-        path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
+        path = resolve_value(action.container_map.volumes[action.config_id.instance_name].default_path)
         user = extract_user(action.config.user)
         c_kwargs = dict(
             name=container_name,

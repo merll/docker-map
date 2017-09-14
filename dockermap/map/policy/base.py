@@ -46,7 +46,7 @@ class BasePolicy(object):
             f_resolver.update(depdendency_items)
             r_resolver.update(depdendency_items)
             default_paths[m.name] = map_paths = {}
-            map_paths.update(m.volumes)
+            map_paths.update(m.volumes.default_paths)
             if m.use_attached_parent_name:
                 map_paths.update(('{0}.{1}'.format(c_name, a.name), a.path)
                                  for c_name, c_config in m

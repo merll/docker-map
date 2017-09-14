@@ -157,7 +157,7 @@ def _get_container_mounts(config_id, container_map, c_config, named_volumes, val
         if isinstance(a, UsedVolume):
             c_path = a.path
         else:
-            c_path = container_map.volumes[a.name]
+            c_path = container_map.volumes[a.name].default_path
         yield {
             'Type': 'volume',
             'Source': posixpath.join(path_prefix, 'attached', a.name) if not named_volumes else '',
@@ -193,7 +193,7 @@ def _get_container_mounts(config_id, container_map, c_config, named_volumes, val
                     if isinstance(instance_volume, UsedVolume):
                         c_path = instance_volume.path
                     else:
-                        c_path = container_map.volumes[i]
+                        c_path = container_map.volumes[i].default_path
                     yield {
                         'Type': 'volume',
                         'Source': posixpath.join(path_prefix, 'attached', i) if not named_volumes else '',

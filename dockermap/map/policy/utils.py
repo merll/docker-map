@@ -71,10 +71,10 @@ def get_shared_volume_path(container_map, vol, instance=None):
         raise ValueError("Host-container-binding must be described by two paths or one alias name.",
                          vol)
     alias = vol.name
-    c_path = resolve_value(container_map.volumes.get(alias))
+    volume_config = resolve_value(container_map.volumes.get(alias))
     h_path = container_map.host.get_path(alias, instance)
-    if c_path and h_path:
-        return c_path, h_path
+    if volume_config and h_path:
+        return volume_config.default_path, h_path
     raise KeyError("No host-volume information found for alias {0}.".format(alias))
 
 

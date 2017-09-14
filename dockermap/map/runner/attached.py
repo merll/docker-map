@@ -30,7 +30,7 @@ class AttachedConfigMixin(object):
         :rtype: dict
         """
         client_config = action.client_config
-        path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
+        path = resolve_value(action.container_map.volumes[action.config_id.instance_name].default_path)
         cmd = get_preparation_cmd(action.config, path)
         if not cmd:
             return None
@@ -160,7 +160,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         else:
             instance_detail = client.inspect_container(a_name)
             volumes = get_instance_volumes(instance_detail, False)
-            path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
+            path = resolve_value(action.container_map.volumes[action.config_id.instance_name].default_path)
             local_path = volumes.get(path)
             if not local_path:
                 raise ValueError("Could not locate local path of volume alias '{0}' / "

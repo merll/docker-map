@@ -6,7 +6,7 @@ import itertools
 from operator import itemgetter
 
 import six
-from six.moves import map
+from six.moves import map, zip
 
 from ... import DEFAULT_PRESET_NETWORKS
 from ...functional import resolve_value
@@ -18,6 +18,7 @@ from . import ConfigurationObject, CP
 from .container import ContainerConfiguration
 from .host_volume import HostVolumeConfiguration
 from .network import NetworkConfiguration
+from .volume import VolumeConfigurationMap
 
 
 get_map_config = itemgetter(0, 1, 2)
@@ -171,7 +172,6 @@ class ContainerMap(ConfigurationObject):
     """
     repository = CP()
     host = CP(dict, default=HostVolumeConfiguration, input_func=HostVolumeConfiguration, update=False)
-    volumes = CP(dict, default=DictMap, input_func=DictMap)
     clients = CP(list)
     groups = CP(dict, default=DictMap, input_func=DictMap)
     default_domain = CP()
@@ -183,7 +183,6 @@ class ContainerMap(ConfigurationObject):
         'repository': "Repository prefix for images. This is prepended to image names used by container "
                       "configurations.",
         'host': "Volume alias assignments of the map.",
-        'volumes': "Volume alias assignments of the map.",
         'clients': "Alias names of clients associated with this container map.",
         'groups': "Groups of configured containers.",
         'default_domain': "Value to use as domain name for new containers, unless the client specifies otherwise.",
@@ -198,6 +197,7 @@ class ContainerMap(ConfigurationObject):
         self._name = name
         self._extended = False
         self._containers = containers = DefaultDictMap(ContainerConfiguration)
+        self._volumes = VolumeConfigurationMap()
         self._networks = DefaultDictMap(NetworkConfiguration)
         super(ContainerMap, self).__init__(initial, **kwargs)
         if containers and check_integrity:
@@ -207,33 +207,40 @@ class ContainerMap(ConfigurationObject):
         return ((c_name, c_config) for c_name, c_config in six.iteritems(self._containers) if not c_config.abstract)
 
     def update_default_from_dict(self, key, value):
-        if key == 'host_root':
-            self.host.root = value
-        elif key == 'containers':
-            for c_name, c_value in six.iteritems(value):
-                self._containers[c_name].update_from_dict(c_value)
+        if key == 'containers':
+            items = self._containers
         elif key == 'networks':
-            for n_name, n_value in six.iteritems(value):
-                self._networks[n_name].update_from_dict(n_value)
+            items = self._networks
+        elif key == 'volumes':
+            items = self._volumes
+        else:
+            items = None
+        if items is not None:
+            for s_key, s_value in six.iteritems(value):
+                items[s_key].update_from_dict(s_value)
+        elif key == 'host_root':
+            self.host.root = value
         else:
             self._containers[key].update_from_dict(value)
 
     def merge_default_from_dict(self, key, value, lists_only=False):
-        if key == 'host_root':
+        if key == 'containers':
+            items = self._containers
+        elif key == 'networks':
+            items = self._networks
+        elif key == 'volumes':
+            items = self._volumes
+        else:
+            items = None
+        if items is not None:
+            for s_key, s_value in six.iteritems(value):
+                if s_key in items:
+                    items[s_key].merge_from_dict(s_value, lists_only=lists_only)
+                else:
+                    items[s_key].update_from_dict(s_value)
+        elif key == 'host_root':
             if not lists_only:
                 self.host.root = value
-        elif key == 'containers':
-            for c_name, c_value in six.iteritems(value):
-                if c_name in self._containers:
-                    self._containers[c_name].merge_from_dict(c_value, lists_only=lists_only)
-                else:
-                    self._containers[c_name].update_from_dict(c_value)
-        elif key == 'networks':
-            for n_name, n_value in six.iteritems(value):
-                if n_name in self._networks:
-                    self._networks[n_name].merge_from_dict(n_value, lists_only=lists_only)
-                else:
-                    self._networks[n_name].update_from_dict(n_value)
         elif key in self._containers:
             self._containers[key].merge_from_dict(value, lists_only=lists_only)
         else:
@@ -245,12 +252,16 @@ class ContainerMap(ConfigurationObject):
             self._config['host'] = HostVolumeConfiguration(host)
         containers = dct.get('containers')
         if containers:
-            self._config['containers'] = containers = DefaultDictMap(ContainerConfiguration)
-            containers.update(containers)
+            self._config['containers'] = c_containers = DefaultDictMap(ContainerConfiguration)
+            c_containers.update(containers)
         networks = dct.get('networks')
         if networks:
-            self._config['networks'] = networks = DefaultDictMap(NetworkConfiguration)
-            networks.update(networks)
+            self._config['networks'] = c_networks = DefaultDictMap(NetworkConfiguration)
+            c_networks.update(networks)
+        volumes = dct.get('volumes')
+        if volumes:
+            self._config['volumes'] = c_volumes = VolumeConfigurationMap()
+            c_volumes.update(volumes)
         super(ContainerMap, self).update_from_dict(dct)
 
     def update_from_obj(self, obj, copy=False, update_containers=True):
@@ -258,21 +269,24 @@ class ContainerMap(ConfigurationObject):
         if update_containers:
             for key, value in obj.containers:
                 self._containers[key].update_from_obj(value, copy=copy)
-        for key, value in obj.networks:
-            self._networks[key].update_from_obj(value, copy=copy)
+        for update_items, current_items in zip(
+            [obj.networks, obj.volumes],
+            [self._networks, self._volumes]
+        ):
+            for key, value in update_items:
+                current_items[key].update_from_obj(value, copy=copy)
         super(ContainerMap, self).update_from_obj(obj, copy=copy)
 
     def merge_from_obj(self, obj, lists_only=False):
-        for key, value in obj.containers:
-            if key in self._containers:
-                self._containers[key].merge_from_obj(value, lists_only=lists_only)
-            else:
-                self._containers[key].update_from_obj(value)
-        for key, value in obj.networks:
-            if key in self._networks:
-                self._networks[key].merge_from_obj(value, lists_only=lists_only)
-            else:
-                self._networks[key].update_from_obj(value)
+        for update_items, current_items in zip(
+            [obj.containers, obj.networks, obj.volumes],
+            [self._containers, self._networks, self._volumes]
+        ):
+            for key, value in update_items:
+                if key in current_items:
+                    current_items[key].merge_from_obj(value, lists_only=lists_only)
+                else:
+                    current_items[key].update_from_obj(value)
         super(ContainerMap, self).merge_from_obj(obj, lists_only=lists_only)
 
     def get_persistent_items(self):
@@ -336,6 +350,24 @@ class ContainerMap(ConfigurationObject):
         else:
             self._networks.clear()
             self._networks.update(value)
+
+    @property
+    def volumes(self):
+        """
+        Volume configurations on the map.
+
+        :return: Volume configurations.
+        :rtype: dict[unicode | str, dockermap.map.config.volume.VolumeConfiguration]
+        """
+        return self._volumes
+
+    @volumes.setter
+    def volumes(self, value):
+        if isinstance(value, VolumeConfigurationMap):
+            self._volumes = value
+        else:
+            self._volumes.clear()
+            self._volumes.update(value)
 
     def get_image(self, image):
         """
@@ -506,9 +538,21 @@ class ContainerMap(ConfigurationObject):
         :param name: Network name.
         :type name: unicode | str
         :return: A network configuration.
-        :rtype: NetworkConfiguration
+        :rtype: dockermap.map.config.network.NetworkConfiguration
         """
         return self._networks[name]
+
+    def get_volume(self, name):
+        """
+        Returns a volume configuration from the map; if it does not yet exist, an initial config is created and
+        returned (to avoid this, use :meth:`get_existing_volume` instead). `name` can be any valid volume name.
+
+        :param name: Volume alias.
+        :type name: unicode | str
+        :return: A volume configuration.
+        :rtype: dockermap.map.config.volume.VolumeConfiguration
+        """
+        return self._volumes[name]
 
     def get_existing_network(self, name):
         """
@@ -518,9 +562,21 @@ class ContainerMap(ConfigurationObject):
         :param name: Network name.
         :type name: unicode | str
         :return: A network configuration.
-        :rtype: NetworkConfiguration
+        :rtype: dockermap.map.config.network.NetworkConfiguration
         """
         return self._networks.get(name)
+
+    def get_existing_volume(self, name):
+        """
+        Same as :meth:`get_volume`, except for that non-existing volume configurations will not be created; ``None``
+        is returned instead in this case.
+
+        :param name: Volume alias.
+        :type name: unicode | str
+        :return: A volume configuration.
+        :rtype: dockermap.map.config.volume.VolumeConfiguration
+        """
+        return self._volumes.get(name)
 
     def get_extended(self, config):
         """
