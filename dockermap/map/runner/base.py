@@ -5,7 +5,7 @@ import logging
 
 from docker.utils.utils import create_host_config, create_networking_config, create_endpoint_config
 from requests import Timeout
-from six import text_type, iteritems
+from six import text_type, iteritems, string_types
 from six.moves import map
 
 from ...functional import resolve_value
@@ -179,7 +179,7 @@ class DockerConfigMixin(object):
         network_mode = container_config.network_mode
         if isinstance(network_mode, tuple):
             c_kwargs['network_mode'] = 'container:{0}'.format(cname(map_name, *network_mode))
-        elif isinstance(network_mode, text_type):
+        elif isinstance(network_mode, string_types):
             c_kwargs['network_mode'] = network_mode
         if container_name:
             c_kwargs['container'] = container_name

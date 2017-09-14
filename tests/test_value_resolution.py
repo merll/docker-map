@@ -3,7 +3,7 @@ from __future__ import absolute_import, unicode_literals
 
 from collections import namedtuple
 import unittest
-from six import text_type
+from six import string_types
 
 from dockermap.functional import lazy, register_type, uses_type_registry, LazyOnceObject, resolve_value, resolve_deep
 
@@ -102,7 +102,7 @@ class LazyValueResolutionTest(unittest.TestCase):
 
         data = resolve_deep(res_data, max_depth=2)
         # Original structures should be preserved
-        self.assertIsInstance(data['a'], text_type)
+        self.assertIsInstance(data['a'], string_types)
         self.assertIsInstance(data['d'], list)
         self.assertIsInstance(data['d'][2], dict)
         # Nested dictionary should be resolved.
