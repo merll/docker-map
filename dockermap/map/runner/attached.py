@@ -30,12 +30,14 @@ class AttachedConfigMixin(object):
         :rtype: dict
         """
         client_config = action.client_config
-        path = resolve_value(action.container_map.volumes[action.config_id.instance_name].default_path)
+        config_id = action.config_id
+        policy = self._policy
+        path = resolve_value(policy.default_volume_paths[config_id.map_name][config_id.instance_name])
         cmd = get_preparation_cmd(action.config, path)
         if not cmd:
             return None
         c_kwargs = dict(
-            image=self._policy.core_image,
+            image=policy.core_image,
             command=' && '.join(cmd),
             user='root',
             network_disabled=True,
@@ -160,7 +162,8 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         else:
             instance_detail = client.inspect_container(a_name)
             volumes = get_instance_volumes(instance_detail, False)
-            path = resolve_value(action.container_map.volumes[action.config_id.instance_name].default_path)
+            config_id = action.config_id
+            path = resolve_value(self._policy.default_volume_paths[config_id.map_name][config_id.instance_name])
             local_path = volumes.get(path)
             if not local_path:
                 raise ValueError("Could not locate local path of volume alias '{0}' / "
