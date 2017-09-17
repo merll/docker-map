@@ -42,25 +42,23 @@ class DockerBaseRunnerMixin(object):
 
     def create_volume(self, action, v_name, **kwargs):
         if action.client_config.supports_volumes:
-            # TODO Implement for volumes.
-            pass
+            c_kwargs = self.get_volume_create_kwargs(action, v_name, kwargs=kwargs)
+            return action.client.create_volume(**c_kwargs)
+        c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
+        res = action.client.create_container(**c_kwargs)
+        if action.client_config.use_host_config:
+            action.client.start(v_name)
         else:
-            c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
-            res = action.client.create_container(**c_kwargs)
-            if action.client_config.use_host_config:
-                action.client.start(v_name)
-            else:
-                c_kwargs = self.get_attached_container_host_config_kwargs(action, v_name, kwargs=kwargs)
-                action.client.start(**c_kwargs)
-            return res
+            c_kwargs = self.get_attached_container_host_config_kwargs(action, v_name, kwargs=kwargs)
+            action.client.start(**c_kwargs)
+        return res
 
-    def remove_volume(self, action, c_name, **kwargs):
+    def remove_volume(self, action, v_name, **kwargs):
         if action.client_config.supports_volumes:
-            # TODO Implement for volumes.
-            pass
-        else:
-            c_kwargs = self.get_container_remove_kwargs(action, c_name, kwargs=kwargs)
-            return action.client.remove_container(**c_kwargs)
+            c_kwargs = self.get_volume_create_kwargs(action, v_name, kwargs=kwargs)
+            return action.client.remove_volume(**c_kwargs)
+        c_kwargs = self.get_container_remove_kwargs(action, v_name, kwargs=kwargs)
+        return action.client.remove_container(**c_kwargs)
 
     def create_container(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_create_kwargs(action, c_name, kwargs=kwargs)
@@ -501,6 +499,48 @@ class DockerConfigMixin(object):
 
     def get_container_kill_kwargs(self, action, container_name, kwargs=None):
         c_kwargs = dict(container=container_name)
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
+    def get_volume_create_kwargs(self, action, volume_name, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to create a volume.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param volume_name: Volume name.
+        :type volume_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        config = action.config
+        c_kwargs = dict(
+            name=volume_name,
+            driver=config.driver,
+        )
+        driver_opts = init_options(config.driver_options)
+        if driver_opts:
+            c_kwargs['driver_opts'] = {option_name: resolve_value(option_value)
+                                       for option_name, option_value in iteritems(driver_opts)}
+        update_kwargs(c_kwargs, init_options(config.create_options), kwargs)
+        return c_kwargs
+
+    def get_volume_remove_kwargs(self, action, volume_name, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to remove a network.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param volume_name: Volume name.
+        :type volume_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        c_kwargs = dict(name=volume_name)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 

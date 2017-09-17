@@ -59,11 +59,14 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                 item_name = policy.cname(config_id.map_name, config_id.config_name, config_id.instance_name)
                 existing_items = policy.container_names[action.client_name]
             elif config_type == ItemType.VOLUME:
-                # TODO: Implement for native volumes.
-                config = c_map.get_existing(config_id.config_name)
                 a_parent_name = config_id.config_name if c_map.use_attached_parent_name else None
                 item_name = policy.aname(config_id.map_name, config_id.instance_name, parent_name=a_parent_name)
-                existing_items = policy.container_names[action.client_name]
+                if client_config.supports_volumes:
+                    config = c_map.get_existing_volume(config_id.config_name)
+                    existing_items = policy.volume_names[action.client_name]
+                else:
+                    config = c_map.get_existing(config_id.config_name)
+                    existing_items = policy.container_names[action.client_name]
             elif config_type == ItemType.NETWORK:
                 config = c_map.get_existing_network(config_id.config_name)
                 item_name = policy.nname(config_id.map_name, config_id.config_name)
