@@ -120,11 +120,14 @@ class TestPolicyClientKwargs(unittest.TestCase):
             hostname='main-app-server',
             domainname=None,
             ports=[8880],
+            networking_config={'EndpointsConfig': {'main.app': {}}},
             host_config=create_host_config(
                 links={},
                 binds=[
                     '/var/lib/site/config/app1:/var/lib/app/config:ro',
                     '/var/lib/site/data/app1:/var/lib/app/data:rw',
+                    'main.app_log:/var/lib/app/log:rw',
+                    'main.app_server_socket:/var/lib/app/socket:rw',
                     '/new_h:/new_c:rw',
                 ],
                 volumes_from=[],

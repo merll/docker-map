@@ -86,7 +86,7 @@ MAP_DATA_1_NEW = {
             'app_data',
         ),
         'networks': 'app',
-        'attaches': ('app_log', ('app_server_socket', 'app_server_socket')),
+        'attaches': ('app_log', ('app_server_socket', '/var/lib/app/socket')),
         'user': 2000,
         'permissions': 'u=rwX,g=rX,o=',
     },
