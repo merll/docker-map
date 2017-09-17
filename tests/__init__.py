@@ -53,6 +53,65 @@ MAP_DATA_1 = {
         },
     },
 }
+MAP_DATA_1_NEW = {
+    'repository': 'registry.example.com',
+    'default_tag': 'custom',
+    'host_root': '/var/lib/site',
+    'web_server': {
+        'image': 'nginx:latest',
+        # If volumes are not shared with any other container, assigning
+        # an alias in "volumes" is possible, but not neccessary:
+        'binds': {'/etc/nginx': ('config/nginx', 'ro')},
+        'uses': [('app_server_socket', '/var/lib/app/custom/socket')],
+        'attaches': [('web_log', '/var/log/nginx')],
+        'networks': {
+            'bridge': None,
+            'app': {
+                'links': [('app_server.instance1', 'i1'),
+                          ('app_server.instance2', 'i2')],
+            }
+        },
+        'exposes': {
+            80: 80,
+            443: 443,
+        },
+        'stop_timeout': 5,
+    },
+    'app_server': {
+        'image': 'app',
+        'instances': ('instance1', 'instance2'),
+        'exposes': [8880],
+        'binds': (
+            {'app_config': 'ro'},
+            'app_data',
+        ),
+        'networks': 'app',
+        'attaches': ('app_log', ('app_server_socket', 'app_server_socket')),
+        'user': 2000,
+        'permissions': 'u=rwX,g=rX,o=',
+    },
+    'app_extra': {
+        'networks': 'app',
+    },
+    'networks': {
+        'app': None,
+    },
+    'volumes': { # Configure volume paths inside containers
+        'app_config': '/var/lib/app/config',
+        'app_log': '/var/lib/app/log',
+        'app_data': '/var/lib/app/data',
+    },
+    'host': { # Configure volume paths on the Docker host
+        'app_config': {
+            'instance1': 'config/app1',
+            'instance2': 'config/app2',
+        },
+        'app_data': {
+            'instance1': 'data/app1',
+            'instance2': 'data/app2',
+        },
+    },
+}
 
 MAP_DATA_2 = {
     'repository': 'registry.example.com',
@@ -214,7 +273,7 @@ MAP_DATA_3 = {
 
 CLIENT_DATA_1 = {
     'interfaces': {'private': '10.0.0.11'},
-    'version': '1.21',
+    'version': '1.22',
 }
 CLIENT_DATA_2 = {
     'interfaces': {'private': '10.0.0.11'},
