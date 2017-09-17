@@ -162,16 +162,19 @@ class DockerConfigMixin(object):
         container_map = action.container_map
         container_config = action.config
         client_config = action.client_config
-        map_name = container_map.name
+        config_id = action.config_id
+        map_name = config_id.map_name
         policy = self._policy
         cname = policy.cname
+        supports_volumes = client_config.supports_volumes
 
         c_kwargs = dict(
             links=[(cname(map_name, l_name), alias or policy.get_hostname(l_name))
                    for l_name, alias in container_config.links],
-            binds=get_host_binds(container_map, container_config, action.config_id.instance_name),
-            volumes_from=get_volumes_from(container_map, action.config_id.config_name, container_config,
-                                          policy, not client_config.supports_volumes),
+            binds=get_host_binds(container_map, config_id.config_name, container_config, config_id.instance_name,
+                                 policy, supports_volumes),
+            volumes_from=get_volumes_from(container_map, config_id.config_name, container_config,
+                                          policy, not supports_volumes),
             port_bindings=get_port_bindings(container_config, client_config),
         )
         network_mode = container_config.network_mode

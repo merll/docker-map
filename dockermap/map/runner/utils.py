@@ -167,9 +167,10 @@ def get_volumes_from(container_map, config_name, config, policy, include_volumes
             if u.name not in volume_names]
 
 
-def get_host_binds(container_map, config, instance):
+def get_host_binds(container_map, config_name, config, instance, policy, named_volumes):
     """
-    Generates the dictionary entries of host volumes of a container configuration.
+    Generates the list of host volumes and named volumes (where applicable) for the host config ``bind`` argument
+    during container creation.
 
     :param container_map: Container map.
     :type container_map: dockermap.map.config.main.ContainerMap
@@ -180,9 +181,43 @@ def get_host_binds(container_map, config, instance):
     :return: List of shared volumes with host volumes and the read-only flag.
     :rtype: list[unicode | str]
     """
-    return ['{0[1]}:{0[0]}:{1}'.format(get_shared_volume_path(container_map, shared_volume, instance),
-                                       'ro' if shared_volume.readonly else 'rw')
+    def volume_str(paths, readonly):
+        return '{0[1]}:{0[0]}:{1}'.format(paths, 'ro' if readonly else 'rw')
+
+    def _attached_volume(vol):
+        parent_name = config_name if use_attached_parent_name else None
+        volume_name = aname(map_name, vol.name, parent_name=parent_name)
+        if isinstance(vol, UsedVolume):
+            path = resolve_value(vol.path)
+        else:
+            path = resolve_value(default_paths.get(vol.name))
+        return volume_str((path, volume_name), vol.readonly)
+
+    def _used_volume(vol):
+        if use_attached_parent_name:
+            parent_name, __, alias = vol.name.partition('.')
+        else:
+            alias = vol.name
+            parent_name = None
+        if alias not in default_paths:
+            return None
+        volume_name = aname(map_name, alias, parent_name=parent_name)
+        if isinstance(vol, UsedVolume):
+            path = resolve_value(vol.path)
+        else:
+            path = resolve_value(default_paths[alias])
+        return volume_str((path, volume_name), vol.readonly)
+
+    aname = policy.aname
+    map_name = container_map.name
+    use_attached_parent_name = container_map.use_attached_parent_name
+    default_paths = policy.default_volume_paths[map_name]
+    bind = [volume_str(get_shared_volume_path(container_map, shared_volume, instance), shared_volume.readonly)
             for shared_volume in config.binds]
+    if named_volumes:
+        bind.extend(map(_attached_volume, config.attaches))
+        bind.extend(filter(None, map(_used_volume, config.uses)))
+    return bind
 
 
 def _get_ex_port(port_binding):
