@@ -12,7 +12,7 @@ from ... import DEFAULT_PRESET_NETWORKS
 from ...functional import resolve_value
 from ...utils import merge_list
 from .. import DictMap, DefaultDictMap
-from ..input import ItemType, bool_if_set, MapConfigId, SharedVolume
+from ..input import ItemType, bool_if_set, MapConfigId, SharedVolume, UsedVolume
 from ..exceptions import MapIntegrityError
 from . import ConfigurationObject, CP
 from .container import ContainerConfiguration
@@ -651,11 +651,16 @@ class ContainerMap(ConfigurationObject):
                 net_containers = []
             if self.use_attached_parent_name:
                 attaches = [(c_name, a.name) for a in c_config.attaches]
+                attaches_with_path = [(c_name, a.name) for a in c_config.attaches
+                                      if isinstance(a, UsedVolume)]
             else:
                 attaches = [a.name for a in c_config.attaches]
-            return instance_names, group_ref_names, uses, attaches, shared, bind, link, networks, net_containers
+                attaches_with_path = [a.name for a in c_config.attaches
+                                      if isinstance(a, UsedVolume)]
+            return (instance_names, group_ref_names, uses, attaches, attaches_with_path, shared, bind, link, networks,
+                    net_containers)
 
-        (all_instances, all_grouprefs, all_used, all_attached, all_shared, all_binds, all_links,
+        (all_instances, all_grouprefs, all_used, all_attached, all_attached_default, all_shared, all_binds, all_links,
          all_networks, all_net_containers) = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
          ])
@@ -701,7 +706,7 @@ class ContainerMap(ConfigurationObject):
             volume_set = binds_set.union(a[1] for a in itertools.chain.from_iterable(all_attached))
         else:
             volume_set = binds_set.union(all_attached_names)
-        named_set = set(self.volumes.keys())
+        named_set = set(self.volumes.keys()).union(itertools.chain.from_iterable(all_attached_default))
         missing_names = volume_set - named_set
         if missing_names:
             missing_names_str = ', '.join(missing_names)
