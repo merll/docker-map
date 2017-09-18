@@ -287,11 +287,10 @@ class DockerConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
+        c_kwargs = dict(container=container_name)
         timeout = action.client_config.get('wait_timeout')
         if timeout is not None:
-            c_kwargs = {'timeout': timeout}
-        else:
-            c_kwargs = {}
+            c_kwargs['timeout'] = timeout
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
