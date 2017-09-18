@@ -521,20 +521,21 @@ class DockerConfigMixin(object):
         :rtype: dict
         """
         config = action.config
-        c_kwargs = dict(
-            name=volume_name,
-            driver=config.driver,
-        )
-        driver_opts = init_options(config.driver_options)
-        if driver_opts:
-            c_kwargs['driver_opts'] = {option_name: resolve_value(option_value)
-                                       for option_name, option_value in iteritems(driver_opts)}
-        update_kwargs(c_kwargs, init_options(config.create_options), kwargs)
+        c_kwargs = dict(name=volume_name)
+        if config:
+            c_kwargs['driver'] = config.driver
+            driver_opts = init_options(config.driver_options)
+            if driver_opts:
+                c_kwargs['driver_opts'] = {option_name: resolve_value(option_value)
+                                           for option_name, option_value in iteritems(driver_opts)}
+            update_kwargs(c_kwargs, init_options(config.create_options), kwargs)
+        else:
+            update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
     def get_volume_remove_kwargs(self, action, volume_name, kwargs=None):
         """
-        Generates keyword arguments for the Docker client to remove a network.
+        Generates keyword arguments for the Docker client to remove a volume.
 
         :param action: Action configuration.
         :type action: ActionConfig
