@@ -2,13 +2,14 @@
 from __future__ import unicode_literals
 
 import json
-from itertools import groupby
+from itertools import groupby, islice
 from operator import itemgetter
 
 import re
 import time
 
 from six import iteritems, text_type
+from six.moves import map
 
 from docker.errors import NotFound
 
@@ -77,7 +78,7 @@ def _container_info(line):
     return {
         'Id': items[0],
         'Image': items[1],
-        'Created': time.mktime(map(int, CREATED_AT_PATTERN.match(items[2]).groups()) + [0, 0, 0]),
+        'Created': time.mktime(list(map(int, CREATED_AT_PATTERN.match(items[2]).groups())) + [0, 0, 0]),
         'Status': items[3],
         'Names': ['/{0}'.format(name) for name in items[4].split(',')],
         'Command': items[5].strip('"'),
@@ -92,6 +93,14 @@ def _network_info(line):
         'Name': items[1],
         'Driver': items[2],
         'Scope': items[3],
+    }
+
+
+def _volume_info(line):
+    items = line.split()
+    return {
+        'Driver': items[0],
+        'Name': items[1],
     }
 
 
@@ -229,9 +238,23 @@ def parse_networks_output(out):
     """
     if not out:
         return []
-    line_iter = iter(out.splitlines())
-    next(line_iter)  # Skip header
-    return [_network_info(line) for line in line_iter]
+    line_iter = islice(out.splitlines(), 1, None)  # Skip header
+    return list(map(_network_info, line_iter))
+
+
+def parse_volumes_output(out):
+    """
+    Parses the output of the Docker CLI 'docker volume ls' and returns it in the format similar to the Docker API.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: list[dict]
+    """
+    if not out:
+        return []
+    line_iter = islice(out.splitlines(), 1, None)  # Skip header
+    return list(map(_volume_info, line_iter))
 
 
 def parse_inspect_output(out, item_type):
@@ -263,9 +286,7 @@ def parse_images_output(out):
     :return: Parsed result.
     :rtype: list[dict]
     """
-    lines = out.splitlines()
-    line_iter = iter(lines)
-    next(line_iter)  # Skip header
+    line_iter = islice(out.splitlines(), 1, None)  # Skip header
     split_lines = (line.split() for line in line_iter)
     return [
         _summarize_tags(image_id, image_lines)
@@ -333,6 +354,10 @@ class DockerCommandLineOutput(object):
         'networks': 'network ls',
         'inspect_network': 'network inspect',
         'remove_network': 'network rm',
+        'create_volume': 'volume create',
+        'volumes': 'volume ls',
+        'inspect_volume': 'volume inspect',
+        'remove_volume': 'volume rm',
         'connect_container_to_network': 'network connect',
         'disconnect_container_from_network': 'network disconnect',
     }
@@ -363,7 +388,7 @@ class DockerCommandLineOutput(object):
             _extend_or_append(p_args, kwargs.pop('cmd'))
             cmd_args.append('--detach')
             cmd_args.extend(_transform_kwargs(kwargs))
-        elif cli_cmd == 'network create':
+        elif cli_cmd in ('network create', 'volume create', 'volume rm'):
             p_args = [kwargs.pop('name')]
             cmd_args.extend(_transform_kwargs(kwargs))
         elif cli_cmd.startswith('network') and (cli_cmd.endswith('connect') or cli_cmd.endswith('rm')):
