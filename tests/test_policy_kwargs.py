@@ -187,7 +187,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         kwargs = self.runner.get_attached_preparation_create_kwargs(config, v_name)
         self.assertDictEqual(kwargs, dict(
             image=BasePolicy.core_image,
-            command='chown -R 2000:2000 /var/lib/app/socket && chmod -R u=rwX,g=rX,o= /var/lib/app/socket',
+            command='chown -R 2000:2000 /volume-tmp && chmod -R u=rwX,g=rX,o= /volume-tmp',
             user='root',
             volumes=['/volume-tmp'],
             host_config=create_host_config(
