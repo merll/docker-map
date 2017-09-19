@@ -168,18 +168,20 @@ class AbstractSingleVfsCheck(object):
             used_volume = used.name
             ref_c_name, __, ref_i_name = used_volume.partition('.')
             if use_parent_name:
-                is_volume = ref_i_name and ref_i_name in default_paths
+                default_path = default_paths.get(used_volume)
+                if default_path is None:
+                    default_path = default_paths.get(ref_i_name)
                 used_config, used_alias = ref_c_name, ref_i_name
             elif not ref_i_name:
-                is_volume = ref_c_name in default_paths
+                default_path = default_paths.get(ref_c_name)
                 used_alias = ref_c_name
                 used_config = None
             else:
-                is_volume = False
+                default_path = None
                 used_config = None
                 used_alias = None
-            if is_volume:
-                if not self.check_used_vfs(used, used_alias, used_config, default_paths[used_alias]):
+            if default_path is not None:
+                if not self.check_used_vfs(used, used_alias, used_config, default_path):
                     return False
                 continue
             log.debug("Looking up dependency %s (instance %s).", ref_c_name, ref_i_name)
