@@ -32,7 +32,10 @@ class AttachedConfigMixin(object):
         client_config = action.client_config
         config_id = action.config_id
         policy = self._policy
-        path = resolve_value(policy.default_volume_paths[config_id.map_name][config_id.instance_name])
+        if client_config.supports_volumes:
+            path = PREPARATION_TMP_PATH
+        else:
+            path = resolve_value(policy.default_volume_paths[config_id.map_name][config_id.instance_name])
         cmd = get_preparation_cmd(action.config, path)
         if not cmd:
             return None
