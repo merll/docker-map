@@ -86,13 +86,13 @@ class AttachedConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
+        c_kwargs = dict(container=container_name)
         client_config = action.client_config
         wait_timeout = client_config.get('wait_timeout')
         if wait_timeout is not None:
-            c_kwargs = dict(timeout=wait_timeout)
-            update_kwargs(c_kwargs, kwargs)
-            return c_kwargs
-        return kwargs
+            c_kwargs['timeout'] = wait_timeout
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
 
 
 class AttachedPreparationMixin(AttachedConfigMixin):
