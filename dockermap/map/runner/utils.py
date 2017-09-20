@@ -263,24 +263,23 @@ def get_port_bindings(container_config, client_config):
     return port_bindings
 
 
-def get_preparation_cmd(container_config, path):
+def get_preparation_cmd(user, permissions, path):
     """
     Generates the command lines for adjusting a volume's ownership and permission flags. Returns an empty list if there
     is nothing to adjust.
 
-    :param container_config: Container configuration.
-    :type container_config: dockermap.map.config.container.ContainerConfiguration
+    :param user: User to set ownership for on the path via ``chown``.
+    :type user: unicode | str | int | dockermap.functional.AbstractLazyObject
+    :param permissions: Permission flags to set via ``chmod``.
+    :type permissions: unicode | str | dockermap.functional.AbstractLazyObject
     :param path: Path to adjust permissions on.
     :type path: unicode | str
-    :return: Resulting command strings.
-    :rtype: list[unicode | str]
+    :return: Iterator over resulting command strings.
+    :rtype: collections.Iterable[unicode | str]
     """
-    def _get_cmd():
-        if user:
-            yield chown(user, path)
-        if permissions:
-            yield chmod(permissions, path)
-
-    user = resolve_value(container_config.user)
-    permissions = container_config.permissions
-    return list(_get_cmd())
+    r_user = resolve_value(user)
+    r_permissions = resolve_value(permissions)
+    if user:
+        yield chown(r_user, path)
+    if permissions:
+        yield chmod(r_permissions, path)

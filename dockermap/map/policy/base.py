@@ -40,23 +40,46 @@ class BasePolicy(object):
         self._images = ImageCache(clients)
         self._f_resolver = f_resolver = ContainerDependencyResolver()
         self._r_resolver = r_resolver = ContainerDependentsResolver()
-        self._default_volume_paths = default_paths = {}
+        self._default_volume_paths = volume_paths = {}
+        self._volume_users = volume_users = {}
+        self._volume_permissions = volume_permissions = {}
         for m in itervalues(maps):
             depdendency_items = list(m.dependency_items())
             f_resolver.update(depdendency_items)
             r_resolver.update(depdendency_items)
-            default_paths[m.name] = map_paths = {}
-            map_paths.update(m.volumes.default_paths)
+            volume_paths[m.name] = map_paths = {}
+            volume_users[m.name] = map_users = {}
+            volume_permissions[m.name] = map_permissions = {}
+            default_paths = m.volumes.get_default_paths()
+            v_users = m.volumes.get_users()
+            v_permissions = m.volumes.get_permissions()
+            map_paths.update(default_paths)
             if m.use_attached_parent_name:
-                map_paths.update(('{0}.{1}'.format(c_name, a.name), a.path)
+                map_paths.update(('{0}.{1}'.format(c_name, a.name),
+                                  a.path if isinstance(a, UsedVolume) else default_paths[a.name])
                                  for c_name, c_config in m
-                                 for a in c_config.attaches
-                                 if isinstance(a, UsedVolume))
+                                 for a in c_config.attaches)
+                map_users.update(('{0}.{1}'.format(c_name, a.name),
+                                  v_users.get(a.name, c_config.user))
+                                 for c_name, c_config in m
+                                 for a in c_config.attaches)
+                map_permissions.update(('{0}.{1}'.format(c_name, a.name),
+                                       v_permissions.get(a.name, c_config.permissions))
+                                       for c_name, c_config in m
+                                       for a in c_config.attaches)
             else:
-                map_paths.update((a.name, a.path)
+                map_paths.update((a.name,
+                                  a.path if isinstance(a, UsedVolume) else default_paths[a.name])
                                  for c_name, c_config in m
-                                 for a in c_config.attaches
-                                 if isinstance(a, UsedVolume))
+                                 for a in c_config.attaches)
+                map_users.update((a.name,
+                                  v_users.get(a.name, c_config.user))
+                                 for c_name, c_config in m
+                                 for a in c_config.attaches)
+                map_permissions.update((a.name,
+                                       v_permissions.get(a.name, c_config.permissions))
+                                       for c_name, c_config in m
+                                       for a in c_config.attaches)
 
     @classmethod
     def cname(cls, map_name, container, instance=None):
@@ -230,9 +253,32 @@ class BasePolicy(object):
     @property
     def default_volume_paths(self):
         """
-        Defined volume names of each map, with a dictionary of default container paths per volume alias.
+        Defined volume names of each map, with a dictionary of default container paths per volume alias. Also includes
+        paths of attached volumes that are defined directly on container configurations.
 
         :return: Default volume paths.
         :rtype: dict[unicode | str, dict]
         """
         return self._default_volume_paths
+
+    @property
+    def volume_users(self):
+        """
+        Defined volume names of each map, with a dictionary of the configured user per volume alias. Only applies
+        to attached volumes.
+
+        :return: Configured volume paths.
+        :rtype: dict[unicode | str, dict]
+        """
+        return self._volume_users
+
+    @property
+    def volume_permissions(self):
+        """
+        Defined volume names of each map, with a dictionary of the configured permissions per volume alias. Only
+        applies to attached volumes.
+
+        :return: Configured volume permissions.
+        :rtype: dict[unicode | str, dict]
+        """
+        return self._volume_permissions

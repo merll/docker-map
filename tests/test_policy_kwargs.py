@@ -166,7 +166,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         cfg_id = MapConfigId(ItemType.VOLUME, 'main', cfg_name, 'app_server_socket')
         v_name = 'main.app_server_socket'
         config = ActionConfig('legacy', cfg_id, self.sample_client_config2, None, self.sample_map2, cfg)
-        kwargs = self.runner.get_attached_preparation_create_kwargs(config, v_name)
+        kwargs = self.runner.get_attached_preparation_create_kwargs(config, v_name, 'app_server_socket')
         self.assertDictEqual(kwargs, dict(
             image=BasePolicy.core_image,
             command='chown -R 2000:2000 /var/lib/app/socket && chmod -R u=rwX,g=rX,o= /var/lib/app/socket',
@@ -184,7 +184,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         cfg_id = MapConfigId(ItemType.VOLUME, 'main', cfg_name, 'app_server_socket')
         v_name = 'main.app_server_socket'
         config = ActionConfig('__default__', cfg_id, self.sample_client_config1, None, self.sample_map1, cfg)
-        kwargs = self.runner.get_attached_preparation_create_kwargs(config, v_name)
+        kwargs = self.runner.get_attached_preparation_create_kwargs(config, v_name, 'app_server_socket')
         self.assertDictEqual(kwargs, dict(
             image=BasePolicy.core_image,
             command='chown -R 2000:2000 /volume-tmp && chmod -R u=rwX,g=rX,o= /volume-tmp',

@@ -15,7 +15,7 @@ PREPARATION_TMP_PATH = '/volume-tmp'
 
 
 class AttachedConfigMixin(object):
-    def get_attached_preparation_create_kwargs(self, action, volume_container, kwargs=None):
+    def get_attached_preparation_create_kwargs(self, action, volume_container, volume_alias, kwargs=None):
         """
         Generates keyword arguments for the Docker client to prepare an attached container (i.e. adjust user and
         permissions).
@@ -24,6 +24,8 @@ class AttachedConfigMixin(object):
         :type action: dockermap.map.runner.ActionConfig
         :param volume_container: Name of the container that shares the volume.
         :type volume_container: unicode | str
+        :param volume_alias: Volume alias that is used for map references, for looking up paths.
+        :type volume_alias: unicode | str
         :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
         :type kwargs: dict | NoneType
         :return: Resulting keyword arguments.
@@ -35,13 +37,15 @@ class AttachedConfigMixin(object):
         if client_config.supports_volumes:
             path = PREPARATION_TMP_PATH
         else:
-            path = resolve_value(policy.default_volume_paths[config_id.map_name][config_id.instance_name])
-        cmd = get_preparation_cmd(action.config, path)
+            path = resolve_value(policy.default_volume_paths[config_id.map_name][volume_alias])
+        user = policy.volume_users[config_id.map_name][volume_alias]
+        permissions = policy.volume_permissions[config_id.map_name][volume_alias]
+        cmd = ' && '.join(get_preparation_cmd(user, permissions, path))
         if not cmd:
             return None
         c_kwargs = dict(
             image=policy.core_image,
-            command=' && '.join(cmd),
+            command=cmd,
             user='root',
             network_disabled=True,
         )
@@ -100,12 +104,12 @@ class AttachedConfigMixin(object):
         :rtype: dict
         """
         client_config = action.client_config
+        c_kwargs = dict(container=container_name)
         wait_timeout = client_config.get('wait_timeout')
         if wait_timeout is not None:
-            c_kwargs = dict(timeout=wait_timeout)
-            update_kwargs(c_kwargs, kwargs)
-            return c_kwargs
-        return kwargs
+            c_kwargs['timeout'] = wait_timeout
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
 
 
 class AttachedPreparationMixin(AttachedConfigMixin):
@@ -118,7 +122,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
     prepare_local = True
     policy_options = ['prepare_local']
 
-    def _prepare_container(self, client, action, volume_container):
+    def _prepare_container(self, client, action, volume_container, volume_alias):
         """
         Runs a temporary container for preparing an attached volume for a container configuration.
 
@@ -128,8 +132,10 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         :type action: dockermap.map.runner.ActionConfig
         :param volume_container: Name of the container that shares the volume.
         :type volume_container: unicode | str
+        :param volume_alias: Volume alias that is used for map references, for looking up paths.
+        :type volume_alias: unicode | str
         """
-        apc_kwargs = self.get_attached_preparation_create_kwargs(action, volume_container)
+        apc_kwargs = self.get_attached_preparation_create_kwargs(action, volume_container, volume_alias)
         if not apc_kwargs:
             return
         a_wait_kwargs = self.get_attached_preparation_wait_kwargs(action, volume_container)
@@ -157,6 +163,15 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         :type a_name: unicode | str
         """
         client = action.client
+        config_id = action.config_id
+        policy = self._policy
+        if action.container_map.use_attached_parent_name:
+            v_alias = '{0.config_name}.{0.instance_name}'.format(config_id)
+        else:
+            v_alias = config_id.instance_name
+        user = policy.volume_users[v_alias]
+        permissions = policy.volume_permissions[v_alias]
+
         if not (self.prepare_local and hasattr(client, 'run_cmd')):
             return self._prepare_container(client, action, a_name)
         if action.client_config.supports_volumes:
@@ -165,13 +180,12 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         else:
             instance_detail = client.inspect_container(a_name)
             volumes = get_instance_volumes(instance_detail, False)
-            config_id = action.config_id
-            path = resolve_value(self._policy.default_volume_paths[config_id.map_name][config_id.instance_name])
+            path = resolve_value(policy.default_volume_paths[config_id.map_name][v_alias])
             local_path = volumes.get(path)
             if not local_path:
                 raise ValueError("Could not locate local path of volume alias '{0}' / "
                                  "path '{1}' in container {2}.".format(action.config_id.instance_name, path, a_name))
         return [
             client.run_cmd(cmd)
-            for cmd in get_preparation_cmd(action.config, local_path)
+            for cmd in get_preparation_cmd(user, permissions, local_path)
         ]
