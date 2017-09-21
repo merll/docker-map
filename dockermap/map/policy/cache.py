@@ -85,7 +85,7 @@ class CachedVolumeNames(CachedItems, set):
         """
         if not self._client:
             return
-        current_volumes = self._client.volumes()
+        current_volumes = self._client.volumes()['Volumes']
         self.clear()
         self.update(vol['Name'] for vol in current_volumes)
 
