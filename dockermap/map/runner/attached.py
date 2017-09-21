@@ -173,7 +173,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         permissions = policy.volume_permissions[v_alias]
 
         if not (self.prepare_local and hasattr(client, 'run_cmd')):
-            return self._prepare_container(client, action, a_name)
+            return self._prepare_container(client, action, a_name, v_alias)
         if action.client_config.supports_volumes:
             volume_detail = client.inspect_volume(a_name)
             local_path = volume_detail['Mountpoint']
