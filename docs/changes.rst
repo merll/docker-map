@@ -2,6 +2,26 @@
 
 Change History
 ==============
+0.8.0b3
+-------
+* Added :attr:`~dockermap.map.config.main.ContainerMap.volumes`: Where the Docker host supports it, volumes can now be
+  configured with additional properties such as driver and options. The original workaround of Docker containers sharing
+  anonymous volumes no longer applies in this case.
+* The default path of volumes in :attr:`~dockermap.map.config.container.ContainerConfiguration.attaches` volumes can now
+  be defined, by using a dictionary or list of tuples. They no longer have to (but still can) be set in
+  :attr:`~dockermap.map.config.main.ContainerMap.volumes`.
+* Where the Docker host supports named volumes, container-side paths of
+  :attr:`~dockermap.map.config.container.ContainerConfiguration.uses` items can be overridden, provided that they are
+  referring to attached volumes created through another container.
+* Removed ``clients`` property from :class:`~dockermap.map.config.container.ContainerConfiguration`. It caused too much
+  complexity in responding to supported client features. In addition, it was likely to break dependency paths.
+  :attr:`~dockermap.map.config.main.ContainerMap.clients` is however still available.
+
+Known issues
+""""""""""""
+* The containers are not yet checked if their endpoint configuration details match the running instance.
+* Volumes are not checked yet against their create options and storage options.
+
 0.8.0b2
 -------
 * :class:`~dockermap.map.client.MappingDockerClient` now wraps all exceptions so that partial results, i.e. actions that
@@ -26,12 +46,6 @@ Change History
   forced where applicable.
 * Implemented CLI, missing from 0.8.0b1.
 * Various bugfixes from 0.8.0b1.
-
-Known issues
-""""""""""""
-* The containers are not yet checked if their endpoint configuration details match the running instance.
-* Volumes will be re-implemented to make use of Docker's built-in functionality as found in more recent Docker versions.
-  The current implementation however still works for all versions.
 
 0.8.0b1
 -------
