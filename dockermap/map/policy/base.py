@@ -60,11 +60,11 @@ class BasePolicy(object):
                                  for c_name, c_config in m
                                  for a in c_config.attaches)
                 map_users.update(('{0}.{1}'.format(c_name, a.name),
-                                  v_users.get(a.name, c_config.user))
+                                  v_users.get(a.name) or c_config.user)
                                  for c_name, c_config in m
                                  for a in c_config.attaches)
                 map_permissions.update(('{0}.{1}'.format(c_name, a.name),
-                                       v_permissions.get(a.name, c_config.permissions))
+                                       v_permissions.get(a.name) or c_config.permissions)
                                        for c_name, c_config in m
                                        for a in c_config.attaches)
             else:
@@ -73,11 +73,11 @@ class BasePolicy(object):
                                  for c_name, c_config in m
                                  for a in c_config.attaches)
                 map_users.update((a.name,
-                                  v_users.get(a.name, c_config.user))
+                                  v_users.get(a.name) or c_config.user)
                                  for c_name, c_config in m
                                  for a in c_config.attaches)
                 map_permissions.update((a.name,
-                                       v_permissions.get(a.name, c_config.permissions))
+                                       v_permissions.get(a.name) or c_config.permissions)
                                        for c_name, c_config in m
                                        for a in c_config.attaches)
 
