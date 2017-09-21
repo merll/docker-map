@@ -6,7 +6,8 @@ import logging
 from six import iteritems, itervalues
 
 from ... import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE, DEFAULT_HOSTNAME_REPLACEMENT, DEFAULT_PRESET_NETWORKS
-from .cache import ContainerCache, ImageCache, NetworkCache
+from ..input import UsedVolume
+from .cache import ContainerCache, ImageCache, NetworkCache, VolumeCache
 from .dep import ContainerDependencyResolver, ContainerDependentsResolver
 
 log = logging.getLogger(__name__)
@@ -35,13 +36,50 @@ class BasePolicy(object):
         self._clients = clients
         self._container_names = ContainerCache(clients)
         self._network_names = NetworkCache(clients)
+        self._volume_names = VolumeCache(clients)
         self._images = ImageCache(clients)
-        self._f_resolver = ContainerDependencyResolver()
-        self._r_resolver = ContainerDependentsResolver()
+        self._f_resolver = f_resolver = ContainerDependencyResolver()
+        self._r_resolver = r_resolver = ContainerDependentsResolver()
+        self._default_volume_paths = volume_paths = {}
+        self._volume_users = volume_users = {}
+        self._volume_permissions = volume_permissions = {}
         for m in itervalues(maps):
             depdendency_items = list(m.dependency_items())
-            self._f_resolver.update(depdendency_items)
-            self._r_resolver.update(depdendency_items)
+            f_resolver.update(depdendency_items)
+            r_resolver.update(depdendency_items)
+            volume_paths[m.name] = map_paths = {}
+            volume_users[m.name] = map_users = {}
+            volume_permissions[m.name] = map_permissions = {}
+            default_paths = m.volumes.get_default_paths()
+            v_users = m.volumes.get_users()
+            v_permissions = m.volumes.get_permissions()
+            map_paths.update(default_paths)
+            if m.use_attached_parent_name:
+                map_paths.update(('{0}.{1}'.format(c_name, a.name),
+                                  a.path if isinstance(a, UsedVolume) else default_paths[a.name])
+                                 for c_name, c_config in m
+                                 for a in c_config.attaches)
+                map_users.update(('{0}.{1}'.format(c_name, a.name),
+                                  v_users.get(a.name) or c_config.user)
+                                 for c_name, c_config in m
+                                 for a in c_config.attaches)
+                map_permissions.update(('{0}.{1}'.format(c_name, a.name),
+                                       v_permissions.get(a.name) or c_config.permissions)
+                                       for c_name, c_config in m
+                                       for a in c_config.attaches)
+            else:
+                map_paths.update((a.name,
+                                  a.path if isinstance(a, UsedVolume) else default_paths[a.name])
+                                 for c_name, c_config in m
+                                 for a in c_config.attaches)
+                map_users.update((a.name,
+                                  v_users.get(a.name) or c_config.user)
+                                 for c_name, c_config in m
+                                 for a in c_config.attaches)
+                map_permissions.update((a.name,
+                                       v_permissions.get(a.name) or c_config.permissions)
+                                       for c_name, c_config in m
+                                       for a in c_config.attaches)
 
     @classmethod
     def cname(cls, map_name, container, instance=None):
@@ -130,25 +168,6 @@ class BasePolicy(object):
             client_suffix = client_suffix.replace(old, new)
         return '{0}-{1}'.format(base_name, client_suffix)
 
-    def get_clients(self, c_map, c_config=None):
-        """
-        Returns the client configuration names for a given item configuration or map. If there are no clients specified
-        for the configuration, the list defaults to the one globally specified for the given map. If that is not defined
-        either, the default client is returned.
-
-        :param c_map: Container map instance.
-        :type c_map: dockermap.map.config.main.ContainerMap
-        :param c_config: Optional container configuration object.
-        :type c_config: dockermap.map.config.ContainerConfiguration
-        :return: Client configuration names.
-        :rtype: list[unicode | str]
-        """
-        if c_config and c_config.clients:
-            return c_config.clients
-        if c_map.clients:
-            return c_map.clients
-        return [self.default_client_name]
-
     def get_dependencies(self, config_id):
         """
         Generates the list of dependency containers, in reverse order (i.e. the last dependency coming first).
@@ -214,9 +233,52 @@ class BasePolicy(object):
     @property
     def network_names(self):
         """
-        Name of existing networks on each client.
+        Names of existing networks on each client.
 
         :return: Dictionary of network names.
         :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedNetworkNames]
         """
         return self._network_names
+
+    @property
+    def volume_names(self):
+        """
+        Names of existing volumes on each client.
+
+        :return: Dictionary of volume names.
+        :rtype: dict[unicode | str, dockermap.map.policy.cache.CachedVolumeNames]
+        """
+        return self._volume_names
+
+    @property
+    def default_volume_paths(self):
+        """
+        Defined volume names of each map, with a dictionary of default container paths per volume alias. Also includes
+        paths of attached volumes that are defined directly on container configurations.
+
+        :return: Default volume paths.
+        :rtype: dict[unicode | str, dict]
+        """
+        return self._default_volume_paths
+
+    @property
+    def volume_users(self):
+        """
+        Defined volume names of each map, with a dictionary of the configured user per volume alias. Only applies
+        to attached volumes.
+
+        :return: Configured volume paths.
+        :rtype: dict[unicode | str, dict]
+        """
+        return self._volume_users
+
+    @property
+    def volume_permissions(self):
+        """
+        Defined volume names of each map, with a dictionary of the configured permissions per volume alias. Only
+        applies to attached volumes.
+
+        :return: Configured volume permissions.
+        :rtype: dict[unicode | str, dict]
+        """
+        return self._volume_permissions

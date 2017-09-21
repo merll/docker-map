@@ -8,6 +8,7 @@ from .. import DictMap
 
 HOST_CONFIG_VERSION = StrictVersion(str('1.15'))
 NETWORKS_VERSION = StrictVersion(str('1.21'))
+VOLUMES_VERSION = StrictVersion(str('1.21'))
 USE_HC_MERGE = 'merge'
 
 
@@ -31,8 +32,9 @@ class ClientConfiguration(DictMap):
     def __init__(self, base_url=None, version=None, timeout=None, *args, **kwargs):
         self._base_url = base_url
         self._version = version
-        self.use_host_config = kwargs.pop('use_host_config', False)
-        self.supports_networks = False
+        self._use_host_config = kwargs.pop('use_host_config', None)
+        self._supports_networks = kwargs.pop('supports_networks', None)
+        self._supports_volumes = kwargs.pop('supports_volumes', None)
         self._timeout = timeout
         if 'interfaces' in kwargs:
             self._interfaces = DictMap(kwargs.pop('interfaces'))
@@ -71,8 +73,12 @@ class ClientConfiguration(DictMap):
         version = kwargs.pop('version', None)
         if version and version != 'auto':
             version_str = str(version)
-            self.use_host_config = version_str >= HOST_CONFIG_VERSION
-            self.supports_networks = version_str >= NETWORKS_VERSION
+            if self._use_host_config is None:
+                self._use_host_config = version_str >= HOST_CONFIG_VERSION
+            if self._supports_networks is None:
+                self._supports_networks = version_str >= NETWORKS_VERSION
+            if self._supports_volumes is None:
+                self._supports_volumes = version_str >= VOLUMES_VERSION
 
     def get_init_kwargs(self):
         """
@@ -213,3 +219,33 @@ class ClientConfiguration(DictMap):
     @client.setter
     def client(self, value):
         self._client = value
+
+    @property
+    def supports_networks(self):
+        if self._supports_networks is None and not self._client:
+            self.get_client()
+        return self._supports_networks
+
+    @supports_networks.setter
+    def supports_networks(self, value):
+        self._supports_networks = value
+
+    @property
+    def supports_volumes(self):
+        if self._supports_volumes is None and not self._client:
+            self.get_client()
+        return self._supports_volumes
+
+    @supports_volumes.setter
+    def supports_volumes(self, value):
+        self._supports_volumes = value
+
+    @property
+    def use_host_config(self):
+        if self._use_host_config is None and not self._client:
+            self.get_client()
+        return self._use_host_config
+
+    @use_host_config.setter
+    def use_host_config(self, value):
+        self._use_host_config = value

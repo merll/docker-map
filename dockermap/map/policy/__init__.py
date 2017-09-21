@@ -8,8 +8,6 @@ from ...map import Flags
 
 class ConfigFlags(Flags):
     DEPENDENT = 1                   # Configuration is checked in a relation to a dependent / dependency container.
-    CONTAINER_ATTACHED = 1 << 1     # Container is an attached volume.
-    CONTAINER_PERSISTENT = 1 << 2   # Container is persistent.
 
 
 class PolicyUtilMeta(type):
@@ -33,7 +31,7 @@ class PolicyUtil(with_metaclass(PolicyUtilMeta)):
     Base class for utility objects used by a policy and referring back to it.
 
     :param policy: Policy object instance.
-    :type policy: BasePolicy
+    :type policy: dockermap.map.policy.base.BasePolicy
     """
     policy_options = []
 

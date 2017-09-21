@@ -2,7 +2,6 @@
 from __future__ import unicode_literals
 
 from ..input import ItemType
-from ..policy import ConfigFlags
 from ..state import State, StateFlags
 from . import ItemAction, Action, VolumeUtilAction, ContainerUtilAction, DerivedAction
 from .base import AbstractActionGenerator
@@ -29,11 +28,11 @@ class ResumeActionGenerator(AbstractActionGenerator):
         config_tuple = (state.client_name, state.config_id.map_name, state.config_id.config_name)
         if config_type == ItemType.VOLUME:
             if state.base_state == State.ABSENT:
-                action = DerivedAction.STARTUP_VOLUME
+                action = Action.CREATE
                 self.recreated_volumes.add(config_tuple)
             else:
                 if state.state_flags & StateFlags.NONRECOVERABLE:
-                    action = DerivedAction.RELAUNCH_VOLUME
+                    action = DerivedAction.RESET_VOLUME
                     self.recreated_volumes.add(config_tuple)
                 elif state.state_flags & StateFlags.INITIAL:
                     action = Action.START
@@ -64,7 +63,7 @@ class ResumeActionGenerator(AbstractActionGenerator):
                         action = DerivedAction.RESET_CONTAINER
                     elif (state.base_state != State.RUNNING and
                           (state.state_flags & StateFlags.INITIAL or
-                           not state.config_flags & ConfigFlags.CONTAINER_PERSISTENT)):
+                           not state.state_flags & StateFlags.PERSISTENT)):
                         action = Action.START
                     else:
                         return None

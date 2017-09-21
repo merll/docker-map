@@ -5,7 +5,7 @@ import logging
 
 from docker.utils.utils import create_host_config, create_networking_config, create_endpoint_config
 from requests import Timeout
-from six import text_type, iteritems
+from six import text_type, iteritems, string_types
 from six.moves import map
 
 from ...functional import resolve_value
@@ -13,7 +13,7 @@ from ...utils import format_image_tag
 from ..action import Action
 from ..config.client import USE_HC_MERGE
 from ..input import ItemType, NotSet
-from ..policy.utils import extract_user, update_kwargs, init_options, get_volumes
+from ..policy.utils import init_options, extract_user
 from . import AbstractRunner
 from .attached import AttachedPreparationMixin
 from .cmd import ExecMixin
@@ -21,8 +21,7 @@ from .image import ImageMixin
 from .network import NetworkUtilMixin
 from .script import ScriptMixin
 from .signal_stop import SignalMixin
-from .utils import get_host_binds, get_port_bindings
-
+from .utils import update_kwargs, get_volumes, get_volumes_from, get_host_binds, get_port_bindings
 
 log = logging.getLogger(__name__)
 
@@ -30,7 +29,6 @@ log = logging.getLogger(__name__)
 class DockerBaseRunnerMixin(object):
     action_method_names = [
         (ItemType.VOLUME, Action.CREATE, 'create_volume'),
-        (ItemType.VOLUME, Action.START, 'start_volume'),
         (ItemType.VOLUME, Action.REMOVE, 'remove_volume'),
 
         (ItemType.CONTAINER, Action.CREATE, 'create_container'),
@@ -43,21 +41,23 @@ class DockerBaseRunnerMixin(object):
     ]
 
     def create_volume(self, action, v_name, **kwargs):
+        if action.client_config.supports_volumes:
+            c_kwargs = self.get_volume_create_kwargs(action, v_name, kwargs=kwargs)
+            return action.client.create_volume(**c_kwargs)
         c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
-        return action.client.create_container(**c_kwargs)
-
-    def start_volume(self, action, v_name, **kwargs):
-        # TODO: Merge with create.
-        if action.client_config.get('use_host_config'):
-            res = action.client.start(v_name)
+        res = action.client.create_container(**c_kwargs)
+        if action.client_config.use_host_config:
+            action.client.start(v_name)
         else:
             c_kwargs = self.get_attached_container_host_config_kwargs(action, v_name, kwargs=kwargs)
-            res = action.client.start(**c_kwargs)
+            action.client.start(**c_kwargs)
         return res
 
-    def remove_volume(self, action, c_name, **kwargs):
-        # TODO: Currently this is a copy of remove_container. Vary implementation for directly using Docker volumes.
-        c_kwargs = self.get_container_remove_kwargs(action, c_name, kwargs=kwargs)
+    def remove_volume(self, action, v_name, **kwargs):
+        if action.client_config.supports_volumes:
+            c_kwargs = self.get_volume_create_kwargs(action, v_name, kwargs=kwargs)
+            return action.client.remove_volume(**c_kwargs)
+        c_kwargs = self.get_container_remove_kwargs(action, v_name, kwargs=kwargs)
         return action.client.remove_container(**c_kwargs)
 
     def create_container(self, action, c_name, **kwargs):
@@ -65,7 +65,7 @@ class DockerBaseRunnerMixin(object):
         return action.client.create_container(**c_kwargs)
 
     def start_container(self, action, c_name, **kwargs):
-        if action.client_config.get('use_host_config'):
+        if action.client_config.use_host_config:
             return action.client.start(c_name)
         c_kwargs = self.get_container_host_config_kwargs(action, c_name, kwargs=kwargs)
         return action.client.start(**c_kwargs)
@@ -114,10 +114,11 @@ class DockerConfigMixin(object):
         container_map = action.container_map
         container_config = action.config
         image_tag = container_map.get_image(container_config.image or action.config_id.config_name)
+        default_paths = policy.default_volume_paths[action.config_id.map_name]
         c_kwargs = dict(
             name=container_name,
             image=format_image_tag(image_tag),
-            volumes=get_volumes(container_map, container_config),
+            volumes=get_volumes(container_map, container_config, default_paths, client_config.supports_volumes),
             user=extract_user(container_config.user),
             ports=[resolve_value(port_binding.exposed_port)
                    for port_binding in container_config.exposes if port_binding.exposed_port],
@@ -134,7 +135,7 @@ class DockerConfigMixin(object):
                 )
             })
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        use_host_config = client_config.get('use_host_config')
+        use_host_config = client_config.use_host_config
         if use_host_config:
             hc_kwargs = self.get_container_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:
@@ -158,37 +159,28 @@ class DockerConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        def volume_str(u):
-            vol = cname(map_name, u.volume)
-            if u.readonly:
-                return '{0}:ro'.format(vol)
-            return vol
-
         container_map = action.container_map
         container_config = action.config
         client_config = action.client_config
-        map_name = container_map.name
+        config_id = action.config_id
+        map_name = config_id.map_name
         policy = self._policy
-        aname = policy.aname
         cname = policy.cname
-        volumes_from = list(map(volume_str, action.config.uses))
-        if container_map.use_attached_parent_name:
-            volumes_from.extend([aname(map_name, attached, action.config_id.config_name)
-                                 for attached in container_config.attaches])
-        else:
-            volumes_from.extend([aname(map_name, attached)
-                                 for attached in container_config.attaches])
+        supports_volumes = client_config.supports_volumes
+
         c_kwargs = dict(
             links=[(cname(map_name, l_name), alias or policy.get_hostname(l_name))
                    for l_name, alias in container_config.links],
-            binds=get_host_binds(container_map, container_config, action.config_id.instance_name),
-            volumes_from=volumes_from,
+            binds=get_host_binds(container_map, config_id.config_name, container_config, config_id.instance_name,
+                                 policy, supports_volumes),
+            volumes_from=get_volumes_from(container_map, config_id.config_name, container_config,
+                                          policy, not supports_volumes),
             port_bindings=get_port_bindings(container_config, client_config),
         )
         network_mode = container_config.network_mode
         if isinstance(network_mode, tuple):
             c_kwargs['network_mode'] = 'container:{0}'.format(cname(map_name, *network_mode))
-        elif isinstance(network_mode, text_type):
+        elif isinstance(network_mode, string_types):
             c_kwargs['network_mode'] = network_mode
         if container_name:
             c_kwargs['container'] = container_name
@@ -209,7 +201,9 @@ class DockerConfigMixin(object):
         :rtype: dict
         """
         client_config = action.client_config
-        path = resolve_value(action.container_map.volumes[action.config_id.instance_name])
+        policy = self._policy
+        config_id = action.config_id
+        path = resolve_value(policy.default_volume_paths[config_id.map_name][config_id.instance_name])
         user = extract_user(action.config.user)
         c_kwargs = dict(
             name=container_name,
@@ -219,7 +213,7 @@ class DockerConfigMixin(object):
             network_disabled=True,
         )
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        use_host_config = client_config.get('use_host_config')
+        use_host_config = client_config.use_host_config
         if use_host_config:
             hc_kwargs = self.get_attached_container_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:
@@ -509,6 +503,49 @@ class DockerConfigMixin(object):
 
     def get_container_kill_kwargs(self, action, container_name, kwargs=None):
         c_kwargs = dict(container=container_name)
+        update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
+    def get_volume_create_kwargs(self, action, volume_name, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to create a volume.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param volume_name: Volume name.
+        :type volume_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        config = action.config
+        c_kwargs = dict(name=volume_name)
+        if config:
+            c_kwargs['driver'] = config.driver
+            driver_opts = init_options(config.driver_options)
+            if driver_opts:
+                c_kwargs['driver_opts'] = {option_name: resolve_value(option_value)
+                                           for option_name, option_value in iteritems(driver_opts)}
+            update_kwargs(c_kwargs, init_options(config.create_options), kwargs)
+        else:
+            update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
+    def get_volume_remove_kwargs(self, action, volume_name, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to remove a volume.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param volume_name: Volume name.
+        :type volume_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        c_kwargs = dict(name=volume_name)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 

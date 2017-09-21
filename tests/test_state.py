@@ -10,21 +10,22 @@ import responses
 
 from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from dockermap.map.config.client import ClientConfiguration
-from dockermap.map.config.host_volume import get_host_path
 from dockermap.map.config.main import ContainerMap, expand_instances
-from dockermap.map.input import ExecCommand, ExecPolicy, MapConfigId, ItemType
+from dockermap.map.input import ExecCommand, ExecPolicy, MapConfigId, ItemType, UsedVolume
 from dockermap.map.policy import ConfigFlags
 from dockermap.map.policy.base import BasePolicy
+from dockermap.map.policy.utils import get_shared_volume_path
 from dockermap.map.state import INITIAL_START_TIME, State, StateFlags
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
 from dockermap.map.state.utils import merge_dependency_paths
 from dockermap.utils import format_image_tag
 
-from tests import MAP_DATA_2, CLIENT_DATA_1
+from tests import MAP_DATA_2, CLIENT_DATA_1, CLIENT_DATA_2
 
 
-URL_PREFIX = 'http+docker://localunixsocket/v{0}'.format(CLIENT_DATA_1['version'])
+URL_PREFIXES = ['http+docker://localunixsocket/v{0}'.format(v) for v in (CLIENT_DATA_1['version'],
+                                                                         CLIENT_DATA_2['version'])]
 
 P_STATE_INITIAL = 0
 P_STATE_RUNNING = 1
@@ -106,7 +107,8 @@ def _add_container_list(rsps, container_names):
         {'Id': get_container_id(name), 'Names': ['/{0}'.format(name)]}
         for name in container_names
     ]
-    rsps.add('GET', '{0}/containers/json'.format(URL_PREFIX), content_type='application/json', json=results)
+    for prefix in URL_PREFIXES:
+        rsps.add('GET', '{0}/containers/json'.format(prefix), content_type='application/json', json=results)
 
 
 def _add_network_list(rsps, network_names):
@@ -114,7 +116,17 @@ def _add_network_list(rsps, network_names):
         {'Id': get_network_id(name), 'Name': name}
         for name in network_names
     ]
-    rsps.add('GET', '{0}/networks'.format(URL_PREFIX), content_type='application/json', json=results)
+    for prefix in URL_PREFIXES:
+        rsps.add('GET', '{0}/networks'.format(prefix), content_type='application/json', json=results)
+
+
+def _add_volume_list(rsps, volume_names):
+    results = [
+        {'Name': name}
+        for name in volume_names
+    ]
+    for prefix in URL_PREFIXES:
+        rsps.add('GET', '{0}/volumes'.format(prefix), content_type='application/json', json=results)
 
 
 def _add_image_list(rsps, image_names):
@@ -125,48 +137,81 @@ def _add_image_list(rsps, image_names):
         }
         for i_id, i_name in image_names
     ]
-    rsps.add('GET', '{0}/images/json'.format(URL_PREFIX), content_type='application/json', json=image_list)
+    for prefix in URL_PREFIXES:
+        rsps.add('GET', '{0}/images/json'.format(prefix), content_type='application/json', json=image_list)
     for image in image_list:
         for r_tag in image['RepoTags']:
-            rsps.add('GET', '{0}/images/{1}/json'.format(URL_PREFIX, r_tag), content_type='application/json',
-                     json=image)
-    rsps.add('POST', '{0}/images/create'.format(URL_PREFIX), content_type='application/json')
+            for prefix in URL_PREFIXES:
+                rsps.add('GET', '{0}/images/{1}/json'.format(prefix, r_tag), content_type='application/json',
+                         json=image)
+    for prefix in URL_PREFIXES:
+        rsps.add('POST', '{0}/images/create'.format(prefix), content_type='application/json')
 
 
-def _get_container_mounts(config_id, container_map, c_config, valid):
+def _get_container_mounts(config_id, container_map, c_config, named_volumes, valid):
     if valid:
         path_prefix = '/valid'
     else:
         path_prefix = '/invalid_{0}'.format(config_id.config_name)
     for a in c_config.attaches:
-        c_path = container_map.volumes[a]
-        yield {'Source': posixpath.join(path_prefix, 'attached', a), 'Destination': c_path, 'RW': True}
+        if isinstance(a, UsedVolume):
+            c_path = a.path
+        else:
+            c_path = container_map.volumes[a.name].default_path
+        yield {
+            'Type': 'volume',
+            'Source': posixpath.join(path_prefix, 'attached', a.name),
+            'Destination': c_path,
+            'Name': '{0}.{1}.{2}'.format(config_id.map_name, config_id.config_name, a.name)
+                    if named_volumes else '',
+            'RW': True
+        }
     if config_id.config_type == ItemType.CONTAINER:
-        for vol, ro in c_config.binds:
-            if isinstance(vol, tuple):
-                c_path, h_r_path = vol
-                h_path = get_host_path(container_map.host.root, h_r_path, config_id.instance_name)
-            else:
-                c_path = container_map.volumes[vol]
-                h_path = container_map.host.get_path(vol, config_id.instance_name)
-            yield {'Source': posixpath.join(path_prefix, h_path), 'Destination': c_path, 'RW': not ro}
+        for vol in c_config.binds:
+            c_path, h_path = get_shared_volume_path(container_map, vol, config_id.instance_name)
+            yield {
+                'Type': 'bind',
+                'Source': posixpath.join(path_prefix, h_path),
+                'Destination': c_path,
+                'RW': not vol.readonly,
+            }
         for s in c_config.shares:
-            yield {'Source': posixpath.join(path_prefix, 'shared', s), 'Destination': s, 'RW': True}
-        for vol, ro in c_config.uses:
-            c, __, i = vol.partition('.')
+            yield {
+                'Type': 'volume',
+                'Source': posixpath.join(path_prefix, 'shared', s),
+                'Destination': s,
+                'Name': _get_hash('shared-volume', path_prefix, s) if named_volumes else '',
+                'RW': True,
+            }
+        for vol in c_config.uses:
+            c, __, i = vol.name.partition('.')
             c_ref = container_map.get_existing(c)
-            if i in c_ref.attaches:
-                c_path = container_map.volumes[i]
-                yield {'Source': posixpath.join(path_prefix, 'attached', i), 'Destination': c_path, 'RW': not ro}
-            elif c_ref and (not i or i in c_ref.instances):
-                for r_mount in _get_container_mounts(MapConfigId(config_id.config_type, config_id.map_name, c, i),
-                                                     container_map, c_ref, valid):
-                    yield r_mount
+            if c_ref:
+                attached_volumes = {a.name: a for a in c_ref.attaches}
+                if i and i in attached_volumes:
+                    instance_volume = attached_volumes[i]
+                    if isinstance(instance_volume, UsedVolume):
+                        c_path = instance_volume.path
+                    else:
+                        c_path = container_map.volumes[i].default_path
+                    yield {
+                        'Type': 'volume',
+                        'Source': posixpath.join(path_prefix, 'attached', i) if not named_volumes else '',
+                        'Destination': c_path,
+                        'Name': '{0}.{1}'.format(config_id.map_name, vol.name) if named_volumes else '',
+                        'RW': not vol.readonly,
+                    }
+                elif not i or i in c_ref.instances:
+                    for r_mount in _get_container_mounts(MapConfigId(config_id.config_type, config_id.map_name, c, i),
+                                                         container_map, c_ref, named_volumes, valid):
+                        yield r_mount
+                else:
+                    raise ValueError("Invalid uses declaration in {0}: volume for {1} not found.".format(config_id.config_name, vol))
             else:
-                raise ValueError("Invalid uses declaration in {0}: {1}".format(config_id.config_name, vol))
+                raise ValueError("Invalid uses declaration in {0}: configuration for {1} not found.".format(config_id.config_name, vol))
 
 
-def _add_container_inspect(rsps, config_id, container_name, container_map, c_config, state, image_id,
+def _add_container_inspect(rsps, config_id, container_name, container_map, c_config, state, image_id, named_volumes,
                            volumes_valid, links_valid=True, network_ep_valid=True, network_link_valid=True,
                            skip_network=None, extra_network=False, **kwargs):
     config_type = config_id.config_type
@@ -249,7 +294,7 @@ def _add_container_inspect(rsps, config_id, container_name, container_map, c_con
         'Names': name_list,
         'State': STATE_RESULTS[state],
         'Image': image_id,
-        'Mounts': list(_get_container_mounts(config_id, container_map, c_config, volumes_valid)),
+        'Mounts': list(_get_container_mounts(config_id, container_map, c_config, named_volumes, volumes_valid)),
         'HostConfig': host_config,
         'Config': config_dict,
         'NetworkSettings': network_settings,
@@ -262,12 +307,13 @@ def _add_container_inspect(rsps, config_id, container_name, container_map, c_con
     }
     results.update(kwargs)
     for i_id in (container_name, container_id):
-        rsps.add('GET', '{0}/containers/{1}/json'.format(URL_PREFIX, i_id),
-                 content_type='application/json',
-                 json=results)
-        rsps.add('GET', '{0}/containers/{1}/top'.format(URL_PREFIX, i_id),
-                 content_type='application/json',
-                 json=exec_results)
+        for prefix in URL_PREFIXES:
+            rsps.add('GET', '{0}/containers/{1}/json'.format(prefix, i_id),
+                     content_type='application/json',
+                     json=results)
+            rsps.add('GET', '{0}/containers/{1}/top'.format(prefix, i_id),
+                     content_type='application/json',
+                     json=exec_results)
     return container_name
 
 
@@ -296,7 +342,22 @@ def _add_network_inspect(rsps, network_name, n_config, containers, **kwargs):
     }
     results.update(kwargs)
     for i_id in (network_name, network_id):
-        rsps.add('GET', '{0}/networks/{1}'.format(URL_PREFIX, i_id),
+        for prefix in URL_PREFIXES:
+            rsps.add('GET', '{0}/networks/{1}'.format(prefix, i_id),
+                     content_type='application/json',
+                     json=results)
+
+
+def _add_volume_inspect(rsps, volume_name, **kwargs):
+    results = {
+        'Driver': 'local',
+        'Mountpoint': '/docker/volumes/{0}/_data'.format(volume_name),
+        'Name': volume_name,
+        'Options': {},
+    }
+    results.update(kwargs)
+    for prefix in URL_PREFIXES:
+        rsps.add('GET', '{0}/volumes/{1}'.format(prefix, volume_name),
                  content_type='application/json',
                  json=results)
 
@@ -339,8 +400,10 @@ class TestPolicyStateGenerators(unittest.TestCase):
         self.sample_map = sample_map = ContainerMap('main', MAP_DATA_2,
                                                     use_attached_parent_name=True).get_extended_map()
         self.sample_map.repository = None
-        self.sample_client_config = client_config = ClientConfiguration(**CLIENT_DATA_1)
-        self.policy = BasePolicy({map_name: sample_map}, {'__default__': client_config})
+        self.sample_client_config1 = client_config1 = ClientConfiguration(**CLIENT_DATA_1)
+        self.sample_client_config2 = client_config2 = ClientConfiguration(**CLIENT_DATA_2)
+        self.policy = BasePolicy({map_name: sample_map}, {'__default__': client_config1})
+        self.policy_legacy = BasePolicy({map_name: sample_map}, {'__default__': client_config2})
         self.server_config_id = self._config_id('server')
         all_images = set(format_image_tag(sample_map.get_image(c_config.image or c_name))
                          for c_name, c_config in sample_map)
@@ -352,8 +415,9 @@ class TestPolicyStateGenerators(unittest.TestCase):
     def _config_id(self, config_name, instance=None):
         return [MapConfigId(ItemType.CONTAINER, self.map_name, config_name, instance)]
 
-    def _setup_containers(self, rsps, containers_states, networks=()):
+    def _setup_containers(self, rsps, containers_states, networks=(), use_named_volumes=True):
         container_names = []
+        volume_names = []
         network_names = []
         _add_image_list(rsps, self.images)
         image_dict = {name: _id for _id, name in self.images}
@@ -362,14 +426,15 @@ class TestPolicyStateGenerators(unittest.TestCase):
         for name, state, instances, attached_valid, instances_valid, kwargs in containers_states:
             c_config = self.sample_map.get_existing(name)
             for a in c_config.attaches:
-                config_id = MapConfigId(ItemType.VOLUME, self.map_name, name, a)
-                if self.sample_map.use_attached_parent_name:
-                    container_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
+                config_id = MapConfigId(ItemType.VOLUME, self.map_name, name, a.name)
+                volume_name = '{0.map_name}.{0.config_name}.{0.instance_name}'.format(config_id)
+                if use_named_volumes:
+                    _add_volume_inspect(rsps, volume_name)
+                    volume_names.append(volume_name)
                 else:
-                    container_name = '{0.map_name}.{0.instance_name}'.format(config_id)
-                _add_container_inspect(rsps, config_id, container_name, self.sample_map, c_config,
-                                       P_STATE_EXITED_0, base_image_id, attached_valid)
-                container_names.append(container_name)
+                    _add_container_inspect(rsps, config_id, volume_name, self.sample_map, c_config,
+                                           P_STATE_EXITED_0, base_image_id, False, attached_valid)
+                    container_names.append(volume_name)
             image_name = format_image_tag(self.sample_map.get_image(c_config.image or name))
             image_id = image_dict[image_name]
             for i in instances or c_config.instances or [None]:
@@ -379,7 +444,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 else:
                     container_name = '{0.map_name}.{0.config_name}'.format(config_id)
                 _add_container_inspect(rsps, config_id, container_name, self.sample_map, c_config,
-                                       state, image_id, instances_valid, **kwargs)
+                                       state, image_id, use_named_volumes, instances_valid, **kwargs)
                 container_names.append(container_name)
                 if c_config.networks:
                     for cn in c_config.networks:
@@ -399,6 +464,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             network_names.append(dn_name)
         _add_container_list(rsps, container_names)
         _add_network_list(rsps, network_names)
+        _add_volume_list(rsps, volume_names)
 
     def _setup_default_containers(self, rsps):
         self._setup_containers(rsps, [
@@ -527,7 +593,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('svc'),
                 _container('server'),
             ])
-            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            states = _get_states_dict(UpdateStateGenerator(self.policy_legacy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
@@ -544,8 +610,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('redis', instance_volumes_valid=False),
                 _container('svc'),
                 _container('server'),
-            ])
-            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            ], use_named_volumes=False)
+            states = _get_states_dict(UpdateStateGenerator(self.policy_legacy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.NEEDS_RESET, 0)
@@ -562,8 +628,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 _container('redis'),
                 _container('svc'),
                 _container('server', attached_volumes_valid=False),
-            ])
-            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+            ], use_named_volumes=False)
+            states = _get_states_dict(UpdateStateGenerator(self.policy_legacy, {}).get_states(self.server_config_id))
             server_state = states['containers'][('server', None)]
             self.assertEqual(server_state.base_state, State.RUNNING)
             self.assertEqual(server_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)

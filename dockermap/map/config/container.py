@@ -2,15 +2,19 @@
 from __future__ import unicode_literals
 
 from . import ConfigurationObject, CP
-from ..input import (get_shared_volumes, get_shared_host_volumes, get_container_links, get_network_mode,
-                     get_port_bindings, get_exec_commands, get_network_endpoints, bool_if_set)
+from ..input import (get_shared_host_volumes, get_attached_volumes, get_used_volumes, get_container_links,
+                     get_network_mode, get_port_bindings, get_exec_commands, get_network_endpoints, bool_if_set)
 
 
 def _merge_first(current, update_list):
     if not update_list:
         return
-    new_keys = set(item[0] for item in update_list) - set(item[0] for item in current)
-    current.extend(u for u in update_list if u[0] in new_keys)
+    update_dict = {item[0]: item for item in update_list}
+    for i, item in enumerate(current):
+        if item[0] in update_dict:
+            current[i] = update_dict.pop(item[0])
+    if update_dict:
+        current.extend(u for u in update_list if u[0] in update_dict)
 
 
 class ContainerConfiguration(ConfigurationObject):
@@ -24,8 +28,8 @@ class ContainerConfiguration(ConfigurationObject):
     clients = CP(list)
     shares = CP(list)
     binds = CP(list, input_func=get_shared_host_volumes, merge_func=_merge_first)
-    attaches = CP(list)
-    uses = CP(list, input_func=get_shared_volumes, merge_func=_merge_first)
+    attaches = CP(list, input_func=get_attached_volumes, merge_func=_merge_first)
+    uses = CP(list, input_func=get_used_volumes, merge_func=_merge_first)
     links = CP(list, input_func=get_container_links)
     exposes = CP(list, input_func=get_port_bindings, merge_func=_merge_first)
     user = CP()
@@ -53,11 +57,16 @@ class ContainerConfiguration(ConfigurationObject):
         'shares': "Shared volumes for a container.",
         'binds': "The host volume shares for a container. These will be added to the shared volumes, and mapped to a "
                  "host volume.",
-        'attaches': "Names of containers that are attached to instances of this one. If set, an empty container will "
-                    "be created with the purpose of sharing a volume. This volume is automatically shared with this "
-                    "one, but also available to other containers.",
+        'attaches': "Names of volumes that are assigned to this container, and that can be shared with other "
+                    "containers. For hosts that do not support named volumes, an empty container will "
+                    "be created that shares a single volume. This can be in the syntax ``alias: mount path`` "
+                    "(dict, tuple, list) or just ``alias`` if the mount path is set in the ``volumes`` property of "
+                    "the container map.",
         'uses': "Volumes used from other containers. This can be a combination of attached volume aliases, and "
-                "container names if all volumes are to be used of that container.",
+                "container names if all volumes are to be used of that container. For hosts that support named volumes "
+                "this can be specified as ``volume alias: mount path`` (as a dict, list, or tuple); otherwise only "
+                "volume names can be provided here and the mount path of the origin is re-used (attached or container "
+                "volume).",
         'links': "Linked containers. Links are set in the format `ContainerLink(name, alias)`, where the name is the "
                  "linked container's name, and the alias name the alias to use for this container instance.",
         'exposes': """\

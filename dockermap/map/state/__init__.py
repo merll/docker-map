@@ -17,6 +17,7 @@ class State(SimpleEnum):
 class StateFlags(Flags):
     INITIAL = 1                # Container is present but has never been started.
     RESTARTING = 1 << 1        # Container is not running, but in the process of restarting.
+    PERSISTENT = 1 << 5        # Container is configured as persistent.
     NONRECOVERABLE = 1 << 10   # Container is stopped with an error that cannot be solved through restarting.
     IMAGE_MISMATCH = 1 << 12   # Container does not correspond with configured image.
     MISSING_LINK = 1 << 13     # A configured linked container cannot be found.
@@ -28,7 +29,6 @@ class StateFlags(Flags):
     MISC_MISMATCH = 1 << 30    # Container does otherwise not correspond with the configuration.
     FORCED_RESET = 1 << 31     # Container in any state should be reset.
 
-    # TODO: Depends on Docker version
     NEEDS_RESET = (NONRECOVERABLE | FORCED_RESET | IMAGE_MISMATCH | MISSING_LINK | VOLUME_MISMATCH | MISC_MISMATCH)
 
 

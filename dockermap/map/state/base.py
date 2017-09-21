@@ -39,26 +39,22 @@ class AbstractState(object):
     :type client_name: unicode | str
     :param config_id: Configuration id tuple.
     :type config_id: dockermap.map.input.MapConfigId
-    :param container_map: Container map instance.
-    :type container_map: dockermap.map.config.main.ContainerMap
-    :param config: Configuration object.
     :param config_flags: Config flags on the container.
     :type config_flags: int
     """
-    def __init__(self, policy, options, client_name, config_id, container_map, config, config_flags=ConfigFlags.NONE,
-                 *args, **kwargs):
+    def __init__(self, policy, options, client_name, config_id, config_flags=ConfigFlags.NONE, *args, **kwargs):
         self.policy = policy
         self.options = options
-        self.config_id = config_id
-        self.container_map = container_map
         self.client_name = client_name
-        self.client_config = client_config = policy.clients[client_name]
+        self.client_config = client_config = self.policy.clients[client_name]
         self.client = client_config.get_client()
-        self.config = config
+        self.config_id = config_id
         self.config_flags = config_flags
+        self.container_map = policy.container_maps[config_id.map_name]
+        self.config = None
         self.detail = None
 
-    def set_defaults(self, *args, **kwargs):
+    def set_defaults(self):
         """
         Resets the state, so that with adjustments of input parameters the object can be reused without side-effects
         to other objects on the client.
@@ -93,19 +89,19 @@ class ContainerBaseState(AbstractState):
     :type client_name: unicode | str
     :param config_id: Configuration id tuple.
     :type config_id: dockermap.map.input.MapConfigId
-    :param container_map: Container map instance.
-    :type container_map: dockermap.map.config.main.ContainerMap
-    :param config: Container configuration object.
-    :type config: dockermap.map.config.container.ContainerConfiguration
     :param config_flags: Config flags on the container.
     :type config_flags: int
     """
     def __init__(self, *args, **kwargs):
         super(ContainerBaseState, self).__init__(*args, **kwargs)
+        self.config = config = self.container_map.get_existing(self.config_id.config_name)
+        if not config:
+            raise KeyError("Container configuration '{0.config_name}' not found on map '{0.map_name}'."
+                           "".format(self.config_id))
         self.container_name = None
 
-    def set_defaults(self, *args, **kwargs):
-        super(ContainerBaseState, self).set_defaults(*args, **kwargs)
+    def set_defaults(self):
+        super(ContainerBaseState, self).set_defaults()
         self.container_name = None
 
     def inspect(self):
@@ -114,7 +110,7 @@ class ContainerBaseState(AbstractState):
         """
         policy = self.policy
         config_id = self.config_id
-        if self.config_flags & ConfigFlags.CONTAINER_ATTACHED:
+        if self.config_id.config_type == ItemType.VOLUME:
             if self.container_map.use_attached_parent_name:
                 container_name = policy.aname(config_id.map_name, config_id.instance_name, config_id.config_name)
             else:
@@ -148,6 +144,8 @@ class ContainerBaseState(AbstractState):
                 state_flag = StateFlags.NONE
             if c_status['Restarting']:
                 state_flag |= StateFlags.RESTARTING
+        if self.config.persistent:
+            state_flag |= StateFlags.PERSISTENT
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
             state_flag |= StateFlags.FORCED_RESET
@@ -166,18 +164,19 @@ class NetworkBaseState(AbstractState):
     :type client_name: unicode | str
     :param config_id: Configuration id tuple.
     :type config_id: dockermap.map.input.MapConfigId
-    :param container_map: Container map instance.
-    :type container_map: dockermap.map.config.main.ContainerMap
-    :param config: Network configuration object.
-    :type config: dockermap.map.config.network.NetworkConfiguration
     :param config_flags: Config flags on the container.
     :type config_flags: int
     """
     def __init__(self, *args, **kwargs):
         super(NetworkBaseState, self).__init__(*args, **kwargs)
+        self.config = config = self.container_map.get_existing_network(self.config_id.config_name)
+        if not config:
+            raise KeyError("Network configuration '{0.config_name}' not found on map '{0.map_name}'."
+                           "".format(self.config_id))
         self.network_name = None
 
-    def set_defaults(self, *args, **kwargs):
+    def set_defaults(self):
+        super(NetworkBaseState, self).set_defaults()
         self.network_name = None
 
     def inspect(self):
@@ -205,6 +204,56 @@ class NetworkBaseState(AbstractState):
         else:
             state_flag = StateFlags.NONE
         return State.PRESENT, state_flag, {'id': n_id, 'containers': connected_containers}
+
+
+class VolumeBaseState(AbstractState):
+    """
+    Base implementation for determining the current state of a single volume on the client.
+
+    :param policy: Policy object.
+    :type policy: dockermap.map.policy.base.BasePolicy
+    :param options: Dictionary of options passed to the state generator.
+    :type options: dict
+    :param client_name: Client name.
+    :type client_name: unicode | str
+    :param config_id: Configuration id tuple.
+    :type config_id: dockermap.map.input.MapConfigId
+    :param config_flags: Config flags on the container.
+    :type config_flags: int
+    """
+    def __init__(self, *args, **kwargs):
+        super(VolumeBaseState, self).__init__(*args, **kwargs)
+        self.config = self.container_map.get_existing_volume(self.config_id.instance_name)
+        self.volume_name = None
+
+    def set_defaults(self):
+        super(VolumeBaseState, self).set_defaults()
+        self.volume_name = None
+
+    def inspect(self):
+        """
+        Inspects the network state.
+        """
+        if not self.client_config.supports_volumes:
+            raise ValueError("Client does not support volume configuration.", self.client_name)
+        config_id = self.config_id
+        parent_name = config_id.config_name if self.container_map.use_attached_parent_name else None
+        volume_name = self.volume_name = self.policy.aname(config_id.map_name, config_id.instance_name,
+                                                           parent_name=parent_name)
+        if volume_name in self.policy.volume_names[self.client_name]:
+            self.detail = self.client.inspect_volume(volume_name)
+        else:
+            self.detail = NOT_FOUND
+
+    def get_state(self):
+        if self.detail is NOT_FOUND:
+            return State.ABSENT, StateFlags.NONE, {}
+        force_update = self.options['force_update']
+        if force_update and self.config_id in force_update:
+            state_flag = StateFlags.FORCED_RESET
+        else:
+            state_flag = StateFlags.NONE
+        return State.PRESENT, state_flag, {}
 
 
 class ImageBaseState(AbstractState):
@@ -239,6 +288,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
     """
     container_state_class = ContainerBaseState
     network_state_class = NetworkBaseState
+    volume_state_class = VolumeBaseState
     image_state_class = ImageBaseState
 
     nonrecoverable_exit_codes = (-127, -1)
@@ -251,63 +301,46 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
     def get_network_state(self, *args, **kwargs):
         return self.network_state_class(self._policy, self.get_options(), *args, **kwargs)
 
+    def get_volume_state(self, *args, **kwargs):
+        return self.volume_state_class(self._policy, self.get_options(), *args, **kwargs)
+
     def get_image_state(self, *args, **kwargs):
         return self.image_state_class(self._policy, self.get_options(), *args, **kwargs)
 
-    def generate_config_states(self, config_id, is_dependency=False):
+    def generate_config_states(self, config_id, config_flags=ConfigFlags.NONE):
         """
         Generates the actions on a single item, which can be either a dependency or a explicitly selected
         container.
 
         :param config_id: Configuration id tuple.
         :type config_id: dockermap.map.input.MapConfigId
-        :param is_dependency: Whether the state check is on a dependency or dependent container.
-        :type is_dependency: bool
+        :param config_flags: Optional configuration flags.
+        :type config_flags: dockermap.map.policy.ConfigFlags
         :return: Generator for container state information.
         :rtype: collections.Iterable[dockermap.map.state.ContainerConfigStates]
         """
         c_map = self._policy.container_maps[config_id.map_name]
-        c_flags = ConfigFlags.DEPENDENT if is_dependency else ConfigFlags.NONE
+        clients = c_map.clients or [self._policy.default_client_name]
         config_type = config_id.config_type
-        config_name = config_id.config_name
-
-        if config_type == ItemType.CONTAINER:
-            config = c_map.get_existing(config_name)
-            if not config:
-                raise KeyError("Container configuration '{0.config_name}' not found on map '{0.map_name}'."
-                               "".format(config_id))
-            clients = self._policy.get_clients(c_map, config)
-            if config.persistent:
-                c_flags |= ConfigFlags.CONTAINER_PERSISTENT
-            state_func = self.get_container_state
-        elif config_type == ItemType.VOLUME:
-            config = c_map.get_existing(config_name)
-            if not config:
-                raise KeyError("Container configuration '{0.config_name}' not found on map '{0.map_name}'."
-                               "".format(config_id))
-            clients = self._policy.get_clients(c_map, config)
-            # TODO: Change for actual volumes.
-            c_flags |= ConfigFlags.CONTAINER_ATTACHED
-            state_func = self.get_container_state
-        elif config_type == ItemType.NETWORK:
-            config = c_map.get_existing_network(config_name)
-            if not config:
-                raise KeyError("Network configuration '{0.config_name}' not found on map '{0.map_name}'."
-                               "".format(config_id))
-            clients = self._policy.get_clients(c_map)
-            state_func = self.get_network_state
-        elif config_type == ItemType.IMAGE:
-            config = None
-            clients = self._policy.get_clients(c_map)
-            state_func = self.get_image_state
-        else:
-            raise ValueError("Invalid configuration type.", config_type)
 
         for client_name in clients:
-            c_state = state_func(client_name, config_id, c_map, config, c_flags)
+            if config_type == ItemType.CONTAINER:
+                c_state = self.get_container_state(client_name, config_id, config_flags)
+            elif config_type == ItemType.VOLUME:
+                client_config = self._policy.clients[client_name]
+                if client_config.supports_volumes:
+                    c_state = self.get_volume_state(client_name, config_id, config_flags)
+                else:
+                    c_state = self.get_container_state(client_name, config_id, config_flags)
+            elif config_type == ItemType.NETWORK:
+                c_state = self.get_network_state(client_name, config_id, config_flags)
+            elif config_type == ItemType.IMAGE:
+                c_state = self.get_image_state(client_name, config_id, config_flags)
+            else:
+                raise ValueError("Invalid configuration type.", config_type)
             c_state.inspect()
             # Extract base state, state flags, and extra info.
-            state_info = ConfigState(client_name, config_id, c_flags, *c_state.get_state())
+            state_info = ConfigState(client_name, config_id, config_flags, *c_state.get_state())
             log.debug("Configuration state information: %s", state_info)
             yield state_info
 
@@ -371,7 +404,7 @@ class AbstractDependencyStateGenerator(with_metaclass(ABCPolicyUtilMeta, Abstrac
         log.debug("Following dependency path for %s.", config_id)
         for d_config_id in dependency_path:
             log.debug("Dependency path at %s.", d_config_id)
-            for state in self.generate_config_states(d_config_id, is_dependency=True):
+            for state in self.generate_config_states(d_config_id, config_flags=ConfigFlags.DEPENDENT):
                 yield state
         log.debug("Processing state for %s.", config_id)
         for state in self.generate_config_states(config_id):

@@ -6,15 +6,15 @@ import six
 
 from dockermap.functional import lazy_once
 from dockermap.utils import merge_list
-from dockermap.map import DictMap
 from dockermap.map.config.main import expand_groups, ContainerMap
-from dockermap.map.input import (is_path, read_only, get_list, get_shared_volume, get_shared_volumes,
+from dockermap.map.input import (is_path, read_only, get_list,
                                  get_shared_host_volume, get_shared_host_volumes, SharedVolume,
                                  get_container_link, get_container_links, ContainerLink,
                                  get_port_binding, get_port_bindings, PortBinding,
                                  get_exec_command, get_exec_commands, ExecCommand, ExecPolicy,
                                  get_map_config_id, get_map_config_ids, MapConfigId,
-                                 ItemType, NetworkEndpoint, get_network_endpoint, get_network_endpoints)
+                                 ItemType, NetworkEndpoint, get_network_endpoint, get_network_endpoints, HostVolume,
+                                 get_attached_volume, UsedVolume, get_attached_volumes)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -43,33 +43,11 @@ class InputConversionTest(unittest.TestCase):
         self.assertEqual(get_list(lazy_once(lambda: 'test')), ['test'])
         self.assertEqual(get_list('test'), ['test'])
 
-    def test_get_shared_volume(self):
-        assert_a = lambda a: self.assertEqual(get_shared_volume(a), SharedVolume('a', False))
-        assert_b = lambda b: self.assertEqual(get_shared_volume(b), SharedVolume('b', True))
-
-        assert_a(SharedVolume('a', False))
-        assert_a('a')
-        assert_a(('a', ))
-        assert_b(('b', 'true'))
-        assert_b({'b': 'true'})
-
-    def test_get_shared_volumes(self):
-        assert_a = lambda a: self.assertEqual(get_shared_volumes(a), [SharedVolume('a', False)])
-        assert_b = lambda b: six.assertCountEqual(self, get_shared_volumes(b), [SharedVolume('a', False),
-                                                                                SharedVolume('b', True)])
-
-        assert_a(SharedVolume('a', False))
-        assert_a('a')
-        assert_a(('a', ))
-        assert_a({'a': False})
-        assert_b(['a', ('b', 'true')])
-        assert_b({'a': False, 'b': 'true'})
-
     def test_get_shared_host_volume(self):
         assert_a = lambda a: self.assertEqual(get_shared_host_volume(a), SharedVolume('a', False))
         assert_b = lambda b: self.assertEqual(get_shared_host_volume(b), SharedVolume('b', True))
-        assert_c = lambda c: self.assertEqual(get_shared_host_volume(c), SharedVolume(('c', 'ch'), False))
-        assert_d = lambda d: self.assertEqual(get_shared_host_volume(d), SharedVolume(('d', 'dh'), True))
+        assert_c = lambda c: self.assertEqual(get_shared_host_volume(c), HostVolume('ch', 'c', False))
+        assert_d = lambda d: self.assertEqual(get_shared_host_volume(d), HostVolume('dh', 'd', True))
 
         assert_a('a')
         assert_a(('a', ))
@@ -90,8 +68,8 @@ class InputConversionTest(unittest.TestCase):
         assert_a = lambda a: self.assertEqual(get_shared_host_volumes(a), [SharedVolume('a', False)])
         assert_b = lambda b: six.assertCountEqual(self, get_shared_host_volumes(b), [SharedVolume('a', False),
                                                                                      SharedVolume('b', True),
-                                                                                     SharedVolume(('c', 'ch'), False),
-                                                                                     SharedVolume(('d', 'dh'), True)])
+                                                                                     HostVolume('ch', 'c', False),
+                                                                                     HostVolume('dh', 'd', True)])
 
         assert_a('a')
         assert_a([('a', )])
@@ -99,6 +77,35 @@ class InputConversionTest(unittest.TestCase):
         assert_b([['a'], SharedVolume('b', True), ('c', 'ch'), ('d', 'dh', 'ro')])
         assert_b(['a', ('b', 'ro'), ('c', ['ch']), ('d', 'dh', True)])
         assert_b({'a': False, 'b': 'ro', 'c': 'ch', 'd': ('dh', True)})
+
+    def test_get_attached_volume(self):
+        assert_a = lambda a: self.assertEqual(get_attached_volume(a), SharedVolume('a', False))
+        assert_c = lambda c: self.assertEqual(get_attached_volume(c), UsedVolume('c', 'p1', False))
+
+        assert_a(SharedVolume('a', False))
+        assert_a('a')
+        assert_a(('a', ))
+        assert_c(UsedVolume('c', 'p1'))
+        assert_c(('c', 'p1'))
+        assert_c({'c': 'p1'})
+
+    def test_get_attached_volumes(self):
+        assert_a = lambda a: self.assertEqual(get_attached_volumes(a), [SharedVolume('a', False)])
+        assert_b = lambda b: six.assertCountEqual(self, get_attached_volumes(b), [SharedVolume('a', False),
+                                                                                  SharedVolume('b', False),
+                                                                                  UsedVolume('c', 'p1', False)])
+
+        assert_a(SharedVolume('a', False))
+        assert_a('a')
+        assert_a(('a', ))
+        assert_b(['a', ('b', False), {'c': 'p1'}])
+        assert_b({'a': False, 'b': None, 'c': 'p1'})
+
+    def test_get_used_volume(self):
+        pass
+
+    def test_get_used_volumes(self):
+        pass
 
     def test_get_container_link(self):
         assert_a = lambda a: self.assertEqual(get_container_link(a), ContainerLink('a', None))
