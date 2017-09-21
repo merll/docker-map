@@ -651,12 +651,10 @@ class ContainerMap(ConfigurationObject):
                 net_containers = []
             if self.use_attached_parent_name:
                 attaches = [(c_name, a.name) for a in c_config.attaches]
-                attaches_with_path = [(c_name, a.name) for a in c_config.attaches
-                                      if isinstance(a, UsedVolume)]
             else:
                 attaches = [a.name for a in c_config.attaches]
-                attaches_with_path = [a.name for a in c_config.attaches
-                                      if isinstance(a, UsedVolume)]
+            attaches_with_path = [a.name for a in c_config.attaches
+                                  if isinstance(a, UsedVolume)]
             return (instance_names, group_ref_names, uses, attaches, attaches_with_path, shared, bind, link, networks,
                     net_containers)
 
