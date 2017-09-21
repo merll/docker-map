@@ -87,7 +87,8 @@ class CachedVolumeNames(CachedItems, set):
             return
         current_volumes = self._client.volumes()['Volumes']
         self.clear()
-        self.update(vol['Name'] for vol in current_volumes)
+        if current_volumes:
+            self.update(vol['Name'] for vol in current_volumes)
 
 
 class DockerHostItemCache(dict):
