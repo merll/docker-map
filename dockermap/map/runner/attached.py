@@ -169,8 +169,8 @@ class AttachedPreparationMixin(AttachedConfigMixin):
             v_alias = '{0.config_name}.{0.instance_name}'.format(config_id)
         else:
             v_alias = config_id.instance_name
-        user = policy.volume_users[v_alias]
-        permissions = policy.volume_permissions[v_alias]
+        user = policy.volume_users[config_id.map_name][v_alias]
+        permissions = policy.volume_permissions[config_id.map_name][v_alias]
 
         if not (self.prepare_local and hasattr(client, 'run_cmd')):
             return self._prepare_container(client, action, a_name, v_alias)
