@@ -92,7 +92,7 @@ def get_instance_volumes(instance_detail, check_names):
     """
     if 'Mounts' in instance_detail:
         if check_names:
-            return {m['Destination']: m['Source'] or m.get('Name')
+            return {m['Destination']: m.get('Name') or m['Source']
                     for m in instance_detail['Mounts']}
         return {m['Destination']: m['Source']
                 for m in instance_detail['Mounts']}

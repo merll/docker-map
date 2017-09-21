@@ -160,7 +160,7 @@ def _get_container_mounts(config_id, container_map, c_config, named_volumes, val
             c_path = container_map.volumes[a.name].default_path
         yield {
             'Type': 'volume',
-            'Source': posixpath.join(path_prefix, 'attached', a.name) if not named_volumes else '',
+            'Source': posixpath.join(path_prefix, 'attached', a.name),
             'Destination': c_path,
             'Name': '{0}.{1}.{2}'.format(config_id.map_name, config_id.config_name, a.name)
                     if named_volumes else '',
@@ -178,7 +178,7 @@ def _get_container_mounts(config_id, container_map, c_config, named_volumes, val
         for s in c_config.shares:
             yield {
                 'Type': 'volume',
-                'Source': posixpath.join(path_prefix, 'shared', s) if not named_volumes else '',
+                'Source': posixpath.join(path_prefix, 'shared', s),
                 'Destination': s,
                 'Name': _get_hash('shared-volume', path_prefix, s) if named_volumes else '',
                 'RW': True,
