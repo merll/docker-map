@@ -354,37 +354,41 @@ class NetworkEndpointRegistry(object):
                     'disconnected': [NetworkEndpoint(cn_name)]
                 }
             return StateFlags.NONE, {}
-        disconnected_networks = []
         configured_network_names = {ce[0] for ce in named_endpoints}
-        network_endpoints = self._endpoints.get(detail['Id'], set())
         reset_networks = []
-        for ref_n_name, cn_config in named_endpoints:
-            log.debug("Checking network %s.", ref_n_name)
-            if ref_n_name not in connected_network_names:
-                log.debug("Network %s not found in container connections.", ref_n_name)
-                disconnected_networks.append(cn_config)
-                continue
-            network_detail = i_networks[ref_n_name]
-            c_alias_set = set(cn_config.aliases or ())
-            if c_alias_set and not c_alias_set.issubset(network_detail.get('Aliases')):
-                log.debug("Aliases in network %s differ or are not present.", ref_n_name)
-                reset_networks.append((ref_n_name, cn_config))
-                continue
-            if (network_detail['NetworkID'], network_detail['EndpointID']) not in network_endpoints:
-                log.debug("Network endpoint not found in %s (%s): %s", ref_n_name, network_detail['NetworkID'],
-                          network_detail['EndpointID'])
-                reset_networks.append((ref_n_name, cn_config))
-                continue
-            if cn_config.links:
-                linked_names = {'{0}:{1}'.format(self._cname(config_id.map_name, lc_name),
-                                                 lc_alias or self._hostname(lc_name))
-                                for lc_name, lc_alias in cn_config.links}
-            else:
-                linked_names = set()
-            if set(network_detail.get('Links', []) or ()) != linked_names:
-                log.debug("Links in %s differ from configuration: %s.", ref_n_name, network_detail.get('Links', []))
-                reset_networks.append((ref_n_name, cn_config))
-                continue
+        if detail['State']['Running']:
+            network_endpoints = self._endpoints.get(detail['Id'], set())
+            disconnected_networks = []
+            for ref_n_name, cn_config in named_endpoints:
+                log.debug("Checking network %s.", ref_n_name)
+                if ref_n_name not in connected_network_names:
+                    log.debug("Network %s not found in container connections.", ref_n_name)
+                    disconnected_networks.append(cn_config)
+                    continue
+                network_detail = i_networks[ref_n_name]
+                c_alias_set = set(cn_config.aliases or ())
+                if c_alias_set and not c_alias_set.issubset(network_detail.get('Aliases')):
+                    log.debug("Aliases in network %s differ or are not present.", ref_n_name)
+                    reset_networks.append((ref_n_name, cn_config))
+                    continue
+                if (network_detail['NetworkID'], network_detail['EndpointID']) not in network_endpoints:
+                    log.debug("Network endpoint not found in %s (%s): %s", ref_n_name, network_detail['NetworkID'],
+                              network_detail['EndpointID'])
+                    reset_networks.append((ref_n_name, cn_config))
+                    continue
+                if cn_config.links:
+                    linked_names = {'{0}:{1}'.format(self._cname(config_id.map_name, lc_name),
+                                                     lc_alias or self._hostname(lc_name))
+                                    for lc_name, lc_alias in cn_config.links}
+                else:
+                    linked_names = set()
+                if set(network_detail.get('Links', []) or ()) != linked_names:
+                    log.debug("Links in %s differ from configuration: %s.", ref_n_name, network_detail.get('Links', []))
+                    reset_networks.append((ref_n_name, cn_config))
+                    continue
+        else:
+            # In this case the endpoints are not registered in the network.
+            disconnected_networks = list(configured_network_names - connected_network_names)
         s_flags = StateFlags.NONE
         extra = {}
         if disconnected_networks:
