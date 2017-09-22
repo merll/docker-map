@@ -121,10 +121,12 @@ def _add_network_list(rsps, network_names):
 
 
 def _add_volume_list(rsps, volume_names):
-    results = [
-        {'Name': name}
-        for name in volume_names
-    ]
+    results = {
+        'Volumes': [
+            {'Name': name} for name in volume_names
+        ] or None,
+        'Warnings': None,
+    }
     for prefix in URL_PREFIXES:
         rsps.add('GET', '{0}/volumes'.format(prefix), content_type='application/json', json=results)
 
