@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from six import iteritems, with_metaclass
+from six import iteritems, with_metaclass, python_2_unicode_compatible, text_type
 
 from .utils import merge_list
 
@@ -65,11 +65,28 @@ def _dependency_dict(items):
     return {item: CachedDependency(parent) for item, parent in _iterate_dependencies(items)}
 
 
+@python_2_unicode_compatible
 class CircularDependency(Exception):
     """
     Indicates that dependencies cannot be resolved, since items are interdependent.
     """
-    pass
+    def __init__(self, item, is_direct=False, *args, **kwargs):
+        self._item = item
+        self._is_direct = is_direct
+        super(CircularDependency, self).__init__(*args, **kwargs)
+
+    def __str__(self):
+        if self._is_direct:
+            return "{0} refers to itself as a dependency.".format(self._item)
+        return "{0} has a dependency that refers back to it.".format(self._item)
+
+    @property
+    def item(self):
+        return self._item
+
+    @property
+    def is_direct(self):
+        return self._is_direct
 
 
 class BaseDependencyResolver(with_metaclass(ABCMeta, object)):
@@ -154,11 +171,13 @@ class ImageDependentsResolver(BaseDependencyResolver):
         """
         dep = []
         for parent_key in parents:
+            if item == parent_key:
+                raise CircularDependency(item, True)
             parent_dep = resolve_parent(parent_key)
+            if item in parent_dep:
+                raise CircularDependency(item)
             merge_list(dep, parent_dep)
         merge_list(dep, parents)
-        if item in dep:
-            raise CircularDependency("Circular dependency found for item '{0}'.".format(item))
         return dep
 
     def update(self, items):

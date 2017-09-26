@@ -28,12 +28,14 @@ class ContainerDependencyMergeMixin(object):
         """
         dep = []
         for parent_key in parents:
+            if item == parent_key:
+                raise CircularDependency(item, True)
             if parent_key.config_type == ItemType.CONTAINER:
                 parent_dep = resolve_parent(parent_key)
+                if item in parent_dep:
+                    raise CircularDependency(item)
                 merge_list(dep, parent_dep)
         merge_list(dep, parents)
-        if item in dep:
-            raise CircularDependency("Circular dependency found for item '{0}'.".format(item))
         return dep
 
 
