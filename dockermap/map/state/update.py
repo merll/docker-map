@@ -346,9 +346,10 @@ class NetworkEndpointRegistry(object):
                 cn_name = 'container:{0}'.format(self._cname(config_id.map_name, *c_net_mode))
             else:
                 cn_name = c_net_mode
-            if cn_name not in connected_network_names:
-                log.debug("Configurations network mode %s not set in available connections: %s.", cn_name,
-                          connected_network_names)
+            i_net_mode = detail['HostConfig']['NetworkMode']
+            if cn_name != i_net_mode and cn_name not in connected_network_names:
+                log.debug("Configurations network mode %s not matching instance mode %s. Additional connections: %s.",
+                          cn_name, i_net_mode, connected_network_names)
                 return (StateFlags.NETWORK_LEFT | StateFlags.NETWORK_DISCONNECTED), {
                     'left': connected_network_names,
                     'disconnected': [NetworkEndpoint(cn_name)]
