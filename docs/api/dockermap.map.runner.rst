@@ -25,6 +25,13 @@ dockermap\.map\.runner\.cmd module
     :members:
     :show-inheritance:
 
+dockermap\.map\.runner\.image module
+------------------------------------
+
+.. automodule:: dockermap.map.runner.image
+    :members:
+    :show-inheritance:
+
 dockermap\.map\.runner\.network module
 --------------------------------------
 
