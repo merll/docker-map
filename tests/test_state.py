@@ -36,30 +36,35 @@ STATE_RESULTS = {
     P_STATE_INITIAL: {
         'Running': False,
         'Restarting': False,
+        'Pid': 0,
         'ExitCode': 0,
         'StartedAt': INITIAL_START_TIME,
     },
     P_STATE_RESTARTING: {
         'Running': False,
         'Restarting': True,
+        'Pid': 0,
         'ExitCode': 255,
         'StartedAt': "2016-02-05T20:14:04.655843958Z",
     },
     P_STATE_RUNNING: {
         'Running': True,
         'Restarting': False,
+        'Pid': 1,
         'ExitCode': 0,
         'StartedAt': "2016-02-05T20:14:04.655843958Z",
     },
     P_STATE_EXITED_0: {
         'Running': False,
         'Restarting': False,
+        'Pid': 0,
         'ExitCode': 0,
         'StartedAt': "2016-02-05T20:14:04.655843958Z",
     },
     P_STATE_EXITED_127: {
         'Running': False,
         'Restarting': False,
+        'Pid': 0,
         'ExitCode': -127,
         'StartedAt': "2016-02-05T20:14:04.655843958Z",
     },
@@ -783,6 +788,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self.assertDictEqual(server_state.extra_data, {
                 'exec_commands': [cmd3],
                 'id': get_container_id('{0}.server'.format(self.map_name, 'server')),
+                'pid': 1,
             })
 
 

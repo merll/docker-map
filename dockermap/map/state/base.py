@@ -129,11 +129,14 @@ class ContainerBaseState(AbstractState):
         if c_detail is NOT_FOUND:
             return State.ABSENT, StateFlags.NONE, {}
 
-        c_id = c_detail['Id']
+        extra_data = {
+            'id': c_detail['Id']
+        }
         c_status = c_detail['State']
         if c_status['Running']:
             base_state = State.RUNNING
             state_flag = StateFlags.NONE
+            extra_data['pid'] = c_status['Pid']
         else:
             base_state = State.PRESENT
             if c_status['StartedAt'] == INITIAL_START_TIME:
@@ -149,7 +152,7 @@ class ContainerBaseState(AbstractState):
         force_update = self.options['force_update']
         if force_update and self.config_id in force_update:
             state_flag |= StateFlags.FORCED_RESET
-        return base_state, state_flag, {'id': c_id}
+        return base_state, state_flag, extra_data
 
 
 class NetworkBaseState(AbstractState):
