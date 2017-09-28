@@ -96,7 +96,7 @@ class MappingDockerClient(object):
         else:
             self._clients = clients or {}
 
-        if docker_client:
+        if docker_client is not None:
             if isinstance(docker_client, ClientConfiguration):
                 default_client = docker_client
             else:
