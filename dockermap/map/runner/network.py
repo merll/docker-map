@@ -9,42 +9,12 @@ from ..input import ItemType
 
 class NetworkUtilMixin(object):
     action_method_names = [
-        (ItemType.NETWORK, Action.CREATE, 'create_network'),
-        (ItemType.NETWORK, Action.REMOVE, 'remove_network'),
         (ItemType.NETWORK, NetworkUtilAction.DISCONNECT_ALL, 'disconnect_all_containers'),
 
         (ItemType.CONTAINER, Action.CONNECT, 'connect_networks'),
         (ItemType.CONTAINER, Action.DISCONNECT, 'disconnect_networks'),
         (ItemType.CONTAINER, ContainerUtilAction.CONNECT_ALL, 'connect_all_networks'),
     ]
-
-    def create_network(self, action, n_name, **kwargs):
-        """
-        Creates a configured network.
-
-        :param action: Action configuration.
-        :type action: dockermap.map.runner.ActionConfig
-        :param n_name: Network name.
-        :type n_name: unicode | str
-        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
-        :type kwargs: dict
-        """
-        c_kwargs = self.get_network_create_kwargs(action, n_name, **kwargs)
-        return action.client.create_network(**c_kwargs)
-
-    def remove_network(self, action, n_name, **kwargs):
-        """
-        Removes a network.
-
-        :param action: Action configuration.
-        :type action: dockermap.map.runner.ActionConfig
-        :param n_name: Network name or id.
-        :type n_name: unicode | str
-        :param kwargs: Additional keyword arguments.
-        :type kwargs: dict
-        """
-        c_kwargs = self.get_network_remove_kwargs(action, n_name, **kwargs)
-        return action.client.remove_network(**c_kwargs)
 
     def disconnect_all_containers(self, action, network_name, containers, **kwargs):
         """

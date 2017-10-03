@@ -28,6 +28,9 @@ log = logging.getLogger(__name__)
 
 class DockerBaseRunnerMixin(object):
     action_method_names = [
+        (ItemType.NETWORK, Action.CREATE, 'create_network'),
+        (ItemType.NETWORK, Action.REMOVE, 'remove_network'),
+
         (ItemType.VOLUME, Action.CREATE, 'create_volume'),
         (ItemType.VOLUME, Action.REMOVE, 'remove_volume'),
 
@@ -39,6 +42,34 @@ class DockerBaseRunnerMixin(object):
         (ItemType.CONTAINER, Action.KILL, 'kill'),
         (ItemType.CONTAINER, Action.WAIT, 'wait'),
     ]
+
+    def create_network(self, action, n_name, **kwargs):
+        """
+        Creates a configured network.
+
+        :param action: Action configuration.
+        :type action: dockermap.map.runner.ActionConfig
+        :param n_name: Network name.
+        :type n_name: unicode | str
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict
+        """
+        c_kwargs = self.get_network_create_kwargs(action, n_name, **kwargs)
+        return action.client.create_network(**c_kwargs)
+
+    def remove_network(self, action, n_name, **kwargs):
+        """
+        Removes a network.
+
+        :param action: Action configuration.
+        :type action: dockermap.map.runner.ActionConfig
+        :param n_name: Network name or id.
+        :type n_name: unicode | str
+        :param kwargs: Additional keyword arguments.
+        :type kwargs: dict
+        """
+        c_kwargs = self.get_network_remove_kwargs(action, n_name, **kwargs)
+        return action.client.remove_network(**c_kwargs)
 
     def create_volume(self, action, v_name, **kwargs):
         if action.client_config.supports_volumes:
