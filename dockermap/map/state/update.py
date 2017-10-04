@@ -311,10 +311,11 @@ class ContainerVolumeChecker(AbstractVolumeChecker):
 
 
 class NetworkEndpointRegistry(object):
-    def __init__(self, nname_func, cname_func, hostname_func, default_networks):
+    def __init__(self, nname_func, cname_func, hostname_func, containers, default_networks):
         self._nname = nname_func
         self._cname = cname_func
         self._hostname = hostname_func
+        self._containers = containers
         self._default_networks = list(default_networks.keys())
         self._endpoints = defaultdict(set)
         for network_detail in six.itervalues(default_networks):
@@ -343,16 +344,23 @@ class NetworkEndpointRegistry(object):
             named_endpoints = []
         else:
             if isinstance(c_net_mode, tuple):
-                cn_name = 'container:{0}'.format(self._cname(config_id.map_name, *c_net_mode))
+                cc_name = self._cname(config_id.map_name, *c_net_mode)
+                cc_name_mode = 'container:{0}'.format(cc_name)
+                cc_id = self._containers.get(cc_name)
+                if cc_id:
+                    cn_names = (cc_name_mode, 'container:{0}'.format(cc_id))
+                else:
+                    cn_names = (cc_name_mode, )
             else:
-                cn_name = c_net_mode
+                cc_name = None
+                cn_names = (c_net_mode, )
             i_net_mode = detail['HostConfig']['NetworkMode']
-            if cn_name != i_net_mode and cn_name not in connected_network_names:
+            if i_net_mode not in cn_names and not any(cn_name in connected_network_names for cn_name in cn_names):
                 log.debug("Configurations network mode %s not matching instance mode %s. Additional connections: %s.",
-                          cn_name, i_net_mode, connected_network_names)
+                          cn_names, i_net_mode, connected_network_names)
                 return (StateFlags.NETWORK_LEFT | StateFlags.NETWORK_DISCONNECTED), {
                     'left': connected_network_names,
-                    'disconnected': [NetworkEndpoint(cn_name)]
+                    'disconnected': [NetworkEndpoint(cc_name)] if cc_name else []
                 }
             return StateFlags.NONE, {}
         configured_network_names = {ce[0] for ce in named_endpoints}
@@ -614,6 +622,7 @@ class UpdateStateGenerator(DependencyStateGenerator):
         }
         self._network_registries = {
             client_name: NetworkEndpointRegistry(policy.nname, policy.cname, policy.get_hostname,
+                                                 policy.container_names[client_name],
                                                  default_network_details[client_name])
             for client_name, network_details in six.iteritems(default_network_details)
         }
