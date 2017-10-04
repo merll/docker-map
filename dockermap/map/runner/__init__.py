@@ -57,24 +57,19 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
             if config_type == ItemType.CONTAINER:
                 config = c_map.get_existing(config_id.config_name)
                 item_name = policy.cname(config_id.map_name, config_id.config_name, config_id.instance_name)
-                existing_items = policy.container_names[action.client_name]
             elif config_type == ItemType.VOLUME:
                 a_parent_name = config_id.config_name if c_map.use_attached_parent_name else None
                 item_name = policy.aname(config_id.map_name, config_id.instance_name, parent_name=a_parent_name)
                 if client_config.supports_volumes:
                     config = c_map.get_existing_volume(config_id.config_name)
-                    existing_items = policy.volume_names[action.client_name]
                 else:
                     config = c_map.get_existing(config_id.config_name)
-                    existing_items = policy.container_names[action.client_name]
             elif config_type == ItemType.NETWORK:
                 config = c_map.get_existing_network(config_id.config_name)
                 item_name = policy.nname(config_id.map_name, config_id.config_name)
-                existing_items = policy.network_names[action.client_name]
             elif config_type == ItemType.IMAGE:
                 config = None
                 item_name = format_image_tag(config_id.config_name, config_id.instance_name)
-                existing_items = None
             else:
                 raise ValueError("Invalid configuration type.", config_id.config_type)
 
@@ -87,14 +82,8 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                                              c_map, config)
                 try:
                     res = a_method(action_config, item_name, **action.extra_data)
-                except:
+                except Exception:
                     exc_info = sys.exc_info()
                     raise ActionException(exc_info, action.client_name, config_id, action_type)
-                if action_type == Action.CREATE:
-                    existing_items.add(item_name)
-                elif action_type == Action.REMOVE:
-                    existing_items.discard(item_name)
-                elif action_type == ImageAction.PULL:
-                    policy.images[action.client_name].refresh_repo(config_id.config_name)
                 if res is not None:
                     yield ActionOutput(action.client_name, config_id, action_type, res)

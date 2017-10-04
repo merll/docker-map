@@ -66,4 +66,6 @@ class ImageMixin(object):
         log.info("Pulling image %s:%s.", config_id.config_name, config_id.instance_name)
         res = action.client.pull(repository=config_id.config_name, tag=config_id.instance_name, **kwargs)
         log.debug("Done pulling image %s:%s.", config_id.config_name, config_id.instance_name)
+        self._policy.images[action.client_name].refresh_repo(config_id.config_name)
+        log.debug("Refreshed image cache for repo %s.", config_id.config_name)
         return res

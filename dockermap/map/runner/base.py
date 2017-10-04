@@ -55,7 +55,9 @@ class DockerBaseRunnerMixin(object):
         :type kwargs: dict
         """
         c_kwargs = self.get_network_create_kwargs(action, n_name, **kwargs)
-        return action.client.create_network(**c_kwargs)
+        res = action.client.create_network(**c_kwargs)
+        self._policy.network_names[action.client_name][n_name] = res['Id']
+        return res
 
     def remove_network(self, action, n_name, **kwargs):
         """
@@ -69,14 +71,19 @@ class DockerBaseRunnerMixin(object):
         :type kwargs: dict
         """
         c_kwargs = self.get_network_remove_kwargs(action, n_name, **kwargs)
-        return action.client.remove_network(**c_kwargs)
+        res = action.client.remove_network(**c_kwargs)
+        del self._policy.network_names[action.client_name][n_name]
+        return res
 
     def create_volume(self, action, v_name, **kwargs):
         if action.client_config.supports_volumes:
             c_kwargs = self.get_volume_create_kwargs(action, v_name, kwargs=kwargs)
-            return action.client.create_volume(**c_kwargs)
+            res = action.client.create_volume(**c_kwargs)
+            self._policy.volume_names[action.client_name].add(v_name)
+            return res
         c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
         res = action.client.create_container(**c_kwargs)
+        self._policy.container_names[action.client_name][v_name] = res['Id']
         if action.client_config.use_host_config:
             action.client.start(v_name)
         else:
@@ -87,13 +94,19 @@ class DockerBaseRunnerMixin(object):
     def remove_volume(self, action, v_name, **kwargs):
         if action.client_config.supports_volumes:
             c_kwargs = self.get_volume_create_kwargs(action, v_name, kwargs=kwargs)
-            return action.client.remove_volume(**c_kwargs)
+            res = action.client.remove_volume(**c_kwargs)
+            self._policy.volume_names[action.client_name].discard(v_name)
+            return res
         c_kwargs = self.get_container_remove_kwargs(action, v_name, kwargs=kwargs)
-        return action.client.remove_container(**c_kwargs)
+        res = action.client.remove_container(**c_kwargs)
+        del self._policy.container_names[action.client_name][v_name]
+        return res
 
     def create_container(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_create_kwargs(action, c_name, kwargs=kwargs)
-        return action.client.create_container(**c_kwargs)
+        res = action.client.create_container(**c_kwargs)
+        self._policy.container_names[action.client_name][c_name] = res['Id']
+        return res
 
     def start_container(self, action, c_name, **kwargs):
         if action.client_config.use_host_config:
@@ -115,7 +128,9 @@ class DockerBaseRunnerMixin(object):
 
     def remove_container(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_remove_kwargs(action, c_name, kwargs=kwargs)
-        return action.client.remove_container(**c_kwargs)
+        res = action.client.remove_container(**c_kwargs)
+        del self._policy.container_names[action.client_name][c_name]
+        return res
 
     def kill(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_kill_kwargs(action, c_name, kwargs=kwargs)

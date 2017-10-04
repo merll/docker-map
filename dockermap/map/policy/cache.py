@@ -51,10 +51,10 @@ class CachedImages(CachedItems, dict):
         self._update(self._client.images(name=name))
 
 
-class CachedContainerNames(CachedItems, set):
+class CachedContainerNames(CachedItems, dict):
     def refresh(self):
         """
-        Fetches all current container names from the client.
+        Fetches all current container names from the client, along with their id.
         """
         if not self._client:
             return
@@ -63,19 +63,22 @@ class CachedContainerNames(CachedItems, set):
         for container in current_containers:
             container_names = container.get('Names')
             if container_names:
-                self.update(name[1:] for name in container_names)
+                c_id = container['Id']
+                self.update((name[1:], c_id)
+                            for name in container_names)
 
 
-class CachedNetworkNames(CachedItems, set):
+class CachedNetworkNames(CachedItems, dict):
     def refresh(self):
         """
-        Fetches all current network names from the client.
+        Fetches all current network names from the client, along with their id.
         """
         if not self._client:
             return
         current_networks = self._client.networks()
         self.clear()
-        self.update(net['Name'] for net in current_networks)
+        self.update((net['Name'], net['Id'])
+                    for net in current_networks)
 
 
 class CachedVolumeNames(CachedItems, set):
