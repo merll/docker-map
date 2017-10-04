@@ -2,6 +2,19 @@
 
 Change History
 ==============
+0.8.0b4
+-------
+* Included main process id in state data, so that implementations can detect a container restart more easily.
+* Handling deprecation of the ``force`` argument when tagging images in newer Docker releases. The tag is added
+  automatically depending on the detected API version.
+* Fixed update check of container network mode referring to another container.
+* Additional minor bugfix from previous prereleases.
+
+Known issues
+""""""""""""
+* The containers are not yet checked if their endpoint configuration details match the running instance.
+* Volumes are not checked yet against their create options and storage options.
+
 0.8.0b3
 -------
 * Added :attr:`~dockermap.map.config.main.ContainerMap.volumes`: Where the Docker host supports it, volumes can now be
@@ -16,11 +29,6 @@ Change History
 * Removed ``clients`` property from :class:`~dockermap.map.config.container.ContainerConfiguration`. It caused too much
   complexity in responding to supported client features. In addition, it was likely to break dependency paths.
   :attr:`~dockermap.map.config.main.ContainerMap.clients` is however still available.
-
-Known issues
-""""""""""""
-* The containers are not yet checked if their endpoint configuration details match the running instance.
-* Volumes are not checked yet against their create options and storage options.
 
 0.8.0b2
 -------
