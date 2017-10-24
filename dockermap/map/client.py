@@ -9,14 +9,15 @@ import docker
 from ..exceptions import PartialResultsError
 from .action import simple, script, update
 from .config.client import ClientConfiguration
-from .config.main import ContainerMap, expand_instances, expand_groups
+from .config.main import ContainerMap
+from .config.utils import get_map_config_ids
 from .exceptions import ActionException, ActionRunnerException
-from .input import get_map_config_ids
 from .policy.base import BasePolicy
 from .runner.base import DockerClientRunner
 from .state.base import (SingleStateGenerator, DependencyStateGenerator, DependentStateGenerator,
                          ImageDependencyStateGenerator)
 from .state.update import UpdateStateGenerator
+
 
 log = logging.getLogger(__name__)
 
@@ -25,14 +26,9 @@ def _set_forced_update_ids(kwargs, maps, default_map_name, default_instances):
     value = kwargs.pop('force_update', None)
     if not value:
         return
-    input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
-    if input_ids:
-        kwargs['force_update'] = set(expand_instances(expand_groups(input_ids, maps), maps, single_instances=False))
-
-
-def _get_config_ids(value, maps, default_map_name, default_instances):
-    input_ids = get_map_config_ids(value, map_name=default_map_name, instances=default_instances)
-    return list(expand_instances(expand_groups(input_ids, maps), maps))
+    config_ids = get_map_config_ids(value, maps, default_map_name, default_instances)
+    if config_ids:
+        kwargs['force_update'] = set(config_ids)
 
 
 class MappingDockerClient(object):
@@ -169,7 +165,7 @@ class MappingDockerClient(object):
         :param action_name: Action name.
         :type action_name: unicode | str
         :param config_name: Name(s) of container configuration(s) or MapConfigId tuple(s).
-        :type config_name: unicode | str | collections.Iterable[unicode | str] | dockermap.map.input.MapConfigId | collections.Iterable[dockermap.map.input.MapConfigId]
+        :type config_name: unicode | str | collections.Iterable[unicode | str] | dockermap.map.input.InputConfigId | collections.Iterable[dockermap.map.input.InputConfigId]
         :param instances: Optional instance names, where applicable but not included in ``config_name``.
         :type instances: unicode | str | collections.Iterable[unicode | str]
         :param map_name: Optional map name, where not inlcuded in ``config_name``.
@@ -181,8 +177,8 @@ class MappingDockerClient(object):
         _set_forced_update_ids(kwargs, policy.container_maps, map_name or self._default_map, instances)
         state_generator = self.get_state_generator(action_name, policy, kwargs)
         log.debug("Remaining kwargs passed to client actions: %s", kwargs)
-        config_ids = _get_config_ids(config_name, policy.container_maps, map_name or self._default_map,
-                                     instances)
+        config_ids = get_map_config_ids(config_name, policy.container_maps, map_name or self._default_map,
+                                        instances)
         log.debug("Generating states for configurations: %s", config_ids)
         return state_generator.get_states(config_ids)
 

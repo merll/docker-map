@@ -10,7 +10,8 @@ import responses
 
 from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from dockermap.map.config.client import ClientConfiguration
-from dockermap.map.config.main import ContainerMap, expand_instances
+from dockermap.map.config.main import ContainerMap
+from dockermap.map.config.utils import get_map_config_ids
 from dockermap.map.input import ExecCommand, ExecPolicy, MapConfigId, ItemType, UsedVolume
 from dockermap.map.policy import ConfigFlags
 from dockermap.map.policy.base import BasePolicy
@@ -530,7 +531,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self._setup_containers(rsps, [
                 _container('redis', instances=['cache', 'queue']),
             ])
-            force_update = set(expand_instances(self._config_id('redis'), {self.map_name: self.sample_map}))
+            force_update = set(get_map_config_ids('redis', {self.map_name: self.sample_map}, self.map_name))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
             self.assertEqual(cache_state.state_flags & StateFlags.FORCED_RESET, StateFlags.FORCED_RESET)
@@ -542,7 +543,7 @@ class TestPolicyStateGenerators(unittest.TestCase):
             self._setup_containers(rsps, [
                 _container('redis', instances=['cache', 'queue']),
             ])
-            force_update = set(expand_instances(self._config_id('redis', 'cache'), {self.map_name: self.sample_map}))
+            force_update = set(get_map_config_ids('redis', {self.map_name: self.sample_map}, self.map_name, 'cache'))
             sg = SingleStateGenerator(self.policy, {'force_update': force_update})
             cache_state = _get_single_state(sg, self._config_id('redis', 'cache'))
             self.assertEqual(cache_state.state_flags & StateFlags.FORCED_RESET, StateFlags.FORCED_RESET)

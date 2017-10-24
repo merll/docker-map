@@ -36,6 +36,8 @@ EXEC_POLICY_RESTART = ExecPolicy.RESTART  # For backwards compatibility.
 EXEC_POLICY_INITIAL = ExecPolicy.INITIAL  # For backwards compatibility.
 MapConfigId = namedtuple('MapConfigId', ('config_type', 'map_name', 'config_name', 'instance_name'))
 MapConfigId.__new__.__defaults__ = None,
+InputConfigId = namedtuple('InputConfigId', ('config_type', 'map_name', 'config_name', 'instance_names'))
+InputConfigId.__new__.__defaults__ = None,
 
 
 CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
@@ -459,9 +461,9 @@ def get_network_endpoint(value):
                      "{0}.".format(type(value).__name__))
 
 
-def get_map_config_id(value, map_name=None, instances=None):
+def get_input_config_id(value, map_name=None, instances=None):
     """
-    Converts the input to a MapConfigId tuple. It can be from a single string, list, or tuple. Single values
+    Converts the input to a InputConfigId tuple. It can be from a single string, list, or tuple. Single values
     (also single-element lists or tuples) are considered to be a container configuration on the default map. A string
     with two elements separated by a dot or two-element lists / tuples are considered to be referring to a specific
     map and configuration. Three strings concatenated with a dot or three-element lists / tuples are considered to be
@@ -473,11 +475,17 @@ def get_map_config_id(value, map_name=None, instances=None):
     :type map_name: unicode | str
     :param instances: Instance names; instances to set if not otherwise specified in ``value``.
     :type instances: unicode | str | tuple[unicode | str | NoneType]
-    :return: MapConfigId tuple.
-    :rtype: MapConfigId
+    :return: InputConfigId tuple.
+    :rtype: InputConfigId
     """
-    if isinstance(value, MapConfigId):
+    if isinstance(value, InputConfigId):
         return value
+    elif isinstance(value, MapConfigId):
+        if value.instance_name:
+            v_instances = value.instance_name,
+        else:
+            v_instances = None
+        return InputConfigId(value.config_type, value.map_name, value.config_name, v_instances or instances)
     elif isinstance(value, six.string_types):
         s_map_name, __, s_config_name = value.partition('.')
         if s_config_name:
@@ -490,27 +498,27 @@ def get_map_config_id(value, map_name=None, instances=None):
             config_name = s_map_name
             s_map_name = map_name
             s_instances = None
-        return MapConfigId(ItemType.CONTAINER, s_map_name, config_name, s_instances or instances)
+        return InputConfigId(ItemType.CONTAINER, s_map_name, config_name, s_instances or instances)
     if isinstance(value, (tuple, list)):
         v_len = len(value)
         if v_len == 3:
             v_instances = value[2]
             if not v_instances:
-                return MapConfigId(ItemType.CONTAINER, value[0], value[1], None)
+                return InputConfigId(ItemType.CONTAINER, value[0], value[1], None)
             if isinstance(v_instances, tuple):
-                return MapConfigId(ItemType.CONTAINER, *value)
+                return InputConfigId(ItemType.CONTAINER, *value)
             elif isinstance(v_instances, list):
-                return MapConfigId(ItemType.CONTAINER, value[0], value[1], tuple(v_instances))
+                return InputConfigId(ItemType.CONTAINER, value[0], value[1], tuple(v_instances))
             elif isinstance(v_instances, six.string_types):
-                return MapConfigId(ItemType.CONTAINER, value[0], value[1], (v_instances, ))
+                return InputConfigId(ItemType.CONTAINER, value[0], value[1], (v_instances, ))
             raise ValueError("Invalid type of instance specification in '{0}'; expected a list, tuple, or string type, "
                              "found {1}.".format(value, type(v_instances).__name__))
         elif v_len == 2:
-            return MapConfigId(ItemType.CONTAINER, value[0] or map_name, value[1], instances)
+            return InputConfigId(ItemType.CONTAINER, value[0] or map_name, value[1], instances)
         elif v_len == 1:
-            return MapConfigId(ItemType.CONTAINER, map_name, value[0], instances)
+            return InputConfigId(ItemType.CONTAINER, map_name, value[0], instances)
         raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
-                         "MapConfigId tuple. Found length {0}.".format(v_len))
+                         "InputConfigId tuple. Found length {0}.".format(v_len))
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
@@ -620,17 +628,17 @@ def get_network_endpoints(value):
     return _get_listed_tuples(value, NetworkEndpoint, get_network_endpoint)
 
 
-def get_map_config_ids(value, map_name=None, instances=None):
+def get_input_config_ids(value, map_name=None, instances=None):
     """
-    Converts a single value, a list or tuple, or a dictionary into a list of MapConfigId tuples.
+    Converts a single value, a list or tuple, or a dictionary into a list of InputConfigId tuples.
 
     :param value: Input value to convert.
     :param map_name: Map name; provides the default map name unless otherwise specified in ``value``.
     :type map_name: unicode | str
     :param instances: Instance names; instances to set if not otherwise specified in ``value``.
     :type instances: unicode | str | list[unicode | str] | tuple[unicode | str]
-    :return: List of MapConfigId tuples.
-    :rtype: list[MapConfigId]
+    :return: List of InputConfigId tuples.
+    :rtype: list[InputConfigId]
     """
     if not instances:
         default_instances = None
@@ -643,4 +651,4 @@ def get_map_config_ids(value, map_name=None, instances=None):
     else:
         raise ValueError("Invalid instances specification; expected string, list, or tuple, found "
                          "{0}.".format(type(instances).__name__))
-    return _get_listed_tuples(value, MapConfigId, get_map_config_id, map_name=map_name, instances=default_instances)
+    return _get_listed_tuples(value, InputConfigId, get_input_config_id, map_name=map_name, instances=default_instances)

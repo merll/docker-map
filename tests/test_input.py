@@ -6,15 +6,16 @@ import six
 
 from dockermap.functional import lazy_once
 from dockermap.utils import merge_list
-from dockermap.map.config.main import expand_groups, ContainerMap
+from dockermap.map.config.main import ContainerMap
+from dockermap.map.config.utils import expand_groups, get_map_config_ids
 from dockermap.map.input import (is_path, read_only, get_list,
                                  get_shared_host_volume, get_shared_host_volumes, SharedVolume,
                                  get_container_link, get_container_links, ContainerLink,
                                  get_port_binding, get_port_bindings, PortBinding,
                                  get_exec_command, get_exec_commands, ExecCommand, ExecPolicy,
-                                 get_map_config_id, get_map_config_ids, MapConfigId,
+                                 get_input_config_id, get_input_config_ids, MapConfigId,
                                  ItemType, NetworkEndpoint, get_network_endpoint, get_network_endpoints, HostVolume,
-                                 get_attached_volume, UsedVolume, get_attached_volumes)
+                                 get_attached_volume, UsedVolume, get_attached_volumes, InputConfigId)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -243,13 +244,13 @@ class InputConversionTest(unittest.TestCase):
             ['endpoint3', dict(aliases=('alias1', ), ipv4_address='0.0.0.0')],
         ])
 
-    def test_get_map_config_id(self):
-        assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
-                                                              MapConfigId(ItemType.CONTAINER, 'm', 'c'))
-        assert_b = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
-                                                              MapConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )))
-        assert_c = lambda v, m=None, i=None: self.assertEqual(get_map_config_id(v, map_name=m, instances=i),
-                                                              MapConfigId(ItemType.CONTAINER, 'm', 'c', ('i', 'j')))
+    def test_get_input_config_id(self):
+        assert_a = lambda v, m=None, i=None: self.assertEqual(get_input_config_id(v, map_name=m, instances=i),
+                                                              InputConfigId(ItemType.CONTAINER, 'm', 'c'))
+        assert_b = lambda v, m=None, i=None: self.assertEqual(get_input_config_id(v, map_name=m, instances=i),
+                                                              InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )))
+        assert_c = lambda v, m=None, i=None: self.assertEqual(get_input_config_id(v, map_name=m, instances=i),
+                                                              InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', 'j')))
         assert_a('m.c')
         assert_a('m.c', 'x')
         assert_a('m.c.')
@@ -273,24 +274,40 @@ class InputConversionTest(unittest.TestCase):
         assert_c('c', 'm', ('i', 'j'))
         assert_c(('c', ), 'm', ('i', 'j'))
 
-    def test_get_map_config_ids(self):
-        map_m = ContainerMap('m', groups=dict(default=['c.i', 'd.i']), check_integrity=False)
-        map_n = ContainerMap('n', groups=dict(default=['e']), check_integrity=False)
-        assert_a = lambda v, m=None, i=None: self.assertEqual(get_map_config_ids(v, map_name=m, instances=i),
-                                                              [MapConfigId(ItemType.CONTAINER, 'm', 'c')])
-        assert_b = lambda v, m=None, i=None: six.assertCountEqual(self, get_map_config_ids(v, map_name=m, instances=i),
-                                                                  [MapConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )),
-                                                                   MapConfigId(ItemType.CONTAINER, 'm', 'd', ('i', )),
-                                                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', ('i', 'j'))])
-        assert_c = lambda v, m=None, i=None: six.assertCountEqual(self,
-                                                                  expand_groups(
-                                                                      get_map_config_ids(v, map_name=m, instances=i),
-                                                                      {'m': map_m, 'n': map_n}
-                                                                  ),
-                                                                  [MapConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )),
-                                                                   MapConfigId(ItemType.CONTAINER, 'm', 'd', ('i', )),
-                                                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', ('i', )),
-                                                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', ('j', ))])
+    def test_get_input_config_ids(self):
+        map_m = ContainerMap('m', c=dict(instances=['i']), d=dict(instances=['i']), groups=dict(default=['c.i', 'd.i']))
+        map_n = ContainerMap('n', e={}, groups=dict(default=['e']))
+        maps = {'m': map_m, 'n': map_n}
+
+        def assert_a(v, m=None, i=None):
+            self.assertEqual(get_input_config_ids(v, map_name=m, instances=i),
+                             [InputConfigId(ItemType.CONTAINER, 'm', 'c')])
+            self.assertEqual(get_map_config_ids(v, maps, default_map_name=m, default_instances=i),
+                             [MapConfigId(ItemType.CONTAINER, 'm', 'c', 'i')])
+
+        def assert_b(v, m=None, i=None):
+            six.assertCountEqual(self, get_input_config_ids(v, map_name=m, instances=i),
+                                 [InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )),
+                                  InputConfigId(ItemType.CONTAINER, 'm', 'd', ('i', )),
+                                  InputConfigId(ItemType.CONTAINER, 'n', 'e', ('i', 'j'))])
+            six.assertCountEqual(self, get_map_config_ids(v, maps, default_map_name=m, default_instances=i),
+                                 [MapConfigId(ItemType.CONTAINER, 'm', 'c', 'i'),
+                                  MapConfigId(ItemType.CONTAINER, 'm', 'd', 'i'),
+                                  MapConfigId(ItemType.CONTAINER, 'n', 'e', 'i'),
+                                  MapConfigId(ItemType.CONTAINER, 'n', 'e', 'j')])
+
+        def assert_c(v, m=None, i=None):
+            six.assertCountEqual(self, expand_groups(get_input_config_ids(v, map_name=m, instances=i), maps),
+                                 [InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )),
+                                  InputConfigId(ItemType.CONTAINER, 'm', 'd', ('i', )),
+                                  InputConfigId(ItemType.CONTAINER, 'n', 'e', ('i', )),
+                                  InputConfigId(ItemType.CONTAINER, 'n', 'e', ('j', ))])
+            six.assertCountEqual(self, get_map_config_ids(v, maps, default_map_name=m, default_instances=i),
+                                 [MapConfigId(ItemType.CONTAINER, 'm', 'c', 'i'),
+                                  MapConfigId(ItemType.CONTAINER, 'm', 'd', 'i'),
+                                  MapConfigId(ItemType.CONTAINER, 'n', 'e', 'i'),
+                                  MapConfigId(ItemType.CONTAINER, 'n', 'e', 'j')])
+
         assert_a('m.c')
         assert_a('c', 'm')
         assert_a('c', 'm', [])
@@ -307,20 +324,20 @@ class InputConversionTest(unittest.TestCase):
         map_m = ContainerMap('m', c1=dict(), c2=dict(), c3=dict(), groups=dict(default=['c3']))
         map_n = ContainerMap('n', c1=dict(), c3=dict(), groups=dict(default=['c3']))
         maps = {'m': map_m, 'n': map_n}
-        six.assertCountEqual(self, expand_groups(get_map_config_ids('__all__', 'm'), maps),
+        six.assertCountEqual(self, get_map_config_ids('m.__all__', maps),
                              [MapConfigId(ItemType.CONTAINER, 'm', 'c1'),
                               MapConfigId(ItemType.CONTAINER, 'm', 'c2'),
                               MapConfigId(ItemType.CONTAINER, 'm', 'c3')])
-        six.assertCountEqual(self, expand_groups(get_map_config_ids('__all__', '__all__'), maps),
+        six.assertCountEqual(self, get_map_config_ids('__all__.__all__', maps),
                              [MapConfigId(ItemType.CONTAINER, 'm', 'c1'),
                               MapConfigId(ItemType.CONTAINER, 'm', 'c2'),
                               MapConfigId(ItemType.CONTAINER, 'm', 'c3'),
                               MapConfigId(ItemType.CONTAINER, 'n', 'c1'),
                               MapConfigId(ItemType.CONTAINER, 'n', 'c3')])
-        six.assertCountEqual(self, expand_groups(get_map_config_ids('c1', '__all__'), maps),
+        six.assertCountEqual(self, get_map_config_ids('__all__.c1',maps),
                              [MapConfigId(ItemType.CONTAINER, 'm', 'c1'),
                               MapConfigId(ItemType.CONTAINER, 'n', 'c1')])
-        six.assertCountEqual(self, expand_groups(get_map_config_ids('default', '__all__'), maps),
+        six.assertCountEqual(self, get_map_config_ids('__all__.default', maps),
                              [MapConfigId(ItemType.CONTAINER, 'm', 'c3'),
                               MapConfigId(ItemType.CONTAINER, 'n', 'c3')])
 
