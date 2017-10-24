@@ -52,8 +52,7 @@ Creating, connecting, and running containers
 This package reduces repetitions of names and paths in API commands, by introducing the
 following main features:
 
-* Automatically create and assign shared volumes, where the only purpose is to share data
-  between containers.
+* Automatically create, configure, and assign shared volumes.
 * Automatically update containers if their shared volumes are inconsistent, their image,
   or their configuration has been updated.
 * Use alias names instead of paths to bind host volumes to container shares.

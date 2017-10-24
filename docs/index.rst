@@ -15,12 +15,28 @@ The project is hosted on GitHub_.
 Features
 ========
 
+* Configuration of container landscapes, including dependencies between containers, networks, and volumes.
+* Update check of containers, volumes, and networks against their running configuration. Consistency check of shared
+  volume paths and re-creation of inconsistent or outdated containers.
+* Utility client functions. Some of these (e.g. ``cleanup_containers``) have also been implemented on later versions of
+  Docker directly; however this library can still provide more fine-grained control.
 * Creation of complex `Dockerfile`'s through Python code.
 * Simplified transfer of build resources (Context) to the Remote API.
-* Configuration of container landscapes, including dependencies between containers.
-* Consistency check of shared volume paths and re-creation of inconsistent or outdated containers.
-* Utility client functions.
 
+Comparison to Compose
+=====================
+The functionality is quite similar to Docker Compose. When development of this library started, a predecessor of Compose
+was known as *Fig*. Docker-Map was mainly developed for the following reasons:
+
+* *Docker-Map* is intended to provide an API that could be embedded into other available systems such as
+  configuration management. This implies that configuration can be implemented through code (although YAML input is also
+  available) and functions can be invoked through Python directly.
+* *Docker-Map* is not a command-line utility, and it can operate on multiple clients. For example Docker-Fabric_ is one
+  implementation that connect to other clients via SSH, but can also run on the same machine.
+* *Fig* and also its successor *Compose* target development and staging environments. *Docker-Map* aims to handle
+  staging to production environments by allowing for embedding external variables, e.g. from configuration management.
+  Although it can be combined with other tools to be suitable for development and CI, *Compose* is more common to use
+  and might be the first choice there.
 
 Contents
 ========
