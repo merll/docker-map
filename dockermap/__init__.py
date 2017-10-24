@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 
-__version__ = '0.8.0b4'
+__version__ = '0.8.0b5'
 
 DEFAULT_BASEIMAGE = 'tianon/true:latest'
 DEFAULT_COREIMAGE = 'busybox:latest'

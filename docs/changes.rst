@@ -2,6 +2,18 @@
 
 Change History
 ==============
+0.8.0b5
+-------
+* The :meth:`~dockermap.map.client.MappingDockerClient.pull_images` action also pulls present images by default (i.e.
+  updates them from the registry). This was optional before, and can be prevented by passing ``pull_all_images=False``,
+  only pulling missing image tags.
+* Internal cleanup of converting input into configuration ids.
+
+Known issues
+""""""""""""
+* The containers are not yet checked if their endpoint configuration details match the running instance.
+* Volumes are not checked yet against their create options and storage options.
+
 0.8.0b4
 -------
 * Included main process id in state data, so that implementations can detect a container restart more easily.
@@ -9,11 +21,6 @@ Change History
   automatically depending on the detected API version.
 * Fixed update check of container network mode referring to another container.
 * Additional minor bugfix from previous prereleases.
-
-Known issues
-""""""""""""
-* The containers are not yet checked if their endpoint configuration details match the running instance.
-* Volumes are not checked yet against their create options and storage options.
 
 0.8.0b3
 -------
