@@ -217,7 +217,7 @@ class SignalActionGenerator(AbstractActionGenerator):
 
 
 class ImagePullActionGenerator(AbstractActionGenerator):
-    pull_all_images = False
+    pull_all_images = True
     pull_insecure_registry = False
     policy_options = ['pull_all_images', 'pull_insecure_regsitry']
 
