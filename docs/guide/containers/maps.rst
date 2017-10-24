@@ -10,7 +10,7 @@ procedures that is often attempted to manage with scripts.
 
 Container landscapes with ContainerMap
 --------------------------------------
-The implementation of :class:`~dockermap.map.config.main.ContainerMap` aims to address both aforementioned issues.
+The implementation of :class:`~dockermap.map.config.main.ContainerMap` aims to address aforementioned issues.
 
 * It configures the creation and start of containers, including their dependencies. It pulls images, creates volumes,
   and configures networks as necessary.
@@ -29,7 +29,8 @@ Structure
 A :class:`~dockermap.map.config.main.ContainerMap` carries the following main elements:
 
 * :attr:`~dockermap.map.config.main.ContainerMap.containers`: A set of container configurations.
-* :attr:`~dockermap.map.config.main.ContainerMap.volumes`: Shared volume aliases to be used by the container configurations.
+* :attr:`~dockermap.map.config.main.ContainerMap.volumes`: Shared volume aliases to be used by the container
+  configurations, that can also be configured with common Docker options.
 * :attr:`~dockermap.map.config.main.ContainerMap.host`: Host volume paths, if they are mapped from the host's file system.
 * :attr:`~dockermap.map.config.main.ContainerMap.networks`: If the Docker version used supports it, allows for
   configuration of additional networks.
