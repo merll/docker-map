@@ -70,9 +70,36 @@ Additionally there are the following attributes:
 
 Volumes
 ^^^^^^^
-Typically Docker images rely on finding shared files (e.g. working data, log paths) in a specific directory.
-The :attr:`~dockermap.map.config.main.ContainerMap.volumes` of a container map assigns aliases to those elements. It is
-more or less just a simple dictionary of alias names and paths.
+Typically Docker applications rely on finding shared files (e.g. working data, log paths) in a specific directory.
+The :attr:`~dockermap.map.config.main.ContainerMap.volumes` of a container map assigns aliases to those elements. At the
+same time, volumes can be configured here including the following properties:
+
+* :attr:`~dockermap.map.config.volume.VolumeConfiguration.default_path`: The path that is used for this volume alias by
+  default (i.e. unless overridden in a container configuration). This is the only property that is assigned when only
+  a string is passed when creating this configuration.
+* :attr:`~dockermap.map.config.volume.VolumeConfiguration.driver`: Volume drive to use, in case this is a named Docker
+  volume that is shared between containers. For host volumes this has no effect. The default is ``local``.
+* :attr:`~dockermap.map.config.volume.VolumeConfiguration.driver_options`: Further options to pass to the driver on
+  volume creation.
+* :attr:`~dockermap.map.config.volume.VolumeConfiguration.create_options`: Additional arguments for volume creation,
+  that are not further connected to Docker-Map's functionality.
+* :attr:`~dockermap.map.config.volume.VolumeConfiguration.user`: On volume creation, ownership of the virtual path
+  is set to this user/group with a ``chown`` command. For host volumes, this has no effect. If not set, the user
+  of the container configuration is used that has this one set in
+  :attr:`~dockermap.map.config.container.ContainerConfiguration.attaches`, if any.
+* :attr:`~dockermap.map.config.volume.VolumeConfiguration.permissions`: Similar to the
+  :attr:`~dockermap.map.config.volume.VolumeConfiguration.user`, permissions on the virtual path of the volume can be
+  made through this setting, and is applied using ``chmod`` on container creation.
+
+Depending on its purpose, this can be used for configuring volumes or just for assigning default volume paths to an
+alias::
+
+    container_map.volume1 = '/var/lib/my-app/data'
+
+is equivalent to::
+
+    container_map.volume1 = VolumeConfiguration(default_path='/var/lib/my-app/data')
+
 
 Host
 ^^^^
@@ -203,14 +230,6 @@ name on instantiation. If this property is not set, there is only one default in
 
 .. _container-clients:
 
-Clients
-"""""""
-The property :attr:`~dockermap.map.config.container.ContainerConfiguration.clients` provides the same functionality as
-:ref:`map_clients` on map level. However, if set for a container, it overrides a map-level setting. This may be useful
-for processes that you only want running exactly once per cluster of servers (e.g. celerybeat or database migrations).
-It is also possible to run a particular configuration on a larger or completely different set of clients than the map
-default specifies.
-
 Stop timeout
 """"""""""""
 When stopping or restarting a container, Docker sends a ``SIGTERM`` signal to its main process. After a timeout period,
@@ -318,18 +337,24 @@ There are multiple possibilities how a file system can be shared between contain
 * Assigning all containers the same host volume. This is the most practical approach for persistent working data.
 * Sharing all volumes of one container with another. It is the most pragmatic approach for temporary
   files, e.g. pid or Unix sockets. However, this also implies access to all other shared volumes such as host paths.
-* In order to restrict sharing to the relevant volumes, an extra container can be created that is shared between
-  all other containers. For example, a web application server communicating with its cache over Unix domain sockets
-  needs access to the latter, but not the cache's data or configuration.
+* Specific volumes can be shared one by one. For example, a web application server communicating with its cache over
+  Unix domain sockets needs access to the latter, but not the cache's data or configuration. In more recent releases
+  (since API 1.21), Docker supports named volumes for this purpose. On older releases, Docker-Map emulates this behavior
+  by creating an extra container that shares a single volume.
 
-Volumes for selective sharing with other containers can be generated using the
+Volumes for selective sharing with other containers can be created using the
 :attr:`~dockermap.map.config.container.ContainerConfiguration.attaches` property. It refers to an alias in
-:attr:`~dockermap.map.config.main.ContainerMap.volumes` in order to define a path. At the same time, this becomes the
-name of the extra container, and other container configurations can refer to it in the
-:attr:`~dockermap.map.config.container.ContainerConfiguration.uses` property.
+:attr:`~dockermap.map.config.main.ContainerMap.volumes` in order to define a path and optionally the configuration.
+At the same time, this becomes the name of the volume (or extra container), and other container configurations can
+refer to it in the :attr:`~dockermap.map.config.container.ContainerConfiguration.uses` property.
 
-`Attached` containers are by default automatically created and launched from a minimal startable base image
-`tianon/true`. They are also shared with the owning container::
+Actually using :attr:`~dockermap.map.config.container.ContainerConfiguration.attaches` and
+:attr:`~dockermap.map.config.container.ContainerConfiguration.uses` is just like using the ``-v`` or
+``--volumes-from`` on the command line, but this concept implies that one container *owns* the volume and provides
+data, a socket file, or something else there for other containers to use.
+
+In the aforementioned emulation pattern, `attached` containers are by default automatically created and launched from
+a minimal startable base image `tianon/true`. They are also shared with the owning container::
 
     container_map.volumes.volume1 = '/var/data1'
     container_map.volumes.volume2 = '/var/more_data'
