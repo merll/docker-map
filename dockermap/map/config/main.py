@@ -640,7 +640,7 @@ class ContainerMap(ConfigurationObject):
             bind = [b.name for b in c_config.binds if isinstance(b, SharedVolume)]
             link = [l.container for l in c_config.links]
             uses = [u.name for u in c_config.uses]
-            networks = [n.network_name for n in c_config.networks if not n.network_name in DEFAULT_PRESET_NETWORKS]
+            networks = [n.network_name for n in c_config.networks if n.network_name not in DEFAULT_PRESET_NETWORKS]
             network_mode = c_config.network_mode
             if isinstance(network_mode, tuple):
                 if network_mode[1]:
