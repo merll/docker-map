@@ -2,6 +2,11 @@
 
 Change History
 ==============
+0.8.0b6
+-------
+* After an unsuccessful stop attempt, added another wait period so that the container has time to process the
+  ``SIGKILL`` signal issued by Docker.
+
 0.8.0b5
 -------
 * The :meth:`~dockermap.map.client.MappingDockerClient.pull_images` action also pulls present images by default (i.e.
