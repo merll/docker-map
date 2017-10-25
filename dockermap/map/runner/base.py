@@ -124,6 +124,10 @@ class DockerBaseRunnerMixin(object):
             return action.client.stop(**c_kwargs)
         except Timeout:
             log.warning("Container %s did not stop in time - sent SIGKILL.", c_name)
+            try:
+                action.client.wait(c_name, timeout=c_kwargs.get('timeout', 10))
+            except Timeout:
+                pass
         return None
 
     def remove_container(self, action, c_name, **kwargs):
