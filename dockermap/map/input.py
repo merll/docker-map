@@ -15,6 +15,12 @@ class ExecPolicy(SimpleEnum):
     INITIAL = 'initial'
 
 
+class CmdCheck(SimpleEnum):
+    FULL = 'full'
+    PARTIAL = 'partial'
+    NONE = 'none'
+
+
 class ItemType(SimpleEnum):
     CONTAINER = 'container'
     VOLUME = 'volume'
