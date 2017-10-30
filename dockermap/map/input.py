@@ -657,4 +657,12 @@ def get_input_config_ids(value, map_name=None, instances=None):
     else:
         raise ValueError("Invalid instances specification; expected string, list, or tuple, found "
                          "{0}.".format(type(instances).__name__))
+
+    if isinstance(value, MapConfigId):
+        if value.instance_name:
+            v_instances = (value.instance_name,)
+        else:
+            v_instances = default_instances
+        return [InputConfigId(value.config_type, value.map_name, value.config_name, v_instances)]
+
     return _get_listed_tuples(value, InputConfigId, get_input_config_id, map_name=map_name, instances=default_instances)
