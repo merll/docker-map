@@ -6,6 +6,8 @@ Change History
 -------
 * After an unsuccessful stop attempt, added another wait period so that the container has time to process the
   ``SIGKILL`` signal issued by Docker.
+* Process a single ``MapConfigId`` as valid input.
+* Moved ``CmdCheck`` flags to :mod:`~dockermap.map.input` module.
 
 0.8.0b5
 -------
