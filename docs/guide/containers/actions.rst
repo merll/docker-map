@@ -160,3 +160,40 @@ Importing a `PostgreSQL` database to a server accessed via ``/var/run/postgresql
 .. NOTE::
    In case files cannot be found by the script or command, check if ownership and access mode match the container
    user.
+
+
+Options
+-------
+Aforementioned commands support a set of options, which are processed by different elements of the policy framework.
+They can be modified in custom implementations, or changed by passing in keyword arguments.
+
+* ``remove_existing_after`` (Actions: ``script``; Default: ``True``): Usually when the script action creates containers,
+  it cleans up after. If you want to keep the containers, you can set this to ``False``.
+* ``remove_existing_before`` (Actions: ``script``; Default: ``False``): Containers by the script action are created new,
+  and if they exist it raises an error. Setting this to ``True`` removes any container that exists before creating new
+  ones.
+* ``remove_persistent`` (Actions: ``remove``, ``shutdown``; Default: ``True``): When removing containers, by default all
+  configurations are considered. If this is set to ``False``, configurations marked as ``persistent`` are skipped.
+* ``remove_attached`` (Actions: ``remove``, ``shutdown``; Default: ``False``): Attached containers serve for volume
+  sharing on Docker versions prior to native volume support. By default they are not removed during ``remove`` and
+  ``shutdown`` actions, but can optionally be included setting this to ``True`` .
+* ``pull_all_images`` (Actions: ``pull``; Default: ``True``): The ``pull`` action attempts to download all images
+  of the input container configurations, also updating existing ones with identical tags. If this is set to ``False``,
+  only missing tags are pulled from the registry.
+* ``pull_before_update`` (Actions: ``update``; Default: ``False``): Before an ``update`` operation, images of configured
+  containers can optionally be pulled before detecting changes by setting this to ``True``.
+* ``pull_insecure_registry`` (Actions: ``pull``, ``update``; Default: ``False``): Docker by default requires a
+  registry to be published on a TLS encrypted connection (i.e. a HTTPS url), and the presented certificates to be
+  trusted by the client (i.e. the Docker host). This is good practice and highly recommended; however, as Docker still
+  offers the possibility to allow insecure connections, setting this flag to ``True`` makes use of it.
+* ``prepare_local`` (Actions: ``create``, ``startup``, ``update``, ``script``; Default: ``True``):
+* ``nonrecoverable_exit_codes`` (Actions: ``update``; Default: ``(-127, -1)``): Exit codes to assume that a container
+  cannot be simply restarted, so that it has to be removed and re-created.
+* ``force_update`` (Actions: ``update``; Default: ``None``): A string or list of container configurations that should
+  be updated without checking. This can be used in case a change in the container configuration cannot be detected
+  reliably.
+* ``update_persistent`` (Actions: ``update``; Default: ``False``): Whether to remove containers where configurations
+  are marked as ``persistent``.
+* ``check_exec_commands`` (Actions: ``update``; Default: ``CmdCheck.FULL``): How to check the command of a running
+  container against the configuration. By default performs to match the full command, but can be set to
+  ``CmdCheck.PARTIAL`` for a partial lookup.
