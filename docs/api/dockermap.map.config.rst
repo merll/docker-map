@@ -42,6 +42,13 @@ dockermap\.map\.config\.network module
 dockermap\.map\.config\.volume module
 -------------------------------------
 
+.. automodule:: dockermap.map.config.utils
+    :members:
+    :show-inheritance:
+
+dockermap\.map\.config\.volume module
+-------------------------------------
+
 .. automodule:: dockermap.map.config.volume
     :members:
     :show-inheritance:

@@ -18,13 +18,6 @@ dockermap\.map\.state\.initial module
     :members:
     :show-inheritance:
 
-dockermap\.map\.state\.update module
-------------------------------------
-
-.. automodule:: dockermap.map.state.update
-    :members:
-    :show-inheritance:
-
 dockermap\.map\.state\.utils module
 -----------------------------------
 
