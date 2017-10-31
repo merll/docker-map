@@ -7,7 +7,7 @@ from ...input import CmdCheck
 from ..base import DependencyStateGenerator
 from .container import UpdateContainerState
 from .network import UpdateNetworkState, NetworkEndpointRegistry
-from .volume import ContainerLegacyVolumeChecker, ContainerVolumeChecker
+from .volume import ContainerLegacyVolumeChecker, ContainerVolumeChecker, VolumeUpdateState
 
 
 class UpdateStateGenerator(DependencyStateGenerator):
@@ -31,6 +31,7 @@ class UpdateStateGenerator(DependencyStateGenerator):
     """
     container_state_class = UpdateContainerState
     network_state_class = UpdateNetworkState
+    volume_state_class = VolumeUpdateState
 
     update_persistent = False
     check_exec_commands = CmdCheck.FULL

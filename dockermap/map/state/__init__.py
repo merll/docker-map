@@ -26,8 +26,8 @@ class StateFlags(Flags):
     NETWORK_DISCONNECTED = 1 << 20  # Container is not connected to a network that it is configured for.
     NETWORK_LEFT = 1 << 21     # Container is connected to a network that it is not configured for.
     NETWORK_MISMATCH = 1 << 22  # Container has different configured connection parameters than the current link.
-    MISC_MISMATCH = 1 << 30    # Container does otherwise not correspond with the configuration.
-    FORCED_RESET = 1 << 31     # Container in any state should be reset.
+    MISC_MISMATCH = 1 << 30    # Item does otherwise not correspond with the configuration.
+    FORCED_RESET = 1 << 31     # Item in any state should be reset.
 
     NEEDS_RESET = (NONRECOVERABLE | FORCED_RESET | IMAGE_MISMATCH | MISSING_LINK | VOLUME_MISMATCH | MISC_MISMATCH)
 

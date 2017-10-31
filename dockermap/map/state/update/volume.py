@@ -6,6 +6,8 @@ import logging
 from ....functional import resolve_value
 from ...input import UsedVolume
 from ...policy.utils import get_shared_volume_path
+from .. import State, StateFlags
+from ..base import VolumeBaseState
 
 
 log = logging.getLogger(__name__)
@@ -191,3 +193,19 @@ class ContainerLegacyVolumeChecker(AbstractVolumeChecker):
 class ContainerVolumeChecker(AbstractVolumeChecker):
     def get_vfs_check(self, config_id, container_map, instance_volumes):
         return SingleVolumeVfsCheck(config_id, container_map, self._policy, self._vfs_paths, instance_volumes)
+
+
+class VolumeUpdateState(VolumeBaseState):
+    def get_state(self):
+        base_state, state_flags, extra = super(VolumeUpdateState, self).get_state()
+        if base_state == State.ABSENT or state_flags & StateFlags.NEEDS_RESET:
+            return base_state, state_flags, extra
+
+        if self.detail['Driver'] != self.config.driver:
+            log.debug("Volume driver %s does not match configuration %s.", self.detail['Driver'], self.config.driver)
+            return base_state, state_flags | StateFlags.MISC_MISMATCH, extra
+        elif self.detail['Options'] != self.config.driver_options:
+            log.debug("Volume driver options %s do not match the configured options: %s.",
+                      self.detail['Options'], self.config.driver_options)
+            return base_state, state_flags | StateFlags.MISC_MISMATCH, extra
+        return base_state, state_flags, extra
