@@ -37,6 +37,10 @@ class SignalMixin(object):
                 client.stop(**stop_kwargs)
             except Timeout:
                 log.warning("Container %s did not stop in time - sent SIGKILL.", c_name)
+                try:
+                    client.wait(c_name, timeout=stop_kwargs.get('timeout', 10))
+                except Timeout:
+                    pass
         else:
             log.debug("Sending signal %s to the container %s and waiting for stop.", sig, c_name)
             client.kill(c_name, signal=sig)
