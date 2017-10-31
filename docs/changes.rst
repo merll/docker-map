@@ -2,8 +2,11 @@
 
 Change History
 ==============
-0.8.0b6
--------
+0.8.0rc1
+--------
+* Added checks on configured ip addresses and link-local ips. Additional general improvements to container network
+  endpoint check against configuration.
+* Added checks on volume driver and driver options.
 * After an unsuccessful stop attempt, added another wait period so that the container has time to process the
   ``SIGKILL`` signal issued by Docker.
 * Process a single ``MapConfigId`` as valid input.
@@ -15,11 +18,6 @@ Change History
   updates them from the registry). This was optional before, and can be prevented by passing ``pull_all_images=False``,
   only pulling missing image tags.
 * Internal cleanup of converting input into configuration ids.
-
-Known issues
-""""""""""""
-* The containers are not yet checked if their endpoint configuration details match the running instance.
-* Volumes are not checked yet against their create options and storage options.
 
 0.8.0b4
 -------
