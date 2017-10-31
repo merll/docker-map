@@ -5,6 +5,7 @@ import logging
 from collections import defaultdict
 
 import six
+from ipaddress import IPv4Address, IPv6Address, ip_address
 
 from ....functional import resolve_value
 from ...input import NetworkEndpoint
@@ -28,6 +29,45 @@ def _check_network_driver_opts(network_config, instance_detail):
     return True
 
 
+def _check_network_endpoint(network_name, network_config, linked_names, network_detail, network_endpoint_id):
+    log.debug("Checking network endpoint detail: %s", network_detail)
+    instance_endpoint_id = network_detail['EndpointID']
+    if instance_endpoint_id != network_endpoint_id:
+        log.debug("Network endpoint found in %s (%s), but with different id from container (%s).", network_name,
+                  network_endpoint_id, instance_endpoint_id)
+        return False
+    c_alias_set = set(network_config.aliases or ())
+    if c_alias_set and not c_alias_set.issubset(network_detail.get('Aliases')):
+        log.debug("Aliases in network %s differ or are not present.", network_name)
+        return False
+    if set(network_detail.get('Links', []) or ()) != linked_names:
+        log.debug("Links in %s differ from configuration: %s.", network_name, network_detail.get('Links', []))
+        return False
+    ipam_config = network_detail['IPAMConfig'] or {}
+    if network_config.ipv4_address:
+        normalized_ip4 = IPv4Address(six.text_type(network_config.ipv4_address)).compressed
+        instance_ip4 = ipam_config.get('IPv4Address')
+        if normalized_ip4 != instance_ip4:
+            log.debug("Container IPv4 address %s is different from configuration: %s.",
+                      instance_ip4, normalized_ip4)
+            return False
+    if network_config.ipv6_address:
+        normalized_ipv6 = IPv6Address(six.text_type(network_config.ipv6_address)).compressed
+        instance_ipv6 = ipam_config.get('IPv6Address')
+        if normalized_ipv6 != instance_ipv6:
+            log.debug("Container IPv6 address %s is different from configuration: %s.",
+                      instance_ipv6, normalized_ipv6)
+            return False
+    normalized_ll_ip = {ip_address(six.text_type(addr)).compressed
+                        for addr in network_config.link_local_ips or ()}
+    instance_ll_ip = set(ipam_config.get('LinkLocalIPs') or ())
+    if normalized_ll_ip != instance_ll_ip:
+        log.debug("Container link-local addresses %s are different from configuration: %s.",
+                  instance_ll_ip, normalized_ll_ip)
+        return False
+    return True
+
+
 class NetworkEndpointRegistry(object):
     def __init__(self, nname_func, cname_func, hostname_func, containers, default_networks):
         self._nname = nname_func
@@ -35,14 +75,14 @@ class NetworkEndpointRegistry(object):
         self._hostname = hostname_func
         self._containers = containers
         self._default_networks = list(default_networks.keys())
-        self._endpoints = defaultdict(set)
+        self._endpoints = defaultdict(dict)
         for network_detail in six.itervalues(default_networks):
             self.register_network(network_detail)
 
     def register_network(self, detail):
         network_id = detail['Id']
         for c_id, c_detail in six.iteritems(detail.get('Containers') or {}):
-            self._endpoints[c_id].add((network_id, c_detail['EndpointID']))
+            self._endpoints[c_id][network_id] = c_detail['EndpointID']
 
     def check_container_config(self, config_id, c_config, detail):
         if not detail['Config'].get('NetworkDisabled', False):
@@ -84,7 +124,7 @@ class NetworkEndpointRegistry(object):
         configured_network_names = {ce[0] for ce in named_endpoints}
         reset_networks = []
         if detail['State']['Running']:
-            network_endpoints = self._endpoints.get(detail['Id'], set())
+            network_endpoints = self._endpoints.get(detail['Id'], {})
             disconnected_networks = []
             for ref_n_name, cn_config in named_endpoints:
                 log.debug("Checking network %s.", ref_n_name)
@@ -93,15 +133,11 @@ class NetworkEndpointRegistry(object):
                     disconnected_networks.append(cn_config)
                     continue
                 network_detail = i_networks[ref_n_name]
-                c_alias_set = set(cn_config.aliases or ())
-                if c_alias_set and not c_alias_set.issubset(network_detail.get('Aliases')):
-                    log.debug("Aliases in network %s differ or are not present.", ref_n_name)
-                    reset_networks.append((ref_n_name, cn_config))
-                    continue
-                if (network_detail['NetworkID'], network_detail['EndpointID']) not in network_endpoints:
-                    log.debug("Network endpoint not found in %s (%s): %s", ref_n_name, network_detail['NetworkID'],
-                              network_detail['EndpointID'])
-                    reset_networks.append((ref_n_name, cn_config))
+                network_id = network_detail['NetworkID']
+                network_endpoint_id = network_endpoints.get(network_id)
+                if not network_endpoint_id:
+                    log.debug("Network endpoint not found in %s (%s).", ref_n_name, network_id)
+                    disconnected_networks.append(cn_config)
                     continue
                 if cn_config.links:
                     linked_names = {'{0}:{1}'.format(self._cname(config_id.map_name, lc_name),
@@ -109,8 +145,8 @@ class NetworkEndpointRegistry(object):
                                     for lc_name, lc_alias in cn_config.links}
                 else:
                     linked_names = set()
-                if set(network_detail.get('Links', []) or ()) != linked_names:
-                    log.debug("Links in %s differ from configuration: %s.", ref_n_name, network_detail.get('Links', []))
+                if not _check_network_endpoint(ref_n_name, cn_config, linked_names, network_detail,
+                                               network_endpoint_id):
                     reset_networks.append((ref_n_name, cn_config))
                     continue
         else:
