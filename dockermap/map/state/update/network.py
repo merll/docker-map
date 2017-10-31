@@ -43,7 +43,7 @@ def _check_network_endpoint(network_name, network_config, linked_names, network_
     if set(network_detail.get('Links', []) or ()) != linked_names:
         log.debug("Links in %s differ from configuration: %s.", network_name, network_detail.get('Links', []))
         return False
-    ipam_config = network_detail['IPAMConfig'] or {}
+    ipam_config = network_detail.get('IPAMConfig') or {}
     if network_config.ipv4_address:
         normalized_ip4 = IPv4Address(six.text_type(network_config.ipv4_address)).compressed
         instance_ip4 = ipam_config.get('IPv4Address')
