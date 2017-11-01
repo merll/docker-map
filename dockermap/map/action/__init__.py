@@ -51,6 +51,7 @@ class DerivedAction(object):
     RESET_CONTAINER = [ContainerUtilAction.SIGNAL_STOP, Action.REMOVE,
                        Action.CREATE, ContainerUtilAction.CONNECT_ALL,
                        Action.START]                                       # Stop, remove, create, connect, & start
+    RESTART_CONTAINER = [ContainerUtilAction.SIGNAL_STOP, Action.START]    # Stop & restart
     RESET_VOLUME = [Action.REMOVE, Action.CREATE]                          # Remove, create, & start
     RELAUNCH_CONTAINER = [Action.REMOVE, Action.CREATE,
                           ContainerUtilAction.CONNECT_ALL, Action.START]   # Remove, create, connect, & start

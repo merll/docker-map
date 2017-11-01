@@ -197,3 +197,5 @@ They can be modified in custom implementations, or changed by passing in keyword
 * ``check_exec_commands`` (Actions: ``update``; Default: ``CmdCheck.FULL``): How to check the command of a running
   container against the configuration. By default performs to match the full command, but can be set to
   ``CmdCheck.PARTIAL`` for a partial lookup.
+* ``restart_exec_commands`` (Actions: ``restart``; Default: ``False``): When a container is restarted and this is
+  set to ``True``, all configured exec commands are also restarted.

@@ -55,6 +55,9 @@ class StartActionGenerator(AbstractActionGenerator):
 
 
 class RestartActionGenerator(AbstractActionGenerator):
+    restart_exec_commands = False
+    policy_options = ['restart_exec_commands']
+
     def get_state_actions(self, state, **kwargs):
         """
         Restarts instance containers.
@@ -67,7 +70,10 @@ class RestartActionGenerator(AbstractActionGenerator):
         """
         if (state.config_id.config_type == ItemType.CONTAINER and state.base_state != State.ABSENT and
                 not state.state_flags & StateFlags.INITIAL):
-            return [ItemAction(state, Action.RESTART, extra_data=kwargs)]
+            actions = [ItemAction(state, DerivedAction.RESTART_CONTAINER, extra_data=kwargs)]
+            if self.restart_exec_commands:
+                actions.append(ItemAction(state, ContainerUtilAction.EXEC_ALL, extra_data=kwargs))
+            return actions
 
 
 class StopActionGenerator(AbstractActionGenerator):
