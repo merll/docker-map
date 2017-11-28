@@ -2,6 +2,12 @@
 
 Change History
 ==============
+0.8.0
+-----
+* Restart uses the configured stop signal for the container.
+* Added option to restart exec commands on container restart.
+* The result (i.e. the id) of exec commands is now returned by the runner.
+
 0.8.0rc1
 --------
 * Added checks on configured ip addresses and link-local ips. Additional general improvements to container network
