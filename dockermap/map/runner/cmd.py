@@ -28,8 +28,12 @@ class ExecMixin(object):
         :type c_name: unicode | str
         :param run_cmds: Commands to run.
         :type run_cmds: list[dockermap.map.input.ExecCommand]
+        :return: List of exec command return values (e.g. containing the command id), if applicable, or ``None``
+          if either no commands have been run or no values have been returned from the API.
+        :rtype: list[dict] | NoneType
         """
         client = action.client
+        exec_results = []
         for run_cmd in run_cmds:
             cmd = run_cmd.cmd
             cmd_user = run_cmd.user
@@ -41,8 +45,12 @@ class ExecMixin(object):
                 log.debug("Starting exec command with id %s.", e_id)
                 es_kwargs = self.get_exec_start_kwargs(action, c_name, e_id)
                 client.exec_start(**es_kwargs)
+                exec_results.append(create_result)
             else:
                 log.debug("Exec command was created, but did not return an id. Assuming that it has been started.")
+        if exec_results:
+            return exec_results
+        return None
 
     def exec_container_commands(self, action, c_name, **kwargs):
         """
@@ -52,8 +60,11 @@ class ExecMixin(object):
         :type action: dockermap.map.runner.ActionConfig
         :param c_name: Container name.
         :type c_name: unicode | str
+        :return: List of exec command return values (e.g. containing the command id), if applicable, or ``None``
+          if either no commands have been run or no values have been returned from the API.
+        :rtype: list[dict] | NoneType
         """
         config_cmds = action.config.exec_commands
         if not config_cmds:
-            return
-        self.exec_commands(action, c_name, run_cmds=config_cmds)
+            return None
+        return self.exec_commands(action, c_name, run_cmds=config_cmds)
