@@ -11,8 +11,8 @@ _IMMUTABLE_TYPES = (type(None), type(NotSet), bool, float, tuple, frozenset) + s
 
 
 class ConfigurationProperty(namedtuple('ConfigurationProperty', ['attr_type', 'default', 'input_func',
-                                                                 'merge_func', 'update'])):
-    def __new__(cls, attr_type=None, default=NotSet, input_func=None, merge_func=None, update=True):
+                                                                 'merge_func'])):
+    def __new__(cls, attr_type=None, default=NotSet, input_func=None, merge_func=None):
         if attr_type not in _IMMUTABLE_TYPES and default is NotSet:
             default = attr_type
         if attr_type is list:
@@ -21,8 +21,8 @@ class ConfigurationProperty(namedtuple('ConfigurationProperty', ['attr_type', 'd
             if merge_func is None:
                 merge_func = merge_list
         return super(ConfigurationProperty, cls).__new__(cls, attr_type=attr_type, default=default,
-                                                         input_func=input_func, merge_func=merge_func,
-                                                         update=update)
+                                                         input_func=input_func, merge_func=merge_func)
+
 
 CP = ConfigurationProperty
 
@@ -114,19 +114,16 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
         for key, value in six.iteritems(dct):
             attr_config = all_props.get(key)
             if attr_config:
-                if attr_config.update:
-                    setattr(self, key, value)
+                setattr(self, key, value)
             else:
                 self.update_default_from_dict(key, value)
 
     def update_from_obj(self, obj, copy=False):
         obj_config = obj._config
-        update_props = {name: config
-                        for name, config in six.iteritems(self.__class__.CONFIG_PROPERTIES)
-                        if config.update}
+        all_props = self.__class__.CONFIG_PROPERTIES
         if copy:
             for key, value in six.iteritems(obj_config):
-                attr_config = update_props.get(key)
+                attr_config = all_props.get(key)
                 if attr_config:
                     attr_type = attr_config.attr_type
                     if attr_type is list:
@@ -138,7 +135,7 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
         else:
             self._config.update({key: value
                                  for key, value in six.iteritems(obj_config)
-                                 if key in update_props})
+                                 if key in all_props})
 
     def merge_from_dict(self, dct, lists_only=False):
         if not dct:

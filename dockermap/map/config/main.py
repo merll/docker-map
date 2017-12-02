@@ -36,7 +36,6 @@ class ContainerMap(ConfigurationObject):
     :param kwargs: Kwargs with initial container configurations, host shares, and volumes.
     """
     repository = CP()
-    host = CP(dict, default=HostVolumeConfiguration, input_func=HostVolumeConfiguration, update=False)
     clients = CP(list)
     groups = CP(dict, default=DictMap, input_func=DictMap)
     default_domain = CP()
@@ -64,6 +63,7 @@ class ContainerMap(ConfigurationObject):
         self._containers = containers = DefaultDictMap(ContainerConfiguration)
         self._volumes = VolumeConfigurationMap()
         self._networks = DefaultDictMap(NetworkConfiguration)
+        self._host = HostVolumeConfiguration()
         super(ContainerMap, self).__init__(initial, **kwargs)
         if containers and check_integrity:
             self.check_integrity(check_duplicates=check_duplicates)
@@ -83,8 +83,10 @@ class ContainerMap(ConfigurationObject):
         if items is not None:
             for s_key, s_value in six.iteritems(value):
                 items[s_key].update_from_dict(s_value)
+        elif key == 'host':
+            self._host.update(value)
         elif key == 'host_root':
-            self.host.root = value
+            self._host.root = value
         else:
             self._containers[key].update_from_dict(value)
 
@@ -103,55 +105,41 @@ class ContainerMap(ConfigurationObject):
                     items[s_key].merge_from_dict(s_value, lists_only=lists_only)
                 else:
                     items[s_key].update_from_dict(s_value)
+        elif key == 'host':
+            self._host.update(value)
         elif key == 'host_root':
             if not lists_only:
-                self.host.root = value
+                self._host.root = value
         elif key in self._containers:
             self._containers[key].merge_from_dict(value, lists_only=lists_only)
         else:
             self._containers[key].update_from_dict(value)
 
-    def update_from_dict(self, dct):
-        host = dct.get('host')
-        if host:
-            self._config['host'] = HostVolumeConfiguration(host)
-        containers = dct.get('containers')
-        if containers:
-            self._config['containers'] = c_containers = DefaultDictMap(ContainerConfiguration)
-            c_containers.update(containers)
-        networks = dct.get('networks')
-        if networks:
-            self._config['networks'] = c_networks = DefaultDictMap(NetworkConfiguration)
-            c_networks.update(networks)
-        volumes = dct.get('volumes')
-        if volumes:
-            self._config['volumes'] = c_volumes = VolumeConfigurationMap()
-            c_volumes.update(volumes)
-        super(ContainerMap, self).update_from_dict(dct)
-
     def update_from_obj(self, obj, copy=False, update_containers=True):
-        self._config['host'] = obj.host.copy() if copy else obj.host
         if update_containers:
             for key, value in obj.containers:
                 self._containers[key].update_from_obj(value, copy=copy)
-        for update_items, current_items in zip(
-            [obj.networks, obj.volumes],
-            [self._networks, self._volumes]
-        ):
+        for update_items, current_items in [
+            (obj.networks, self._networks),
+            (obj.volumes, self._volumes),
+        ]:
             for key, value in update_items:
                 current_items[key].update_from_obj(value, copy=copy)
+        self._host.update(obj.host)
         super(ContainerMap, self).update_from_obj(obj, copy=copy)
 
     def merge_from_obj(self, obj, lists_only=False):
-        for update_items, current_items in zip(
-            [obj.containers, obj.networks, obj.volumes],
-            [self._containers, self._networks, self._volumes]
-        ):
+        for update_items, current_items in [
+            (obj.containers, self._containers),
+            (obj.networks, self._networks),
+            (obj.volumes, self._volumes),
+        ]:
             for key, value in update_items:
                 if key in current_items:
                     current_items[key].merge_from_obj(value, lists_only=lists_only)
                 else:
                     current_items[key].update_from_obj(value)
+        self._host.update(obj.host)
         super(ContainerMap, self).merge_from_obj(obj, lists_only=lists_only)
 
     def get_persistent_items(self):
@@ -233,6 +221,24 @@ class ContainerMap(ConfigurationObject):
         else:
             self._volumes.clear()
             self._volumes.update(value)
+
+    @property
+    def host(self):
+        """
+        Volume alias assignments of the map.
+
+        :return: Host volumes.
+        :rtype: dockermap.map.config.host_volume.HostVolumeConfiguration
+        """
+        return self._host
+
+    @host.setter
+    def host(self, value):
+        if isinstance(value, HostVolumeConfiguration):
+            self._host = value
+        else:
+            self._host.clear()
+            self._host.update(value)
 
     def get_image(self, image):
         """
