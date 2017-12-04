@@ -76,9 +76,26 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
         return '<{0}{1}({2})>'.format(status, self.__class__.__name__, props)
 
     def update_default_from_dict(self, key, value):
+        """
+        When updating from a dictionary, this is processed for any key that does not match a ``ConfigurationProperty``.
+
+        :param key: Dictionary key.
+        :type key: unicode | str
+        :param value: Dictionary value.
+        """
         pass
 
     def merge_default_from_dict(self, key, value, lists_only=False):
+        """
+        When merging from a dictionary, this is processed for any key that does not match a ``ConfigurationProperty``.
+
+        :param key: Dictionary key.
+        :type key: unicode | str
+        :param value: Dictionary value.
+        :param lists_only: Matches the ``list_only`` argument from :meth:`ConfigurationObject.merge_from_dict`.
+        :type lists_only: bool
+        :return:
+        """
         pass
 
     def _merge_value(self, attr_type, merge_func, key, value):
@@ -105,6 +122,14 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
             self._config[key] = value
 
     def update_from_dict(self, dct):
+        """
+        Updates this configuration object from a dictionary.
+
+        See :meth:`ConfigurationObject.update` for details.
+
+        :param dct: Values to update the ConfigurationObject with.
+        :type dct: dict
+        """
         if not dct:
             return
         all_props = self.__class__.CONFIG_PROPERTIES
@@ -116,6 +141,16 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
                 self.update_default_from_dict(key, value)
 
     def update_from_obj(self, obj, copy=False):
+        """
+        Updates this configuration object from another.
+
+        See :meth:`ConfigurationObject.update` for details.
+
+        :param obj: Values to update the ConfigurationObject with.
+        :type obj: ConfigurationObject
+        :param copy: Copies lists and dictionaries.
+        :type copy: bool
+        """
         obj.clean()
         obj_config = obj._config
         all_props = self.__class__.CONFIG_PROPERTIES
@@ -139,6 +174,16 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
             self._modified.difference_update(filtered_dict.keys())
 
     def merge_from_dict(self, dct, lists_only=False):
+        """
+        Merges a dictionary into this configuration object.
+
+        See :meth:`ConfigurationObject.merge` for details.
+
+        :param dct: Values to update the ConfigurationObject with.
+        :type dct: dict
+        :param lists_only: Ignore single-value attributes and update dictionary options.
+        :type lists_only: bool
+        """
         if not dct:
             return
         self.clean()
@@ -155,6 +200,16 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
                 self.merge_default_from_dict(key, value, lists_only=lists_only)
 
     def merge_from_obj(self, obj, lists_only=False):
+        """
+        Merges a configuration object into this one.
+
+        See :meth:`ConfigurationObject.merge` for details.
+
+        :param obj: Values to update the ConfigurationObject with.
+        :type obj: ConfigurationObject
+        :param lists_only: Ignore single-value attributes and update dictionary options.
+        :type lists_only: bool
+        """
         self.clean()
         obj.clean()
         obj_config = obj._config
@@ -167,15 +222,18 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
 
     def update(self, values, copy_instance=False):
         """
-        Updates the configuration with the contents of the given configuration object or dictionary. In case
-        of a dictionary, only valid attributes for this class are considered. Existing attributes are replaced with
-        the new values.
+        Updates the configuration with the contents of the given configuration object or dictionary.
+
+        In case of a dictionary, only valid attributes for this class are considered. Existing attributes are replaced
+        with the new values. The object is not cleaned before or after, i.e. may accept invalid input.
+
+        In case of an update by object, that object is cleaned before the update, so that updated values should be
+        validated. However, already-stored values are not cleaned before or after.
 
         :param values: Dictionary or ConfigurationObject to update this configuration with.
         :type values: dict | ConfigurationObject
         :param copy_instance: Copies lists and dictionaries. Only has an effect if ``values`` is a ConfigurationObject.
         :type copy_instance: bool
-        :return:
         """
         if isinstance(values, self.__class__):
             self.update_from_obj(values, copy=copy_instance)
@@ -188,7 +246,9 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
     def merge(self, values, lists_only=False):
         """
         Merges list-based attributes into one list including unique elements from both lists. When ``lists_only`` is
-        set to ``False``, updates dictionaries and overwrites single-value attributes.
+        set to ``False``, updates dictionaries and overwrites single-value attributes. The resulting configuration
+        is 'clean', i.e. input values converted and validated. If the conversion is not possible, a ``ValueError`` is
+        raised.
 
         :param values: Values to update the ConfigurationObject with.
         :type values: dict | ConfigurationObject
@@ -204,9 +264,22 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
                                                                                type(values).__name__))
 
     def copy(self):
+        """
+        Creates a copy of the current instance.
+
+        :return: Copy of this ``ConfigurationObject``.
+        :rtype: ConfigurationObject
+        """
         return self.__class__(self)
 
     def clean(self):
+        """
+        Cleans the input values of this configuration object.
+
+        Fields that have gotten updated through properties are converted to configuration values that match the
+        format needed by functions using them. For example, for list-like values it means that input of single strings
+        is transformed into a single-entry list. If this conversion fails, a ``ValueError`` is raised.
+        """
         all_props = self.__class__.CONFIG_PROPERTIES
         for prop_name in self._modified:
             attr_config = all_props.get(prop_name)
@@ -216,4 +289,10 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
 
     @property
     def is_clean(self):
+        """
+        Whether the current object is 'clean', i.e. has no non-converted input.
+
+        :return: ``True`` if no values have been modified since the last ``clean``, ``False`` otherwise.
+        :rtype: bool
+        """
         return not self._modified
