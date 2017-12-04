@@ -27,27 +27,15 @@ class ConfigurationProperty(namedtuple('ConfigurationProperty', ['attr_type', 'd
 CP = ConfigurationProperty
 
 
-def _get_property(prop_name, config_property, doc=None):
-    default, input_func = config_property[1:3]
+def _get_property(prop_name, doc=None):
+    def get_item(self):
+        return self._config[prop_name]
 
-    if callable(default):
-        def get_item(self):
-            return self._config.setdefault(prop_name, default())
-    else:
-        def get_item(self):
-            return self._config.get(prop_name, default)
+    def set_item(self, value):
+        self._modified.add(prop_name)
+        self._config[prop_name] = value
 
-    if input_func:
-        def set_item(self, value):
-            self._config[prop_name] = input_func(value)
-    else:
-        def set_item(self, value):
-            self._config[prop_name] = value
-
-    def del_item(self):
-        del self._config[prop_name]
-
-    return property(get_item, set_item, del_item, doc)
+    return property(get_item, set_item, doc)
 
 
 class ConfigurationMeta(type):
@@ -59,7 +47,7 @@ class ConfigurationMeta(type):
         docstrings = new_cls.DOCSTRINGS
         for attr_name, config in six.iteritems(attrs):
             doc = docstrings.get(attr_name)
-            setattr(new_cls, attr_name, _get_property(attr_name, config, doc=doc))
+            setattr(new_cls, attr_name, _get_property(attr_name, doc))
         return new_cls
 
 
@@ -67,16 +55,25 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
     DOCSTRINGS = {}
 
     def __init__(self, values=None, **kwargs):
-        self._config = {}
+        all_props = self.__class__.CONFIG_PROPERTIES
+        self._config = {
+            attr_name: attr_config.default() if callable(attr_config.default) else attr_config.default
+            for attr_name, attr_config in six.iteritems(all_props)
+        }
+        self._modified = set()
         if values:
             self.update(values, copy_instance=True)
         if kwargs:
             self.update_from_dict(kwargs)
 
     def __repr__(self):
+        if not self._modified:
+            status = ''
+        else:
+            status = '(Modified) '
         props = ', '.join('{0}={1!r}'.format(key, value)
                           for key, value in six.iteritems(self._config))
-        return '<{0}({1})>'.format(self.__class__.__name__, props)
+        return '<{0}{1}({2})>'.format(status, self.__class__.__name__, props)
 
     def update_default_from_dict(self, key, value):
         pass
@@ -119,6 +116,7 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
                 self.update_default_from_dict(key, value)
 
     def update_from_obj(self, obj, copy=False):
+        obj.clean()
         obj_config = obj._config
         all_props = self.__class__.CONFIG_PROPERTIES
         if copy:
@@ -140,6 +138,7 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
     def merge_from_dict(self, dct, lists_only=False):
         if not dct:
             return
+        self.clean()
         all_props = self.__class__.CONFIG_PROPERTIES
         for key, value in six.iteritems(dct):
             attr_config = all_props.get(key)
@@ -153,6 +152,8 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
                 self.merge_default_from_dict(key, value, lists_only=lists_only)
 
     def merge_from_obj(self, obj, lists_only=False):
+        self.clean()
+        obj.clean()
         obj_config = obj._config
         all_props = self.__class__.CONFIG_PROPERTIES
         for key, value in six.iteritems(obj_config):
@@ -201,3 +202,15 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
 
     def copy(self):
         return self.__class__(self)
+
+    def clean(self):
+        all_props = self.__class__.CONFIG_PROPERTIES
+        for prop_name in self._modified:
+            attr_config = all_props.get(prop_name)
+            if attr_config and attr_config.input_func:
+                self._config[prop_name] = attr_config.input_func(self._config[prop_name])
+        self._modified.clear()
+
+    @property
+    def is_clean(self):
+        return not self._modified

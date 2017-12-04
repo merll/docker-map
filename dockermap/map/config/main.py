@@ -142,6 +142,12 @@ class ContainerMap(ConfigurationObject):
         self._host.update(obj.host)
         super(ContainerMap, self).merge_from_obj(obj, lists_only=lists_only)
 
+    def clean(self):
+        for items in [self._containers, self._networks, self._volumes]:
+            for v in six.itervalues(items):
+                v.clean()
+        super(ContainerMap, self).clean()
+
     def get_persistent_items(self):
         """
         Returns attached container items and container configurations that are marked as persistent. Each returned
@@ -529,6 +535,7 @@ class ContainerMap(ConfigurationObject):
             return (instance_names, group_ref_names, uses, attaches, attaches_with_path, shared, bind, link, networks,
                     net_containers)
 
+        self.clean()
         (all_instances, all_grouprefs, all_used, all_attached, all_attached_default, all_shared, all_binds, all_links,
          all_networks, all_net_containers) = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()
