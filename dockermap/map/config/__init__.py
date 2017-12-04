@@ -130,10 +130,13 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
                         self._config[key] = value.copy()
                     else:
                         self._config[key] = value
+                    self._modified.discard(key)
         else:
-            self._config.update({key: value
-                                 for key, value in six.iteritems(obj_config)
-                                 if key in all_props})
+            filtered_dict = {key: value
+                             for key, value in six.iteritems(obj_config)
+                             if key in all_props}
+            self._config.update(filtered_dict)
+            self._modified.difference_update(filtered_dict.keys())
 
     def merge_from_dict(self, dct, lists_only=False):
         if not dct:
