@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 import six
 
@@ -12,6 +12,8 @@ _IMMUTABLE_TYPES = (type(None), type(NotSet), bool, float, tuple, frozenset) + s
 
 class ConfigurationProperty(namedtuple('ConfigurationProperty', ['attr_type', 'default', 'input_func',
                                                                  'merge_func'])):
+    _field_order = 0
+
     def __new__(cls, attr_type=None, default=NotSet, input_func=None, merge_func=None):
         if attr_type not in _IMMUTABLE_TYPES and default is NotSet:
             default = attr_type
@@ -20,8 +22,12 @@ class ConfigurationProperty(namedtuple('ConfigurationProperty', ['attr_type', 'd
                 input_func = get_list
             if merge_func is None:
                 merge_func = merge_list
-        return super(ConfigurationProperty, cls).__new__(cls, attr_type=attr_type, default=default,
-                                                         input_func=input_func, merge_func=merge_func)
+
+        new_instance = super(ConfigurationProperty, cls).__new__(cls, attr_type=attr_type, default=default,
+                                                                 input_func=input_func, merge_func=merge_func)
+        new_instance._field_order = cls._field_order
+        cls._field_order += 1
+        return new_instance
 
 
 CP = ConfigurationProperty
@@ -41,11 +47,13 @@ def _get_property(prop_name, doc=None):
 class ConfigurationMeta(type):
     def __new__(mcs, name, bases, dct):
         new_cls = super(ConfigurationMeta, mcs).__new__(mcs, name, bases, dct)
-        new_cls.CONFIG_PROPERTIES = attrs = {attr_name: config
-                                             for attr_name, config in six.iteritems(dct)
-                                             if isinstance(config, ConfigurationProperty)}
+        attrs = sorted([(attr_name, config)
+                       for attr_name, config in six.iteritems(dct)
+                       if isinstance(config, ConfigurationProperty)],
+                       key=lambda i: i[1]._field_order)
+        new_cls.CONFIG_PROPERTIES = OrderedDict(attrs)
         docstrings = new_cls.DOCSTRINGS
-        for attr_name, config in six.iteritems(attrs):
+        for attr_name, config in attrs:
             doc = docstrings.get(attr_name)
             setattr(new_cls, attr_name, _get_property(attr_name, doc))
         return new_cls
