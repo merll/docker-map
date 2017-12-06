@@ -7,7 +7,7 @@ from ...utils import merge_list
 from ..input import NotSet, get_list
 
 
-_IMMUTABLE_TYPES = (type(None), type(NotSet), bool, float, tuple, frozenset) + six.integer_types + six.string_types
+_IMMUTABLE_TYPES = (bool, float, tuple, frozenset) + six.integer_types + six.string_types
 
 
 class ConfigurationProperty(namedtuple('ConfigurationProperty', ['attr_type', 'default', 'input_func',
@@ -15,7 +15,7 @@ class ConfigurationProperty(namedtuple('ConfigurationProperty', ['attr_type', 'd
     _field_order = 0
 
     def __new__(cls, attr_type=None, default=NotSet, input_func=None, merge_func=None):
-        if attr_type not in _IMMUTABLE_TYPES and default is NotSet:
+        if attr_type and attr_type not in _IMMUTABLE_TYPES and default is NotSet:
             default = attr_type
         if attr_type is list:
             if input_func is None:
