@@ -246,6 +246,22 @@ class ContainerMap(ConfigurationObject):
             self._host.clear()
             self._host.update(value)
 
+    def as_dict(self):
+        d = super(ContainerMap, self).as_dict()
+        for (d_key, c_attr) in [
+            ('containers', self._containers),
+            ('volumes', self._volumes),
+            ('networks', self._networks),
+        ]:
+            if c_attr:
+                d[d_key] = {k: v.as_dict()
+                            for k, v in six.iteritems(c_attr)}
+        host = self._host
+        d['host'] = dict(host)
+        if host.root:
+            d['host_root'] = host.root
+        return d
+
     def get_image(self, image):
         """
         Generates a tuple of the full image name and tag, that should be used when creating a new container.

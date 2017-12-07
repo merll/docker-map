@@ -97,6 +97,11 @@ class ExecCommand(namedtuple('ExecCommand', ('cmd', 'user', 'policy'))):
             policy = ExecPolicy(policy)
         return super(ExecCommand, cls).__new__(cls, cmd, user, policy)
 
+    def _asdict(self):
+        d = super(ExecCommand, self)._asdict()
+        d['policy'] = self[2].value
+        return d
+
 
 def _get_listed_tuples(value, element_type, conversion_func, **kwargs):
     if value is None:

@@ -304,3 +304,32 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
         :rtype: bool
         """
         return not self._modified
+
+    def as_dict(self):
+        """
+        Returns a copy of the configuration dictionary. Changes in this should not reflect on the original
+        object.
+
+        :return: Configuration dictionary.
+        :rtype: dict
+        """
+        self.clean()
+        d = OrderedDict()
+        all_props = self.__class__.CONFIG_PROPERTIES
+        for attr_name, attr_config in six.iteritems(all_props):
+            value = self._config[attr_name]
+            attr_type = attr_config.attr_type
+            input_func = attr_config.input_func
+            if attr_type is list:
+                if value:
+                    if input_func:
+                        d[attr_name] = [i._asdict() if hasattr(i, '_asdict') else i
+                                        for i in value]
+                    else:
+                        d[attr_name] = value[:]
+            elif attr_type is dict:
+                if value:
+                    d[attr_name] = dict(value)
+            elif value is not NotSet:
+                d[attr_name] = value
+        return d
