@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 import posixpath
-from collections import namedtuple
+from collections import namedtuple, Iterable
 import six
 
 from .. import DEFAULT_PRESET_NETWORKS
@@ -87,7 +87,7 @@ def _get_list(value):
 class NetworkEndpoint(namedtuple('NetworkEndpoint', ('network_name', 'aliases', 'links', 'ipv4_address', 'ipv6_address',
                                                      'link_local_ips'))):
     def __new__(cls, network_name, aliases=None, links=None, ipv4_address=None, ipv6_address=None, link_local_ips=None):
-        return super(NetworkEndpoint, cls).__new__(cls, network_name, _get_list(aliases), get_container_links(links),
+        return super(NetworkEndpoint, cls).__new__(cls, network_name, _get_list(aliases), ContainerLinkList(links),
                                                    ipv4_address, ipv6_address, _get_list(link_local_ips))
 
 
@@ -110,12 +110,47 @@ def _get_listed_tuples(value, element_type, conversion_func, **kwargs):
         return [value]
     elif isinstance(value, six.string_types):
         return [conversion_func(value, **kwargs)]
-    elif isinstance(value, (list, tuple)):
-        return [conversion_func(e, **kwargs) for e in value]
     elif isinstance(value, dict):
         return [conversion_func(e, **kwargs) for e in six.iteritems(value)]
+    elif isinstance(value, Iterable):
+        return [conversion_func(e, **kwargs) for e in value]
     raise ValueError("Invalid type; expected {0}, list, tuple, or dict; found {1}.".format(
         element_type.__name__, type(value).__name__))
+
+
+class NamedTupleList(list):
+    element_type = None
+
+    def __init__(self, seq=()):
+        cls = self.__class__
+        if isinstance(seq, cls):
+            values = seq
+        else:
+            values = _get_listed_tuples(seq, cls.element_type, self.get_type_item)
+        list.__init__(self, values)
+
+    def append(self, item):
+        cls = self.__class__
+        if not isinstance(item, cls.element_type):
+            item = self.get_type_item(item)
+        list.append(self, item)
+
+    def extend(self, iterable):
+        cls = self.__class__
+        if isinstance(iterable, cls):
+            values = iterable
+        else:
+            values = _get_listed_tuples(iterable, cls.element_type, self.get_type_item)
+        list.extend(self, values)
+
+    def insert(self, index, item):
+        cls = self.__class__
+        if not isinstance(item, cls.element_type):
+            item = self.get_type_item(item)
+        list.insert(self, index, item)
+
+    def get_type_item(self, value):
+        raise NotImplementedError()
 
 
 def is_path(value):
@@ -202,80 +237,6 @@ def _shared_host_volume_from_tuple(*values):
                      "HostVolume or SharedVolume tuple. Found length {0}.".format(v_len))
 
 
-def get_shared_host_volume(value):
-    """
-    Converts the input to a ``SharedVolume`` or ``HostVolume`` tuple for a host bind. Input can be a single string, a
-    list or tuple, or a single-entry dictionary.
-    Single values are assumed to be volume aliases for read-write access. Tuples or lists with two elements, can be
-    ``(alias, read-only indicator)``, or ``(container path, host path)``. The latter is assumed, unless the second
-    element is boolean or a string of either ``ro`` or ``rw``, indicating read-only or read-write access for a volume
-    alias. Three elements are always used as ``(container path, host path, read-only indicator)``.
-    Nested values are unpacked, so that valid input formats are also ``{container path: (host path, read-only)}`` or
-    ``(container_path: [host path, read-only])``.
-
-    :param value: Input value for conversion.
-    :return: A SharedVolume tuple
-    :rtype: SharedVolume
-    """
-    if isinstance(value, (HostVolume, SharedVolume)):
-        return value
-    elif isinstance(value, six.string_types):
-        return SharedVolume(value, False)
-    elif isinstance(value, (list, tuple)):
-        return _shared_host_volume_from_tuple(*value)
-    elif isinstance(value, dict):
-        v_len = len(value)
-        if v_len == 1:
-            c_path, v = list(value.items())[0]
-            if isinstance(v, (list, tuple)):
-                return _shared_host_volume_from_tuple(c_path, *v)
-            return _shared_host_volume_from_tuple(c_path, v)
-        raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
-                         "or HostVolume tuple. Found length {0}.".format(v_len))
-    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
-
-
-def get_attached_volume(value):
-    """
-    Converts the given value to a ``UsedVolume`` or ``SharedVolume` tuple for attached volumes. It accepts strings,
-    lists, tuples, and dicts as input.
-
-    For strings and collections of a single element, the first item is considered to be an alias for lookup on the map.
-    It is converted to a ``SharedVolume` tuple.
-    For two-element collections, the first item defines a new volume alias that can be re-used by other instances and
-    the second item is considered to be the mount point for the volume.
-    All attached volumes are considered as read-write access.
-
-    :param value: Input value for conversion.
-    :return: UsedVolume or SharedVolume tuple.
-    :rtype: UsedVolume | SharedVolume
-    """
-    if isinstance(value, (UsedVolume, SharedVolume)):
-        if value.readonly:
-            raise ValueError("Attached volumes should not be read-only.", value)
-        return value
-    elif isinstance(value, six.string_types):
-        return SharedVolume(value)
-    elif isinstance(value, (list, tuple)):
-        v_len = len(value)
-        if v_len == 2:
-            if value[1]:
-                return UsedVolume(value[0], value[1])
-            return SharedVolume(value[0])
-        elif v_len == 1:
-            return SharedVolume(value[0])
-        raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
-                         "UsedVolume or SharedVolume tuple; found length {0}.".format(v_len))
-    elif isinstance(value, dict):
-        v_len = len(value)
-        if v_len == 1:
-            k, v = list(value.items())[0]
-            return UsedVolume(k, v)
-        raise ValueError("Invalid element length; only dicts with one element can be converted to a UsedVolume or "
-                         "SharedVolume tuple. Found length {0}.".format(v_len))
-    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
-
-
 def _shared_used_volume_from_tuple(*values):
     v_len = len(values)
     if v_len == 3:
@@ -302,174 +263,30 @@ def _shared_used_volume_from_tuple(*values):
                      "HostVolume or SharedVolume tuple. Found length {0}.".format(v_len))
 
 
-def get_used_volume(value):
+def get_network_mode(value):
     """
-    Converts the given value to a ``UsedVolume`` or ``SharedVolume` tuple for used volumes. It accepts strings, lists,
-    tuples, and dicts as input.
+    Generates input for the ``network_mode`` of a Docker host configuration. If it points at a container, the
+    configuration of the container is returned.
 
-    Single values are assumed to be volume aliases for read-write access. Tuples or lists with two elements, can be
-    ``(alias, read-only indicator)``, or ``(alias, mount path)``. The latter is assumed, unless the second
-    element is boolean or a string of either ``ro`` or ``rw``, indicating read-only or read-write access for a volume
-    alias. Three elements are always used as ``(alias, mount path, read-only indicator)``.
-    Nested values are unpacked, so that valid input formats are also ``{alias: (mount path, read-only)}`` or
-    ``(alias: [mount path, read-only])``.
-
-    :param value: Input value for conversion.
-    :return: UsedVolume or SharedVolume tuple.
-    :rtype: UsedVolume | SharedVolume
+    :param value: Network mode input.
+    :type value: unicode | str | tuple | list | NoneType
+    :return: Network mode or container to re-use the network stack of.
+    :rtype: unicode | str | tuple | NoneType
     """
-    if isinstance(value, (UsedVolume, SharedVolume)):
+    if not value or value == 'disabled':
+        return 'none'
+    if isinstance(value, (tuple, list)):
+        if len(value) == 2:
+            return tuple(value)
+        return ValueError("Tuples or lists need to have length 2 for container network references.")
+    if value in DEFAULT_PRESET_NETWORKS:
         return value
-    elif isinstance(value, six.string_types):
-        return SharedVolume(value, False)
-    elif isinstance(value, (list, tuple)):
-        return _shared_used_volume_from_tuple(*value)
-    elif isinstance(value, dict):
-        v_len = len(value)
-        if v_len == 1:
-            alias, v = list(value.items())[0]
-            if isinstance(v, (list, tuple)):
-                return _shared_used_volume_from_tuple(alias, *v)
-            return _shared_used_volume_from_tuple(alias, v)
-        raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
-                         "or UsedVolume tuple. Found length {0}.".format(v_len))
-    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
-
-
-def get_container_link(value):
-    """
-    Converts the input to a ContainerLink tuple. It can be from a single string, list, or tuple. Single values (also
-    single-element lists or tuples) are considered a simple container link, whereas two-element items are read as
-    ``(linked container, alias name)``.
-
-    :param value: Input value for conversion.
-    :return: ContainerLink tuple.
-    :rtype: ContainerLink
-    """
-    if isinstance(value, ContainerLink):
+    if value.startswith('container:'):
         return value
-    elif isinstance(value, six.string_types):
-        return ContainerLink(value, None)
-    elif isinstance(value, (list, tuple)):
-        v_len = len(value)
-        if 1 <= v_len <= 2:
-            return ContainerLink(*value)
-        raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
-                         "ContainerLink tuple. Found length {0}.".format(v_len))
-    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
-
-
-def get_port_binding(value):
-    """
-    Converts the given value to a ``PortBinding`` tuple. Input may come as a single value (exposed port for container
-    linking only), a two-element tuple/list (port published on all host interfaces) or a three-element tuple/list
-    (port published on a particular host interface). It can also be a dictionary with keyword arguments
-    ``exposed_port``, ``host_port``, ``interface``, and ``ipv6``.
-
-    :param value: Input value for conversion.
-    :return: PortBinding tuple.
-    :rtype: PortBinding
-    """
-    sub_types = six.string_types + six.integer_types
-    if isinstance(value, PortBinding):
-        return value
-    elif isinstance(value, sub_types):  # Port only
-        return PortBinding(value)
-    elif isinstance(value, (list, tuple)):  # Exposed port, host port, and possibly interface
-        v_len = len(value)
-        if v_len == 1 and isinstance(value[0], sub_types):
-            return PortBinding(value[0])
-        if v_len == 2:
-            if isinstance(value[1], dict):
-                return PortBinding(value[0], **value[1])
-            ex_port, host_bind = value
-            if isinstance(host_bind, sub_types + (lazy_type, )) or host_bind is None or uses_type_registry(host_bind):
-                # Port, host port
-                return PortBinding(ex_port, host_bind)
-            elif isinstance(host_bind, (list, tuple)):
-                s_len = len(host_bind)
-                if s_len in (2, 3):  # Port, (host port, interface) or (host port, interface, ipv6)
-                    return PortBinding(ex_port, *host_bind)
-            raise ValueError("Invalid sub-element type or length. Needs to be a port number or a tuple / list: "
-                             "(port, interface) or (port, interface, ipv6).")
-        elif v_len in (3, 4):
-            return PortBinding(*value)
-        raise ValueError("Invalid element length; only tuples and lists of length 2 to 4 can be converted to a "
-                         "PortBinding tuple.")
-    elif isinstance(value, dict):
-        return PortBinding(**value)
-    raise ValueError("Invalid type; expected a dict, list, tuple, int, or string type, found "
-                     "{0}.".format(type(value).__name__))
-
-
-def get_exec_command(value):
-    """
-    Converts the input to a ExecCommand tuple. It can be from a single string, list, or tuple. Single values (also
-    single-element lists or tuples) are considered a command string, whereas two-element items are read as
-    ``(command string, user name)``.
-
-    :param value: Input value for conversion.
-    :return: ExecCommand tuple.
-    :rtype: ExecCommand
-    """
-    if isinstance(value, ExecCommand):
-        return value
-    elif isinstance(value, six.string_types + (lazy_type, )):
-        return ExecCommand(value)
-    elif isinstance(value, (list, tuple)):
-        v_len = len(value)
-        if 1 <= v_len <= 3:
-            return ExecCommand(*value)
-        raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
-                         "ExecCommand tuple. Found length {0}.".format(v_len))
-    raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
-
-
-def get_network_endpoint(value):
-    """
-    Converts the input to a NetworkEndpoint tuple. It can be from a single-entry dictionary, single string, list, or
-    tuple. Single values (also single-element lists or tuples) are considered a network name. Dictionaries can also
-    contain nested dictionaries with keyword arguments to the NetworkEndpoint. Lists / tuples of length 2 are also
-    checked for such dictionaries.
-
-    :param value: Input value for conversion.
-    :return: NetworkEndpoint tuple.
-    :rtype: NetworkEndpoint
-    """
-    if isinstance(value, NetworkEndpoint):
-        return value
-    elif isinstance(value, six.string_types + (lazy_type, )):
-        return NetworkEndpoint(value)
-    elif isinstance(value, (list, tuple)):
-        v_len = len(value)
-        if v_len == 2 and isinstance(value[1], dict):
-            return NetworkEndpoint(value[0], **value[1])
-        elif 1 <= v_len <= 6:
-            return NetworkEndpoint(*value)
-        raise ValueError("Invalid element length; only dictionaries, pr tuples and lists of length 1-6 can be "
-                         "converted to a NetworkEndpoint tuple. Found length {0}.".format(v_len))
-    elif isinstance(value, dict):
-        d_len = len(value)
-        if d_len == 1:
-            k, v = list(value.items())[0]
-            if not v:
-                return NetworkEndpoint(k)
-            if isinstance(v, six.string_types):
-                return NetworkEndpoint(k, v)
-            v_len = len(v)
-            if isinstance(v, dict):
-                return NetworkEndpoint(k, **v)
-            elif isinstance(v, (list, tuple)):
-                if 1 <= v_len <= 5:
-                    return NetworkEndpoint(k, *v)
-                raise ValueError("Invalid sub-element length; lists and tuples of length 1-5 can be converted. "
-                                 "Found length {0}.".format(v_len))
-            raise ValueError("Invalid sub-element format; only dicts and tuples of length 1-5 can be converted. Found "
-                             "type {0}.".format(type(value).__name__))
-        raise ValueError("Invalid element length; only dicts with one element can be converted to a NetworkEndpoint "
-                         "tuple. Found length {0}.".format(d_len))
-    raise ValueError("Invalid type; expected a dict, list, tuple, or string type, found "
-                     "{0}.".format(type(value).__name__))
+    if value.startswith('/'):
+        return 'container:{0}'.format(value[1:])
+    ref_name, __, ref_instance = value.partition('.')
+    return ref_name, ref_instance or None
 
 
 def get_input_config_id(value, map_name=None, instances=None):
@@ -533,110 +350,301 @@ def get_input_config_id(value, map_name=None, instances=None):
     raise ValueError("Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
-def get_shared_host_volumes(value):
+class SharedHostVolumesList(NamedTupleList):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume or HostVolume tuples for
     host volumes.
-
-    :param value: Input value to convert.
-    :return: List of SharedVolume or HostVolume tuples.
-    :rtype: list[SharedVolume | HostVolume]
     """
-    return _get_listed_tuples(value, (SharedVolume, HostVolume), get_shared_host_volume)
+    element_type = (SharedVolume, HostVolume)
+
+    def get_type_item(self, value):
+        """
+        Converts the input to a ``SharedVolume`` or ``HostVolume`` tuple for a host bind. Input can be a single string, a
+        list or tuple, or a single-entry dictionary.
+        Single values are assumed to be volume aliases for read-write access. Tuples or lists with two elements, can be
+        ``(alias, read-only indicator)``, or ``(container path, host path)``. The latter is assumed, unless the second
+        element is boolean or a string of either ``ro`` or ``rw``, indicating read-only or read-write access for a volume
+        alias. Three elements are always used as ``(container path, host path, read-only indicator)``.
+        Nested values are unpacked, so that valid input formats are also ``{container path: (host path, read-only)}`` or
+        ``(container_path: [host path, read-only])``.
+
+        :param value: Input value for conversion.
+        :return: A SharedVolume tuple
+        :rtype: SharedVolume
+        """
+        if isinstance(value, (HostVolume, SharedVolume)):
+            return value
+        elif isinstance(value, six.string_types):
+            return SharedVolume(value, False)
+        elif isinstance(value, (list, tuple)):
+            return _shared_host_volume_from_tuple(*value)
+        elif isinstance(value, dict):
+            v_len = len(value)
+            if v_len == 1:
+                c_path, v = list(value.items())[0]
+                if isinstance(v, (list, tuple)):
+                    return _shared_host_volume_from_tuple(c_path, *v)
+                return _shared_host_volume_from_tuple(c_path, v)
+            raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
+                             "or HostVolume tuple. Found length {0}.".format(v_len))
+        raise ValueError(
+            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
-def get_attached_volumes(value):
+class AttachedVolumeList(NamedTupleList):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume or UsedVolume tuples for
     attached volumes.
-
-    :param value: Input value to convert.
-    :return: List of SharedVolume or UsedVolume tuples.
-    :rtype: list[SharedVolume | UsedVolume]
     """
-    return _get_listed_tuples(value, (SharedVolume, UsedVolume), get_attached_volume)
+    element_type = (SharedVolume, UsedVolume)
+
+    def get_type_item(self, value):
+        """
+        Converts the given value to a ``UsedVolume`` or ``SharedVolume` tuple for attached volumes. It accepts strings,
+        lists, tuples, and dicts as input.
+
+        For strings and collections of a single element, the first item is considered to be an alias for lookup on the map.
+        It is converted to a ``SharedVolume` tuple.
+        For two-element collections, the first item defines a new volume alias that can be re-used by other instances and
+        the second item is considered to be the mount point for the volume.
+        All attached volumes are considered as read-write access.
+
+        :param value: Input value for conversion.
+        :return: UsedVolume or SharedVolume tuple.
+        :rtype: UsedVolume | SharedVolume
+        """
+        if isinstance(value, (UsedVolume, SharedVolume)):
+            if value.readonly:
+                raise ValueError("Attached volumes should not be read-only.", value)
+            return value
+        elif isinstance(value, six.string_types):
+            return SharedVolume(value)
+        elif isinstance(value, (list, tuple)):
+            v_len = len(value)
+            if v_len == 2:
+                if value[1]:
+                    return UsedVolume(value[0], value[1])
+                return SharedVolume(value[0])
+            elif v_len == 1:
+                return SharedVolume(value[0])
+            raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
+                             "UsedVolume or SharedVolume tuple; found length {0}.".format(v_len))
+        elif isinstance(value, dict):
+            v_len = len(value)
+            if v_len == 1:
+                k, v = list(value.items())[0]
+                return UsedVolume(k, v)
+            raise ValueError("Invalid element length; only dicts with one element can be converted to a UsedVolume or "
+                             "SharedVolume tuple. Found length {0}.".format(v_len))
+        raise ValueError(
+            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
-def get_used_volumes(value):
+class UsedVolumeList(NamedTupleList):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of SharedVolume or UsedVolume tuples for
     used volumes.
-
-    :param value: Input value to convert.
-    :return: List of SharedVolume or UsedVolume tuples.
-    :rtype: list[SharedVolume | UsedVolume]
     """
-    return _get_listed_tuples(value, (SharedVolume, UsedVolume), get_used_volume)
+    element_type = (SharedVolume, UsedVolume)
+
+    def get_type_item(self, value):
+        """
+        Converts the given value to a ``UsedVolume`` or ``SharedVolume` tuple for used volumes. It accepts strings, lists,
+        tuples, and dicts as input.
+
+        Single values are assumed to be volume aliases for read-write access. Tuples or lists with two elements, can be
+        ``(alias, read-only indicator)``, or ``(alias, mount path)``. The latter is assumed, unless the second
+        element is boolean or a string of either ``ro`` or ``rw``, indicating read-only or read-write access for a volume
+        alias. Three elements are always used as ``(alias, mount path, read-only indicator)``.
+        Nested values are unpacked, so that valid input formats are also ``{alias: (mount path, read-only)}`` or
+        ``(alias: [mount path, read-only])``.
+
+        :param value: Input value for conversion.
+        :return: UsedVolume or SharedVolume tuple.
+        :rtype: UsedVolume | SharedVolume
+        """
+        if isinstance(value, (UsedVolume, SharedVolume)):
+            return value
+        elif isinstance(value, six.string_types):
+            return SharedVolume(value, False)
+        elif isinstance(value, (list, tuple)):
+            return _shared_used_volume_from_tuple(*value)
+        elif isinstance(value, dict):
+            v_len = len(value)
+            if v_len == 1:
+                alias, v = list(value.items())[0]
+                if isinstance(v, (list, tuple)):
+                    return _shared_used_volume_from_tuple(alias, *v)
+                return _shared_used_volume_from_tuple(alias, v)
+            raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
+                             "or UsedVolume tuple. Found length {0}.".format(v_len))
+        raise ValueError(
+            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
-def get_container_links(value):
+class ContainerLinkList(NamedTupleList):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of ContainerLink tuples.
-
-    :param value: Input value to convert.
-    :return: List of ContainerLink tuples.
-    :rtype: list[ContainerLink]
     """
-    return _get_listed_tuples(value, ContainerLink, get_container_link)
+    element_type = ContainerLink
+
+    def get_type_item(self, value):
+        """
+        Converts the input to a ContainerLink tuple. It can be from a single string, list, or tuple. Single values (also
+        single-element lists or tuples) are considered a simple container link, whereas two-element items are read as
+        ``(linked container, alias name)``.
+
+        :param value: Input value for conversion.
+        :return: ContainerLink tuple.
+        :rtype: ContainerLink
+        """
+        if isinstance(value, ContainerLink):
+            return value
+        elif isinstance(value, six.string_types):
+            return ContainerLink(value, None)
+        elif isinstance(value, (list, tuple)):
+            v_len = len(value)
+            if 1 <= v_len <= 2:
+                return ContainerLink(*value)
+            raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
+                             "ContainerLink tuple. Found length {0}.".format(v_len))
+        raise ValueError(
+            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
-def get_exec_commands(value):
+class ExecCommandList(NamedTupleList):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of ExecCommand tuples.
-
-    :param value: Input value to convert.
-    :return: List of ExecCommand tuples.
-    :rtype: list[ExecCommand]
     """
-    return _get_listed_tuples(value, ExecCommand, get_exec_command)
+    element_type = ExecCommand
+
+    def get_type_item(self, value):
+        """
+        Converts the input to a ExecCommand tuple. It can be from a single string, list, or tuple. Single values (also
+        single-element lists or tuples) are considered a command string, whereas two-element items are read as
+        ``(command string, user name)``.
+
+        :param value: Input value for conversion.
+        :return: ExecCommand tuple.
+        :rtype: ExecCommand
+        """
+        if isinstance(value, ExecCommand):
+            return value
+        elif isinstance(value, six.string_types + (lazy_type,)):
+            return ExecCommand(value)
+        elif isinstance(value, (list, tuple)):
+            v_len = len(value)
+            if 1 <= v_len <= 3:
+                return ExecCommand(*value)
+            raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
+                             "ExecCommand tuple. Found length {0}.".format(v_len))
+        raise ValueError(
+            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
-def get_network_mode(value):
-    """
-    Generates input for the ``network_mode`` of a Docker host configuration. If it points at a container, the
-    configuration of the container is returned.
-
-    :param value: Network mode input.
-    :type value: unicode | str | tuple | list | NoneType
-    :return: Network mode or container to re-use the network stack of.
-    :rtype: unicode | str | tuple | NoneType
-    """
-    if not value or value == 'disabled':
-        return 'none'
-    if isinstance(value, (tuple, list)):
-        if len(value) == 2:
-            return tuple(value)
-        return ValueError("Tuples or lists need to have length 2 for container network references.")
-    if value in DEFAULT_PRESET_NETWORKS:
-        return value
-    if value.startswith('container:'):
-        return value
-    if value.startswith('/'):
-        return 'container:{0}'.format(value[1:])
-    ref_name, __, ref_instance = value.partition('.')
-    return ref_name, ref_instance or None
-
-
-def get_port_bindings(value):
+class PortBindingList(NamedTupleList):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of PortBinding tuples.
-
-    :param value: Input value to convert.
-    :return: List of PortBinding tuples.
-    :rtype: list[PortBinding]
     """
-    return _get_listed_tuples(value, PortBinding, get_port_binding)
+    element_type = PortBinding
+
+    def get_type_item(self, value):
+        """
+        Converts the given value to a ``PortBinding`` tuple. Input may come as a single value (exposed port for container
+        linking only), a two-element tuple/list (port published on all host interfaces) or a three-element tuple/list
+        (port published on a particular host interface). It can also be a dictionary with keyword arguments
+        ``exposed_port``, ``host_port``, ``interface``, and ``ipv6``.
+
+        :param value: Input value for conversion.
+        :return: PortBinding tuple.
+        :rtype: PortBinding
+        """
+        sub_types = six.string_types + six.integer_types
+        if isinstance(value, PortBinding):
+            return value
+        elif isinstance(value, sub_types):  # Port only
+            return PortBinding(value)
+        elif isinstance(value, (list, tuple)):  # Exposed port, host port, and possibly interface
+            v_len = len(value)
+            if v_len == 1 and isinstance(value[0], sub_types):
+                return PortBinding(value[0])
+            if v_len == 2:
+                if isinstance(value[1], dict):
+                    return PortBinding(value[0], **value[1])
+                ex_port, host_bind = value
+                if isinstance(host_bind, sub_types + (lazy_type,)) or host_bind is None or uses_type_registry(
+                        host_bind):
+                    # Port, host port
+                    return PortBinding(ex_port, host_bind)
+                elif isinstance(host_bind, (list, tuple)):
+                    s_len = len(host_bind)
+                    if s_len in (2, 3):  # Port, (host port, interface) or (host port, interface, ipv6)
+                        return PortBinding(ex_port, *host_bind)
+                raise ValueError("Invalid sub-element type or length. Needs to be a port number or a tuple / list: "
+                                 "(port, interface) or (port, interface, ipv6).")
+            elif v_len in (3, 4):
+                return PortBinding(*value)
+            raise ValueError("Invalid element length; only tuples and lists of length 2 to 4 can be converted to a "
+                             "PortBinding tuple.")
+        elif isinstance(value, dict):
+            return PortBinding(**value)
+        raise ValueError("Invalid type; expected a dict, list, tuple, int, or string type, found "
+                         "{0}.".format(type(value).__name__))
 
 
-def get_network_endpoints(value):
+class NetworkEndpointList(NamedTupleList):
     """
     Converts a single value, a list or tuple, or a dictionary into a list of NetworkEndpoint tuples.
-
-    :param value: Input value to convert.
-    :return: List of NetworkEndpoint tuples.
-    :rtype: list[NetworkEndpoint]
     """
-    return _get_listed_tuples(value, NetworkEndpoint, get_network_endpoint)
+    element_type = NetworkEndpoint
+
+    def get_type_item(self, value):
+        """
+        Converts the input to a NetworkEndpoint tuple. It can be from a single-entry dictionary, single string, list, or
+        tuple. Single values (also single-element lists or tuples) are considered a network name. Dictionaries can also
+        contain nested dictionaries with keyword arguments to the NetworkEndpoint. Lists / tuples of length 2 are also
+        checked for such dictionaries.
+
+        :param value: Input value for conversion.
+        :return: NetworkEndpoint tuple.
+        :rtype: NetworkEndpoint
+        """
+        if isinstance(value, NetworkEndpoint):
+            return value
+        elif isinstance(value, six.string_types + (lazy_type,)):
+            return NetworkEndpoint(value)
+        elif isinstance(value, (list, tuple)):
+            v_len = len(value)
+            if v_len == 2 and isinstance(value[1], dict):
+                return NetworkEndpoint(value[0], **value[1])
+            elif 1 <= v_len <= 6:
+                return NetworkEndpoint(*value)
+            raise ValueError("Invalid element length; only dictionaries, pr tuples and lists of length 1-6 can be "
+                             "converted to a NetworkEndpoint tuple. Found length {0}.".format(v_len))
+        elif isinstance(value, dict):
+            d_len = len(value)
+            if d_len == 1:
+                k, v = list(value.items())[0]
+                if not v:
+                    return NetworkEndpoint(k)
+                if isinstance(v, six.string_types):
+                    return NetworkEndpoint(k, v)
+                v_len = len(v)
+                if isinstance(v, dict):
+                    return NetworkEndpoint(k, **v)
+                elif isinstance(v, (list, tuple)):
+                    if 1 <= v_len <= 5:
+                        return NetworkEndpoint(k, *v)
+                    raise ValueError("Invalid sub-element length; lists and tuples of length 1-5 can be converted. "
+                                     "Found length {0}.".format(v_len))
+                raise ValueError(
+                    "Invalid sub-element format; only dicts and tuples of length 1-5 can be converted. Found "
+                    "type {0}.".format(type(value).__name__))
+            raise ValueError(
+                "Invalid element length; only dicts with one element can be converted to a NetworkEndpoint "
+                "tuple. Found length {0}.".format(d_len))
+        raise ValueError("Invalid type; expected a dict, list, tuple, or string type, found "
+                         "{0}.".format(type(value).__name__))
 
 
 def get_input_config_ids(value, map_name=None, instances=None):

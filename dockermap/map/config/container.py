@@ -1,20 +1,22 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+from collections import OrderedDict
+
 from . import ConfigurationObject, CP
-from ..input import (get_shared_host_volumes, get_attached_volumes, get_used_volumes, get_container_links,
-                     get_network_mode, get_port_bindings, get_exec_commands, get_network_endpoints, bool_if_set)
+from ..input import (SharedHostVolumesList, AttachedVolumeList, UsedVolumeList, ContainerLinkList, PortBindingList,
+                     NetworkEndpointList, ExecCommandList, get_network_mode,  bool_if_set)
 
 
 def _merge_first(current, update_list):
     if not update_list:
         return
-    update_dict = {item[0]: item for item in update_list}
+    update_dict = OrderedDict((item[0], item) for item in update_list)
     for i, item in enumerate(current):
         if item[0] in update_dict:
             current[i] = update_dict.pop(item[0])
     if update_dict:
-        current.extend(u for u in update_list if u[0] in update_dict)
+        current.extend(update_dict.values())
 
 
 class ContainerConfiguration(ConfigurationObject):
@@ -27,18 +29,18 @@ class ContainerConfiguration(ConfigurationObject):
     instances = CP(list)
     clients = CP(list)
     shares = CP(list)
-    binds = CP(list, input_func=get_shared_host_volumes, merge_func=_merge_first)
-    attaches = CP(list, input_func=get_attached_volumes, merge_func=_merge_first)
-    uses = CP(list, input_func=get_used_volumes, merge_func=_merge_first)
-    links = CP(list, input_func=get_container_links)
-    exposes = CP(list, input_func=get_port_bindings, merge_func=_merge_first)
+    binds = CP(SharedHostVolumesList, merge_func=_merge_first)
+    attaches = CP(AttachedVolumeList, merge_func=_merge_first)
+    uses = CP(UsedVolumeList, merge_func=_merge_first)
+    links = CP(ContainerLinkList)
+    exposes = CP(PortBindingList, merge_func=_merge_first)
     user = CP()
     permissions = CP()
     stop_timeout = CP()
     stop_signal = CP()
     network_mode = CP(input_func=get_network_mode)
-    networks = CP(list, input_func=get_network_endpoints, merge_func=_merge_first)
-    exec_commands = CP(list, input_func=get_exec_commands)
+    networks = CP(NetworkEndpointList, merge_func=_merge_first)
+    exec_commands = CP(ExecCommandList)
     persistent = CP(input_func=bool_if_set)
     create_options = CP(dict)
     host_config = CP(dict)

@@ -4,7 +4,7 @@ from collections import namedtuple, OrderedDict
 import six
 
 from ...utils import merge_list
-from ..input import NotSet, get_list
+from ..input import NotSet, NamedTupleList, get_list
 
 
 _IMMUTABLE_TYPES = (bool, float, tuple, frozenset) + six.integer_types + six.string_types
@@ -15,13 +15,17 @@ class ConfigurationProperty(namedtuple('ConfigurationProperty', ['attr_type', 'd
     _field_order = 0
 
     def __new__(cls, attr_type=None, default=NotSet, input_func=None, merge_func=None):
-        if attr_type and attr_type not in _IMMUTABLE_TYPES and default is NotSet:
-            default = attr_type
-        if attr_type is list:
-            if input_func is None:
-                input_func = get_list
-            if merge_func is None:
-                merge_func = merge_list
+        if attr_type:
+            if attr_type not in _IMMUTABLE_TYPES and default is NotSet:
+                default = attr_type
+            if attr_type and issubclass(attr_type, list):
+                if input_func is None:
+                    if issubclass(attr_type, NamedTupleList):
+                        input_func = attr_type
+                    else:
+                        input_func = get_list
+                if merge_func is None:
+                    merge_func = merge_list
 
         new_instance = super(ConfigurationProperty, cls).__new__(cls, attr_type=attr_type, default=default,
                                                                  input_func=input_func, merge_func=merge_func)
@@ -108,22 +112,23 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
 
     def _merge_value(self, attr_type, merge_func, key, value):
         get_current = self._config.get
-        if attr_type is list:
-            if value and merge_func:
-                current = get_current(key)
-                if current:
-                    merge_func(current, value)
-                else:
-                    self._config[key] = value[:]
-        elif attr_type is dict:
-            if value:
-                current = get_current(key)
-                if merge_func and current:
-                    merge_func(current, value)
-                elif current:
-                    current.update(value)
-                else:
-                    self._config[key] = value.copy()
+        if attr_type:
+            if issubclass(attr_type, list):
+                if value and merge_func:
+                    current = get_current(key)
+                    if current:
+                        merge_func(current, value)
+                    else:
+                        self._config[key] = value[:]
+            elif attr_type is dict:
+                if value:
+                    current = get_current(key)
+                    if merge_func and current:
+                        merge_func(current, value)
+                    elif current:
+                        current.update(value)
+                    else:
+                        self._config[key] = value.copy()
         elif merge_func and value:
             self._config[key] = merge_func(get_current(key), value)
         else:
@@ -167,10 +172,11 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
                 attr_config = all_props.get(key)
                 if attr_config:
                     attr_type = attr_config.attr_type
-                    if attr_type is list:
-                        self._config[key] = value[:]
-                    elif attr_type is dict:
-                        self._config[key] = value.copy()
+                    if attr_type:
+                        if issubclass(attr_type, list):
+                            self._config[key] = value[:]
+                        elif attr_type is dict:
+                            self._config[key] = value.copy()
                     else:
                         self._config[key] = value
                     self._modified.discard(key)
@@ -200,7 +206,8 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
             attr_config = all_props.get(key)
             if attr_config:
                 attr_type, default, input_func, merge_func = attr_config[:4]
-                if merge_func is not False and value != default and (not lists_only or attr_type is list):
+                if (merge_func is not False and value != default and
+                        (not lists_only or (attr_type and issubclass(attr_type, list)))):
                     if input_func:
                         value = input_func(value)
                     self._merge_value(attr_type, merge_func, key, value)
@@ -225,7 +232,8 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
         for key, value in six.iteritems(obj_config):
             attr_config = all_props[key]
             attr_type, default, __, merge_func = attr_config[:4]
-            if merge_func is not False and value != default and (not lists_only or attr_type is list):
+            if (merge_func is not False and value != default and
+                    (not lists_only or (attr_type and issubclass(attr_type, list)))):
                 self._merge_value(attr_type, merge_func, key, value)
 
     def update(self, values, copy_instance=False):
@@ -319,17 +327,15 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
         for attr_name, attr_config in six.iteritems(all_props):
             value = self._config[attr_name]
             attr_type = attr_config.attr_type
-            input_func = attr_config.input_func
-            if attr_type is list:
+            if attr_type:
                 if value:
-                    if input_func:
-                        d[attr_name] = [i._asdict() if hasattr(i, '_asdict') else i
-                                        for i in value]
-                    else:
-                        d[attr_name] = value[:]
-            elif attr_type is dict:
-                if value:
-                    d[attr_name] = dict(value)
+                    if issubclass(attr_type, list):
+                        if issubclass(attr_type, NamedTupleList):
+                            d[attr_name] = [i._asdict() for i in value]
+                        else:
+                            d[attr_name] = value[:]
+                    elif attr_type is dict:
+                        d[attr_name] = dict(value)
             elif value is not NotSet:
                 d[attr_name] = value
         return d
