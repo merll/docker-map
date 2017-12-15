@@ -30,7 +30,7 @@ class ItemType(SimpleEnum):
 
 SharedVolume = namedtuple('SharedVolume', ('name', 'readonly'))
 SharedVolume.__new__.__defaults__ = False,
-HostVolume = namedtuple('HostVolume', ('host_path', 'path', 'readonly'))
+HostVolume = namedtuple('HostVolume', ('path', 'host_path', 'readonly'))
 HostVolume.__new__.__defaults__ = False,
 UsedVolume = namedtuple('UsedVolume', ('name', 'path', 'readonly'))
 UsedVolume.__new__.__defaults__ = None, False
@@ -214,23 +214,23 @@ def get_list(value):
 def _shared_host_volume_from_tuple(*values):
     v_len = len(values)
     if v_len == 3:
-        return HostVolume(values[1], values[0], read_only(values[2]))
+        return HostVolume(values[0], values[1], read_only(values[2]))
     elif v_len == 2:
         v0, v1 = values
         if isinstance(v1, (list, tuple)):
             sv_len = len(v1)
             v1_0 = v1[0]
             if sv_len == 2:
-                return HostVolume(v1_0, v0, read_only(v1[1]))
+                return HostVolume(v0, v1_0, read_only(v1[1]))
             elif sv_len == 1:
                 if isinstance(v1_0, bool) or v1_0 in ('ro', 'rw'):
                     return SharedVolume(v0, read_only(v1_0))
-                return HostVolume(v1_0, v0)
+                return HostVolume(v0, v1_0)
             raise ValueError("Nested list in {0} must have exactly one or two entries; found "
                              "{1}.".format(values, sv_len))
         elif isinstance(v1, bool) or v1 in ('ro', 'rw'):
             return SharedVolume(v0, read_only(v1))
-        return HostVolume(v1, v0)
+        return HostVolume(v0, v1)
     elif v_len == 1:
         return SharedVolume(values[0])
     raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "

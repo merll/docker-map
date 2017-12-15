@@ -48,8 +48,8 @@ class InputConversionTest(unittest.TestCase):
         l = SharedHostVolumesList()
         assert_a = lambda a: self.assertEqual(l.get_type_item(a), SharedVolume('a', False))
         assert_b = lambda b: self.assertEqual(l.get_type_item(b), SharedVolume('b', True))
-        assert_c = lambda c: self.assertEqual(l.get_type_item(c), HostVolume('ch', 'c', False))
-        assert_d = lambda d: self.assertEqual(l.get_type_item(d), HostVolume('dh', 'd', True))
+        assert_c = lambda c: self.assertEqual(l.get_type_item(c), HostVolume('c', 'ch', False))
+        assert_d = lambda d: self.assertEqual(l.get_type_item(d), HostVolume('d', 'dh', True))
 
         assert_a('a')
         assert_a(('a', ))
@@ -70,8 +70,8 @@ class InputConversionTest(unittest.TestCase):
         assert_a = lambda a: self.assertEqual(SharedHostVolumesList(a), [SharedVolume('a', False)])
         assert_b = lambda b: six.assertCountEqual(self, SharedHostVolumesList(b), [SharedVolume('a', False),
                                                                                    SharedVolume('b', True),
-                                                                                   HostVolume('ch', 'c', False),
-                                                                                   HostVolume('dh', 'd', True)])
+                                                                                   HostVolume('c', 'ch', False),
+                                                                                   HostVolume('d', 'dh', True)])
 
         assert_a('a')
         assert_a([('a', )])
