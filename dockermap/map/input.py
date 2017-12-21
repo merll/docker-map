@@ -40,10 +40,6 @@ PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface
 PortBinding.__new__.__defaults__ = None, None, False
 EXEC_POLICY_RESTART = ExecPolicy.RESTART  # For backwards compatibility.
 EXEC_POLICY_INITIAL = ExecPolicy.INITIAL  # For backwards compatibility.
-MapConfigId = namedtuple('MapConfigId', ('config_type', 'map_name', 'config_name', 'instance_name'))
-MapConfigId.__new__.__defaults__ = None,
-InputConfigId = namedtuple('InputConfigId', ('config_type', 'map_name', 'config_name', 'instance_names'))
-InputConfigId.__new__.__defaults__ = None,
 
 
 CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
@@ -100,6 +96,30 @@ class ExecCommand(namedtuple('ExecCommand', ('cmd', 'user', 'policy'))):
     def _asdict(self):
         d = super(ExecCommand, self)._asdict()
         d['policy'] = self[2].value
+        return d
+
+
+class MapConfigId(namedtuple('MapConfigId', ('config_type', 'map_name', 'config_name', 'instance_name'))):
+    def __new__(cls, config_type, map_name, config_name, instance_name=None):
+        if isinstance(config_type, six.string_types):
+            config_type = ItemType(config_type)
+        return super(MapConfigId, cls).__new__(cls, config_type, map_name, config_name, instance_name)
+
+    def _asdict(self):
+        d = super(MapConfigId, self)._asdict()
+        d['config_type'] = self[0].value
+        return d
+
+
+class InputConfigId(namedtuple('InputConfigId', ('config_type', 'map_name', 'config_name', 'instance_names'))):
+    def __new__(cls, config_type, map_name, config_name, instance_names=None):
+        if isinstance(config_type, six.string_types):
+            config_type = ItemType(config_type)
+        return super(InputConfigId, cls).__new__(cls, config_type, map_name, config_name, instance_names)
+
+    def _asdict(self):
+        d = super(InputConfigId, self)._asdict()
+        d['config_type'] = self[0].value
         return d
 
 
@@ -320,14 +340,17 @@ class SharedHostVolumesList(NamedTupleList):
         elif isinstance(value, dict):
             v_len = len(value)
             if v_len == 1:
-                c_path, v = list(value.items())[0]
-                if isinstance(v, (list, tuple)):
-                    return _shared_host_volume_from_tuple(c_path, *v)
-                return _shared_host_volume_from_tuple(c_path, v)
-            raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
-                             "or HostVolume tuple. Found length {0}.".format(v_len))
+                k, v = list(value.items())[0]
+                if k == 'name':
+                    return SharedVolume(v)
+                elif isinstance(v, (list, tuple)):
+                    return _shared_host_volume_from_tuple(k, *v)
+                return _shared_host_volume_from_tuple(k, v)
+            elif 'path' in value:
+                return HostVolume(**value)
+            return SharedVolume(**value)
         raise ValueError(
-            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+            "Invalid type; expected a list, tuple, dict, or string type, found {0}.".format(type(value).__name__))
 
 
 class AttachedVolumeList(NamedTupleList):
@@ -354,7 +377,7 @@ class AttachedVolumeList(NamedTupleList):
         """
         if isinstance(value, (UsedVolume, SharedVolume)):
             if value.readonly:
-                raise ValueError("Attached volumes should not be read-only.", value)
+                raise ValueError("Attached volumes should not be read-only.")
             return value
         elif isinstance(value, six.string_types):
             return SharedVolume(value)
@@ -372,11 +395,14 @@ class AttachedVolumeList(NamedTupleList):
             v_len = len(value)
             if v_len == 1:
                 k, v = list(value.items())[0]
+                if k == 'name':
+                    return SharedVolume(v)
                 return UsedVolume(k, v)
-            raise ValueError("Invalid element length; only dicts with one element can be converted to a UsedVolume or "
-                             "SharedVolume tuple. Found length {0}.".format(v_len))
+            elif 'path' in value:
+                return UsedVolume(**value)
+            return SharedVolume(**value)
         raise ValueError(
-            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+            "Invalid type; expected a list, tuple, dict, or string type, found {0}.".format(type(value).__name__))
 
 
 class UsedVolumeList(NamedTupleList):
@@ -411,14 +437,17 @@ class UsedVolumeList(NamedTupleList):
         elif isinstance(value, dict):
             v_len = len(value)
             if v_len == 1:
-                alias, v = list(value.items())[0]
-                if isinstance(v, (list, tuple)):
-                    return _shared_used_volume_from_tuple(alias, *v)
-                return _shared_used_volume_from_tuple(alias, v)
-            raise ValueError("Invalid element length; only dicts with one element can be converted to a SharedVolume "
-                             "or UsedVolume tuple. Found length {0}.".format(v_len))
+                k, v = list(value.items())[0]
+                if k == 'name':
+                    return SharedVolume(v)
+                elif isinstance(v, (list, tuple)):
+                    return _shared_used_volume_from_tuple(k, *v)
+                return _shared_used_volume_from_tuple(k, v)
+            if 'path' in value:
+                return UsedVolume(**value)
+            return SharedVolume(**value)
         raise ValueError(
-            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+            "Invalid type; expected a list, tuple, dict, or string type, found {0}.".format(type(value).__name__))
 
 
 class ContainerLinkList(NamedTupleList):
@@ -447,8 +476,10 @@ class ContainerLinkList(NamedTupleList):
                 return ContainerLink(*value)
             raise ValueError("Invalid element length; only tuples and lists of length 1-2 can be converted to a "
                              "ContainerLink tuple. Found length {0}.".format(v_len))
+        elif isinstance(value, dict):
+            return ContainerLink(**value)
         raise ValueError(
-            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+            "Invalid type; expected a list, tuple, dict, or string type, found {0}.".format(type(value).__name__))
 
 
 class ExecCommandList(NamedTupleList):
@@ -477,8 +508,10 @@ class ExecCommandList(NamedTupleList):
                 return ExecCommand(*value)
             raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
                              "ExecCommand tuple. Found length {0}.".format(v_len))
+        elif isinstance(value, dict):
+            return ExecCommand(**value)
         raise ValueError(
-            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+            "Invalid type; expected a list, tuple, dict, or string type, found {0}.".format(type(value).__name__))
 
 
 class PortBindingList(NamedTupleList):
@@ -527,8 +560,8 @@ class PortBindingList(NamedTupleList):
                              "PortBinding tuple.")
         elif isinstance(value, dict):
             return PortBinding(**value)
-        raise ValueError("Invalid type; expected a dict, list, tuple, int, or string type, found "
-                         "{0}.".format(type(value).__name__))
+        raise ValueError(
+            "Invalid type; expected a dict, list, tuple, int, or string type, found {0}.".format(type(value).__name__))
 
 
 class NetworkEndpointList(NamedTupleList):
@@ -564,6 +597,8 @@ class NetworkEndpointList(NamedTupleList):
             d_len = len(value)
             if d_len == 1:
                 k, v = list(value.items())[0]
+                if k == 'network_name':
+                    return NetworkEndpoint(v)
                 if not v:
                     return NetworkEndpoint(k)
                 if isinstance(v, six.string_types):
@@ -579,11 +614,9 @@ class NetworkEndpointList(NamedTupleList):
                 raise ValueError(
                     "Invalid sub-element format; only dicts and tuples of length 1-5 can be converted. Found "
                     "type {0}.".format(type(value).__name__))
-            raise ValueError(
-                "Invalid element length; only dicts with one element can be converted to a NetworkEndpoint "
-                "tuple. Found length {0}.".format(d_len))
-        raise ValueError("Invalid type; expected a dict, list, tuple, or string type, found "
-                         "{0}.".format(type(value).__name__))
+            return NetworkEndpoint(**value)
+        raise ValueError(
+            "Invalid type; expected a dict, list, tuple, or string type, found {0}.".format(type(value).__name__))
 
 
 class InputConfigIdList(NamedTupleList):
@@ -654,12 +687,12 @@ class InputConfigIdList(NamedTupleList):
                 s_map_name = map_name
                 s_instances = None
             return InputConfigId(ItemType.CONTAINER, s_map_name, config_name, s_instances or instances)
-        if isinstance(value, (tuple, list)):
+        elif isinstance(value, (tuple, list)):
             v_len = len(value)
             if v_len == 3:
                 v_instances = value[2]
                 if not v_instances:
-                    return InputConfigId(ItemType.CONTAINER, value[0], value[1], None)
+                    return InputConfigId(ItemType.CONTAINER, value[0], value[1])
                 if isinstance(v_instances, tuple):
                     return InputConfigId(ItemType.CONTAINER, *value)
                 elif isinstance(v_instances, list):
@@ -668,12 +701,20 @@ class InputConfigIdList(NamedTupleList):
                     return InputConfigId(ItemType.CONTAINER, value[0], value[1], (v_instances,))
                 raise ValueError(
                     "Invalid type of instance specification in '{0}'; expected a list, tuple, or string type, "
-                    "found {1}.".format(value, type(v_instances).__name__))
+                    "found {1}.".format(value, type(v_instances).__name__), v_instances)
             elif v_len == 2:
                 return InputConfigId(ItemType.CONTAINER, value[0] or map_name, value[1], instances)
             elif v_len == 1:
                 return InputConfigId(ItemType.CONTAINER, map_name, value[0], instances)
             raise ValueError("Invalid element length; only tuples and lists of length 1-3 can be converted to a "
                              "InputConfigId tuple. Found length {0}.".format(v_len))
+        elif isinstance(value, dict):
+            kwargs = {
+                'config_type': ItemType.CONTAINER,
+                'map_name': map_name,
+                'instance_names': instances,
+            }
+            kwargs.update(value)
+            return InputConfigId(**kwargs)
         raise ValueError(
-            "Invalid type; expected a list, tuple, or string type, found {0}.".format(type(value).__name__))
+            "Invalid type; expected a list, tuple, dict, or string type, found {0}.".format(type(value).__name__))

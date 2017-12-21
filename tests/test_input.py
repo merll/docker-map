@@ -88,9 +88,11 @@ class InputConversionTest(unittest.TestCase):
         assert_a(SharedVolume('a', False))
         assert_a('a')
         assert_a(('a', ))
+        assert_a({'name': 'a'})
         assert_c(UsedVolume('c', 'p1'))
         assert_c(('c', 'p1'))
         assert_c({'c': 'p1'})
+        assert_c({'name': 'c', 'path': 'p1'})
 
     def test_get_attached_volumes(self):
         assert_a = lambda a: self.assertEqual(AttachedVolumeList(a), [SharedVolume('a', False)])
@@ -101,8 +103,11 @@ class InputConversionTest(unittest.TestCase):
         assert_a(SharedVolume('a', False))
         assert_a('a')
         assert_a(('a', ))
+        assert_a([{'name': 'a'}])
         assert_b(['a', ('b', False), {'c': 'p1'}])
         assert_b({'a': False, 'b': None, 'c': 'p1'})
+        assert_b({'a': False, 'b': None, 'c': 'p1'})
+        assert_b((SharedVolume('a'), {'name': 'b', 'readonly': False}, {'name': 'c', 'path': 'p1'}))
 
     def test_get_used_volume(self):
         pass
@@ -117,8 +122,10 @@ class InputConversionTest(unittest.TestCase):
 
         assert_a('a')
         assert_a(('a', ))
+        assert_a({'container': 'a'})
         assert_a(['a', None])
         assert_b(('b', 'b_'))
+        assert_b({'container': 'b', 'alias': 'b_'})
 
     def test_get_container_links(self):
         assert_a = lambda a: self.assertEqual(ContainerLinkList(a), [ContainerLink('a', None)])
@@ -127,9 +134,12 @@ class InputConversionTest(unittest.TestCase):
 
         assert_a('a')
         assert_a((ContainerLink('a'), ))
+        assert_a({'a': None})
+        assert_a(({'container': 'a'},))
         assert_a([('a', )])
         assert_b(('a', ('b', 'b_')))
         assert_b({'a': None, 'b': 'b_'})
+        assert_b([{'container': 'a'}, {'container': 'b', 'alias': 'b_'}])
 
     def test_get_port_binding(self):
         l = PortBindingList()
@@ -192,6 +202,7 @@ class InputConversionTest(unittest.TestCase):
         assert_e([lazy_once(lambda: 'a b c'), lazy_once(lambda: 'user'), ExecPolicy.INITIAL])
         assert_f((['a', 'b', 'c'], 'user', ExecPolicy.INITIAL))
         assert_f([lazy_once(lambda: ['a', 'b', 'c']), lazy_once(lambda: 'user'), ExecPolicy.INITIAL])
+        assert_f({'cmd': ['a', 'b', 'c'], 'user': 'user', 'policy': ExecPolicy.INITIAL})
 
     def test_get_exec_commmands(self):
         assert_a = lambda a: self.assertEqual(ExecCommandList(a), [ExecCommand('a b c', None, ExecPolicy.RESTART)])
@@ -202,9 +213,10 @@ class InputConversionTest(unittest.TestCase):
         assert_a('a b c')
         assert_a([ExecCommand('a b c', None, ExecPolicy.RESTART)])
         assert_a(['a b c'])
+        assert_a(({'cmd': 'a b c'},))
         assert_b([(['a', 'b', 'c', ],), ('a b c', 'user'), [['a', 'b', 'c', ], 'root', ExecPolicy.INITIAL]])
         assert_b([(['a', 'b', 'c'], None),
-                  ExecCommand('a b c', 'user', ExecPolicy.RESTART),
+                  {'cmd': 'a b c', 'user': 'user', 'policy': ExecPolicy.RESTART},
                   [['a', 'b', 'c'], 'root', ExecPolicy.INITIAL]])
 
     def test_get_network_endpoint(self):
@@ -216,6 +228,7 @@ class InputConversionTest(unittest.TestCase):
         assert_e1('endpoint1')
         assert_e1(['endpoint1'])
         assert_e1({'endpoint1': ''})
+        assert_e1({'network_name': 'endpoint1'})
         assert_e2(['endpoint2', 'alias1'])
         assert_e2({'endpoint2': 'alias1'})
         assert_e2(['endpoint2', dict(aliases='alias1')])
@@ -224,10 +237,13 @@ class InputConversionTest(unittest.TestCase):
         assert_e2({'endpoint2': ('alias1', )})
         assert_e2({'endpoint2': dict(aliases='alias1')})
         assert_e2({'endpoint2': dict(aliases=('alias1', ))})
+        assert_e2({'network_name': 'endpoint2', 'aliases': 'alias1'})
+        assert_e2({'network_name': 'endpoint2', 'aliases': ('alias1',)})
         assert_e3(['endpoint3', 'alias1', None, '0.0.0.0'])
         assert_e3({'endpoint3': ('alias1', None, '0.0.0.0')})
         assert_e3(['endpoint3', dict(aliases='alias1', ipv4_address='0.0.0.0')])
         assert_e3({'endpoint3': dict(aliases='alias1', ipv4_address='0.0.0.0')})
+        assert_e3(dict(network_name='endpoint3', aliases='alias1', ipv4_address='0.0.0.0'))
 
     def test_get_network_endpoints(self):
         assert_e1 = lambda v: self.assertEqual(NetworkEndpointList(v), [NetworkEndpoint('endpoint1')])
@@ -237,6 +253,7 @@ class InputConversionTest(unittest.TestCase):
         assert_e1('endpoint1')
         assert_e1(['endpoint1'])
         assert_e1({'endpoint1': None})
+        assert_e1(({'network_name': 'endpoint1'},))
         assert_e2([
             ('endpoint2', 'alias1'),
             ['endpoint3', 'alias1', None, '0.0.0.0'],
@@ -249,6 +266,10 @@ class InputConversionTest(unittest.TestCase):
             ('endpoint2', dict(aliases='alias1')),
             ['endpoint3', dict(aliases=('alias1', ), ipv4_address='0.0.0.0')],
         ])
+        assert_e2([
+            dict(network_name='endpoint2', aliases='alias1'),
+            dict(network_name='endpoint3', aliases=('alias1', ), ipv4_address='0.0.0.0'),
+        ])
 
     def test_get_input_config_id(self):
         l = InputConfigIdList()
@@ -258,6 +279,8 @@ class InputConversionTest(unittest.TestCase):
                                                               InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )))
         assert_c = lambda v, m=None, i=None: self.assertEqual(l.get_type_item(v, map_name=m, instances=i),
                                                               InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', 'j')))
+        assert_d = lambda v, m=None, i=None: self.assertEqual(l.get_type_item(v, map_name=m, instances=i),
+                                                              InputConfigId(ItemType.NETWORK, 'm', 'n'))
         assert_a('m.c')
         assert_a('m.c', 'x')
         assert_a('m.c.')
@@ -266,6 +289,8 @@ class InputConversionTest(unittest.TestCase):
         assert_a(['m', 'c', []], 'x')
         assert_a('c', 'm')
         assert_a(['c'], 'm')
+        assert_a(dict(config_name='c', map_name='m'))
+        assert_a(dict(config_name='c'), 'm')
         assert_b('m.c.i')
         assert_b('m.c.i', 'x', 'j')
         assert_b(('m', 'c', 'i'))
@@ -275,15 +300,19 @@ class InputConversionTest(unittest.TestCase):
         assert_b(('m', 'c'), i=('i', ))
         assert_b('c', 'm', ('i', ))
         assert_b(('c', ), 'm', ('i', ))
+        assert_b(dict(config_name='c', map_name='m', instance_names=('i', )))
         assert_c(['m', 'c', ('i', 'j')])
         assert_c(('m', 'c', ['i', 'j']))
         assert_c(('m', 'c'), i=('i', 'j'))
         assert_c('c', 'm', ('i', 'j'))
         assert_c(('c', ), 'm', ('i', 'j'))
+        assert_c(dict(config_name='c', map_name='m', instance_names=('i', 'j')))
+        assert_c(dict(config_name='c'), 'm', ('i', 'j'))
+        assert_d(dict(config_type='network', config_name='n'), 'm')
 
     def test_get_input_config_ids(self):
         map_m = ContainerMap('m', c=dict(instances=['i']), d=dict(instances=['i']), groups=dict(default=['c.i', 'd.i']))
-        map_n = ContainerMap('n', e={}, groups=dict(default=['e']))
+        map_n = ContainerMap('n', e={}, networks=dict(nn1={}), groups=dict(default=['e']))
         maps = {'m': map_m, 'n': map_n}
 
         def assert_a(v, m=None, i=None):
@@ -315,6 +344,12 @@ class InputConversionTest(unittest.TestCase):
                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', 'i'),
                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', 'j')])
 
+        def assert_d(v, m=None, i=None):
+            six.assertCountEqual(self, expand_groups(InputConfigIdList(v, map_name=m, instances=i), maps),
+                                 [InputConfigId(ItemType.NETWORK, 'n', 'nn1')])
+            six.assertCountEqual(self, get_map_config_ids(v, maps, default_map_name=m, default_instances=i),
+                                 [MapConfigId(ItemType.NETWORK, 'n', 'nn1')])
+
         assert_a('m.c')
         assert_a('c', 'm')
         assert_a('c', 'm', [])
@@ -326,6 +361,8 @@ class InputConversionTest(unittest.TestCase):
                   ('d', ),
                   ['n', 'e', ('i', 'j')]], 'm', ('i',))
         assert_c(['m.default', 'n.default', 'n.e.j'], None, ('i', ))
+        assert_d([dict(config_type='network', config_name='nn1', map_name='n')])
+        assert_d([dict(config_type='network', config_name='nn1')], 'n')
 
     def test_get_map_config_ids_all_alias(self):
         map_m = ContainerMap('m', c1=dict(), c2=dict(), c3=dict(), groups=dict(default=['c3']))
