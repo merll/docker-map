@@ -112,11 +112,3 @@ class ContainerConfiguration(ConfigurationObject):
         'host_config': "Additional keyword args for :meth:`docker.client.Client.start` or HostConfig options to pass "
                        "to :meth:`docker.client.Client.create`.",
     }
-
-    def __repr__(self):
-        if self.extends:
-            ext_str = 'extends {0}'.format(self.extends)
-        else:
-            ext_str = ''
-        return ("{1}{0.__class__.__name__} {2} shares: {0.shares}; binds: {0.binds}; uses: {0.uses}; "
-                "attaches: {0.attaches}").format(self, 'Abstract ' if self.abstract else '', ext_str)

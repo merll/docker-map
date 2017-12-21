@@ -71,6 +71,25 @@ class ContainerMap(ConfigurationObject):
     def __iter__(self):
         return ((c_name, c_config) for c_name, c_config in six.iteritems(self._containers) if not c_config.abstract)
 
+    def __repr__(self):
+        if self._modified:
+            status = '(Modified) '
+        elif self._extended:
+            status = '(Extended) '
+        else:
+            status = ''
+        props = [('name', self._name)]
+        props.extend(six.iteritems(self._config))
+        props.extend((
+            ('containers', self._containers),
+            ('networks', self._networks),
+            ('volumes', self._volumes),
+            ('host', self._host),
+        ))
+        props_str = ', '.join('{0}={1!r}'.format(key, value)
+                              for key, value in props)
+        return '<{0}{1}({2})>'.format(status, self.__class__.__name__, props_str)
+
     def update_default_from_dict(self, key, value):
         if key == 'containers':
             items = self._containers

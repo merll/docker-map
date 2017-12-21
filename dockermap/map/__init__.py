@@ -44,11 +44,13 @@ class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
         super(AttributeMixin, self).__init__(*args, **kwargs)
 
     def __repr__(self):
-        default_repr = super(AttributeMixin, self).__repr__()
+        default_repr = dict.__repr__(self)
         cls = self.__class__
-        props = ', '.join('{0}={1!r}'.format(p_name, getattr(self, p_name))
-                          for p_name in cls.external_properties)
-        return '<{0}({1}): {2}>'.format(cls.__name__, props, default_repr)
+        if cls.external_properties:
+            props = ', '.join('{0}={1!r}'.format(p_name, getattr(self, p_name))
+                              for p_name in cls.external_properties)
+            return '<{0}({1}): {2}>'.format(cls.__name__, props, default_repr)
+        return '<{0}: {1}>'.format(cls.__name__, default_repr)
 
     def __getattr__(self, item):
         return self[item]
