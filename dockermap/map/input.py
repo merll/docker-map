@@ -49,6 +49,7 @@ CURRENT_DIR = '{0}{1}'.format(posixpath.curdir, posixpath.sep)
 class _NotSet(object):
     def __nonzero__(self):
         return False
+
     __bool__ = __nonzero__
 
     def __repr__(self):
@@ -56,6 +57,9 @@ class _NotSet(object):
 
     def __str__(self):
         return "Not set"
+
+    def __eq__(self, other):
+        return isinstance(other, self.__class__)
 
 
 NotSet = _NotSet()

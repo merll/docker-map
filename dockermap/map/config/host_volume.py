@@ -47,6 +47,9 @@ class HostVolumeConfiguration(DictMap):
         self._root = NotSet
         super(HostVolumeConfiguration, self).__init__(*args, **kwargs)
 
+    def __eq__(self, other):
+        return super(HostVolumeConfiguration, self).__eq__(other) and self._root == other._root
+
     @property
     def root(self):
         """

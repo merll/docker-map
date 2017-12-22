@@ -78,6 +78,9 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
         if kwargs:
             self.update_from_dict(kwargs)
 
+    def __eq__(self, other):
+        return isinstance(other, self.__class__) and self._config == other._config
+
     def __repr__(self):
         if not self._modified:
             status = ''
@@ -85,7 +88,7 @@ class ConfigurationObject(six.with_metaclass(ConfigurationMeta)):
             status = '(Modified) '
         props = ', '.join('{0}={1!r}'.format(key, value)
                           for key, value in six.iteritems(self._config))
-        return '<{0}{1}({2})>'.format(status, self.__class__.__name__, props)
+        return '<{0}({1}{2})>'.format(self.__class__.__name__, status, props)
 
     def update_default_from_dict(self, key, value):
         """

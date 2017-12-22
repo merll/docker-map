@@ -71,6 +71,15 @@ class ContainerMap(ConfigurationObject):
     def __iter__(self):
         return ((c_name, c_config) for c_name, c_config in six.iteritems(self._containers) if not c_config.abstract)
 
+    def __eq__(self, other):
+        return super(ContainerMap, self).__eq__(other) and (
+            self._name == other._name and
+            self._extended == other._extended and
+            self._containers == other._containers and
+            self._networks == other._networks and
+            self._host == other._host
+        )
+
     def __repr__(self):
         if self._modified:
             status = '(Modified) '
