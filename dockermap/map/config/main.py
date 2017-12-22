@@ -97,7 +97,7 @@ class ContainerMap(ConfigurationObject):
         ))
         props_str = ', '.join('{0}={1!r}'.format(key, value)
                               for key, value in props)
-        return '<{0}{1}({2})>'.format(status, self.__class__.__name__, props_str)
+        return '<{0}({1}{2})>'.format(self.__class__.__name__, status, props_str)
 
     def update_default_from_dict(self, key, value):
         if key == 'containers':
