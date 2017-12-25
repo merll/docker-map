@@ -61,7 +61,7 @@ class ClientConfiguration(DictMap):
         """
         if hasattr(client, 'client_configuration'):
             return client.client_configuration
-        kwargs = {}
+        kwargs = {'client': client}
         for attr in cls.init_kwargs:
             if hasattr(client, attr):
                 kwargs[attr] = getattr(client, attr)
