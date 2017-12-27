@@ -87,14 +87,13 @@ class ClientConfiguration(DictMap):
         :return: Keyword arguments as defined through this configuration.
         :rtype: dict
         """
-        def _if_set():
-            for k in self.init_kwargs:
-                if hasattr(self, k):
-                    yield k, getattr(self, k)
-                elif k in self:
-                    yield k, self[k]
-
-        return dict(_if_set())
+        init_kwargs = {}
+        for k in self.init_kwargs:
+            if k in self.core_property_set:
+                init_kwargs[k] = getattr(self, k)
+            elif k in self:
+                init_kwargs[k] = self[k]
+        return init_kwargs
 
     def get_client(self):
         """
