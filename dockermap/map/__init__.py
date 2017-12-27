@@ -2,6 +2,7 @@
 from collections import defaultdict
 import itertools
 import six
+import sys
 from enum import Enum
 
 from ..utils import merge_list
@@ -51,7 +52,12 @@ class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
         return '<{0}({1}): {2}>'.format(cls.__name__, props, default_repr)
 
     def __getattr__(self, item):
-        return self[item]
+        try:
+            return self[item]
+        except KeyError:
+            exc_info = sys.exc_info()
+            message = "'{0}' object has no attribute '{1}'".format(self.__class__.__name__, item)
+            six.reraise(AttributeError, AttributeError(message), exc_info[2])
 
     def __setattr__(self, key, value):
         if key in self.__class__.core_property_set:

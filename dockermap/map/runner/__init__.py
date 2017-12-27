@@ -28,13 +28,13 @@ class RunnerMeta(PolicyUtilMeta):
 
 
 class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
-    def __new__(cls, *args, **kwargs):
-        instance = super(AbstractRunner, cls).__new__(cls, *args, **kwargs)
-        instance.action_methods = {
-            (item_type, action_name): getattr(instance, action_method)
+    def __init__(self, *args, **kwargs):
+        cls = self.__class__
+        self.action_methods = {
+            (item_type, action_name): getattr(self, action_method)
             for item_type, action_name, action_method in cls._a_methods
         }
-        return instance
+        super(AbstractRunner, self).__init__(*args, **kwargs)
 
     def run_actions(self, actions):
         """

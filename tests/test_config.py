@@ -3,6 +3,8 @@ from __future__ import absolute_import, unicode_literals
 
 import unittest
 
+import six
+
 from dockermap.map.config.main import ContainerMap
 from dockermap.map.input import SharedVolume, PortBinding, ContainerLink
 from tests import MAP_DATA_2, MAP_DATA_3
@@ -154,12 +156,12 @@ class TestConfig(unittest.TestCase):
 
     def test_get_persistent(self):
         attached_items, persistent_items = self.ext_main.get_persistent_items()
-        self.assertItemsEqual(attached_items, [('worker', SharedVolume('app_log')),
-                                               ('server', SharedVolume('app_log')),
-                                               ('server', SharedVolume('server_log')),
-                                               ('server2', SharedVolume('app_log')),
-                                               ('server2', SharedVolume('server_log')),
-                                               ('redis', SharedVolume('redis_socket')),
-                                               ('redis', SharedVolume('redis_log')),
-                                               ('worker_q2', SharedVolume('app_log'))])
-        self.assertItemsEqual(persistent_items, [('persistent_one', None)])
+        six.assertCountEqual(self, attached_items, [('worker', SharedVolume('app_log')),
+                                                    ('server', SharedVolume('app_log')),
+                                                    ('server', SharedVolume('server_log')),
+                                                    ('server2', SharedVolume('app_log')),
+                                                    ('server2', SharedVolume('server_log')),
+                                                    ('redis', SharedVolume('redis_socket')),
+                                                    ('redis', SharedVolume('redis_log')),
+                                                    ('worker_q2', SharedVolume('app_log'))])
+        six.assertCountEqual(self, persistent_items, [('persistent_one', None)])

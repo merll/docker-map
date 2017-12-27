@@ -2,11 +2,12 @@
 from __future__ import absolute_import, unicode_literals
 
 from collections import defaultdict
-from hashlib import md5
+from hashlib import sha224
 
 import posixpath
 import unittest
 import responses
+import six
 
 from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from dockermap.map.config.client import ClientConfiguration
@@ -73,9 +74,9 @@ STATE_RESULTS = {
 
 
 def _get_hash(main, *args):
-    h = md5(main)
+    h = sha224(main.encode('utf-8'))
     for a in args:
-        h.update(a)
+        h.update(a.encode('utf-8'))
     return h.hexdigest()
 
 
@@ -832,7 +833,7 @@ class TestPolicyStateUtils(unittest.TestCase):
         merged_paths = merge_dependency_paths([
             (redis_config, self.state_gen.get_dependency_path(redis_config))
         ])
-        self.assertItemsEqual([
+        six.assertCountEqual(self, [
             (redis_config, self.redis_dependencies)
         ], merged_paths)
 
@@ -841,7 +842,7 @@ class TestPolicyStateUtils(unittest.TestCase):
         merged_paths = merge_dependency_paths([
             (svc_config, [])
         ])
-        self.assertItemsEqual([(svc_config, [])], merged_paths)
+        six.assertCountEqual(self, [(svc_config, [])], merged_paths)
 
     def _config_id(self, config_name, instance=None):
         return MapConfigId(ItemType.CONTAINER, self.map_name, config_name, instance)
