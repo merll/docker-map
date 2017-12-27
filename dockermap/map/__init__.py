@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 import itertools
+from operator import itemgetter
+
 import six
 import sys
 from enum import Enum
@@ -45,11 +47,14 @@ class AttributeMixin(six.with_metaclass(PropertyDictMeta)):
         super(AttributeMixin, self).__init__(*args, **kwargs)
 
     def __repr__(self):
-        default_repr = super(AttributeMixin, self).__repr__()
+        contents = ', '.join('{0!r}: {1!r}'.format(k, v)
+                             for k, v in sorted(self, key=itemgetter(0)))
         cls = self.__class__
-        props = ', '.join('{0}={1!r}'.format(p_name, getattr(self, p_name))
-                          for p_name in cls.external_properties)
-        return '<{0}({1}): {2}>'.format(cls.__name__, props, default_repr)
+        if cls.external_properties:
+            props = ', '.join('{0}={1!r}'.format(p_name, getattr(self, p_name))
+                              for p_name in cls.external_properties)
+            return '<{0}({1}, {{{2}}})>'.format(cls.__name__, props, contents)
+        return '<{0}({{{1}}})>'.format(cls.__name__, contents)
 
     def __getattr__(self, item):
         try:

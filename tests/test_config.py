@@ -165,3 +165,21 @@ class TestConfig(unittest.TestCase):
                                                     ('redis', SharedVolume('redis_log')),
                                                     ('worker_q2', SharedVolume('app_log'))])
         six.assertCountEqual(self, persistent_items, [('persistent_one', None)])
+
+    def test_serialization(self):
+        sd1 = self.sample_map.as_dict()
+        m1_1 = ContainerMap('main', sd1)
+        self.assertEqual(m1_1, self.sample_map)
+        sd1_2 = ContainerMap('main_1', sd1)
+        self.assertNotEqual(sd1_2, self.sample_map)
+        sd2 = m1_1.as_dict()
+        self.assertEqual(sd1, sd2)
+
+    def test_serialization_extended(self):
+        sd2 = self.ext_main.as_dict()
+        m2_1 = ContainerMap('main', sd2)
+        self.assertNotEqual(m2_1, self.ext_main)
+        m2_2 = m2_1.get_extended_map()
+        self.assertEqual(m2_2, self.ext_main)
+        self.assertEqual(m2_1.as_dict(), sd2)
+        self.assertEqual(m2_2.as_dict(), sd2)

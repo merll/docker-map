@@ -71,6 +71,34 @@ class ContainerMap(ConfigurationObject):
     def __iter__(self):
         return ((c_name, c_config) for c_name, c_config in six.iteritems(self._containers) if not c_config.abstract)
 
+    def __eq__(self, other):
+        return super(ContainerMap, self).__eq__(other) and (
+            self._name == other._name and
+            self._extended == other._extended and
+            self._containers == other._containers and
+            self._networks == other._networks and
+            self._host == other._host
+        )
+
+    def __repr__(self):
+        if self._modified:
+            status = '(Modified) '
+        elif self._extended:
+            status = '(Extended) '
+        else:
+            status = ''
+        props = [('name', self._name)]
+        props.extend(six.iteritems(self._config))
+        props.extend((
+            ('containers', self._containers),
+            ('networks', self._networks),
+            ('volumes', self._volumes),
+            ('host', self._host),
+        ))
+        props_str = ', '.join('{0}={1!r}'.format(key, value)
+                              for key, value in props)
+        return '<{0}({1}{2})>'.format(self.__class__.__name__, status, props_str)
+
     def update_default_from_dict(self, key, value):
         if key == 'containers':
             items = self._containers
@@ -141,6 +169,12 @@ class ContainerMap(ConfigurationObject):
                     current_items[key].update_from_obj(value)
         self._host.update(obj.host)
         super(ContainerMap, self).merge_from_obj(obj, lists_only=lists_only)
+
+    def clean(self):
+        for items in [self._containers, self._networks, self._volumes]:
+            for v in six.itervalues(items):
+                v.clean()
+        super(ContainerMap, self).clean()
 
     def get_persistent_items(self):
         """
@@ -239,6 +273,22 @@ class ContainerMap(ConfigurationObject):
         else:
             self._host.clear()
             self._host.update(value)
+
+    def as_dict(self):
+        d = super(ContainerMap, self).as_dict()
+        for (d_key, c_attr) in [
+            ('containers', self._containers),
+            ('volumes', self._volumes),
+            ('networks', self._networks),
+        ]:
+            if c_attr:
+                d[d_key] = {k: v.as_dict()
+                            for k, v in six.iteritems(c_attr)}
+        host = self._host
+        d['host'] = dict(host)
+        if host.root:
+            d['host_root'] = host.root
+        return d
 
     def get_image(self, image):
         """
@@ -529,6 +579,7 @@ class ContainerMap(ConfigurationObject):
             return (instance_names, group_ref_names, uses, attaches, attaches_with_path, shared, bind, link, networks,
                     net_containers)
 
+        self.clean()
         (all_instances, all_grouprefs, all_used, all_attached, all_attached_default, all_shared, all_binds, all_links,
          all_networks, all_net_containers) = zip(*[
             _get_container_items(k, v) for k, v in self.get_extended_map()

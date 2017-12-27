@@ -8,14 +8,14 @@ from dockermap.functional import lazy_once
 from dockermap.utils import merge_list
 from dockermap.map.config.main import ContainerMap
 from dockermap.map.config.utils import expand_groups, get_map_config_ids
-from dockermap.map.input import (is_path, read_only, get_list,
-                                 get_shared_host_volume, get_shared_host_volumes, SharedVolume,
-                                 get_container_link, get_container_links, ContainerLink,
-                                 get_port_binding, get_port_bindings, PortBinding,
-                                 get_exec_command, get_exec_commands, ExecCommand, ExecPolicy,
-                                 get_input_config_id, get_input_config_ids, MapConfigId,
-                                 ItemType, NetworkEndpoint, get_network_endpoint, get_network_endpoints, HostVolume,
-                                 get_attached_volume, UsedVolume, get_attached_volumes, InputConfigId)
+from dockermap.map.input import (is_path, read_only, get_list, ItemType,
+                                 SharedHostVolumesList, SharedVolume, HostVolume,
+                                 ContainerLinkList, ContainerLink,
+                                 PortBindingList, PortBinding,
+                                 ExecCommandList, ExecCommand, ExecPolicy,
+                                 NetworkEndpointList, NetworkEndpoint,
+                                 AttachedVolumeList, UsedVolume,
+                                 InputConfigIdList, MapConfigId, InputConfigId)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -45,10 +45,11 @@ class InputConversionTest(unittest.TestCase):
         self.assertEqual(get_list('test'), ['test'])
 
     def test_get_shared_host_volume(self):
-        assert_a = lambda a: self.assertEqual(get_shared_host_volume(a), SharedVolume('a', False))
-        assert_b = lambda b: self.assertEqual(get_shared_host_volume(b), SharedVolume('b', True))
-        assert_c = lambda c: self.assertEqual(get_shared_host_volume(c), HostVolume('ch', 'c', False))
-        assert_d = lambda d: self.assertEqual(get_shared_host_volume(d), HostVolume('dh', 'd', True))
+        l = SharedHostVolumesList()
+        assert_a = lambda a: self.assertEqual(l.get_type_item(a), SharedVolume('a', False))
+        assert_b = lambda b: self.assertEqual(l.get_type_item(b), SharedVolume('b', True))
+        assert_c = lambda c: self.assertEqual(l.get_type_item(c), HostVolume('c', 'ch', False))
+        assert_d = lambda d: self.assertEqual(l.get_type_item(d), HostVolume('d', 'dh', True))
 
         assert_a('a')
         assert_a(('a', ))
@@ -66,11 +67,11 @@ class InputConversionTest(unittest.TestCase):
         assert_d({'d': ('dh', True)})
 
     def test_get_shared_host_volumes(self):
-        assert_a = lambda a: self.assertEqual(get_shared_host_volumes(a), [SharedVolume('a', False)])
-        assert_b = lambda b: six.assertCountEqual(self, get_shared_host_volumes(b), [SharedVolume('a', False),
-                                                                                     SharedVolume('b', True),
-                                                                                     HostVolume('ch', 'c', False),
-                                                                                     HostVolume('dh', 'd', True)])
+        assert_a = lambda a: self.assertEqual(SharedHostVolumesList(a), [SharedVolume('a', False)])
+        assert_b = lambda b: six.assertCountEqual(self, SharedHostVolumesList(b), [SharedVolume('a', False),
+                                                                                   SharedVolume('b', True),
+                                                                                   HostVolume('c', 'ch', False),
+                                                                                   HostVolume('d', 'dh', True)])
 
         assert_a('a')
         assert_a([('a', )])
@@ -80,27 +81,33 @@ class InputConversionTest(unittest.TestCase):
         assert_b({'a': False, 'b': 'ro', 'c': 'ch', 'd': ('dh', True)})
 
     def test_get_attached_volume(self):
-        assert_a = lambda a: self.assertEqual(get_attached_volume(a), SharedVolume('a', False))
-        assert_c = lambda c: self.assertEqual(get_attached_volume(c), UsedVolume('c', 'p1', False))
+        l = AttachedVolumeList()
+        assert_a = lambda a: self.assertEqual(l.get_type_item(a), SharedVolume('a', False))
+        assert_c = lambda c: self.assertEqual(l.get_type_item(c), UsedVolume('c', 'p1', False))
 
         assert_a(SharedVolume('a', False))
         assert_a('a')
         assert_a(('a', ))
+        assert_a({'name': 'a'})
         assert_c(UsedVolume('c', 'p1'))
         assert_c(('c', 'p1'))
         assert_c({'c': 'p1'})
+        assert_c({'name': 'c', 'path': 'p1'})
 
     def test_get_attached_volumes(self):
-        assert_a = lambda a: self.assertEqual(get_attached_volumes(a), [SharedVolume('a', False)])
-        assert_b = lambda b: six.assertCountEqual(self, get_attached_volumes(b), [SharedVolume('a', False),
-                                                                                  SharedVolume('b', False),
-                                                                                  UsedVolume('c', 'p1', False)])
+        assert_a = lambda a: self.assertEqual(AttachedVolumeList(a), [SharedVolume('a', False)])
+        assert_b = lambda b: six.assertCountEqual(self, AttachedVolumeList(b), [SharedVolume('a', False),
+                                                                                SharedVolume('b', False),
+                                                                                UsedVolume('c', 'p1', False)])
 
         assert_a(SharedVolume('a', False))
         assert_a('a')
         assert_a(('a', ))
+        assert_a([{'name': 'a'}])
         assert_b(['a', ('b', False), {'c': 'p1'}])
         assert_b({'a': False, 'b': None, 'c': 'p1'})
+        assert_b({'a': False, 'b': None, 'c': 'p1'})
+        assert_b((SharedVolume('a'), {'name': 'b', 'readonly': False}, {'name': 'c', 'path': 'p1'}))
 
     def test_get_used_volume(self):
         pass
@@ -109,30 +116,37 @@ class InputConversionTest(unittest.TestCase):
         pass
 
     def test_get_container_link(self):
-        assert_a = lambda a: self.assertEqual(get_container_link(a), ContainerLink('a', None))
-        assert_b = lambda b: self.assertEqual(get_container_link(b), ContainerLink('b', 'b_'))
+        l = ContainerLinkList()
+        assert_a = lambda a: self.assertEqual(l.get_type_item(a), ContainerLink('a', None))
+        assert_b = lambda b: self.assertEqual(l.get_type_item(b), ContainerLink('b', 'b_'))
 
         assert_a('a')
         assert_a(('a', ))
+        assert_a({'container': 'a'})
         assert_a(['a', None])
         assert_b(('b', 'b_'))
+        assert_b({'container': 'b', 'alias': 'b_'})
 
     def test_get_container_links(self):
-        assert_a = lambda a: self.assertEqual(get_container_links(a), [ContainerLink('a', None)])
-        assert_b = lambda b: six.assertCountEqual(self, get_container_links(b), [ContainerLink('a', None),
-                                                                                 ContainerLink('b', 'b_')])
+        assert_a = lambda a: self.assertEqual(ContainerLinkList(a), [ContainerLink('a', None)])
+        assert_b = lambda b: six.assertCountEqual(self, ContainerLinkList(b), [ContainerLink('a', None),
+                                                                               ContainerLink('b', 'b_')])
 
         assert_a('a')
         assert_a((ContainerLink('a'), ))
+        assert_a({'a': None})
+        assert_a(({'container': 'a'},))
         assert_a([('a', )])
         assert_b(('a', ('b', 'b_')))
         assert_b({'a': None, 'b': 'b_'})
+        assert_b([{'container': 'a'}, {'container': 'b', 'alias': 'b_'}])
 
     def test_get_port_binding(self):
-        assert_a = lambda a: self.assertEqual(get_port_binding(a), PortBinding('1234'))
-        assert_b = lambda b: self.assertEqual(get_port_binding(b), PortBinding(1234, 1234))
-        assert_c = lambda c: self.assertEqual(get_port_binding(c), PortBinding(1234, 1234, '0.0.0.0'))
-        assert_d = lambda d: self.assertEqual(get_port_binding(d), PortBinding(1234, 1234, '0.0.0.0', True))
+        l = PortBindingList()
+        assert_a = lambda a: self.assertEqual(l.get_type_item(a), PortBinding('1234'))
+        assert_b = lambda b: self.assertEqual(l.get_type_item(b), PortBinding(1234, 1234))
+        assert_c = lambda c: self.assertEqual(l.get_type_item(c), PortBinding(1234, 1234, '0.0.0.0'))
+        assert_d = lambda d: self.assertEqual(l.get_type_item(d), PortBinding(1234, 1234, '0.0.0.0', True))
 
         assert_a('1234')
         assert_a(('1234', ))
@@ -146,10 +160,10 @@ class InputConversionTest(unittest.TestCase):
         assert_d((1234, [1234, '0.0.0.0', True]))
 
     def test_get_port_bindings(self):
-        assert_a = lambda a: self.assertEqual(get_port_bindings(a), [PortBinding('1234')])
-        assert_b = lambda b: six.assertCountEqual(self, get_port_bindings(b), [PortBinding('1234'),
-                                                                               PortBinding(1234, 1234),
-                                                                               PortBinding(1235, 1235, '0.0.0.0', True)])
+        assert_a = lambda a: self.assertEqual(PortBindingList(a), [PortBinding('1234')])
+        assert_b = lambda b: six.assertCountEqual(self, PortBindingList(b), [PortBinding('1234'),
+                                                                             PortBinding(1234, 1234),
+                                                                             PortBinding(1235, 1235, '0.0.0.0', True)])
 
         assert_a('1234')
         assert_a(PortBinding('1234', None, None, False))
@@ -160,17 +174,18 @@ class InputConversionTest(unittest.TestCase):
         assert_b({'1234': None, 1234: dict(host_port=1234), 1235: dict(host_port=1235, interface='0.0.0.0', ipv6=True)})
 
     def test_get_exec_command(self):
-        assert_a = lambda a: self.assertEqual(get_exec_command(a),
+        l = ExecCommandList()
+        assert_a = lambda a: self.assertEqual(l.get_type_item(a),
                                               ExecCommand('a b c', None, ExecPolicy.RESTART))
-        assert_b = lambda b: self.assertEqual(get_exec_command(b),
+        assert_b = lambda b: self.assertEqual(l.get_type_item(b),
                                               ExecCommand(['a', 'b', 'c'], None, ExecPolicy.RESTART))
-        assert_c = lambda c: self.assertEqual(get_exec_command(c),
+        assert_c = lambda c: self.assertEqual(l.get_type_item(c),
                                               ExecCommand('a b c', 'user', ExecPolicy.RESTART))
-        assert_d = lambda d: self.assertEqual(get_exec_command(d),
+        assert_d = lambda d: self.assertEqual(l.get_type_item(d),
                                               ExecCommand(['a', 'b', 'c'], 'user', ExecPolicy.RESTART))
-        assert_e = lambda e: self.assertEqual(get_exec_command(e),
+        assert_e = lambda e: self.assertEqual(l.get_type_item(e),
                                               ExecCommand('a b c', 'user', ExecPolicy.INITIAL))
-        assert_f = lambda f: self.assertEqual(get_exec_command(f),
+        assert_f = lambda f: self.assertEqual(l.get_type_item(f),
                                               ExecCommand(['a', 'b', 'c'], 'user', ExecPolicy.INITIAL))
 
         assert_a('a b c')
@@ -187,29 +202,33 @@ class InputConversionTest(unittest.TestCase):
         assert_e([lazy_once(lambda: 'a b c'), lazy_once(lambda: 'user'), ExecPolicy.INITIAL])
         assert_f((['a', 'b', 'c'], 'user', ExecPolicy.INITIAL))
         assert_f([lazy_once(lambda: ['a', 'b', 'c']), lazy_once(lambda: 'user'), ExecPolicy.INITIAL])
+        assert_f({'cmd': ['a', 'b', 'c'], 'user': 'user', 'policy': ExecPolicy.INITIAL})
 
     def test_get_exec_commmands(self):
-        assert_a = lambda a: self.assertEqual(get_exec_commands(a), [ExecCommand('a b c', None, ExecPolicy.RESTART)])
-        assert_b = lambda b: six.assertCountEqual(self, get_exec_commands(b),
+        assert_a = lambda a: self.assertEqual(ExecCommandList(a), [ExecCommand('a b c', None, ExecPolicy.RESTART)])
+        assert_b = lambda b: six.assertCountEqual(self, ExecCommandList(b),
                                                   [ExecCommand(['a', 'b', 'c'], None, ExecPolicy.RESTART),
                                                    ExecCommand('a b c', 'user', ExecPolicy.RESTART),
                                                    ExecCommand(['a', 'b', 'c'], 'root', ExecPolicy.INITIAL)])
         assert_a('a b c')
         assert_a([ExecCommand('a b c', None, ExecPolicy.RESTART)])
         assert_a(['a b c'])
+        assert_a(({'cmd': 'a b c'},))
         assert_b([(['a', 'b', 'c', ],), ('a b c', 'user'), [['a', 'b', 'c', ], 'root', ExecPolicy.INITIAL]])
         assert_b([(['a', 'b', 'c'], None),
-                  ExecCommand('a b c', 'user', ExecPolicy.RESTART),
+                  {'cmd': 'a b c', 'user': 'user', 'policy': ExecPolicy.RESTART},
                   [['a', 'b', 'c'], 'root', ExecPolicy.INITIAL]])
 
     def test_get_network_endpoint(self):
-        assert_e1 = lambda v: self.assertEqual(get_network_endpoint(v), NetworkEndpoint('endpoint1'))
-        assert_e2 = lambda v: self.assertEqual(get_network_endpoint(v), NetworkEndpoint('endpoint2', ['alias1']))
-        assert_e3 = lambda v: self.assertEqual(get_network_endpoint(v),
+        l = NetworkEndpointList()
+        assert_e1 = lambda v: self.assertEqual(l.get_type_item(v), NetworkEndpoint('endpoint1'))
+        assert_e2 = lambda v: self.assertEqual(l.get_type_item(v), NetworkEndpoint('endpoint2', ['alias1']))
+        assert_e3 = lambda v: self.assertEqual(l.get_type_item(v),
                                                NetworkEndpoint('endpoint3', ['alias1'], ipv4_address='0.0.0.0'))
         assert_e1('endpoint1')
         assert_e1(['endpoint1'])
         assert_e1({'endpoint1': ''})
+        assert_e1({'network_name': 'endpoint1'})
         assert_e2(['endpoint2', 'alias1'])
         assert_e2({'endpoint2': 'alias1'})
         assert_e2(['endpoint2', dict(aliases='alias1')])
@@ -218,19 +237,23 @@ class InputConversionTest(unittest.TestCase):
         assert_e2({'endpoint2': ('alias1', )})
         assert_e2({'endpoint2': dict(aliases='alias1')})
         assert_e2({'endpoint2': dict(aliases=('alias1', ))})
+        assert_e2({'network_name': 'endpoint2', 'aliases': 'alias1'})
+        assert_e2({'network_name': 'endpoint2', 'aliases': ('alias1',)})
         assert_e3(['endpoint3', 'alias1', None, '0.0.0.0'])
         assert_e3({'endpoint3': ('alias1', None, '0.0.0.0')})
         assert_e3(['endpoint3', dict(aliases='alias1', ipv4_address='0.0.0.0')])
         assert_e3({'endpoint3': dict(aliases='alias1', ipv4_address='0.0.0.0')})
+        assert_e3(dict(network_name='endpoint3', aliases='alias1', ipv4_address='0.0.0.0'))
 
     def test_get_network_endpoints(self):
-        assert_e1 = lambda v: self.assertEqual(get_network_endpoints(v), [NetworkEndpoint('endpoint1')])
-        assert_e2 = lambda v: six.assertCountEqual(self, get_network_endpoints(v),
+        assert_e1 = lambda v: self.assertEqual(NetworkEndpointList(v), [NetworkEndpoint('endpoint1')])
+        assert_e2 = lambda v: six.assertCountEqual(self, NetworkEndpointList(v),
                                                    [NetworkEndpoint('endpoint2', ['alias1']),
                                                     NetworkEndpoint('endpoint3', ['alias1'], ipv4_address='0.0.0.0')])
         assert_e1('endpoint1')
         assert_e1(['endpoint1'])
         assert_e1({'endpoint1': None})
+        assert_e1(({'network_name': 'endpoint1'},))
         assert_e2([
             ('endpoint2', 'alias1'),
             ['endpoint3', 'alias1', None, '0.0.0.0'],
@@ -243,14 +266,21 @@ class InputConversionTest(unittest.TestCase):
             ('endpoint2', dict(aliases='alias1')),
             ['endpoint3', dict(aliases=('alias1', ), ipv4_address='0.0.0.0')],
         ])
+        assert_e2([
+            dict(network_name='endpoint2', aliases='alias1'),
+            dict(network_name='endpoint3', aliases=('alias1', ), ipv4_address='0.0.0.0'),
+        ])
 
     def test_get_input_config_id(self):
-        assert_a = lambda v, m=None, i=None: self.assertEqual(get_input_config_id(v, map_name=m, instances=i),
+        l = InputConfigIdList()
+        assert_a = lambda v, m=None, i=None: self.assertEqual(l.get_type_item(v, map_name=m, instances=i),
                                                               InputConfigId(ItemType.CONTAINER, 'm', 'c'))
-        assert_b = lambda v, m=None, i=None: self.assertEqual(get_input_config_id(v, map_name=m, instances=i),
+        assert_b = lambda v, m=None, i=None: self.assertEqual(l.get_type_item(v, map_name=m, instances=i),
                                                               InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )))
-        assert_c = lambda v, m=None, i=None: self.assertEqual(get_input_config_id(v, map_name=m, instances=i),
+        assert_c = lambda v, m=None, i=None: self.assertEqual(l.get_type_item(v, map_name=m, instances=i),
                                                               InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', 'j')))
+        assert_d = lambda v, m=None, i=None: self.assertEqual(l.get_type_item(v, map_name=m, instances=i),
+                                                              InputConfigId(ItemType.NETWORK, 'm', 'n'))
         assert_a('m.c')
         assert_a('m.c', 'x')
         assert_a('m.c.')
@@ -259,6 +289,8 @@ class InputConversionTest(unittest.TestCase):
         assert_a(['m', 'c', []], 'x')
         assert_a('c', 'm')
         assert_a(['c'], 'm')
+        assert_a(dict(config_name='c', map_name='m'))
+        assert_a(dict(config_name='c'), 'm')
         assert_b('m.c.i')
         assert_b('m.c.i', 'x', 'j')
         assert_b(('m', 'c', 'i'))
@@ -268,25 +300,29 @@ class InputConversionTest(unittest.TestCase):
         assert_b(('m', 'c'), i=('i', ))
         assert_b('c', 'm', ('i', ))
         assert_b(('c', ), 'm', ('i', ))
+        assert_b(dict(config_name='c', map_name='m', instance_names=('i', )))
         assert_c(['m', 'c', ('i', 'j')])
         assert_c(('m', 'c', ['i', 'j']))
         assert_c(('m', 'c'), i=('i', 'j'))
         assert_c('c', 'm', ('i', 'j'))
         assert_c(('c', ), 'm', ('i', 'j'))
+        assert_c(dict(config_name='c', map_name='m', instance_names=('i', 'j')))
+        assert_c(dict(config_name='c'), 'm', ('i', 'j'))
+        assert_d(dict(config_type='network', config_name='n'), 'm')
 
     def test_get_input_config_ids(self):
         map_m = ContainerMap('m', c=dict(instances=['i']), d=dict(instances=['i']), groups=dict(default=['c.i', 'd.i']))
-        map_n = ContainerMap('n', e={}, groups=dict(default=['e']))
+        map_n = ContainerMap('n', e={}, networks=dict(nn1={}), groups=dict(default=['e']))
         maps = {'m': map_m, 'n': map_n}
 
         def assert_a(v, m=None, i=None):
-            self.assertEqual(get_input_config_ids(v, map_name=m, instances=i),
+            self.assertEqual(InputConfigIdList(v, map_name=m, instances=i),
                              [InputConfigId(ItemType.CONTAINER, 'm', 'c')])
             self.assertEqual(get_map_config_ids(v, maps, default_map_name=m, default_instances=i),
                              [MapConfigId(ItemType.CONTAINER, 'm', 'c', 'i')])
 
         def assert_b(v, m=None, i=None):
-            six.assertCountEqual(self, get_input_config_ids(v, map_name=m, instances=i),
+            six.assertCountEqual(self, InputConfigIdList(v, map_name=m, instances=i),
                                  [InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )),
                                   InputConfigId(ItemType.CONTAINER, 'm', 'd', ('i', )),
                                   InputConfigId(ItemType.CONTAINER, 'n', 'e', ('i', 'j'))])
@@ -297,7 +333,7 @@ class InputConversionTest(unittest.TestCase):
                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', 'j')])
 
         def assert_c(v, m=None, i=None):
-            six.assertCountEqual(self, expand_groups(get_input_config_ids(v, map_name=m, instances=i), maps),
+            six.assertCountEqual(self, expand_groups(InputConfigIdList(v, map_name=m, instances=i), maps),
                                  [InputConfigId(ItemType.CONTAINER, 'm', 'c', ('i', )),
                                   InputConfigId(ItemType.CONTAINER, 'm', 'd', ('i', )),
                                   InputConfigId(ItemType.CONTAINER, 'n', 'e', ('i', )),
@@ -307,6 +343,12 @@ class InputConversionTest(unittest.TestCase):
                                   MapConfigId(ItemType.CONTAINER, 'm', 'd', 'i'),
                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', 'i'),
                                   MapConfigId(ItemType.CONTAINER, 'n', 'e', 'j')])
+
+        def assert_d(v, m=None, i=None):
+            six.assertCountEqual(self, expand_groups(InputConfigIdList(v, map_name=m, instances=i), maps),
+                                 [InputConfigId(ItemType.NETWORK, 'n', 'nn1')])
+            six.assertCountEqual(self, get_map_config_ids(v, maps, default_map_name=m, default_instances=i),
+                                 [MapConfigId(ItemType.NETWORK, 'n', 'nn1')])
 
         assert_a('m.c')
         assert_a('c', 'm')
@@ -319,6 +361,8 @@ class InputConversionTest(unittest.TestCase):
                   ('d', ),
                   ['n', 'e', ('i', 'j')]], 'm', ('i',))
         assert_c(['m.default', 'n.default', 'n.e.j'], None, ('i', ))
+        assert_d([dict(config_type='network', config_name='nn1', map_name='n')])
+        assert_d([dict(config_type='network', config_name='nn1')], 'n')
 
     def test_get_map_config_ids_all_alias(self):
         map_m = ContainerMap('m', c1=dict(), c2=dict(), c3=dict(), groups=dict(default=['c3']))

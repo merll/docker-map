@@ -6,7 +6,7 @@ from operator import itemgetter
 
 import six
 
-from ..input import ItemType, MapConfigId, get_input_config_ids, InputConfigId
+from ..input import ItemType, MapConfigId, InputConfigIdList, InputConfigId
 
 get_map_config = itemgetter(0, 1, 2)
 
@@ -125,5 +125,5 @@ def get_map_config_ids(value, maps, default_map_name=None, default_instances=Non
     :return: List of MapConfigId tuples.
     :rtype: list[dockermap.map.input.MapConfigId]
     """
-    input_ids = get_input_config_ids(value, map_name=default_map_name, instances=default_instances)
+    input_ids = InputConfigIdList(value, map_name=default_map_name, instances=default_instances)
     return list(expand_instances(expand_groups(input_ids, maps), maps))
