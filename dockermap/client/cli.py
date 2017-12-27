@@ -139,6 +139,7 @@ def _transform_create_kwargs(ka):
     expose = ka.pop('ports', None)
     port_bindings = ka.pop('port_bindings', None)
     links = ka.pop('links', None)
+    restart_policy = ka.pop('restart_policy', None)
 
     for arg in _transform_kwargs(ka):
         yield arg
@@ -210,6 +211,15 @@ def _transform_create_kwargs(ka):
     if links:
         for l in links:
             yield _mapping_format('link', *l)
+
+    if restart_policy:
+        policy_name = restart_policy.get('Name')
+        if policy_name:
+            max_retries = restart_policy.get('MaximumRetryCount')
+            if max_retries is not None:
+                yield _mapping_format('restart-policy', policy_name, max_retries)
+            else:
+                yield _arg_format('restart-policy', policy_name)
 
 
 def parse_containers_output(out):
