@@ -2,6 +2,11 @@
 
 Change History
 ==============
+0.8.1
+-----
+* Fixed Python 3 compatibility.
+* Minor internal refactoring.
+
 0.8.0
 -----
 * Restart uses the configured stop signal for the container.
