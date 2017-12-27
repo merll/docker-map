@@ -18,7 +18,21 @@ class InitialState(AbstractState):
         return State.ABSENT, StateFlags.NONE, {}
 
 
+class PresentState(AbstractState):
+    """
+    Assumes every item to be present. This is intended for testing and situations where the actual state
+    cannot be determined.
+    """
+    def inspect(self):
+        # No need to actually make any client call
+        pass
+
+    def get_state(self):
+        return State.PRESENT, StateFlags.NONE, {}
+
+
 class InitialStateGenerator(DependencyStateGenerator):
     container_state_class = InitialState
     network_state_class = InitialState
-    image_state_class = InitialState
+    volume_state_class = InitialState
+    image_state_class = PresentState
