@@ -9,6 +9,7 @@ from .. import DictMap
 HOST_CONFIG_VERSION = StrictVersion(str('1.15'))
 NETWORKS_VERSION = StrictVersion(str('1.21'))
 VOLUMES_VERSION = StrictVersion(str('1.21'))
+CONTAINER_UPDATE_VERSION = StrictVersion(str('1.22'))
 USE_HC_MERGE = 'merge'
 
 
@@ -35,6 +36,7 @@ class ClientConfiguration(DictMap):
         self._use_host_config = kwargs.pop('use_host_config', None)
         self._supports_networks = kwargs.pop('supports_networks', None)
         self._supports_volumes = kwargs.pop('supports_volumes', None)
+        self._supports_container_update = kwargs.pop('supports_container_update', None)
         self._timeout = timeout
         if 'interfaces' in kwargs:
             self._interfaces = DictMap(kwargs.pop('interfaces'))
@@ -72,13 +74,19 @@ class ClientConfiguration(DictMap):
     def update_settings(self, **kwargs):
         version = kwargs.pop('version', None)
         if version and version != 'auto':
-            version_str = str(version)
-            if self._use_host_config is None:
-                self._use_host_config = version_str >= HOST_CONFIG_VERSION
-            if self._supports_networks is None:
-                self._supports_networks = version_str >= NETWORKS_VERSION
-            if self._supports_volumes is None:
-                self._supports_volumes = version_str >= VOLUMES_VERSION
+            try:
+                version_str = StrictVersion(str(version))
+            except ValueError:
+                pass
+            else:
+                if self._use_host_config is None:
+                    self._use_host_config = version_str >= HOST_CONFIG_VERSION
+                if self._supports_networks is None:
+                    self._supports_networks = version_str >= NETWORKS_VERSION
+                if self._supports_volumes is None:
+                    self._supports_volumes = version_str >= VOLUMES_VERSION
+                if self._supports_container_update is None:
+                    self._supports_container_update = version_str >= CONTAINER_UPDATE_VERSION
 
     def get_init_kwargs(self):
         """
@@ -238,6 +246,16 @@ class ClientConfiguration(DictMap):
     @supports_volumes.setter
     def supports_volumes(self, value):
         self._supports_volumes = value
+
+    @property
+    def supports_container_update(self):
+        if self._supports_container_update is None and not self._client:
+            self.get_client()
+        return self._supports_container_update
+
+    @supports_container_update.setter
+    def supports_container_update(self, value):
+        self._supports_container_update = value
 
     @property
     def use_host_config(self):
