@@ -4,8 +4,6 @@ from __future__ import unicode_literals
 import logging
 import sys
 
-import docker
-
 from ..exceptions import PartialResultsError
 from .action import simple, script, update
 from .config.client import ClientConfiguration
