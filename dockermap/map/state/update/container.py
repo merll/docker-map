@@ -299,8 +299,9 @@ class UpdateContainerState(ContainerBaseState):
                     hc_needs_reset = True
                 state_flags |= StateFlags.HOST_CONFIG_UPDATE
                 extra['update_container'] = hc_update
-            if hc_needs_reset and not self.options['skip_limit_reset']:
-                state_flags |= StateFlags.MISC_MISMATCH
-            else:
-                log.info("Container has a different host-config that cannot be update, but is not reset.")
+            if hc_needs_reset:
+                if not self.options['skip_limit_reset']:
+                    state_flags |= StateFlags.MISC_MISMATCH
+                else:
+                    log.info("Container has a different host-config that cannot be update, but is not reset.")
         return base_state, state_flags, extra
