@@ -23,6 +23,7 @@ class StateFlags(Flags):
     MISSING_LINK = 1 << 13     # A configured linked container cannot be found.
     VOLUME_MISMATCH = 1 << 14  # Container is pointing to a different path than some of its configured volumes.
     EXEC_COMMANDS = 1 << 15    # Container is missing at least one exec command.
+    HOST_CONFIG_UPDATE = 1 << 16  # The container host config (e.g. memory limits) differs, but can be updated.
     NETWORK_DISCONNECTED = 1 << 20  # Container is not connected to a network that it is configured for.
     NETWORK_LEFT = 1 << 21     # Container is connected to a network that it is not configured for.
     NETWORK_MISMATCH = 1 << 22  # Container has different configured connection parameters than the current link.

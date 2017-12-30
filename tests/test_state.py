@@ -20,6 +20,7 @@ from dockermap.map.policy.utils import get_shared_volume_path
 from dockermap.map.state import INITIAL_START_TIME, State, StateFlags
 from dockermap.map.state.base import DependencyStateGenerator, DependentStateGenerator, SingleStateGenerator
 from dockermap.map.state.update import UpdateStateGenerator
+from dockermap.map.state.update.container import CONTAINER_UPDATE_VARS
 from dockermap.map.state.utils import merge_dependency_paths
 from dockermap.utils import format_image_tag
 
@@ -295,6 +296,17 @@ def _add_container_inspect(rsps, config_id, container_name, container_map, c_con
             'Ports': ports,
             'Networks': networks,
         }
+        for i_hc_key, c_hc_kwarg, i_hc_func in CONTAINER_UPDATE_VARS:
+            if c_hc_kwarg in kwargs:
+                c_val = kwargs.pop(c_hc_kwarg)
+            elif c_hc_kwarg in c_config.host_config:
+                c_val = c_config.host_config[c_hc_kwarg]
+            else:
+                continue
+            if c_val and i_hc_func:
+                c_val = i_hc_func(c_val)
+            if c_val is not None:
+                host_config[i_hc_key] = c_val
     else:
         config_dict['NetworkDisabled'] = True
     name_list = [container_name]
@@ -792,6 +804,36 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 'id': get_container_id('{0}.server'.format(self.map_name, 'server')),
                 'pid': 1,
             })
+
+    def test_update_memlimit(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_default_containers(rsps)
+            self.sample_map.containers['server'].host_config['mem_limit'] = '3g'
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+        server_state = states['containers'][('server', None)]
+        self.assertEqual(server_state.base_state, State.RUNNING)
+        self.assertEqual(server_state.state_flags & StateFlags.HOST_CONFIG_UPDATE, StateFlags.HOST_CONFIG_UPDATE)
+
+    def test_reset_memlimit(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self.sample_map.containers['server'].host_config['mem_limit'] = '3g'
+            self._setup_default_containers(rsps)
+            del self.sample_map.containers['server'].host_config['mem_limit']
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+        server_state = states['containers'][('server', None)]
+        self.assertEqual(server_state.base_state, State.RUNNING)
+        self.assertEqual(server_state.state_flags & StateFlags.MISC_MISMATCH, StateFlags.MISC_MISMATCH)
+
+    def test_skip_reset_memlimit(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self.sample_map.containers['server'].host_config['mem_limit'] = '3g'
+            self._setup_default_containers(rsps)
+            del self.sample_map.containers['server'].host_config['mem_limit']
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {'skip_limit_reset': True})
+                                      .get_states(self.server_config_id))
+        server_state = states['containers'][('server', None)]
+        self.assertEqual(server_state.base_state, State.RUNNING)
+        self.assertEqual(server_state.state_flags & StateFlags.MISC_MISMATCH, 0)
 
 
 class TestPolicyStateUtils(unittest.TestCase):

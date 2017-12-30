@@ -35,7 +35,8 @@ class UpdateStateGenerator(DependencyStateGenerator):
 
     update_persistent = False
     check_exec_commands = CmdCheck.FULL
-    policy_options = ['update_persistent', 'check_exec_commands']
+    skip_limit_reset = False
+    policy_options = ['update_persistent', 'check_exec_commands', 'skip_limit_reset']
 
     def __init__(self, policy, kwargs):
         super(UpdateStateGenerator, self).__init__(policy, kwargs)
