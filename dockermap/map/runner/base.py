@@ -39,6 +39,7 @@ class DockerBaseRunnerMixin(object):
         (ItemType.CONTAINER, Action.RESTART, 'restart'),
         (ItemType.CONTAINER, Action.STOP, 'stop'),
         (ItemType.CONTAINER, Action.REMOVE, 'remove_container'),
+        (ItemType.CONTAINER, Action.UPDATE, 'update_container'),
         (ItemType.CONTAINER, Action.KILL, 'kill'),
         (ItemType.CONTAINER, Action.WAIT, 'wait'),
     ]
