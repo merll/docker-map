@@ -6,10 +6,10 @@ import sys
 import logging
 
 import six
-import docker
 from docker.errors import APIError
 
 from ..exceptions import DockerStatusError
+from ..docker_api import APIClient
 from .docker_util import DockerUtilityMixin
 
 log = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ def parse_response(response):
     return obj
 
 
-class DockerClientWrapper(DockerUtilityMixin, docker.Client):
+class DockerClientWrapper(DockerUtilityMixin, APIClient):
     """
     Adds a few utility functions to the Docker API client.
     """

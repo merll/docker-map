@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from docker.utils import create_host_config
-
+from ...docker_api import HostConfig
 from ...functional import resolve_value
 from ..action import VolumeUtilAction
 from ..config.client import USE_HC_MERGE
@@ -60,7 +59,7 @@ class AttachedConfigMixin(object):
                 if use_host_config == USE_HC_MERGE:
                     c_kwargs.update(hc_kwargs)
                 else:
-                    c_kwargs['host_config'] = create_host_config(version=client_config.version, **hc_kwargs)
+                    c_kwargs['host_config'] = HostConfig(version=client_config.version, **hc_kwargs)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 

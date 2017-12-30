@@ -19,7 +19,7 @@ def include_readme():
         return doc.rst
 
 
-REQURED_PACKAGES = ['six', 'docker-py>=1.9.0']
+REQURED_PACKAGES = ['six']
 if sys.version_info[:2] < (3, 4):
     REQURED_PACKAGES.append('enum34')
 
@@ -31,6 +31,8 @@ setup(
     install_requires=REQURED_PACKAGES,
     extras_require={
         'yaml': ['PyYAML'],
+        'legacy': ['docker-py>=1.9.0'],
+        'docker': ['docker'],
     },
     license='MIT',
     author='Matthias Erll',
