@@ -29,7 +29,7 @@ def update_kwargs(kwargs, *updates):
     :param kwargs: Base keyword arguments. This is modified in-place.
     :type kwargs: dict
     :param updates: Dictionaries to update ``kwargs`` with.
-    :type updates: tuple[dict]
+    :type updates: dict
     """
     for update in updates:
         if not update:
