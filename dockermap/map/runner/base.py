@@ -136,6 +136,10 @@ class DockerBaseRunnerMixin(object):
         del self._policy.container_names[action.client_name][c_name]
         return res
 
+    def update_container(self, action, c_name, update_values, **kwargs):
+        c_kwargs = self.get_container_update_kwargs(action, c_name, update_values, kwargs=kwargs)
+        return action.client.update_container(**c_kwargs)
+
     def kill(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_kill_kwargs(action, c_name, kwargs=kwargs)
         return action.client.kill(**c_kwargs)
@@ -292,6 +296,25 @@ class DockerConfigMixin(object):
         else:
             c_kwargs = {}
         update_kwargs(c_kwargs, kwargs)
+        return c_kwargs
+
+    def get_container_update_kwargs(self, action, container_name, update_values, kwargs=None):
+        """
+        Generates keyword arguments for the Docker client to update the HostConfig of an existing container.
+
+        :param action: Action configuration.
+        :type action: ActionConfig
+        :param container_name: Container name or id.
+        :type container_name: unicode | str
+        :param update_values: Dictionary of values to update; i.e. keyword arguments to the Docker client.
+        :type update_values: dict[unicode | str, unicode | str | int | float | decimal.Decimal]
+        :param kwargs: Additional keyword arguments to complement or override the configuration-based values.
+        :type kwargs: dict | NoneType
+        :return: Resulting keyword arguments.
+        :rtype: dict
+        """
+        c_kwargs = dict(container=container_name)
+        update_kwargs(c_kwargs, update_values, kwargs)
         return c_kwargs
 
     def get_container_restart_kwargs(self, action, container_name, kwargs=None):

@@ -260,3 +260,19 @@ class TestPolicyClientKwargs(unittest.TestCase):
         self.assertDictEqual(kwargs, dict(
             container=c_name,
         ))
+
+    def test_update_kwargs(self):
+        cfg_name = 'web_server'
+        cfg = self.sample_map1.get_existing(cfg_name)
+        cfg_id = MapConfigId(ItemType.CONTAINER, 'main', cfg_name)
+        c_name = 'main.web_server'
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config1, None, self.sample_map1, cfg)
+        kwargs = self.runner.get_container_update_kwargs(config, c_name, {
+            'mem_limit': '2g',
+            'cpu_shares': 512,
+        })
+        self.assertDictEqual(kwargs, dict(
+            container=c_name,
+            mem_limit='2g',
+            cpu_shares=512,
+        ))
