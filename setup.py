@@ -19,16 +19,16 @@ def include_readme():
         return doc.rst
 
 
-REQURED_PACKAGES = ['six']
+REQUIRED_PACKAGES = ['six']
 if sys.version_info[:2] < (3, 4):
-    REQURED_PACKAGES.append('enum34')
+    REQUIRED_PACKAGES.append('enum34')
 
 
 setup(
     name='docker-map',
     version=__version__,
     packages=find_packages(),
-    install_requires=REQURED_PACKAGES,
+    install_requires=REQUIRED_PACKAGES,
     extras_require={
         'yaml': ['PyYAML'],
         'legacy': ['docker-py>=1.9.0'],
