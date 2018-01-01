@@ -96,6 +96,18 @@ def format_expose(expose):
     return six.text_type(expose),
 
 
+def format_labels(labels):
+    if isinstance(labels, six.string_types):
+        return labels,
+    elif isinstance(labels, dict):
+        return ['"{0}"="{1}"'.format(k, v.replace('\n', '\\\n'))
+                for k, v in six.iteritems(labels)]
+    elif isinstance(labels, collections.Iterable):
+        return ['"{0}"="{1}"'.format(k, v.replace('\n', '\\\n'))
+                for k, v in labels]
+    raise ValueError("Invalid format for labels.", labels)
+
+
 class DockerFile(DockerStringBuffer):
     """
     Class for constructing Dockerfiles; can be saved or used in a :class:`DockerContext`. For :class:`DockerContext`, it
@@ -122,6 +134,10 @@ class DockerFile(DockerStringBuffer):
         self._cmd_user = kwargs.pop('cmd_user', None)
         self._cmd_workdir = kwargs.pop('cmd_workdir', None)
         self._expose = kwargs.pop('expose', None)
+        self._labels = kwargs.pop('labels', None)
+        self._shell = kwargs.pop('shell', None)
+        self._stopsignal = kwargs.pop('stopsignal', None)
+        self._healthcheck = kwargs.pop('healthcheck', None)
 
         if baseimage:
             self.prefix('FROM', baseimage)
@@ -428,6 +444,42 @@ class DockerFile(DockerStringBuffer):
         self.check_not_finalized()
         self._expose = value
 
+    @property
+    def labels(self):
+        return self._labels
+
+    @labels.setter
+    def labels(self, value):
+        self.check_not_finalized()
+        self._labels = value
+
+    @property
+    def shell(self):
+        return self._shell
+
+    @shell.setter
+    def shell(self, value):
+        self.check_not_finalized()
+        self._shell = value
+
+    @property
+    def stopsignal(self):
+        return self._stopsignal
+
+    @stopsignal.setter
+    def stopsignal(self, value):
+        self.check_not_finalized()
+        self._stopsignal = value
+
+    @property
+    def healthcheck(self):
+        return self._healthcheck
+
+    @healthcheck.setter
+    def healthcheck(self, value):
+        self.check_not_finalized()
+        self._healthcheck = value
+
     def finalize(self):
         """
         Finalizes the Dockerfile. Before the buffer is practically marked as read-only, the following Dockerfile
@@ -437,8 +489,10 @@ class DockerFile(DockerStringBuffer):
         * ``VOLUME`` for shared volumes;
         * ``USER`` as the default user for following commands;
         * ``WORKDIR`` as the working directory for following commands;
+        * ``SHELL`` if the default shell is to be changed;
         * ``ENTRYPOINT`` and ``CMD``, each formatted as a shell or exec command according to :attr:`command_shell`;
-        * and ``EXPOSE`` for exposed ports.
+        * ``EXPOSE`` for exposed ports;
+        * ``LABEL``, ``STOPSIGNAL``, and ``HEALTHCHECK`` instructions for the image;
 
         An attempt to finalize an already-finalized instance has no effect.
         """
@@ -454,10 +508,18 @@ class DockerFile(DockerStringBuffer):
             self.prefix('USER', self._cmd_user)
         if self._cmd_workdir:
             self.prefix('WORKDIR', self._cmd_workdir)
+        if self._shell:
+            self.prefix('SHELL', self._shell)
         if self._entrypoint is not None:
             self.prefix('ENTRYPOINT', format_command(self._entrypoint, self._command_shell))
         if self._command is not None:
             self.prefix('CMD', format_command(self._command, self._command_shell))
         if self._expose is not None:
             self.prefix('EXPOSE', *format_expose(self._expose))
+        if self._labels:
+            self.prefix('LABEL', *format_labels(self._labels))
+        if self._stopsignal:
+            self.prefix('STOPSIGNAL', self._stopsignal)
+        if self._healthcheck:
+            self.prefix('HEALTHCHECK', self._healthcheck)
         super(DockerFile, self).finalize()
