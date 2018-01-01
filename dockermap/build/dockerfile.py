@@ -203,8 +203,8 @@ class DockerFile(DockerStringBuffer):
         :param expanduser: Expand local user variables. Default is ``False``.
         :type expanduser: bool
         :param remove_final: Remove the file after the build operation has completed. Can be useful e.g. for source code
-         archives, which are no longer needed after building the binaries. Note that this will delete recursively, so
-         use with care.
+         archives, which are no longer needed after building the binaries. Note that this will not reduce the size of
+         the resulting image (actually may increase instead) unless the image is squashed.
         :type remove_final: bool
         :return: The path of the file in the Dockerfile context.
         :rtype: unicode | str
@@ -242,18 +242,16 @@ class DockerFile(DockerStringBuffer):
         :type src_file: unicode | str
         :param remove_final: Remove the contents after the build operation has completed. Note that this will remove all
          top-level components of the tar archive recursively. Therefore, you should not use this on standard unix
-         folders.
+         folders. This will also not reduce the size of the resulting image (actually may increase instead) unless the
+         image is squashed.
         :type remove_final: bool
         :return: Name of the root files / directories added to the Dockerfile.
         :rtype: list[unicode | str]
         """
-        def _root_members():
-            with tarfile.open(src_file, 'r') as tf:
-                for member in tf.getmembers():
-                    if posixpath.sep not in member.name:
-                        yield member.name
-
-        member_names = list(_root_members())
+        with tarfile.open(src_file, 'r') as tf:
+            member_names = [member.name
+                            for member in tf.getmembers()
+                            if posixpath.sep not in member.name]
         self.prefix_all('ADD', *zip(member_names, member_names))
         if remove_final:
             self._remove_files.update(member_names)
