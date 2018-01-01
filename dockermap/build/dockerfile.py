@@ -2,6 +2,8 @@
 from __future__ import unicode_literals
 
 import json
+
+import collections
 import os
 import posixpath
 import six
@@ -74,7 +76,7 @@ def format_command(cmd, shell=False):
         if isinstance(cmd, (list, tuple)):
             return json.dumps(map(six.text_type, cmd))
         elif isinstance(cmd, six.string_types):
-            return json.dumps([c for c in _split_cmd()])
+            return json.dumps(list(_split_cmd()))
     raise ValueError("Invalid type of command string or sequence: {0}".format(cmd))
 
 
@@ -87,10 +89,10 @@ def format_expose(expose):
     :return: A tuple, to be separated by spaces before inserting in a Dockerfile.
     :rtype: tuple
     """
-    if isinstance(expose, (list, tuple)):
-        return map(six.text_type, expose)
-    elif isinstance(expose, six.string_types):
+    if isinstance(expose, six.string_types):
         return expose,
+    elif isinstance(expose, collections.Iterable):
+        return map(six.text_type, expose)
     return six.text_type(expose),
 
 
@@ -108,18 +110,18 @@ class DockerFile(DockerStringBuffer):
      ``MAINTAINER``, if those are not set in aforementioned parameters.
     :type initial: unicode | str
     """
-    def __init__(self, baseimage=DEFAULT_BASEIMAGE, maintainer=None, initial=None):
+    def __init__(self, baseimage=DEFAULT_BASEIMAGE, maintainer=None, initial=None, **kwargs):
         super(DockerFile, self).__init__()
         self._files = []
         self._remove_files = set()
         self._archives = []
-        self._volumes = None
-        self._entrypoint = None
-        self._command = None
-        self._command_shell = False
-        self._cmd_user = None
-        self._cmd_workdir = None
-        self._expose = None
+        self._volumes = kwargs.pop('volumes', None)
+        self._entrypoint = kwargs.pop('entrypoint', None)
+        self._command = kwargs.pop('command', None)
+        self._command_shell = kwargs.pop('command_shell', False)
+        self._cmd_user = kwargs.pop('cmd_user', None)
+        self._cmd_workdir = kwargs.pop('cmd_workdir', None)
+        self._expose = kwargs.pop('expose', None)
 
         if baseimage:
             self.prefix('FROM', baseimage)
@@ -128,10 +130,10 @@ class DockerFile(DockerStringBuffer):
             self.prefix('MAINTAINER', maintainer)
             self.blank()
 
-        if isinstance(initial, (tuple, list)):
-            self.writelines(initial)
-        elif initial is not None:
+        if isinstance(initial, six.string_types):
             self.writeline(initial)
+        elif isinstance(initial, collections.Iterable):
+            self.writelines(initial)
 
     def prefix(self, prefix='#', *args):
         """
