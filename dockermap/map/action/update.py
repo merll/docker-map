@@ -109,6 +109,11 @@ class UpdateActionGenerator(AbstractActionGenerator):
                         ItemAction(state, ContainerUtilAction.EXEC_ALL),
                     ])
                 else:
+                    if state.state_flags & StateFlags.HOST_CONFIG_UPDATE:
+                        update_args = state.extra_data['update_container']
+                        if update_args:
+                            log.debug("Container %s with updated host config: %s.", config_id, update_args)
+                            actions.append(ItemAction(state, Action.UPDATE, update_values=update_args))
                     if state.state_flags & StateFlags.EXEC_COMMANDS:
                         run_cmds = state.extra_data['exec_commands']
                         if run_cmds:

@@ -26,6 +26,9 @@ KWARG_MAP = {
     'ipv6_address': 'ip6',
     'links': 'link',
     'aliases': 'alias',
+    'mem_limit': 'memory',
+    'mem_reservation': 'memory-reservation',
+    'memswap_limit': 'memory-swap',
 }
 NONE_TAG = '<none>'
 _arg_format = '--{0}={1}'.format

@@ -6,6 +6,7 @@ import shlex
 from collections import defaultdict
 
 import six
+from docker import utils as docker_utils
 
 from ....functional import resolve_value
 from ....utils import format_image_tag
@@ -16,6 +17,21 @@ from ..base import ContainerBaseState
 
 
 log = logging.getLogger(__name__)
+
+
+CONTAINER_UPDATE_VARS = [
+    # Key in inspect output, docker-py kwarg, whether to also check create kwargs, conversion function
+    ('BlkioWeight', 'blkio_weight', False, None),
+    ('CpuPeriod', 'cpu_period', False, None),
+    ('CpuQuota', 'cpu_quota', False, None),
+    ('CpuShares', 'cpu_shares', True, None),
+    ('CpusetCpus', 'cpuset_cpus', False, None),
+    ('CpusetMems', 'cpuset_mems', False, None),
+    ('Memory', 'mem_limit', True, docker_utils.parse_bytes),
+    ('MemoryReservation', 'mem_reservation', False, docker_utils.parse_bytes),
+    ('MemorySwap', 'memswap_limit', True, docker_utils.parse_bytes),
+    ('KernelMemory', 'kernel_memory', False, docker_utils.parse_bytes),
+]
 
 
 def _check_environment(c_config, instance_detail):
@@ -104,6 +120,38 @@ def _check_container_network_ports(container_config, client_config, instance_det
             if bind_config not in i_val:
                 return False
     return True
+
+
+def _check_limits(container_config, instance_detail):
+    i_host_config = instance_detail['HostConfig']
+    c_host_config = container_config.host_config
+    c_create_options = container_config.create_options
+    update_dict = {}
+    needs_reset = False
+    for inspect_key, config_key, check_co, input_func in CONTAINER_UPDATE_VARS:
+        i_value = i_host_config.get(inspect_key) or None
+        c_value = c_host_config.get(config_key) or None
+        if not c_value and check_co:
+            c_value = c_create_options.get(config_key) or None
+        if config_key == 'memswap_limit' and not c_value:
+            # Has a dependent default value.
+            mem = c_host_config.get('mem_limit') or c_create_options.get('mem_limit')
+            if mem:
+                c_value = docker_utils.parse_bytes(mem) * 2
+        if c_value and input_func:
+            c_value = input_func(c_value)
+        if i_value or c_value:
+            log.debug("Comparing host-config variable %s - Container: %s - Config: %s.", inspect_key, i_value, c_value)
+            if i_value != c_value:
+                if c_value is not None:
+                    log.debug("Updating %s to %s.", inspect_key, c_value)
+                    update_dict[config_key] = c_value
+                else:
+                    # The API implementation (maybe just docker-py) will discard empty default values.
+                    log.debug("Host-config variable %s cannot be reset to default, suggesting container reset.",
+                              inspect_key)
+                    needs_reset = True
+    return update_dict, needs_reset
 
 
 class UpdateContainerState(ContainerBaseState):
@@ -245,4 +293,15 @@ class UpdateContainerState(ContainerBaseState):
                 extra.update(net_extra)
             elif not self._check_container_network_mode():
                 state_flags |= StateFlags.MISC_MISMATCH
+            hc_update, hc_needs_reset = _check_limits(self.config, self.detail)
+            if hc_update:
+                if not self.client_config.supports_container_update:
+                    hc_needs_reset = True
+                state_flags |= StateFlags.HOST_CONFIG_UPDATE
+                extra['update_container'] = hc_update
+            if hc_needs_reset:
+                if not self.options['skip_limit_reset']:
+                    state_flags |= StateFlags.MISC_MISMATCH
+                else:
+                    log.info("Container has a different host-config that cannot be update, but is not reset.")
         return base_state, state_flags, extra
