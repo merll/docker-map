@@ -3,7 +3,7 @@ from __future__ import absolute_import, unicode_literals
 
 import unittest
 
-from docker.utils.utils import create_host_config
+from dockermap.docker_api import HostConfig
 from dockermap.api import ClientConfiguration, ContainerMap
 from dockermap.map.input import MapConfigId, ItemType
 from dockermap.map.policy.base import BasePolicy
@@ -86,7 +86,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             hostname='main-app-server-legacy',
             domainname=None,
             ports=[8880],
-            host_config=create_host_config(
+            host_config=HostConfig(
                 links={},
                 binds=[
                     '/var/lib/site/config/app1:/var/lib/app/config:ro',
@@ -121,7 +121,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             domainname=None,
             ports=[8880],
             networking_config={'EndpointsConfig': {'main.app': {}}},
-            host_config=create_host_config(
+            host_config=HostConfig(
                 links={},
                 binds=[
                     '/var/lib/site/config/app1:/var/lib/app/config:ro',
@@ -171,7 +171,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             image=BasePolicy.core_image,
             command='chown -R 2000:2000 /var/lib/app/socket && chmod -R u=rwX,g=rX,o= /var/lib/app/socket',
             user='root',
-            host_config=create_host_config(
+            host_config=HostConfig(
                 volumes_from=[v_name],
                 version=self.client_version2,
             ),
@@ -190,7 +190,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
             command='chown -R 2000:2000 /volume-tmp && chmod -R u=rwX,g=rX,o= /volume-tmp',
             user='root',
             volumes=['/volume-tmp'],
-            host_config=create_host_config(
+            host_config=HostConfig(
                 binds=['main.app_server_socket:/volume-tmp'],
                 version=self.client_version1,
             ),

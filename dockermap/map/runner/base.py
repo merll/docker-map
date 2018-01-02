@@ -3,11 +3,11 @@ from __future__ import unicode_literals
 
 import logging
 
-from docker.utils.utils import create_host_config, create_networking_config, create_endpoint_config
 from requests import Timeout
 from six import text_type, iteritems, string_types
 from six.moves import map
 
+from ...docker_api import HostConfig, NetworkingConfig, EndpointConfig
 from ...functional import resolve_value
 from ...utils import format_image_tag
 from ..action import Action
@@ -184,8 +184,8 @@ class DockerConfigMixin(object):
             c_kwargs['network_disabled'] = True
         elif client_config.supports_networks and container_config.networks:
             first_network = container_config.networks[0]
-            c_kwargs['networking_config'] = create_networking_config({
-                policy.nname(action.config_id.map_name, first_network.network_name): create_endpoint_config(
+            c_kwargs['networking_config'] = NetworkingConfig({
+                policy.nname(action.config_id.map_name, first_network.network_name): EndpointConfig(
                     client_config.version, **self.get_network_create_endpoint_kwargs(action, first_network)
                 )
             })
@@ -197,7 +197,7 @@ class DockerConfigMixin(object):
                 if use_host_config == USE_HC_MERGE:
                     c_kwargs.update(hc_kwargs)
                 else:
-                    c_kwargs['host_config'] = create_host_config(version=client_config.version, **hc_kwargs)
+                    c_kwargs['host_config'] = HostConfig(version=client_config.version, **hc_kwargs)
         update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
         return c_kwargs
 
@@ -275,7 +275,7 @@ class DockerConfigMixin(object):
                 if use_host_config == USE_HC_MERGE:
                     c_kwargs.update(hc_kwargs)
                 else:
-                    c_kwargs['host_config'] = create_host_config(version=client_config.version, **hc_kwargs)
+                    c_kwargs['host_config'] = HostConfig(version=client_config.version, **hc_kwargs)
         update_kwargs(c_kwargs, kwargs)
         return c_kwargs
 
@@ -452,8 +452,8 @@ class DockerConfigMixin(object):
 
     def get_network_create_endpoint_kwargs(self, action, endpoint_config, kwargs=None):
         """
-        Generates keyword arguments for Docker's ``create_endpoint_config`` utility as well as for
-        ``connect_container_to_network``.
+        Generates keyword arguments for Docker's ``create_endpoint_config`` utility / ``EndpointConfig`` type as well
+        as for ``connect_container_to_network``.
 
         :param action: Action configuration.
         :type action: ActionConfig
