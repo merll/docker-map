@@ -5,7 +5,7 @@ import docker
 
 
 if docker.version_info[0] == 1:
-    from docker import utils as docker_utils
+    from docker.utils import utils as docker_utils
 
     APIClient = docker.Client
     HostConfig = docker_utils.create_host_config
