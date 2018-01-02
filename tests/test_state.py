@@ -8,6 +8,7 @@ import posixpath
 import unittest
 import responses
 import six
+from docker.utils import parse_bytes
 
 from dockermap import DEFAULT_COREIMAGE, DEFAULT_BASEIMAGE
 from dockermap.map.config.client import ClientConfiguration
@@ -296,11 +297,21 @@ def _add_container_inspect(rsps, config_id, container_name, container_map, c_con
             'Ports': ports,
             'Networks': networks,
         }
-        for i_hc_key, c_hc_kwarg, i_hc_func in CONTAINER_UPDATE_VARS:
+        for i_hc_key, c_hc_kwarg, c_cc_opt, i_hc_func in CONTAINER_UPDATE_VARS:
             if c_hc_kwarg in kwargs:
                 c_val = kwargs.pop(c_hc_kwarg)
             elif c_hc_kwarg in c_config.host_config:
                 c_val = c_config.host_config[c_hc_kwarg]
+            elif c_cc_opt and c_hc_kwarg in c_config.create_options:
+                c_val = c_config.create_options[c_hc_kwarg]
+            elif c_hc_kwarg == 'memswap_limit':
+                # Has a dependent default value.
+                if 'mem_limit' in c_config.host_config:
+                    c_val = parse_bytes(c_config.host_config['mem_limit']) * 2
+                elif 'mem_limit' in c_config.create_options:
+                    c_val = parse_bytes(c_config.create_options['mem_limit']) * 2
+                else:
+                    continue
             else:
                 continue
             if c_val and i_hc_func:
