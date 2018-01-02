@@ -824,12 +824,13 @@ class TestPolicyStateGenerators(unittest.TestCase):
         server_state = states['containers'][('server', None)]
         self.assertEqual(server_state.base_state, State.RUNNING)
         self.assertEqual(server_state.state_flags & StateFlags.HOST_CONFIG_UPDATE, StateFlags.HOST_CONFIG_UPDATE)
+        self.assertEqual(server_state.extra_data['update_container'], {'mem_limit': 3221225472,
+                                                                       'memswap_limit': 6442450944})
 
     def test_reset_memlimit(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-            self.sample_map.containers['server'].host_config['mem_limit'] = '3g'
             self._setup_default_containers(rsps)
-            del self.sample_map.containers['server'].host_config['mem_limit']
+            del self.sample_map.containers['server'].create_options['mem_limit']
             states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
         server_state = states['containers'][('server', None)]
         self.assertEqual(server_state.base_state, State.RUNNING)
@@ -837,9 +838,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
 
     def test_skip_reset_memlimit(self):
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
-            self.sample_map.containers['server'].host_config['mem_limit'] = '3g'
             self._setup_default_containers(rsps)
-            del self.sample_map.containers['server'].host_config['mem_limit']
+            del self.sample_map.containers['server'].create_options['mem_limit']
             states = _get_states_dict(UpdateStateGenerator(self.policy, {'skip_limit_reset': True})
                                       .get_states(self.server_config_id))
         server_state = states['containers'][('server', None)]
