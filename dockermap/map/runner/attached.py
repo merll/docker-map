@@ -33,7 +33,7 @@ class AttachedConfigMixin(object):
         client_config = action.client_config
         config_id = action.config_id
         policy = self._policy
-        if client_config.supports_volumes:
+        if client_config.features['volumes']:
             path = PREPARATION_TMP_PATH
         else:
             path = resolve_value(policy.default_volume_paths[config_id.map_name][volume_alias])
@@ -49,9 +49,9 @@ class AttachedConfigMixin(object):
             network_disabled=True,
         )
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        use_host_config = client_config.use_host_config
+        use_host_config = client_config.features['host_config']
         if use_host_config:
-            if client_config.supports_volumes:
+            if client_config.features['volumes']:
                 c_kwargs['volumes'] = [PREPARATION_TMP_PATH]
             hc_kwargs = self.get_attached_preparation_host_config_kwargs(action, None, volume_container,
                                                                          kwargs=hc_extra_kwargs)
@@ -79,7 +79,7 @@ class AttachedConfigMixin(object):
         :return: Resulting keyword arguments.
         :rtype: dict
         """
-        if action.client_config.supports_volumes:
+        if action.client_config.features['volumes']:
             c_kwargs = dict(binds=['{0}:{1}'.format(volume_container, PREPARATION_TMP_PATH)])
         else:
             c_kwargs = dict(volumes_from=[volume_container])
@@ -143,7 +143,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
         temp_container = client.create_container(**apc_kwargs)
         temp_id = temp_container['Id']
         try:
-            if action.client_config.use_host_config:
+            if action.client_config.features['host_config']:
                 client.start(temp_id)
             else:
                 aps_kwargs = self.get_attached_preparation_host_config_kwargs(action, temp_id, volume_container)
@@ -174,7 +174,7 @@ class AttachedPreparationMixin(AttachedConfigMixin):
 
         if not (self.prepare_local and hasattr(client, 'run_cmd')):
             return self._prepare_container(client, action, a_name, v_alias)
-        if action.client_config.supports_volumes:
+        if action.client_config.features['volumes']:
             volume_detail = client.inspect_volume(a_name)
             local_path = volume_detail['Mountpoint']
         else:

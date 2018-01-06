@@ -186,7 +186,7 @@ class NetworkBaseState(AbstractState):
         """
         Inspects the network state.
         """
-        if not self.client_config.supports_networks:
+        if not self.client_config.features['networks']:
             raise ValueError("Client does not support network configuration.", self.client_name)
         config_id = self.config_id
         network_name = self.network_name = self.policy.nname(config_id.map_name, config_id.config_name)
@@ -237,7 +237,7 @@ class VolumeBaseState(AbstractState):
         """
         Inspects the network state.
         """
-        if not self.client_config.supports_volumes:
+        if not self.client_config.features['volumes']:
             raise ValueError("Client does not support volume configuration.", self.client_name)
         config_id = self.config_id
         parent_name = config_id.config_name if self.container_map.use_attached_parent_name else None
@@ -331,7 +331,7 @@ class AbstractStateGenerator(with_metaclass(ABCPolicyUtilMeta, PolicyUtil)):
                 c_state = self.get_container_state(client_name, config_id, config_flags)
             elif config_type == ItemType.VOLUME:
                 client_config = self._policy.clients[client_name]
-                if client_config.supports_volumes:
+                if client_config.features['volumes']:
                     c_state = self.get_volume_state(client_name, config_id, config_flags)
                 else:
                     c_state = self.get_container_state(client_name, config_id, config_flags)

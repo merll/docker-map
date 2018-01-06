@@ -60,7 +60,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
             elif config_type == ItemType.VOLUME:
                 a_parent_name = config_id.config_name if c_map.use_attached_parent_name else None
                 item_name = policy.aname(config_id.map_name, config_id.instance_name, parent_name=a_parent_name)
-                if client_config.supports_volumes:
+                if client_config.features['volumes']:
                     config = c_map.get_existing_volume(config_id.config_name)
                 else:
                     config = c_map.get_existing(config_id.config_name)
