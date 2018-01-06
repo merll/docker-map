@@ -190,6 +190,8 @@ class DockerConfigMixin(object):
                     client_config.version, **self.get_network_create_endpoint_kwargs(action, first_network)
                 )
             })
+        if client_config.features['stop_signal'] and container_config.stop_signal:
+            c_kwargs['stop_signal'] = container_config.stop_signal
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
         use_host_config = client_config.features['host_config']
         if use_host_config:

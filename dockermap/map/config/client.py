@@ -16,6 +16,7 @@ CLIENT_FEATURES = [
         ('networks', '1.21'),
         ('volumes', '1.21'),
         ('container_update', '1.22'),
+        ('stop_signal', '1.21'),
     )
 ]
 

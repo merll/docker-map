@@ -134,6 +134,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                 port_bindings={},
                 version=self.client_version1,
             ),
+            stop_signal='SIGTERM',
         ))
 
     def test_attached_create_kwargs_without_host_config(self):
