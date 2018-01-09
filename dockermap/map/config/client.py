@@ -4,19 +4,15 @@ from __future__ import unicode_literals
 from distutils.version import StrictVersion
 
 from ...client.base import DockerClientWrapper
+from ...docker_api import CLIENT_FEATURES
 from .. import DictMap
 
 USE_HC_MERGE = 'merge'
 
 
-CLIENT_FEATURES = [
+FEATURE_VERSIONS = [
     (fn, StrictVersion(str(fv)))
-    for fn, fv in (
-        ('host_config', '1.15'),
-        ('networks', '1.21'),
-        ('volumes', '1.21'),
-        ('container_update', '1.22'),
-    )
+    for fn, fv in CLIENT_FEATURES
 ]
 
 
@@ -41,7 +37,7 @@ class ClientConfiguration(DictMap):
         self._base_url = base_url
         self._version = version
         self._features = features = kwargs.pop('features', {})
-        for f_name, __ in CLIENT_FEATURES:
+        for f_name, __ in FEATURE_VERSIONS:
             if f_name in kwargs:
                 features[f_name] = kwargs.pop(f_name)
         self._timeout = timeout
@@ -87,7 +83,7 @@ class ClientConfiguration(DictMap):
                 pass
             else:
                 features = self._features
-                for f_name, f_version in CLIENT_FEATURES:
+                for f_name, f_version in FEATURE_VERSIONS:
                     features.setdefault(f_name, version_str >= f_version)
 
     def get_init_kwargs(self):

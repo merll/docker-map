@@ -5,7 +5,7 @@ from collections import OrderedDict
 
 from . import ConfigurationObject, CP
 from ..input import (SharedHostVolumesList, AttachedVolumeList, UsedVolumeList, ContainerLinkList, PortBindingList,
-                     NetworkEndpointList, ExecCommandList, get_network_mode,  bool_if_set)
+                     NetworkEndpointList, ExecCommandList, get_network_mode, bool_if_set, get_healthcheck)
 
 
 def _merge_first(current, update_list):
@@ -41,6 +41,7 @@ class ContainerConfiguration(ConfigurationObject):
     network_mode = CP(input_func=get_network_mode)
     networks = CP(NetworkEndpointList, merge_func=_merge_first)
     exec_commands = CP(ExecCommandList)
+    healthcheck = CP(input_func=get_healthcheck)
     persistent = CP(input_func=bool_if_set)
     create_options = CP(dict)
     host_config = CP(dict)
@@ -106,6 +107,8 @@ class ContainerConfiguration(ConfigurationObject):
         'exec_commands': "Commands to run as soon as the container is started. Set in the format "
                          "`ExecCommand(cmd, user, policy)`, where the user is set to the same as this configuration's "
                          "user by default (or root, if not available). The policy decides when to start the command.",
+        'healthcheck': "Healthcheck instruction for testing the container state. Should be passed as a tuple or "
+                       "dictionary.",
         'persistent': "Set this to ``True`` for containers that are only started to share a volume, but exist "
                       "immediately. Such containers are restarted and not removed during cleanup.",
         'create_options': "Additional keyword args for :meth:`docker.client.Client.create_container`.",
