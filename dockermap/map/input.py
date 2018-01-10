@@ -169,6 +169,12 @@ class HealthCheck(namedtuple('HealthCheck', ('test', 'interval', 'timeout', 'ret
         super(HealthCheck, cls).__new__(cls, test, _get_nanoseconds(interval), _get_nanoseconds(timeout),
                                         retries, _get_nanoseconds(start_period))
 
+    def _as_dict(self):
+        d = super(HealthCheck, self)._as_dict()
+        return {k: v
+                for k, v in six.iteritems(d)
+                if v or k == 'test'}
+
 
 def _get_listed_tuples(value, element_type, conversion_func, **kwargs):
     if value is None:
