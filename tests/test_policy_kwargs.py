@@ -121,6 +121,14 @@ class TestPolicyClientKwargs(unittest.TestCase):
             domainname=None,
             ports=[8880],
             networking_config={'EndpointsConfig': {'main.app': {}}},
+            stop_timeout=10,
+            healthcheck={
+                'test': ['CMD', 'curl', 'http://localhost/'],
+                'interval': 60000000000,
+                'timeout': 1000000000,
+                'retries': 3,
+                'start_period': 5000000000,
+            },
             host_config=HostConfig(
                 links={},
                 binds=[

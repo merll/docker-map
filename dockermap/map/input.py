@@ -162,15 +162,15 @@ class HealthCheck(namedtuple('HealthCheck', ('test', 'interval', 'timeout', 'ret
     def __new__(cls, test, interval=None, timeout=None, retries=None, start_period=None):
         if not test or test == 'NONE':
             test = None
-        elif isinstance(test, (tuple, list)) and test[0] is not 'CMD-SHELL':
+        elif isinstance(test, (tuple, list)) and test[0] not in ('NONE', 'CMD', 'CMD-SHELL'):
             test_args = ['CMD']
             test_args.extend(test)
             test = test_args
-        super(HealthCheck, cls).__new__(cls, test, _get_nanoseconds(interval), _get_nanoseconds(timeout),
-                                        retries, _get_nanoseconds(start_period))
+        return super(HealthCheck, cls).__new__(cls, test, _get_nanoseconds(interval), _get_nanoseconds(timeout),
+                                              retries, _get_nanoseconds(start_period))
 
-    def _as_dict(self):
-        d = super(HealthCheck, self)._as_dict()
+    def _asdict(self):
+        d = super(HealthCheck, self)._asdict()
         return {k: v
                 for k, v in six.iteritems(d)
                 if v or k == 'test'}
