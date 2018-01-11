@@ -318,6 +318,12 @@ def _add_container_inspect(rsps, config_id, container_name, container_map, c_con
                 c_val = i_hc_func(c_val)
             if c_val is not None:
                 host_config[i_hc_key] = c_val
+        if 'restart_policy' in kwargs:
+            c_rp_val = kwargs.pop('restart_policy')
+        else:
+            c_rp_val = c_config.host_config.get('restart_policy')
+        if c_rp_val:
+            host_config['RestartPolicy'] = c_rp_val
     else:
         config_dict['NetworkDisabled'] = True
     name_list = [container_name]
@@ -845,6 +851,18 @@ class TestPolicyStateGenerators(unittest.TestCase):
         server_state = states['containers'][('server', None)]
         self.assertEqual(server_state.base_state, State.RUNNING)
         self.assertEqual(server_state.state_flags & StateFlags.MISC_MISMATCH, 0)
+
+    def test_update_restart_policy(self):
+        with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
+            self._setup_default_containers(rsps)
+            self.sample_map.containers['server'].host_config['restart_policy']['Name'] = 'on-failure'
+            states = _get_states_dict(UpdateStateGenerator(self.policy, {}).get_states(self.server_config_id))
+        server_state = states['containers'][('server', None)]
+        self.assertEqual(server_state.base_state, State.RUNNING)
+        self.assertEqual(server_state.state_flags & StateFlags.HOST_CONFIG_UPDATE, StateFlags.HOST_CONFIG_UPDATE)
+        self.assertEqual(server_state.extra_data['update_container'],
+                         {'restart_policy': {'Name': 'on-failure', 'MaximumRetryCount': 3}})
+
 
 
 class TestPolicyStateUtils(unittest.TestCase):
