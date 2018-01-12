@@ -38,6 +38,7 @@ class ContainerConfiguration(ConfigurationObject):
     permissions = CP()
     stop_timeout = CP()
     stop_signal = CP()
+    start_delay = CP()
     network_mode = CP(input_func=get_network_mode)
     networks = CP(NetworkEndpointList, merge_func=_merge_first)
     exec_commands = CP(ExecCommandList)
@@ -98,6 +99,7 @@ class ContainerConfiguration(ConfigurationObject):
         'stop_signal': "By default Docker sends ``SIGTERM`` to containers on stop or restart. This may not always be "
                        "the best signal to get the main process to shut down properly. This property can for example "
                        "be set to ``SIGINT``, where more appropriate.",
+        'start_delay': "Delay in seconds to insert after a container start.",
         'network_mode': "Networking to apply to this container. If not ``bridge`` or ``host`` (as described in the "
                         "docker-py docs), tries to locate a container configuration on this map. Prefixed with ``/`` "
                         "assumes the full container name. Setting it to ``disabled`` deactivates networking for the "
