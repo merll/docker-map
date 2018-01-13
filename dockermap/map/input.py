@@ -437,11 +437,11 @@ class AttachedVolumeList(NamedTupleList):
 
     def get_type_item(self, value):
         """
-        Converts the given value to a ``UsedVolume`` or ``SharedVolume` tuple for attached volumes. It accepts strings,
-        lists, tuples, and dicts as input.
+        Converts the given value to a ``UsedVolume`` or ``SharedVolume`` tuple for attached volumes. It
+        accepts strings, lists, tuples, and dicts as input.
 
         For strings and collections of a single element, the first item is considered to be an alias for lookup on the map.
-        It is converted to a ``SharedVolume` tuple.
+        It is converted to a ``SharedVolume`` tuple.
         For two-element collections, the first item defines a new volume alias that can be re-used by other instances and
         the second item is considered to be the mount point for the volume.
         All attached volumes are considered as read-write access.
@@ -489,8 +489,8 @@ class UsedVolumeList(NamedTupleList):
 
     def get_type_item(self, value):
         """
-        Converts the given value to a ``UsedVolume`` or ``SharedVolume` tuple for used volumes. It accepts strings, lists,
-        tuples, and dicts as input.
+        Converts the given value to a ``UsedVolume`` or ``SharedVolume`` tuple for used volumes. It accepts
+        strings, lists, tuples, and dicts as input.
 
         Single values are assumed to be volume aliases for read-write access. Tuples or lists with two elements, can be
         ``(alias, read-only indicator)``, or ``(alias, mount path)``. The latter is assumed, unless the second
