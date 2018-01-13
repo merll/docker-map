@@ -17,18 +17,11 @@ class FinalizedError(Exception):
 
 class DockerBuffer(six.with_metaclass(ABCMeta, object)):
     """
-    Abstract class for managing Docker file-like objects. Subclasses must override at least :attr:`init_fileobj` with
-    a callable which constructs the actual file-like object.
-
-    :param args: Args to :attr:`init_fileobj`.
-    :param kwargs: Kwargs to :attr:`init_fileobj`.
+    Abstract class for managing Docker file-like objects. Subclasses must override :meth:`create_fileobj` with
+    which constructs the actual file-like object. :meth:`save` should be implemented for saving to an actual file.
     """
-    init_fileobj = None
-
     def __init__(self, *args, **kwargs):
-        if not callable(self.init_fileobj):
-            raise ValueError("Class attribute 'init_fileobj' must be callable.")
-        self._fileobj = self.init_fileobj(*args, **kwargs)
+        self._fileobj = self.create_fileobj()
         self._finalized = False
 
     def __enter__(self):
@@ -36,6 +29,16 @@ class DockerBuffer(six.with_metaclass(ABCMeta, object)):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
+
+    @abstractmethod
+    def create_fileobj(self):
+        """
+        Initializes a new file object.
+
+        :return: File object.
+        :rtype: file
+        """
+        pass
 
     def check_not_finalized(self):
         """
@@ -93,7 +96,8 @@ class DockerStringBuffer(six.with_metaclass(ABCMeta, DockerBuffer)):
     """
     Partial implementation of :class:`~DockerBuffer`, backed by a :class:`~BytesIO` buffer.
     """
-    init_fileobj = BytesIO
+    def create_fileobj(self):
+        return BytesIO()
 
     def save(self, name):
         """
@@ -110,15 +114,12 @@ class DockerStringBuffer(six.with_metaclass(ABCMeta, DockerBuffer)):
                 f.write(self.fileobj.getvalue().encode('utf-8'))
 
 
-def init_temp_file(obj):
-    return NamedTemporaryFile('wb+')
-
-
 class DockerTempFile(six.with_metaclass(ABCMeta, DockerBuffer)):
     """
     Partial implementation of :class:`~DockerBuffer`, backed by a :class:`~tempfile.NamedTemporaryFile`.
     """
-    init_fileobj = init_temp_file
+    def create_fileobj(self):
+        return NamedTemporaryFile('wb+')
 
     def save(self, name):
         """

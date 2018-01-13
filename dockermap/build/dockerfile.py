@@ -2,6 +2,8 @@
 from __future__ import unicode_literals
 
 import json
+
+import collections
 import os
 import posixpath
 import six
@@ -74,7 +76,7 @@ def format_command(cmd, shell=False):
         if isinstance(cmd, (list, tuple)):
             return json.dumps(map(six.text_type, cmd))
         elif isinstance(cmd, six.string_types):
-            return json.dumps([c for c in _split_cmd()])
+            return json.dumps(list(_split_cmd()))
     raise ValueError("Invalid type of command string or sequence: {0}".format(cmd))
 
 
@@ -87,11 +89,23 @@ def format_expose(expose):
     :return: A tuple, to be separated by spaces before inserting in a Dockerfile.
     :rtype: tuple
     """
-    if isinstance(expose, (list, tuple)):
-        return map(six.text_type, expose)
-    elif isinstance(expose, six.string_types):
+    if isinstance(expose, six.string_types):
         return expose,
+    elif isinstance(expose, collections.Iterable):
+        return map(six.text_type, expose)
     return six.text_type(expose),
+
+
+def format_labels(labels):
+    if isinstance(labels, six.string_types):
+        return labels,
+    elif isinstance(labels, dict):
+        return ['"{0}"="{1}"'.format(k, v.replace('\n', '\\\n'))
+                for k, v in six.iteritems(labels)]
+    elif isinstance(labels, collections.Iterable):
+        return ['"{0}"="{1}"'.format(k, v.replace('\n', '\\\n'))
+                for k, v in labels]
+    raise ValueError("Invalid format for labels.", labels)
 
 
 class DockerFile(DockerStringBuffer):
@@ -108,18 +122,22 @@ class DockerFile(DockerStringBuffer):
      ``MAINTAINER``, if those are not set in aforementioned parameters.
     :type initial: unicode | str
     """
-    def __init__(self, baseimage=DEFAULT_BASEIMAGE, maintainer=None, initial=None):
+    def __init__(self, baseimage=DEFAULT_BASEIMAGE, maintainer=None, initial=None, **kwargs):
         super(DockerFile, self).__init__()
         self._files = []
         self._remove_files = set()
         self._archives = []
-        self._volumes = None
-        self._entrypoint = None
-        self._command = None
-        self._command_shell = False
-        self._cmd_user = None
-        self._cmd_workdir = None
-        self._expose = None
+        self._volumes = kwargs.pop('volumes', None)
+        self._entrypoint = kwargs.pop('entrypoint', None)
+        self._command = kwargs.pop('command', None)
+        self._command_shell = kwargs.pop('command_shell', False)
+        self._cmd_user = kwargs.pop('cmd_user', None)
+        self._cmd_workdir = kwargs.pop('cmd_workdir', None)
+        self._expose = kwargs.pop('expose', None)
+        self._labels = kwargs.pop('labels', None)
+        self._shell = kwargs.pop('shell', None)
+        self._stopsignal = kwargs.pop('stopsignal', None)
+        self._healthcheck = kwargs.pop('healthcheck', None)
 
         if baseimage:
             self.prefix('FROM', baseimage)
@@ -128,10 +146,10 @@ class DockerFile(DockerStringBuffer):
             self.prefix('MAINTAINER', maintainer)
             self.blank()
 
-        if isinstance(initial, (tuple, list)):
-            self.writelines(initial)
-        elif initial is not None:
+        if isinstance(initial, six.string_types):
             self.writeline(initial)
+        elif isinstance(initial, collections.Iterable):
+            self.writelines(initial)
 
     def prefix(self, prefix='#', *args):
         """
@@ -201,8 +219,8 @@ class DockerFile(DockerStringBuffer):
         :param expanduser: Expand local user variables. Default is ``False``.
         :type expanduser: bool
         :param remove_final: Remove the file after the build operation has completed. Can be useful e.g. for source code
-         archives, which are no longer needed after building the binaries. Note that this will delete recursively, so
-         use with care.
+         archives, which are no longer needed after building the binaries. Note that this will not reduce the size of
+         the resulting image (actually may increase instead) unless the image is squashed.
         :type remove_final: bool
         :return: The path of the file in the Dockerfile context.
         :rtype: unicode | str
@@ -240,18 +258,16 @@ class DockerFile(DockerStringBuffer):
         :type src_file: unicode | str
         :param remove_final: Remove the contents after the build operation has completed. Note that this will remove all
          top-level components of the tar archive recursively. Therefore, you should not use this on standard unix
-         folders.
+         folders. This will also not reduce the size of the resulting image (actually may increase instead) unless the
+         image is squashed.
         :type remove_final: bool
         :return: Name of the root files / directories added to the Dockerfile.
         :rtype: list[unicode | str]
         """
-        def _root_members():
-            with tarfile.open(src_file, 'r') as tf:
-                for member in tf.getmembers():
-                    if posixpath.sep not in member.name:
-                        yield member.name
-
-        member_names = list(_root_members())
+        with tarfile.open(src_file, 'r') as tf:
+            member_names = [member.name
+                            for member in tf.getmembers()
+                            if posixpath.sep not in member.name]
         self.prefix_all('ADD', *zip(member_names, member_names))
         if remove_final:
             self._remove_files.update(member_names)
@@ -428,6 +444,42 @@ class DockerFile(DockerStringBuffer):
         self.check_not_finalized()
         self._expose = value
 
+    @property
+    def labels(self):
+        return self._labels
+
+    @labels.setter
+    def labels(self, value):
+        self.check_not_finalized()
+        self._labels = value
+
+    @property
+    def shell(self):
+        return self._shell
+
+    @shell.setter
+    def shell(self, value):
+        self.check_not_finalized()
+        self._shell = value
+
+    @property
+    def stopsignal(self):
+        return self._stopsignal
+
+    @stopsignal.setter
+    def stopsignal(self, value):
+        self.check_not_finalized()
+        self._stopsignal = value
+
+    @property
+    def healthcheck(self):
+        return self._healthcheck
+
+    @healthcheck.setter
+    def healthcheck(self, value):
+        self.check_not_finalized()
+        self._healthcheck = value
+
     def finalize(self):
         """
         Finalizes the Dockerfile. Before the buffer is practically marked as read-only, the following Dockerfile
@@ -437,8 +489,10 @@ class DockerFile(DockerStringBuffer):
         * ``VOLUME`` for shared volumes;
         * ``USER`` as the default user for following commands;
         * ``WORKDIR`` as the working directory for following commands;
+        * ``SHELL`` if the default shell is to be changed;
         * ``ENTRYPOINT`` and ``CMD``, each formatted as a shell or exec command according to :attr:`command_shell`;
-        * and ``EXPOSE`` for exposed ports.
+        * ``EXPOSE`` for exposed ports;
+        * ``LABEL``, ``STOPSIGNAL``, and ``HEALTHCHECK`` instructions for the image;
 
         An attempt to finalize an already-finalized instance has no effect.
         """
@@ -454,10 +508,18 @@ class DockerFile(DockerStringBuffer):
             self.prefix('USER', self._cmd_user)
         if self._cmd_workdir:
             self.prefix('WORKDIR', self._cmd_workdir)
+        if self._shell:
+            self.prefix('SHELL', self._shell)
         if self._entrypoint is not None:
             self.prefix('ENTRYPOINT', format_command(self._entrypoint, self._command_shell))
         if self._command is not None:
             self.prefix('CMD', format_command(self._command, self._command_shell))
         if self._expose is not None:
             self.prefix('EXPOSE', *format_expose(self._expose))
+        if self._labels:
+            self.prefix('LABEL', *format_labels(self._labels))
+        if self._stopsignal:
+            self.prefix('STOPSIGNAL', self._stopsignal)
+        if self._healthcheck:
+            self.prefix('HEALTHCHECK', self._healthcheck)
         super(DockerFile, self).finalize()
