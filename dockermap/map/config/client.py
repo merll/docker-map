@@ -6,11 +6,19 @@ from distutils.version import StrictVersion
 from ...client.base import DockerClientWrapper
 from .. import DictMap
 
-HOST_CONFIG_VERSION = StrictVersion(str('1.15'))
-NETWORKS_VERSION = StrictVersion(str('1.21'))
-VOLUMES_VERSION = StrictVersion(str('1.21'))
-CONTAINER_UPDATE_VERSION = StrictVersion(str('1.22'))
 USE_HC_MERGE = 'merge'
+
+
+CLIENT_FEATURES = [
+    (fn, StrictVersion(str(fv)))
+    for fn, fv in (
+        ('host_config', '1.15'),
+        ('networks', '1.21'),
+        ('volumes', '1.21'),
+        ('container_update', '1.22'),
+        ('stop_signal', '1.21'),
+    )
+]
 
 
 class ClientConfiguration(DictMap):
@@ -33,10 +41,10 @@ class ClientConfiguration(DictMap):
     def __init__(self, base_url=None, version=None, timeout=None, *args, **kwargs):
         self._base_url = base_url
         self._version = version
-        self._use_host_config = kwargs.pop('use_host_config', None)
-        self._supports_networks = kwargs.pop('supports_networks', None)
-        self._supports_volumes = kwargs.pop('supports_volumes', None)
-        self._supports_container_update = kwargs.pop('supports_container_update', None)
+        self._features = features = kwargs.pop('features', {})
+        for f_name, __ in CLIENT_FEATURES:
+            if f_name in kwargs:
+                features[f_name] = kwargs.pop(f_name)
         self._timeout = timeout
         if 'interfaces' in kwargs:
             self._interfaces = DictMap(kwargs.pop('interfaces'))
@@ -79,14 +87,9 @@ class ClientConfiguration(DictMap):
             except ValueError:
                 pass
             else:
-                if self._use_host_config is None:
-                    self._use_host_config = version_str >= HOST_CONFIG_VERSION
-                if self._supports_networks is None:
-                    self._supports_networks = version_str >= NETWORKS_VERSION
-                if self._supports_volumes is None:
-                    self._supports_volumes = version_str >= VOLUMES_VERSION
-                if self._supports_container_update is None:
-                    self._supports_container_update = version_str >= CONTAINER_UPDATE_VERSION
+                features = self._features
+                for f_name, f_version in CLIENT_FEATURES:
+                    features.setdefault(f_name, version_str >= f_version)
 
     def get_init_kwargs(self):
         """
@@ -228,41 +231,13 @@ class ClientConfiguration(DictMap):
         self._client = value
 
     @property
-    def supports_networks(self):
-        if self._supports_networks is None and not self._client:
+    def features(self):
+        """
+        Supported client features.
+
+        :return: Feature dict.
+        :rtype: dict
+        """
+        if not self._client:
             self.get_client()
-        return self._supports_networks
-
-    @supports_networks.setter
-    def supports_networks(self, value):
-        self._supports_networks = value
-
-    @property
-    def supports_volumes(self):
-        if self._supports_volumes is None and not self._client:
-            self.get_client()
-        return self._supports_volumes
-
-    @supports_volumes.setter
-    def supports_volumes(self, value):
-        self._supports_volumes = value
-
-    @property
-    def supports_container_update(self):
-        if self._supports_container_update is None and not self._client:
-            self.get_client()
-        return self._supports_container_update
-
-    @supports_container_update.setter
-    def supports_container_update(self, value):
-        self._supports_container_update = value
-
-    @property
-    def use_host_config(self):
-        if self._use_host_config is None and not self._client:
-            self.get_client()
-        return self._use_host_config
-
-    @use_host_config.setter
-    def use_host_config(self, value):
-        self._use_host_config = value
+        return self._features

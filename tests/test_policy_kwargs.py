@@ -32,7 +32,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         cfg = self.sample_map1.get_existing(cfg_name)
         cfg_id = MapConfigId(ItemType.CONTAINER, 'main', cfg_name)
         c_name = 'main.web_server'
-        self.sample_client_config2.use_host_config = False
+        self.sample_client_config2.features['host_config'] = False
         config = ActionConfig('legacy', cfg_id, self.sample_client_config2, None, self.sample_map2, cfg)
         kwargs = self.runner.get_container_create_kwargs(config, c_name, kwargs=dict(ports=[22]))
         self.assertDictEqual(kwargs, dict(
@@ -134,6 +134,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
                 port_bindings={},
                 version=self.client_version1,
             ),
+            stop_signal='SIGTERM',
         ))
 
     def test_attached_create_kwargs_without_host_config(self):

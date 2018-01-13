@@ -227,7 +227,7 @@ class UpdateContainerState(ContainerBaseState):
                 if not _cmd_running(exec_cmd.cmd, exec_cmd.user) and exec_cmd.policy != ExecPolicy.INITIAL]
 
     def _check_volumes(self):
-        instance_volumes = get_instance_volumes(self.detail, self.client_config.supports_volumes)
+        instance_volumes = get_instance_volumes(self.detail, self.client_config.features['volumes'])
         return self.volume_checker.check(self.config_id, self.container_map, self.config, instance_volumes)
 
     def _check_container_network_mode(self):
@@ -295,7 +295,7 @@ class UpdateContainerState(ContainerBaseState):
                 state_flags |= StateFlags.MISC_MISMATCH
             hc_update, hc_needs_reset = _check_limits(self.config, self.detail)
             if hc_update:
-                if not self.client_config.supports_container_update:
+                if not self.client_config.features['container_update']:
                     hc_needs_reset = True
                 state_flags |= StateFlags.HOST_CONFIG_UPDATE
                 extra['update_container'] = hc_update

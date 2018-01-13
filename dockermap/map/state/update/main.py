@@ -42,7 +42,7 @@ class UpdateStateGenerator(DependencyStateGenerator):
         super(UpdateStateGenerator, self).__init__(policy, kwargs)
         self._volume_checkers = {
             client_name: ContainerVolumeChecker(policy)
-            if client_config.supports_volumes
+            if client_config.features['volumes']
             else ContainerLegacyVolumeChecker(policy)
             for client_name, client_config in six.iteritems(policy.clients)
         }
@@ -53,7 +53,7 @@ class UpdateStateGenerator(DependencyStateGenerator):
                 if n_name in policy.network_names[client_name]
             }
             for client_name, client_config in six.iteritems(policy.clients)
-            if client_config.supports_networks
+            if client_config.features['networks']
         }
         self._network_registries = {
             client_name: NetworkEndpointRegistry(policy.nname, policy.cname, policy.get_hostname,

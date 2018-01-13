@@ -83,7 +83,7 @@ class ScriptMixin(object):
             binds = None
             command = command_format
 
-        if client_config.use_host_config:
+        if client_config.features['host_config']:
             create_extra_kwargs = {'host_config': dict(binds=binds)}
             start_extra_kwargs = {}
         else:

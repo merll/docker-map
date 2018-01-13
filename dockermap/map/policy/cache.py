@@ -156,7 +156,7 @@ class NetworkCache(DockerHostItemCache):
 
     def refresh(self, item):
         client_config = self._clients[item]
-        if client_config.supports_networks:
+        if client_config.features['networks']:
             return super(NetworkCache, self).refresh(item)
         raise ValueError("Client does not support network configuration.", item)
 
@@ -169,6 +169,6 @@ class VolumeCache(DockerHostItemCache):
 
     def refresh(self, item):
         client_config = self._clients[item]
-        if client_config.supports_volumes:
+        if client_config.features['volumes']:
             return super(VolumeCache, self).refresh(item)
         raise ValueError("Client does not support volume configuration.", item)

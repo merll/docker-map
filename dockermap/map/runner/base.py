@@ -78,7 +78,7 @@ class DockerBaseRunnerMixin(object):
         return res
 
     def create_volume(self, action, v_name, **kwargs):
-        if action.client_config.supports_volumes:
+        if action.client_config.features['volumes']:
             c_kwargs = self.get_volume_create_kwargs(action, v_name, kwargs=kwargs)
             res = action.client.create_volume(**c_kwargs)
             self._policy.volume_names[action.client_name].add(v_name)
@@ -86,7 +86,7 @@ class DockerBaseRunnerMixin(object):
         c_kwargs = self.get_attached_container_create_kwargs(action, v_name, kwargs=kwargs)
         res = action.client.create_container(**c_kwargs)
         self._policy.container_names[action.client_name][v_name] = res['Id']
-        if action.client_config.use_host_config:
+        if action.client_config.features['host_config']:
             action.client.start(v_name)
         else:
             c_kwargs = self.get_attached_container_host_config_kwargs(action, v_name, kwargs=kwargs)
@@ -94,7 +94,7 @@ class DockerBaseRunnerMixin(object):
         return res
 
     def remove_volume(self, action, v_name, **kwargs):
-        if action.client_config.supports_volumes:
+        if action.client_config.features['volumes']:
             c_kwargs = self.get_volume_create_kwargs(action, v_name, kwargs=kwargs)
             res = action.client.remove_volume(**c_kwargs)
             self._policy.volume_names[action.client_name].discard(v_name)
@@ -111,7 +111,7 @@ class DockerBaseRunnerMixin(object):
         return res
 
     def start_container(self, action, c_name, **kwargs):
-        if action.client_config.use_host_config:
+        if action.client_config.features['host_config']:
             res = action.client.start(c_name)
         else:
             c_kwargs = self.get_container_host_config_kwargs(action, c_name, kwargs=kwargs)
@@ -180,7 +180,8 @@ class DockerConfigMixin(object):
         c_kwargs = dict(
             name=container_name,
             image=format_image_tag(image_tag),
-            volumes=get_volumes(container_map, container_config, default_paths, client_config.supports_volumes),
+            volumes=get_volumes(container_map, container_config, default_paths,
+                                client_config.features['volumes']),
             user=extract_user(container_config.user),
             ports=[resolve_value(port_binding.exposed_port)
                    for port_binding in container_config.exposes if port_binding.exposed_port],
@@ -189,15 +190,17 @@ class DockerConfigMixin(object):
         )
         if container_config.network_mode == 'none':
             c_kwargs['network_disabled'] = True
-        elif client_config.supports_networks and container_config.networks:
+        elif client_config.features['networks'] and container_config.networks:
             first_network = container_config.networks[0]
             c_kwargs['networking_config'] = NetworkingConfig({
                 policy.nname(action.config_id.map_name, first_network.network_name): EndpointConfig(
                     client_config.version, **self.get_network_create_endpoint_kwargs(action, first_network)
                 )
             })
+        if client_config.features['stop_signal'] and container_config.stop_signal:
+            c_kwargs['stop_signal'] = container_config.stop_signal
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        use_host_config = client_config.use_host_config
+        use_host_config = client_config.features['host_config']
         if use_host_config:
             hc_kwargs = self.get_container_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:
@@ -228,7 +231,7 @@ class DockerConfigMixin(object):
         map_name = config_id.map_name
         policy = self._policy
         cname = policy.cname
-        supports_volumes = client_config.supports_volumes
+        supports_volumes = client_config.features['volumes']
 
         c_kwargs = dict(
             links=[(cname(map_name, l_name), alias or policy.get_hostname(l_name))
@@ -275,7 +278,7 @@ class DockerConfigMixin(object):
             network_disabled=True,
         )
         hc_extra_kwargs = kwargs.pop('host_config', None) if kwargs else None
-        use_host_config = client_config.use_host_config
+        use_host_config = client_config.features['host_config']
         if use_host_config:
             hc_kwargs = self.get_attached_container_host_config_kwargs(action, None, kwargs=hc_extra_kwargs)
             if hc_kwargs:
