@@ -154,6 +154,26 @@ def _check_limits(container_config, instance_detail):
     return update_dict, needs_reset
 
 
+def _check_restart_policy(container_config, instance_detail):
+    c_restart_policy = container_config.host_config.get('restart_policy')
+    i_restart_policy = instance_detail['HostConfig'].get('RestartPolicy')
+    if c_restart_policy and i_restart_policy:
+        cr_name = c_restart_policy.get('Name')
+        ir_name = i_restart_policy.get('Name')
+        if cr_name == 'on-failure':
+            if ir_name == 'on-failure':
+                rp_update = c_restart_policy.get('MaximumRetryCount', 0) != i_restart_policy.get('MaximumRetryCount', 0)
+            else:
+                rp_update = True
+        else:
+            rp_update = cr_name != ir_name
+    else:
+        rp_update = False
+    if rp_update:
+        return {'restart_policy': c_restart_policy}
+    return {}
+
+
 class UpdateContainerState(ContainerBaseState):
     """
     Extends the base state by checking the current instance detail against the container configuration and volumes
@@ -294,6 +314,10 @@ class UpdateContainerState(ContainerBaseState):
             elif not self._check_container_network_mode():
                 state_flags |= StateFlags.MISC_MISMATCH
             hc_update, hc_needs_reset = _check_limits(self.config, self.detail)
+            restart_policy_update = _check_restart_policy(self.config, self.detail)
+            hc_update.update(restart_policy_update)
+            if not self.client_config.features['container_update_restart_policy'] and restart_policy_update:
+                hc_needs_reset = True
             if hc_update:
                 if not self.client_config.features['container_update']:
                     hc_needs_reset = True

@@ -15,7 +15,8 @@ from dockermap.map.input import (is_path, read_only, get_list, ItemType,
                                  ExecCommandList, ExecCommand, ExecPolicy,
                                  NetworkEndpointList, NetworkEndpoint,
                                  AttachedVolumeList, UsedVolume,
-                                 InputConfigIdList, MapConfigId, InputConfigId)
+                                 InputConfigIdList, MapConfigId, InputConfigId,
+                                 get_healthcheck, HealthCheck)
 
 
 class InputConversionTest(unittest.TestCase):
@@ -270,6 +271,29 @@ class InputConversionTest(unittest.TestCase):
             dict(network_name='endpoint2', aliases='alias1'),
             dict(network_name='endpoint3', aliases=('alias1', ), ipv4_address='0.0.0.0'),
         ])
+
+    def test_get_healthcheck(self):
+        assert_h1 = lambda v: self.assertEqual(get_healthcheck(v),
+                                               HealthCheck(['CMD', 'test'],
+                                                           10000,
+                                                           1000000000,
+                                                           3,
+                                                           60000000000))
+        assert_h2 = lambda v: self.assertEqual(get_healthcheck(v),
+                                               HealthCheck(['CMD-SHELL', 'test2'],
+                                                           10000,
+                                                           1000000,
+                                                           1))
+        assert_h1([['test'], '10us', '1000 ms', 3, '1m'])
+        assert_h1({
+            'test': ['CMD', 'test'],
+            'interval': '10000 ns',
+            'timeout': '1000ms',
+            'retries': 3,
+            'start_period': '1m',
+        })
+        assert_h2((['CMD-SHELL', 'test2'], '10 us', '1ms', 1))
+        self.assertEqual(HealthCheck('NONE')._asdict(), {'test': None})
 
     def test_get_input_config_id(self):
         l = InputConfigIdList()

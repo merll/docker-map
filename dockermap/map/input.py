@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 import posixpath
 from collections import namedtuple, Iterable
+
+import re
 import six
 
 from .. import DEFAULT_PRESET_NETWORKS
@@ -38,6 +40,7 @@ ContainerLink = namedtuple('ContainerLink', ('container', 'alias'))
 ContainerLink.__new__.__defaults__ = None,
 PortBinding = namedtuple('PortBinding', ('exposed_port', 'host_port', 'interface', 'ipv6'))
 PortBinding.__new__.__defaults__ = None, None, False
+
 EXEC_POLICY_RESTART = ExecPolicy.RESTART  # For backwards compatibility.
 EXEC_POLICY_INITIAL = ExecPolicy.INITIAL  # For backwards compatibility.
 
@@ -84,6 +87,34 @@ def _get_list(value):
         type(value).__name__))
 
 
+TIME_PATTERN = re.compile(r'(\d+)\s*([num]s|s|m)?')
+
+
+def _get_nanoseconds(value):
+    if value is None:
+        return None
+    elif not value:
+        return 0
+    elif not isinstance(value, six.string_types):
+        return value
+    match = TIME_PATTERN.match(value.strip())
+    if not match:
+        raise ValueError("Invalid time format.", value)
+    value, unit = match.groups()
+    int_val = int(value)
+    if not unit or unit == 'ns':
+        return int_val
+    elif unit == 'us':
+        return int_val * 1000
+    elif unit == 'ms':
+        return int_val * 1000000
+    elif unit == 's':
+        return int_val * 1000000000
+    elif unit == 'm':
+        return int_val * 60000000000
+    raise ValueError("Invalid unit.", unit)
+
+
 class NetworkEndpoint(namedtuple('NetworkEndpoint', ('network_name', 'aliases', 'links', 'ipv4_address', 'ipv6_address',
                                                      'link_local_ips'))):
     def __new__(cls, network_name, aliases=None, links=None, ipv4_address=None, ipv6_address=None, link_local_ips=None):
@@ -125,6 +156,24 @@ class InputConfigId(namedtuple('InputConfigId', ('config_type', 'map_name', 'con
         d = super(InputConfigId, self)._asdict()
         d['config_type'] = self[0].value
         return d
+
+
+class HealthCheck(namedtuple('HealthCheck', ('test', 'interval', 'timeout', 'retries', 'start_period'))):
+    def __new__(cls, test, interval=None, timeout=None, retries=None, start_period=None):
+        if not test or test == 'NONE':
+            test = None
+        elif isinstance(test, (tuple, list)) and test[0] not in ('NONE', 'CMD', 'CMD-SHELL'):
+            test_args = ['CMD']
+            test_args.extend(test)
+            test = test_args
+        return super(HealthCheck, cls).__new__(cls, test, _get_nanoseconds(interval), _get_nanoseconds(timeout),
+                                              retries, _get_nanoseconds(start_period))
+
+    def _asdict(self):
+        d = super(HealthCheck, self)._asdict()
+        return {k: v
+                for k, v in six.iteritems(d)
+                if v or k == 'test'}
 
 
 def _get_listed_tuples(value, element_type, conversion_func, **kwargs):
@@ -311,6 +360,28 @@ def get_network_mode(value):
         return 'container:{0}'.format(value[1:])
     ref_name, __, ref_instance = value.partition('.')
     return ref_name, ref_instance or None
+
+
+def get_healthcheck(value):
+    """
+    Converts input into a :class:`HealthCheck` tuple. Input can be passed as string, tuple, list, or a dictionary. If
+    set to ``None``, the health check will be set to ``NONE``, i.e. override an existing configuration from the image.
+
+    :param value: Health check input.
+    :type value: unicode | str | tuple | list | NoneType
+    :return: HealthCheck tuple
+    :rtype: HealthCheck
+    """
+    if isinstance(value, HealthCheck):
+        return value
+    elif isinstance(value, six.string_types + (lazy_type,)) or uses_type_registry(value):
+        return HealthCheck(value)
+    elif isinstance(value, (tuple, list)):
+        return HealthCheck(*value)
+    elif isinstance(value, dict):
+        return HealthCheck(**value)
+    raise ValueError(
+        "Invalid type; expected a list, tuple, dict, or string type, found {0}.".format(type(value).__name__))
 
 
 class SharedHostVolumesList(NamedTupleList):

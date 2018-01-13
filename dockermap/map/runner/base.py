@@ -208,6 +208,10 @@ class DockerConfigMixin(object):
                     c_kwargs.update(hc_kwargs)
                 else:
                     c_kwargs['host_config'] = HostConfig(version=client_config.version, **hc_kwargs)
+        if client_config.features['stop_timeout'] and container_config.stop_timeout:
+            c_kwargs['stop_timeout'] = container_config.stop_timeout
+        if client_config.features['healthcheck'] and container_config.healthcheck:
+            c_kwargs['healthcheck'] = container_config.healthcheck._asdict()
         update_kwargs(c_kwargs, init_options(container_config.create_options), kwargs)
         return c_kwargs
 

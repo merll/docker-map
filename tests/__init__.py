@@ -90,6 +90,14 @@ MAP_DATA_1_NEW = {
         'user': 2000,
         'permissions': 'u=rwX,g=rX,o=',
         'stop_signal': 'SIGTERM',
+        'stop_timeout': 10,
+        'healthcheck': {
+            'test': ['curl', 'http://localhost/'],
+            'interval': '1m',
+            'timeout': '1000ms',
+            'retries': 3,
+            'start_period': '5s',
+        },
     },
     'app_extra': {
         'networks': 'app',
@@ -274,7 +282,7 @@ MAP_DATA_3 = {
 
 CLIENT_DATA_1 = {
     'interfaces': {'private': '10.0.0.11'},
-    'version': '1.22',
+    'version': '1.25',
 }
 CLIENT_DATA_2 = {
     'interfaces': {'private': '10.0.0.11'},
