@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import logging
+from time import sleep
 
 from requests import Timeout
 from six import text_type, iteritems, string_types
@@ -111,9 +112,15 @@ class DockerBaseRunnerMixin(object):
 
     def start_container(self, action, c_name, **kwargs):
         if action.client_config.use_host_config:
-            return action.client.start(c_name)
-        c_kwargs = self.get_container_host_config_kwargs(action, c_name, kwargs=kwargs)
-        return action.client.start(**c_kwargs)
+            res = action.client.start(c_name)
+        else:
+            c_kwargs = self.get_container_host_config_kwargs(action, c_name, kwargs=kwargs)
+            res = action.client.start(**c_kwargs)
+        start_delay = action.config.start_delay
+        if start_delay:
+            log.debug("Sleeping %s seconds after container %s start.", start_delay, c_name)
+            sleep(start_delay)
+        return res
 
     def restart(self, action, c_name, **kwargs):
         c_kwargs = self.get_container_restart_kwargs(action, c_name, kwargs=kwargs)
