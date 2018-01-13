@@ -110,7 +110,8 @@ class ContainerConfiguration(ConfigurationObject):
                          "`ExecCommand(cmd, user, policy)`, where the user is set to the same as this configuration's "
                          "user by default (or root, if not available). The policy decides when to start the command.",
         'healthcheck': "Healthcheck instruction for testing the container state. Should be passed as a tuple or "
-                       "dictionary.",
+                       "dictionary with the elements ``test``, ``interval``, ``timeout``, ``retries``, and "
+                       "``start_period``.",
         'persistent': "Set this to ``True`` for containers that are only started to share a volume, but exist "
                       "immediately. Such containers are restarted and not removed during cleanup.",
         'create_options': "Additional keyword args for :meth:`docker.client.Client.create_container`.",
