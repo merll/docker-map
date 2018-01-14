@@ -242,6 +242,11 @@ longer than Docker's default timeout of 10 seconds. For this purpose
     This setting is also available on client level. The container configuration takes precedence over the client
     setting.
 
+Where the Docker host supports it (API version >=1.25), and provided you are using version 2.x of the Docker Python
+library, this setting is also passed during container creation so that manually stopping a container (e.g. through
+CLI ``docker stop <container>``) is making use of this setting as well. Otherwise this only applies when stopping or
+restarting containers through Docker-Map.
+
 Stop signal
 """""""""""
 Not all applications handle ``SIGTERM`` in a way that is expected by Docker, so setting
@@ -254,6 +259,10 @@ In this case you can use a more appropriate signal, e.g. ``SIGINT``. Set either 
 ``SIGQUIT``, ``SIGHUP`` etc.) or the numerical constant (see the `signal` man page) in the property
 :attr:`~dockermap.map.config.container.ContainerConfiguration.stop_signal`. It will be considered during stop and restart actions
 of the container. As usual, ``SIGKILL`` will be used after, if necessary.
+
+Where the Docker host supports it (API version >=1.21), this setting is also passed during container creation so that
+manually stopping a container (e.g. through CLI ``docker stop <container>``) is making use of this setting. Otherwise
+this only applies when stopping or restarting containers through Docker-Map.
 
 Shared volumes
 """"""""""""""
@@ -525,7 +534,7 @@ considered:
   :const:`dockermap.map.input.ExecPolicy.INITIAL` indicates that the command should only be run once at container
   creation, but not at a later time, e.g. when the container is restarted or updated::
 
-    from dockermap.map.input import ExecPolicy.INITIAL
+    from dockermap.map.input import ExecPolicy
     config.exec_commands = [
         ("/bin/bash -c 'script1.sh'", 'root'),                              # Run each time the container is started.
         (['/bin/bash', '-c', 'script2.sh'], 'user', ExecPolicy.INITIAL),   # Run only when the container is created.
@@ -647,13 +656,19 @@ dictionary at run-time.
 
 Input formats
 """""""""""""
-On the attributes :attr:`~dockermap.map.config.container.ContainerConfiguration.instances`,
+On the attributes
+:attr:`~dockermap.map.config.container.ContainerConfiguration.extends`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.instances`,
 :attr:`~dockermap.map.config.container.ContainerConfiguration.shares`,
-:attr:`~dockermap.map.config.container.ContainerConfiguration.uses`, :attr:`~dockermap.map.config.container.ContainerConfiguration.links`,
-:attr:`~dockermap.map.config.container.ContainerConfiguration.exec_commands`,
-:attr:`~dockermap.map.config.container.ContainerConfiguration.attaches`, and
-:attr:`~dockermap.map.config.container.ContainerConfiguration.clients`, any assignment (property set) will be converted to
-a list::
+:attr:`~dockermap.map.config.container.ContainerConfiguration.binds`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.attaches`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.uses`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.links`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.exposes`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.networks`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.exec_commands`, and
+:attr:`~dockermap.map.config.container.ContainerConfiguration.clients`,
+any input value that is not a list will be converted into one::
 
     container_map.containers.app1.uses = 'volume1'
 
@@ -665,20 +680,33 @@ and::
 
     container_map.containers.app1.uses = ('volume1',)
 
-Additional conversions are made for :attr:`~dockermap.map.config.container.ContainerConfiguration.binds`,
+Additional conversions are made for
+:attr:`~dockermap.map.config.container.ContainerConfiguration.binds`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.attaches`,
 :attr:`~dockermap.map.config.container.ContainerConfiguration.uses`,
 :attr:`~dockermap.map.config.container.ContainerConfiguration.links`,
 :attr:`~dockermap.map.config.container.ContainerConfiguration.exposes`,
+:attr:`~dockermap.map.config.container.ContainerConfiguration.networks`,
 :attr:`~dockermap.map.config.container.ContainerConfiguration.exec_commands`, and
-:attr:`~dockermap.map.config.container.ContainerConfiguration.networks`; each element in an input list or tuple is converted
-to :attr:`~dockermap.map.config.SharedVolume`, :attr:`~dockermap.map.config.ContainerLink`,
-:attr:`~dockermap.map.config.PortBinding` or :attr:`~dockermap.map.config.ExecCommand`. Keep this in mind when
-modifying existing elements, since no automated conversion is done then. For example, for adding a host-shared volume
-at run-time, use::
+:attr:`~dockermap.map.config.container.ContainerConfiguration.healthcheck`;
+each element (where applicable, i.e. each list item) is converted into a named tuple
+:class:`~dockermap.map.input.SharedVolume`,
+:class:`~dockermap.map.input.HostVolume`,
+:class:`~dockermap.map.input.UsedVolume`,
+:class:`~dockermap.map.input.ContainerLink`,
+:class:`~dockermap.map.input.PortBinding`,
+:class:`~dockermap.map.input.NetworkEndpoint`,
+:class:`~dockermap.map.input.ExecCommand`, or
+:class:`~dockermap.map.input.HealthCheck`.
 
-    from dockermap.map.config import SharedVolume
-
-    container_map.containers.app1.binds.append(SharedVolume('volume1', False))
+This conversion takes places place, together with some input validation, if
+:meth:`~dockermap.map.config.ConfigurationObject.clean` is called directly or indirectly through any of
+:meth:`~dockermap.map.config.ConfigurationObject.as_dict`,
+:meth:`~dockermap.map.config.ConfigurationObject.merge_from_dict`,
+:meth:`~dockermap.map.config.ConfigurationObject.merge_from_obj`, or
+:meth:`~dockermap.map.config.ConfigurationObject.update_from_obj`.
+Since the merge-methods are also used before resolving container dependencies, this is done implicitly before invoking
+any command on container maps.
 
 Creating and using container maps
 ---------------------------------
@@ -697,7 +725,7 @@ any time later with :meth:`~dockermap.map.config.main.ContainerMap.check_integri
 :class:`~dockermap.map.container.MapIntegrityError`.
 
 A :class:`~dockermap.map.client.MappingDockerClient` instance finally applies the container map to a Docker client. This
-can be a an instance of the Docker Remove API client. For added logging and additional functionality, using an instance
+can be a an instance of the Docker Remote API client. For added logging and additional functionality, using an instance
 of :class:`~dockermap.map.base.DockerClientWrapper` is recommended. Details of these implementations are described in
 :ref:`container_client`.
 

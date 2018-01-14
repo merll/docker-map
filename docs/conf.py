@@ -52,7 +52,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Docker-Map'
-copyright = u'2017, Matthias Erll'
+copyright = u'2018, Matthias Erll'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -269,5 +269,5 @@ texinfo_documents = [
 #texinfo_no_detailmenu = False
 
 intersphinx_mapping = {
-    'python': ('https://docs.python.org/', None),
+    'python': ('https://docs.python.org/3/', None),
 }

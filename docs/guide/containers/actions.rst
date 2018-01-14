@@ -39,8 +39,9 @@ applies:
 
   * The image id from existing container is compared to the current id of the image as specified in the container
     configuration. If it does not match, the container is re-created based on the new image.
-  * Linked containers, as declared on the map, are compared to the current container's runtime configuration. If any
-    container is missing or the linked alias mismatches, the dependent container is re-created and restarted.
+  * Linked containers, as declared on the map, are compared to the current container's runtime configuration. For
+    legacy container links, if any container is missing or the linked alias mismatches, the dependent container is
+    re-created and restarted. If used with configured container networks, only the network endpoint is re-created.
   * The virtual filesystem path of attached containers and other shared volumes is compared to dependent
     containers' paths. In case of a mismatch, the latter is updated.
   * The environment variables, command, and entrypoint of the container are compared to variables set in
@@ -48,6 +49,23 @@ applies:
     the container is considered outdated.
   * Exposed ports of the container are checked against :attr:`~dockermap.map.config.container.ContainerConfiguration.exposes`.
     If any ports are missing or configured differently, this also causes a container update.
+  * The following container limits are checked against the host configuration of the currently-running container:
+
+    * ``BlkioWeight``
+    * ``CpuPeriod``
+    * ``CpuQuota``
+    * ``CpuShares``
+    * ``CpusetCpus``
+    * ``CpusetMems``
+    * ``Memory``
+    * ``MemoryReservation``
+    * ``MemorySwap``
+    * ``KernelMemory``
+
+    If the Docker API supports it (version >= 1.22), changes will be applied to a running container (i.e. without the
+    need to re-create the container). Due to a limitation in the Docker SDK for Python, existing limits can only be
+    modified by not be removed (or set to zero). Where necessary, the container is reset unless
+    ``skip_limit_reset=True`` is passed in as a keyword argument.
 
 The keyword argument ``force_update`` takes a single name or list of container configuration names to force the update
 on. This can be useful in cases where the need for re-creating a container cannot be detected automatically.
@@ -56,8 +74,8 @@ Post-start commands in :attr:`~dockermap.map.config.container.ContainerConfigura
 be found on a running container, matching command line and user. If not, the configured command is executed, unless
 :const:`dockermap.map.input.ExecPolicy.INITIAL` has been set for the command. By default
 the entire command line is matched. For considering partial matches (i.e. if the command in the process overview gets
-modified), you can set :attr:`~dockermap.map.update.ContainerUpdateMixin.check_exec_commands` to
-:const:`dockermap.map.update.CmdCheck.PARTIAL`. Setting it to :const:`dockermap.map.update.CmdCheck.NONE`
+modified), you can set :attr:`~dockermap.map.state.update.main.UpdateStateGenerator.check_exec_commands` to
+:const:`dockermap.map.input.CmdCheck.PARTIAL`. Setting it to :const:`dockermap.map.input.CmdCheck.NONE`
 deactivates this check entirely.
 
 Networks in :attr:`~dockermap.map.config.container.ContainerConfiguration.networks` are tested if they exist and if
@@ -192,6 +210,9 @@ They can be modified in custom implementations, or changed by passing in keyword
 * ``force_update`` (Actions: ``update``; Default: ``None``): A string or list of container configurations that should
   be updated without checking. This can be used in case a change in the container configuration cannot be detected
   reliably.
+* ``skip_limit_reset`` (Actions: ``update``; Default: ``False``): Due to a limitation of the current Docker API, limits
+  of containers can be updated but not removed. This may lead to the need to re-create the container. If this is not
+  desired, set this to ``True``.
 * ``update_persistent`` (Actions: ``update``; Default: ``False``): Whether to remove containers where configurations
   are marked as ``persistent``.
 * ``check_exec_commands`` (Actions: ``update``; Default: ``CmdCheck.FULL``): How to check the command of a running

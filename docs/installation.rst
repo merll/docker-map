@@ -6,11 +6,26 @@ Installation and configuration
 
 Installation
 ============
+The first version of the Docker API Python client was released as ``docker-py``. Version 2.x of the now so-called
+Docker SDK for Python introduced some breaking changes and removed backwards compatibility with older Docker Remote API
+versions. It was published with the ``pip`` package name ``docker``. Since Docker-Map currently supports *both*
+versions which cannot be installed at the same time, none of them will be installed by default. You can either
+
+* install one of ``docker`` or ``docker-py``,
+* or use one of the extra-options below.
+
 The current stable release, published on PyPI_, can be installed using the following command:
 
 .. code-block:: bash
 
-   pip install docker-map
+   pip install docker-map[docker]
+
+This also installs the Docker SDK for Python 2.x. If you want to install the older implementation (version 1.x),
+use the following instead:
+
+.. code-block:: bash
+
+   pip install docker-map[legacy]
 
 
 For importing YAML configurations, you can install Docker-Map using
@@ -20,12 +35,15 @@ For importing YAML configurations, you can install Docker-Map using
    pip install docker-map[yaml]
 
 
-Dependencies
-------------
-The following libraries will be automatically installed from PyPI:
+Upgrading
+---------
+If you were using an older version (< 1.0.0) of Docker-Map and want to migrate from ``docker-py`` (1.x) to the new
+``docker`` (2.x) library, uninstall the older one first, and then reinstall:
 
-* docker-py (>=0.5.0)
-* Optional: PyYAML (tested with 3.11) for YAML configuration import
+.. code-block:: bash
+
+   pip uninstall docker-py
+   pip install docker
 
 
 Docker service
