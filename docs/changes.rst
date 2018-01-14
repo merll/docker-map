@@ -2,6 +2,38 @@
 
 Change History
 ==============
+1.0.0
+-----
+* Implemented update of container settings (i.e. memory limit, cpu shares) without a need for resetting the container,
+  where supported by more recent Docker hosts.
+* Version-dependent client features such as volumes and networks have been consolidated into a dictionary-type
+  property :attr:`~dockermap.map.config.client.ClientConfiguration.features`.
+* Added support for the Docker SDK for Python 2.x. Version 1.x is still supported. Using 2.x and a sufficiently recent
+  Docker host adds the following functionality:
+
+  * The ``restart_policy`` setting in the host config can be updated at runtime.
+  * :attr:`~dockermap.map.config.container.ContainerConfiguration.stop_timeout` is passed to the container on creation.
+    Whereas Docker-Map has been supporting this setting for a while now, this will also apply when manually stopping a
+    container (e.g. through the command line).
+* Added :attr:`~dockermap.map.config.container.ContainerConfiguration.healthcheck`: Adds a health check command to
+  containers, if the Docker host and the API client supports it.
+* :attr:`~dockermap.map.config.container.ContainerConfiguration.start_delay`: Simply adds a delay of *x* seconds after a
+  container has been started. Can be used on older Docker hosts to prevent race conditions during container linking.
+* Added Dockerfile properties :attr:`~dockermap.build.dockerfile.DockerFile.labels`,
+  :attr:`~dockermap.build.dockerfile.DockerFile.shell`, :attr:`~dockermap.build.dockerfile.DockerFile.stopsignal`, and
+  :attr:`~dockermap.build.dockerfile.DockerFile.healthcheck`. There is however no verification if the Docker host
+  supports these commands.
+* Added serialization: Container maps now have a method :meth:`~dockermap.map.config.ConfigurationObject.as_dict`,
+  that return all contents as a nested Python dictionary structure. Passing this in as the ``initial`` argument of
+  :class:`~dockermap.map.config.container.ContainerMap` yields a copy of the original map.
+* Input validation and conversion is no longer performed immediately when configuration properties are being set, but
+  deferred to a later step. This will likely not have any practical implications for most users, since conversion
+  still happens automatically before merge operations and before the configuration is being used. It can also be invoked
+  by calling :meth:`~dockermap.map.config.ConfigurationObject.clean`.
+* All tuple input lists from :mod:`dockermap.map.input` now accept dictionaries with their named parameters as input.
+* For consistency with other properties, the order of arguments in the :class:`~dockermap.map.input.HostConfig` tuple
+  have been changed. It is not ``path``, ``host_path``, ``readonly`` (optional).
+
 0.8.1
 -----
 * Fixed Python 3 compatibility.

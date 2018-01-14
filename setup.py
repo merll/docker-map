@@ -19,9 +19,7 @@ def include_readme():
         return doc.rst
 
 
-REQUIRED_PACKAGES = ['six']
-if sys.version_info[:2] < (3, 4):
-    REQUIRED_PACKAGES.append('enum34')
+REQUIRED_PACKAGES = ['six', 'enum34;python_version<"3.4"']
 
 
 setup(
@@ -51,10 +49,11 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Software Development :: Build Tools',
         'Topic :: System :: Software Distribution',
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
     ],
     include_package_data=True,
 )
