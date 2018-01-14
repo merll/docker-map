@@ -45,7 +45,7 @@ def _get_property(prop_name, doc=None):
         self._modified.add(prop_name)
         self._config[prop_name] = value
 
-    return property(get_item, set_item, doc)
+    return property(get_item, set_item, doc=doc)
 
 
 class ConfigurationMeta(type):
