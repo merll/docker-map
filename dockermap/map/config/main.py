@@ -39,9 +39,9 @@ class ContainerMap(ConfigurationObject):
     clients = CP(list)
     groups = CP(dict, default=DictMap, input_func=DictMap)
     default_domain = CP()
-    set_hostname = CP(default=True, input_func=bool_if_set)
-    use_attached_parent_name = CP(default=False, input_func=bool_if_set)
-    default_tag = CP(default='latest')
+    set_hostname = CP(input_func=bool_if_set)
+    use_attached_parent_name = CP(input_func=bool_if_set)
+    default_tag = CP()
 
     DOCSTRINGS = {
         'repository': "Repository prefix for images. This is prepended to image names used by container "
@@ -520,14 +520,18 @@ class ContainerMap(ConfigurationObject):
         extended_config.merge_from_obj(config)
         return extended_config
 
-    def get_extended_map(self):
+    def get_extended_map(self, defaults=None):
         """
         Creates a copy of this map which includes all non-abstract configurations in their extended form.
 
+        :param defaults: Optional default map properties.
+        :type defaults: dict
         :return: Copy of this map.
         :rtype: ContainerMap
         """
         map_copy = self.__class__(self.name)
+        if defaults:
+            map_copy.update_from_dict(defaults)
         map_copy.update_from_obj(self, copy=True, update_containers=False)
         for c_name, c_config in self:
             map_copy._containers[c_name] = self.get_extended(c_config)

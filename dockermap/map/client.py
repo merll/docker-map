@@ -51,6 +51,10 @@ class MappingDockerClient(object):
     :type docker_client: dockermap.map.config.client.ClientConfiguration or docker.client.Client
     :param clients: Dictionary of client configurations
     :type clients: dict[unicode | str, dockermap.map.config.client.ClientConfiguration]
+    :param map_defaults: Default values to set on each container map.
+    :type map_defaults: dict
+    :param option_defaults: Default values to set for various state, action generator, and runner classes.
+    :type option_defaults: dict
     """
     configuration_class = ClientConfiguration
     policy_class = BasePolicy
@@ -69,7 +73,8 @@ class MappingDockerClient(object):
     }
     runner_class = DockerClientRunner
 
-    def __init__(self, container_maps=None, docker_client=None, clients=None):
+    def __init__(self, container_maps=None, docker_client=None, clients=None,
+                 map_defaults=None, option_defaults=None):
         if container_maps:
             if isinstance(container_maps, ContainerMap):
                 self._default_map = container_maps.name
@@ -96,6 +101,8 @@ class MappingDockerClient(object):
             else:
                 default_client = self.configuration_class.from_client(docker_client)
             self._clients[self.policy_class.default_client_name] = default_client
+        self._map_defaults = map_defaults or {}
+        self._option_defaults = option_defaults or {}
         self._policy = None
 
     def get_policy(self):
@@ -106,7 +113,8 @@ class MappingDockerClient(object):
         :rtype: dockermap.map.policy.base.BasePolicy
         """
         if not self._policy:
-            self._policy = self.policy_class(self._maps, self._clients)
+            self._policy = self.policy_class(self._maps, self._clients,
+                                             self._map_defaults, self._option_defaults)
         return self._policy
 
     def get_state_generator(self, action_name, policy, kwargs):
@@ -514,6 +522,24 @@ class MappingDockerClient(object):
         :rtype: dict[unicode | str, dockermap.map.config.client.ClientConfiguration]
         """
         return self._clients
+
+    def map_defaults(self):
+        """
+        Default values to set on each container map.
+
+        :return: Dictionary of container map defaults.
+        :rtype: dict[unicode | str, Any]
+        """
+        return self._map_defaults
+
+    def option_defaults(self):
+        """
+        Default values to set for various state, action generator, and runner classes.
+
+        :return: Dictionary of container map defaults.
+        :rtype: dict[unicode | str, Any]
+        """
+        return self._option_defaults
 
     @property
     def default_map(self):

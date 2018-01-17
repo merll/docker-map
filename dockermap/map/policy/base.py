@@ -28,12 +28,19 @@ class BasePolicy(object):
     hostname_replace = DEFAULT_HOSTNAME_REPLACEMENT
     default_network_names = ['bridge']
 
-    def __init__(self, container_maps, clients):
+    def __init__(self, container_maps, clients, map_defaults=None, option_defaults=None):
         self._maps = maps = {
-            map_name: map_contents.get_extended_map()
+            map_name: map_contents.get_extended_map(map_defaults)
             for map_name, map_contents in iteritems(container_maps)
         }
         self._clients = clients
+        self._option_defaults = default_opts = {}
+        if option_defaults:
+            default_opts.update(option_defaults)
+            for p_opt in ['core_image', 'base_image', 'default_client_name',
+                          'hostname_replace', 'default_network_names']:
+                if p_opt in default_opts:
+                    setattr(self, p_opt, default_opts.pop(p_opt))
         self._container_names = ContainerCache(clients)
         self._network_names = NetworkCache(clients)
         self._volume_names = VolumeCache(clients)
@@ -209,6 +216,17 @@ class BasePolicy(object):
         :rtype: dict[unicode | str, dockermap.map.config.client.ClientConfiguration]
         """
         return self._clients
+
+    @property
+    def option_defaults(self):
+        """
+        Default values for options of state, action, and runner implementations, for overriding the
+        class-implemented defaults.
+
+        :return: Dictionary with option name and default value to use.
+        :rtype: dict
+        """
+        return self._option_defaults
 
     @property
     def container_names(self):

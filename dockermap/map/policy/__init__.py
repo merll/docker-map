@@ -36,9 +36,12 @@ class PolicyUtil(with_metaclass(PolicyUtilMeta)):
     policy_options = []
 
     def __init__(self, policy, kwargs):
+        defaults = policy.option_defaults
         for option_name in self.__class__.policy_options:
             if option_name in kwargs:
                 setattr(self, option_name, kwargs.pop(option_name))
+            elif option_name in defaults:
+                setattr(self, option_name, defaults[option_name])
         self._policy = policy
 
     def get_options(self):
