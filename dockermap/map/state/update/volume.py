@@ -161,7 +161,7 @@ class AbstractVolumeChecker(object):
         self._vfs_paths = {}
         self._policy = policy
 
-    def register_attached(self, alias, parent_name, mapped_path, path):
+    def register_attached(self, volume_name, mapped_path, path):
         pass
 
     def get_vfs_check(self, config_id, container_map, instance_volumes):
@@ -182,8 +182,7 @@ class AbstractVolumeChecker(object):
 
 
 class ContainerLegacyVolumeChecker(AbstractVolumeChecker):
-    def register_attached(self, alias, parent_name, mapped_path, path):
-        volume_name = '{0}.{1}'.format(parent_name, alias) if parent_name else alias
+    def register_attached(self, volume_name, mapped_path, path):
         self._vfs_paths[volume_name, None, mapped_path] = path
 
     def get_vfs_check(self, config_id, container_map, instance_volumes):

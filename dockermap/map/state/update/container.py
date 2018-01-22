@@ -282,10 +282,13 @@ class UpdateContainerState(ContainerBaseState):
         if config_id.config_type == ItemType.VOLUME:
             volumes = get_instance_volumes(self.detail, False)
             if volumes:
-                mapped_path = resolve_value(self.container_map.volumes[config_id.instance_name].default_path)
-                parent_name = config_id.config_name if self.container_map.use_attached_parent_name else None
-                self.volume_checker.register_attached(config_id.instance_name, parent_name,
-                                                      mapped_path, volumes.get(mapped_path))
+                default_paths = self.policy.default_volume_paths[config_id.map_name]
+                if self.container_map.use_attached_parent_name:
+                    volume_name = '{0}.{1}'.format(config_id.config_name, config_id.instance_name)
+                else:
+                    volume_name = config_id.instance_name
+                mapped_path = resolve_value(default_paths[volume_name])
+                self.volume_checker.register_attached(volume_name, mapped_path, volumes.get(mapped_path))
         else:
             image_name = format_image_tag(self.container_map.get_image(self.config.image or config_id.config_name))
             images = self.policy.images[self.client_name]

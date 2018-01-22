@@ -223,7 +223,7 @@ MAP_DATA_2 = {
                 '/var/lib/redis': 'redis/data',
             },
             'links': 'sub_svc',
-            'attaches': ['redis_socket', 'redis_log'],
+            'attaches': ['redis_socket', ('redis_log', '/var/log/redis')],
             'user': 'redis',
             'permissions': 'u=rwX,g=rX,o=',
             'host_config': {
@@ -239,7 +239,6 @@ MAP_DATA_2 = {
     },
     'volumes': {
         'redis_socket': '/var/run/redis',
-        'redis_log': '/var/log/redis',
         'server_log': '/var/lib/server/log',
         'app_data': '/var/lib/app/data',
         'app_config': '/var/lib/app/config',
@@ -251,7 +250,7 @@ MAP_DATA_2 = {
     },
     'networks': {
         'app_net1': {'driver': 'bridge'},
-        'app_net2': {'driver': 'bridge'},
+        'app_net2': None,
     },
     'groups': {
         'group1': ['server', 'worker', 'worker_q2'],

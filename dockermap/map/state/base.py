@@ -8,6 +8,7 @@ import logging
 from six import with_metaclass
 
 from ...utils import format_image_tag
+from ..config.volume import VolumeConfiguration
 from ..input import ItemType
 from ..policy import ConfigFlags, ABCPolicyUtilMeta, PolicyUtil
 from . import INITIAL_START_TIME, State, StateFlags, ConfigState
@@ -226,7 +227,11 @@ class VolumeBaseState(AbstractState):
     """
     def __init__(self, *args, **kwargs):
         super(VolumeBaseState, self).__init__(*args, **kwargs)
-        self.config = self.container_map.get_existing_volume(self.config_id.instance_name)
+        config = self.container_map.get_existing_volume(self.config_id.instance_name)
+        if config is None:
+            self.config = VolumeConfiguration()
+        else:
+            self.config = config
         self.volume_name = None
 
     def set_defaults(self):
