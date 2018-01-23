@@ -117,7 +117,7 @@ def get_map_config_ids(value, maps, default_map_name=None, default_instances=Non
     tuples with expanded groups, listing all input or configured instances, and sorted by map and configuration.
 
     :param value: Input value(s).
-    :type value: str | unicode | dockermap.map.input.InputConfigId | collection.Iterable[str | unicode | dockermap.map.input.InputConfigId]
+    :type value: str | unicode | dockermap.map.input.InputConfigId | collections.Iterable[str | unicode | dockermap.map.input.InputConfigId]
     :param maps: Dictionary with expanded container maps, for resolving groups, aliases (``'__all__'``), and configured
       instances in absence of instance specification in the input.
     :param default_map_name: Default map name that is used, in case it is not part of the input.
