@@ -10,6 +10,7 @@ from docker.errors import APIError
 
 from ..exceptions import DockerStatusError
 from ..docker_api import APIClient
+from . import use_get_archive
 from .docker_util import DockerUtilityMixin
 
 log = logging.getLogger(__name__)
@@ -295,10 +296,16 @@ class DockerClientWrapper(DockerUtilityMixin, APIClient):
         :param local_filename: Local file to store resource into. Will be overwritten if present.
         :type local_filename: unicode | str
         """
-        raw = self.copy(container, resource)
-        with open(local_filename, 'wb+') as f:
-            for buf in raw:
-                f.write(buf)
+        if use_get_archive(self.api_version):
+            raw = self.get_archive(container, resource)[0]
+        else:
+            raw = self.copy(container, resource)
+        try:
+            with open(local_filename, 'wb+') as f:
+                for buf in raw:
+                    f.write(buf)
+        finally:
+            raw.close()
 
     def save_image(self, image, local_filename):
         """
@@ -311,6 +318,9 @@ class DockerClientWrapper(DockerUtilityMixin, APIClient):
         :type local_filename: unicode | str
         """
         raw = self.get_image(image)
-        with open(local_filename, 'wb+') as f:
-            for buf in raw:
-                f.write(buf)
+        try:
+            with open(local_filename, 'wb+') as f:
+                for buf in raw:
+                    f.write(buf)
+        finally:
+            raw.close()

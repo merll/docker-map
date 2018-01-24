@@ -2,18 +2,14 @@
 from __future__ import unicode_literals
 
 import logging
-
 import sys
 
-from distutils.version import StrictVersion
 from requests import Timeout
 
 from ..build.context import DockerContext
 from ..dep import ImageDependentsResolver
 from ..exceptions import PartialResultsError
-
-
-DEPRECATED_FORCE_TAG_VERSION = StrictVersion(str('1.24'))
+from . import use_force_tag
 
 log = logging.getLogger(__name__)
 
@@ -99,7 +95,7 @@ class DockerUtilityMixin(object):
         tag_set.discard(i_tag)
         added_tags = []
         tag_kwargs = {}
-        if str(self.api_version) < DEPRECATED_FORCE_TAG_VERSION:
+        if use_force_tag(self.api_version):
             tag_kwargs['force'] = True
         if repo and tag_set:
             for t in tag_set:
