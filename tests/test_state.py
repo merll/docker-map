@@ -28,8 +28,11 @@ from dockermap.utils import format_image_tag
 from tests import MAP_DATA_2, CLIENT_DATA_1, CLIENT_DATA_2
 
 
-URL_PREFIXES = ['http+docker://localunixsocket/v{0}'.format(v) for v in (CLIENT_DATA_1['version'],
-                                                                         CLIENT_DATA_2['version'])]
+URL_PREFIXES = ['http+docker://{1}/v{0}'.format(v, h)
+                for h in ('localunixsocket',
+                          'localhost')
+                for v in (CLIENT_DATA_1['version'],
+                          CLIENT_DATA_2['version'])]
 
 P_STATE_INITIAL = 0
 P_STATE_RUNNING = 1
