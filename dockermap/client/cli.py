@@ -132,7 +132,23 @@ def _transform_kwargs(ka):
             yield _quoted_arg_format(cmd_arg, value)
 
 
+def _transform_host_config(ka):
+    for key, value in iteritems(ka):
+        if key == 'NetworkMode':
+            if value != 'default':
+                yield _quoted_arg_format('network', value)
+            continue
+        for item in value:
+            if key == "Binds":
+                yield _quoted_arg_format('volume', item)
+            elif key == "Links":
+                yield _quoted_arg_format('link', item)
+            elif key == 'PortBindings':
+                yield _mapping_format('publish', item)
+
+
 def _transform_create_kwargs(ka):
+    host_config = ka.pop('host_config', None)
     network = ka.pop('network_mode', None)
     network_disabled = ka.pop('network_disabled', False)
     network_config = ka.pop('networking_config', None)
@@ -145,6 +161,9 @@ def _transform_create_kwargs(ka):
     restart_policy = ka.pop('restart_policy', None)
 
     for arg in _transform_kwargs(ka):
+        yield arg
+
+    for arg in _transform_host_config(host_config):
         yield arg
 
     if environment:
