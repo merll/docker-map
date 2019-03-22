@@ -149,7 +149,7 @@ def _transform_host_config(ka):
                     if source_dict['HostIp']:
                         source = '{}:{}'.format(source_dict['HostIp'], source)
                     yield _mapping_format(
-                        'expose',
+                        'publish',
                         source,
                         item,
                     )

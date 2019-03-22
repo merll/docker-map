@@ -42,7 +42,7 @@ class TransformCreateKwargs(TestCase):
         }
         final_kwargs = _transform_create_kwargs(initial_kwargs.copy())
         self.assertIn(
-            '--expose=8080:80/tcp',
+            '--publish=8080:80/tcp',
             final_kwargs
         )
 
