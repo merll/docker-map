@@ -14,7 +14,7 @@ class TransformCreateKwargs(TestCase):
                 links=[('from', 'to')],
             )
         }
-        final_kwargs = _transform_create_kwargs(initial_kwargs)
+        final_kwargs = _transform_create_kwargs(initial_kwargs.copy())
         self.assertIn(
             '--link="from:to"',
             final_kwargs
@@ -27,9 +27,22 @@ class TransformCreateKwargs(TestCase):
                 binds=['/var/lib/site/config/app1:/var/lib/app/config:ro'],
             )
         }
-        final_kwargs = _transform_create_kwargs(initial_kwargs)
+        final_kwargs = _transform_create_kwargs(initial_kwargs.copy())
         self.assertIn(
             '--volume="/var/lib/site/config/app1:/var/lib/app/config:ro"',
+            final_kwargs
+        )
+
+    def test_port(self):
+        initial_kwargs = {
+            'host_config': HostConfig(
+                version='1.25',
+                port_bindings={8080: 80},
+            )
+        }
+        final_kwargs = _transform_create_kwargs(initial_kwargs.copy())
+        self.assertIn(
+            '--publish=8080/tcp:80',
             final_kwargs
         )
 

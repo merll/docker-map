@@ -144,7 +144,15 @@ def _transform_host_config(ka):
             elif key == "Links":
                 yield _quoted_arg_format('link', item)
             elif key == 'PortBindings':
-                yield _mapping_format('publish', item)
+                for dest_dict in value[item]:
+                    destination = dest_dict['HostPort']
+                    if dest_dict['HostIp']:
+                        destination = '{}:{}'.format(dest_dict['HostIp'], destination)
+                    yield _mapping_format(
+                        'publish',
+                        item,
+                        destination,
+                    )
 
 
 def _transform_create_kwargs(ka):
