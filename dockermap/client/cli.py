@@ -81,7 +81,7 @@ def _container_info(line):
     return {
         'Id': items[0],
         'Image': items[1],
-        'Created': time.mktime(list(map(int, CREATED_AT_PATTERN.match(items[2]).groups())) + [0, 0, 0]),
+        'Created': time.mktime(tuple(map(int, CREATED_AT_PATTERN.match(items[2]).groups())) + (0, 0, 0)),
         'Status': items[3],
         'Names': ['/{0}'.format(name) for name in items[4].split(',')],
         'Command': items[5].strip('"'),
