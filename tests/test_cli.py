@@ -37,12 +37,12 @@ class TransformCreateKwargs(TestCase):
         initial_kwargs = {
             'host_config': HostConfig(
                 version='1.25',
-                port_bindings={8080: 80},
+                port_bindings={80: 8080},
             )
         }
         final_kwargs = _transform_create_kwargs(initial_kwargs.copy())
         self.assertIn(
-            '--expose=8080/tcp:80',
+            '--expose=8080:80/tcp',
             final_kwargs
         )
 

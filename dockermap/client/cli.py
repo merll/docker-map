@@ -144,14 +144,14 @@ def _transform_host_config(ka):
             elif key == "Links":
                 yield _quoted_arg_format('link', item)
             elif key == 'PortBindings':
-                for dest_dict in value[item]:
-                    destination = dest_dict['HostPort']
-                    if dest_dict['HostIp']:
-                        destination = '{}:{}'.format(dest_dict['HostIp'], destination)
+                for source_dict in value[item]:
+                    source = source_dict['HostPort']
+                    if source_dict['HostIp']:
+                        source = '{}:{}'.format(source_dict['HostIp'], source)
                     yield _mapping_format(
                         'expose',
+                        source,
                         item,
-                        destination,
                     )
 
 
