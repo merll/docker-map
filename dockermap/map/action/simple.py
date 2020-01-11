@@ -228,6 +228,8 @@ class ImagePullActionGenerator(AbstractActionGenerator):
     policy_options = ['pull_all_images', 'pull_insecure_regsitry']
 
     def get_state_actions(self, state, **kwargs):
+        pull_kwargs = {}
+        if self.pull_insecure_registry:
+            pull_kwargs['insecure_registry'] = self.pull_insecure_registry
         if state.config_id.config_type == ItemType.IMAGE and (self.pull_all_images or state.base_state == State.ABSENT):
-            return [ItemAction(state, ImageAction.PULL,
-                    insecure_registry=self.pull_insecure_registry)]
+            return [ItemAction(state, ImageAction.PULL, **pull_kwargs)]

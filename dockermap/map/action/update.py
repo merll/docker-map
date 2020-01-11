@@ -52,9 +52,11 @@ class UpdateActionGenerator(AbstractActionGenerator):
                 actions.append(ItemAction(state, DerivedAction.RESET_NETWORK))
                 return actions
         elif config_type == ItemType.IMAGE:
+            pull_kwargs = {}
+            if self.pull_insecure_registry:
+                pull_kwargs['insecure_registry'] = self.pull_insecure_registry
             if state.base_state == State.ABSENT or self.pull_before_update:
-                return [ItemAction(state, ImageAction.PULL,
-                                   insecure_registry=self.pull_insecure_registry)]
+                return [ItemAction(state, ImageAction.PULL, **pull_kwargs)]
         elif config_type == ItemType.VOLUME:
             if state.base_state == State.ABSENT:
                 log.debug("Not found - creating attached volume %s.", config_id)

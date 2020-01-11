@@ -28,6 +28,8 @@ if docker.version_info[0] == 1:
         ('healthcheck', '100.0'),
         ('container_update_restart_policy', '100.0'),
     ])
+
+    INSECURE_REGISTRIES = True
 else:
     from docker import types as docker_types
 
@@ -43,3 +45,5 @@ else:
         ('healthcheck', '1.24'),
         ('container_update_restart_policy', '1.23'),
     ])
+
+    INSECURE_REGISTRIES = docker.version_info[0] < 3

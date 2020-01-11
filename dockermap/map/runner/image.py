@@ -3,11 +3,22 @@ from __future__ import unicode_literals
 
 import logging
 
+from ...docker_api import INSECURE_REGISTRIES
 from ..action import ImageAction
 from ..input import ItemType
 from .utils import update_kwargs
 
 log = logging.getLogger(__name__)
+
+
+def _check_insecure_registry(kwargs):
+    insecure_registry = kwargs.pop('insecure_registry', None)
+    if insecure_registry:
+        if INSECURE_REGISTRIES:
+            kwargs['insecure_registry'] = insecure_registry
+            return insecure_registry
+        log.warning("This Docker SDK does not support insecure registry configurations.")
+    return False
 
 
 class ImageMixin(object):
@@ -42,6 +53,7 @@ class ImageMixin(object):
         else:
             raise KeyError("No login information found for registry.", registry)
         update_kwargs(login_kwargs, kwargs)
+        _check_insecure_registry(login_kwargs)
         res = action.client.login(**login_kwargs)
         if res:
             log.debug("User %(username)s logged into %(registry)s.", login_kwargs)
@@ -61,8 +73,11 @@ class ImageMixin(object):
         """
         config_id = action.config_id
         registry, __, image = config_id.config_name.rpartition('/')
+        login_kwargs = {}
+        if _check_insecure_registry(kwargs):
+            login_kwargs['insecure_registry'] = True
         if registry and '.' in registry and registry not in self._login_registries:
-            self.login(action, registry, insecure_registry=kwargs.get('insecure_registry'))
+            self.login(action, registry, **login_kwargs)
         log.info("Pulling image %s:%s.", config_id.config_name, config_id.instance_name)
         res = action.client.pull(repository=config_id.config_name, tag=config_id.instance_name, **kwargs)
         log.debug("Done pulling image %s:%s.", config_id.config_name, config_id.instance_name)
