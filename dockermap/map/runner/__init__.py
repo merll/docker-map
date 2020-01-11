@@ -69,7 +69,7 @@ class AbstractRunner(with_metaclass(RunnerMeta, PolicyUtil)):
                 item_name = policy.nname(config_id.map_name, config_id.config_name)
             elif config_type == ItemType.IMAGE:
                 config = None
-                item_name = format_image_tag(config_id.config_name, config_id.instance_name)
+                item_name = format_image_tag((config_id.config_name, config_id.instance_name))
             else:
                 raise ValueError("Invalid configuration type.", config_id.config_type)
 
