@@ -5,12 +5,13 @@ import unittest
 
 from dockermap.docker_api import HostConfig
 from dockermap.api import ClientConfiguration, ContainerMap
+from dockermap.map.config.client import USE_HC_MERGE
 from dockermap.map.input import MapConfigId, ItemType
 from dockermap.map.policy.base import BasePolicy
 from dockermap.map.runner import ActionConfig
 from dockermap.map.runner.base import DockerClientRunner
 
-from tests import MAP_DATA_1, CLIENT_DATA_1, CLIENT_DATA_2, MAP_DATA_1_NEW
+from tests import MAP_DATA_1, CLIENT_DATA_1, CLIENT_DATA_2, MAP_DATA_1_NEW, SKIP_LEGACY_TESTS
 
 
 class TestPolicyClientKwargs(unittest.TestCase):
@@ -23,11 +24,16 @@ class TestPolicyClientKwargs(unittest.TestCase):
         self.client_version2 = CLIENT_DATA_2['version']
         self.sample_client_config1 = client_config1 = ClientConfiguration(**CLIENT_DATA_1)
         self.sample_client_config2 = client_config2 = ClientConfiguration(**CLIENT_DATA_2)
+        self.sample_client_config3 = client_config3 = ClientConfiguration(**CLIENT_DATA_1)
+        self.sample_client_config3.features['host_config'] = USE_HC_MERGE
         self.policy = BasePolicy({'main': self.sample_map1}, {'__default__': client_config1,
+                                                              'merge': client_config3,
                                                               'legacy': client_config2})
         self.runner = DockerClientRunner(self.policy, {})
 
     def test_create_kwargs_without_host_config(self):
+        if SKIP_LEGACY_TESTS:
+            return
         cfg_name = 'web_server'
         cfg = self.sample_map1.get_existing(cfg_name)
         cfg_id = MapConfigId(ItemType.CONTAINER, 'main', cfg_name)
@@ -46,6 +52,8 @@ class TestPolicyClientKwargs(unittest.TestCase):
         ))
 
     def test_host_config_kwargs(self):
+        if SKIP_LEGACY_TESTS:
+            return
         cfg_name = 'web_server'
         cfg = self.sample_map2.get_existing(cfg_name)
         cfg_id = MapConfigId(ItemType.CONTAINER, 'main', cfg_name)
@@ -68,6 +76,8 @@ class TestPolicyClientKwargs(unittest.TestCase):
         ))
 
     def test_create_kwargs_with_host_config(self):
+        if SKIP_LEGACY_TESTS:
+            return
         cfg_name = 'app_server'
         cfg = self.sample_map2.get_existing(cfg_name)
         cfg_id = MapConfigId(ItemType.CONTAINER, 'main', cfg_name, 'instance1')
@@ -145,7 +155,52 @@ class TestPolicyClientKwargs(unittest.TestCase):
             stop_signal='SIGTERM',
         ))
 
+    def test_create_kwargs_with_merged_host_config(self):
+        cfg_name = 'app_server'
+        cfg = self.sample_map1.get_existing(cfg_name)
+        cfg_id = MapConfigId(ItemType.CONTAINER, 'main', cfg_name, 'instance1')
+        c_name = 'main.app_server'
+        config = ActionConfig('merge', cfg_id, self.sample_client_config3, None, self.sample_map1, cfg)
+        hc_kwargs = dict(binds=['/new_h:/new_c:rw'])
+        kwargs = self.runner.get_container_create_kwargs(config, c_name, kwargs=dict(host_config=hc_kwargs))
+        self.assertDictEqual(kwargs, dict(
+            name=c_name,
+            image='registry.example.com/app:custom',
+            volumes=[
+                '/var/lib/app/config',
+                '/var/lib/app/data',
+                '/var/lib/app/log',
+                '/var/lib/app/socket',
+            ],
+            user='2000',
+            hostname='main-app-server-merge',
+            domainname=None,
+            ports=[8880],
+            networking_config={'EndpointsConfig': {'main.app': {}}},
+            stop_timeout=10,
+            healthcheck={
+                'test': ['CMD', 'curl', 'http://localhost/'],
+                'interval': 60000000000,
+                'timeout': 1000000000,
+                'retries': 3,
+                'start_period': 5000000000,
+            },
+            links=[],
+            binds=[
+                '/var/lib/site/config/app1:/var/lib/app/config:ro',
+                '/var/lib/site/data/app1:/var/lib/app/data:rw',
+                'main.app_log:/var/lib/app/log:rw',
+                'main.app_server_socket:/var/lib/app/socket:rw',
+                '/new_h:/new_c:rw',
+            ],
+            volumes_from=[],
+            port_bindings={},
+            stop_signal='SIGTERM',
+        ))
+
     def test_attached_create_kwargs_without_host_config(self):
+        if SKIP_LEGACY_TESTS:
+            return
         cfg_name = 'app_server'
         cfg = self.sample_map2.get_existing(cfg_name)
         cfg_id = MapConfigId(ItemType.VOLUME, 'main', cfg_name, 'app_server_socket')
@@ -161,6 +216,8 @@ class TestPolicyClientKwargs(unittest.TestCase):
         ))
 
     def test_attached_host_config_kwargs(self):
+        if SKIP_LEGACY_TESTS:
+            return
         cfg_name = 'app_server'
         cfg = self.sample_map2.get_existing(cfg_name)
         cfg_id = MapConfigId(ItemType.VOLUME, 'main', cfg_name, 'app_server_socket')
@@ -170,6 +227,8 @@ class TestPolicyClientKwargs(unittest.TestCase):
         self.assertDictEqual(kwargs, dict(container=c_name))
 
     def test_attached_preparation_create_kwargs(self):
+        if SKIP_LEGACY_TESTS:
+            return
         cfg_name = 'app_server'
         cfg = self.sample_map2.get_existing(cfg_name)
         cfg_id = MapConfigId(ItemType.VOLUME, 'main', cfg_name, 'app_server_socket')
@@ -207,6 +266,8 @@ class TestPolicyClientKwargs(unittest.TestCase):
         ))
 
     def test_attached_preparation_host_config_kwargs(self):
+        if SKIP_LEGACY_TESTS:
+            return
         cfg_name = 'app_server'
         cfg = self.sample_map2.get_existing(cfg_name)
         cfg_id = MapConfigId(ItemType.VOLUME, 'main', cfg_name, 'app_server_socket')
@@ -224,7 +285,7 @@ class TestPolicyClientKwargs(unittest.TestCase):
         cfg = self.sample_map2.get_existing(cfg_name)
         cfg_id = MapConfigId(ItemType.CONTAINER, 'main', cfg_name)
         c_name = 'main.app_extra'
-        config = ActionConfig('__default__', cfg_id, self.sample_client_config2, None, self.sample_map2, cfg)
+        config = ActionConfig('__default__', cfg_id, self.sample_client_config1, None, self.sample_map2, cfg)
         kwargs = self.runner.get_container_host_config_kwargs(config, c_name)
         self.assertDictEqual(kwargs, dict(
             binds=[],

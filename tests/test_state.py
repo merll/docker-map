@@ -25,14 +25,17 @@ from dockermap.map.state.update.container import CONTAINER_UPDATE_VARS
 from dockermap.map.state.utils import merge_dependency_paths
 from dockermap.utils import format_image_tag
 
-from tests import MAP_DATA_2, CLIENT_DATA_1, CLIENT_DATA_2
+from tests import MAP_DATA_2, CLIENT_DATA_1, CLIENT_DATA_2, SKIP_LEGACY_TESTS
 
+if SKIP_LEGACY_TESTS:
+    client_versions = CLIENT_DATA_1['version'],
+else:
+    client_versions = CLIENT_DATA_1['version'], CLIENT_DATA_2['version']
 
 URL_PREFIXES = ['http+docker://{1}/v{0}'.format(v, h)
                 for h in ('localunixsocket',
                           'localhost')
-                for v in (CLIENT_DATA_1['version'],
-                          CLIENT_DATA_2['version'])]
+                for v in client_versions]
 
 P_STATE_INITIAL = 0
 P_STATE_RUNNING = 1
@@ -626,6 +629,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
                         self.assertEqual(c_state.state_flags, StateFlags.NONE)
 
     def test_update_states_invalid_attached(self):
+        if SKIP_LEGACY_TESTS:
+            return
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
                 _container('sub_sub_svc'),
@@ -644,6 +649,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 self.assertEqual(redis_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
 
     def test_update_states_invalid_dependent_instance(self):
+        if SKIP_LEGACY_TESTS:
+            return
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
                 _container('sub_sub_svc'),
@@ -662,6 +669,8 @@ class TestPolicyStateGenerators(unittest.TestCase):
                 self.assertEqual(redis_state.state_flags & StateFlags.VOLUME_MISMATCH, StateFlags.VOLUME_MISMATCH)
 
     def test_update_states_invalid_dependent_instance_attached(self):
+        if SKIP_LEGACY_TESTS:
+            return
         with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
             self._setup_containers(rsps, [
                 _container('sub_sub_svc'),

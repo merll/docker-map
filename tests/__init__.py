@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import, unicode_literals
 
+from distutils.version import StrictVersion
+try:
+    from docker.constants import MINIMUM_DOCKER_API_VERSION
+except ImportError:
+    MINIMUM_DOCKER_API_VERSION = '1.00'
+
+
+SKIP_LEGACY_TESTS = StrictVersion('1.19') < StrictVersion(MINIMUM_DOCKER_API_VERSION)
 
 MAP_DATA_1 = {
     'repository': 'registry.example.com',
