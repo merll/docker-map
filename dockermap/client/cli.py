@@ -60,7 +60,7 @@ def _summarize_tags(image_id, image_lines):
 
 
 CREATED_AT_PATTERN = re.compile(r'(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) [+-]\d{4} \w+')
-PRIVATE_PORT_PATTERN = re.compile('(?P<PrivatePort>\d+(-\d+)?)\/(?P<Type>\w+)')
+PRIVATE_PORT_PATTERN = re.compile(r'(?P<PrivatePort>\d+(-\d+)?)\/(?P<Type>\w+)')
 PUBLIC_PORT_PATTERN = re.compile(r'(?P<IP>\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(?P<PublicPort>\d+(-\d+)?)->'
                                  r'(?P<PrivatePort>\d+(-\d+)?)\/(?P<Type>\w+)')
 
@@ -132,31 +132,7 @@ def _transform_kwargs(ka):
             yield _quoted_arg_format(cmd_arg, value)
 
 
-def _transform_host_config(ka):
-    for key, value in iteritems(ka):
-        if key == 'NetworkMode':
-            if value != 'default':
-                yield _quoted_arg_format('network', value)
-            continue
-        for item in value:
-            if key == "Binds":
-                yield _quoted_arg_format('volume', item)
-            elif key == "Links":
-                yield _quoted_arg_format('link', item)
-            elif key == 'PortBindings':
-                for source_dict in value[item]:
-                    source = source_dict['HostPort']
-                    if source_dict['HostIp']:
-                        source = '{}:{}'.format(source_dict['HostIp'], source)
-                    yield _mapping_format(
-                        'publish',
-                        source,
-                        item,
-                    )
-
-
 def _transform_create_kwargs(ka):
-    host_config = ka.pop('host_config', None)
     network = ka.pop('network_mode', None)
     network_disabled = ka.pop('network_disabled', False)
     network_config = ka.pop('networking_config', None)
@@ -167,11 +143,9 @@ def _transform_create_kwargs(ka):
     port_bindings = ka.pop('port_bindings', None)
     links = ka.pop('links', None)
     restart_policy = ka.pop('restart_policy', None)
+    healthcheck = ka.pop('healthcheck', None)
 
     for arg in _transform_kwargs(ka):
-        yield arg
-
-    for arg in _transform_host_config(host_config):
         yield arg
 
     if environment:
@@ -188,13 +162,13 @@ def _transform_create_kwargs(ka):
         yield _arg_format('net', network)
     elif network_config:
         ep_config = network_config['EndpointsConfig']
-        network_name = ep_config.keys()[0]
+        network_name = tuple(ep_config.keys())[0]
         nc = ep_config[network_name]
         yield _arg_format('net', network_name)
         for a in nc.get('Aliases') or ():
             yield _arg_format('network-alias', a)
-        for l in nc.get('Links') or ():
-            yield _arg_format(l)
+        for nc_link in nc.get('Links') or ():
+            yield _arg_format('link', nc_link)
         ipam = nc.get('IPAMConfig')
         if ipam:
             ip4 = ipam.get('IPv4Address')
@@ -203,8 +177,8 @@ def _transform_create_kwargs(ka):
             ip6 = ipam.get('IPv6Address')
             if ip6:
                 yield _arg_format('ip6', ip6)
-            for l in ipam.get('LinkLocalIPs') or ():
-                yield _arg_format('link-local-ip', l)
+            for ll_ip in ipam.get('LinkLocalIPs') or ():
+                yield _arg_format('link-local-ip', ll_ip)
 
     if volumes:
         bind_keys = {}
@@ -218,18 +192,21 @@ def _transform_create_kwargs(ka):
             else:
                 yield _quoted_arg_format('volume', v)
 
-    if expose and port_bindings:
+    if expose:
         for e in expose:
-            yield _arg_format('expose', e)
             if isinstance(e, tuple):
                 port, proto = e
+                yield _arg_format('expose', '{0}/{1}'.format(port, proto))
             else:
                 port, proto = e, None
+                yield _arg_format('expose', e)
+            if not port_bindings:
+                continue
             if proto:
                 pkey = '{0}/{1}'.format(port, proto)
                 pbind = port_bindings.get(pkey)
             else:
-                pkey, pbind = _first_key_value(port_bindings, port, text_type(port), '{0}/tcp')
+                pkey, pbind = _first_key_value(port_bindings, port, text_type(port), '{0}/tcp'.format(port))
             if pbind:
                 for pbi in pbind:
                     if isinstance(pbi, tuple):
@@ -239,8 +216,8 @@ def _transform_create_kwargs(ka):
                         yield _arg_format('publish', '{0}:{1}'.format(pbi, pkey))
 
     if links:
-        for l in links:
-            yield _mapping_format('link', *l)
+        for link in links:
+            yield _mapping_format('link', *link)
 
     if restart_policy:
         policy_name = restart_policy.get('Name')
@@ -250,6 +227,15 @@ def _transform_create_kwargs(ka):
                 yield _mapping_format('restart-policy', policy_name, max_retries)
             else:
                 yield _arg_format('restart-policy', policy_name)
+
+    if healthcheck:
+        cmd = healthcheck.get('test')
+        if cmd and isinstance(cmd, list) and cmd[0] in ('CMD', 'CMD-SHELL') and len(cmd) > 1:
+            yield _quoted_arg_format('healthcheck-cmd', ' '.join(cmd[1:]))
+            for hc_key in ('interval', 'timeout', 'retries', 'start_period'):
+                hc_val = healthcheck.get(hc_key)
+                if hc_val:
+                    yield _arg_format('healthcheck-{0}'.format(hc_key.replace('_', '-')), hc_val)
 
 
 def parse_containers_output(out):
