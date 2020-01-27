@@ -49,8 +49,6 @@ class DockerClientWrapper(DockerUtilityMixin, APIClient):
             output = parse_response(e)
             if 'stream' in output:
                 log_str = output['stream']
-                if log_str and log_str[-1] == '\n':
-                    log_str = log_str[:-1]
                 if log_str.startswith('Successfully built '):
                     image_str = log_str
                 self.push_log(log_str, logging.INFO)
