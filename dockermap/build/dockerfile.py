@@ -74,7 +74,7 @@ def format_command(cmd, shell=False):
             return cmd
     else:
         if isinstance(cmd, (list, tuple)):
-            return json.dumps(map(six.text_type, cmd))
+            return json.dumps(list(map(six.text_type, cmd)))
         elif isinstance(cmd, six.string_types):
             return json.dumps(list(_split_cmd()))
     raise ValueError("Invalid type of command string or sequence: {0}".format(cmd))
