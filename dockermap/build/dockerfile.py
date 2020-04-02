@@ -199,6 +199,15 @@ class DockerFile(DockerStringBuffer):
         """
         self.prefix_all('RUN', *lines)
 
+    def run_join(self, *lines):
+        """
+        Insert a series of commands in a Dockerfile joined with '&&' and prefixed with ``RUN``.
+
+        :param lines: Command lines to be inserted.
+        :type: collections.Iterable[unicode | str]
+        """
+        self.prefix('RUN', ' && '.join(lines))
+
     def add_file(self, src_path, dst_path=None, ctx_path=None, replace_space=True, expandvars=False, expanduser=False,
                  remove_final=False):
         """
