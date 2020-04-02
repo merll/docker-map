@@ -173,7 +173,9 @@ class DockerUtilityMixin(object):
             for container in self.containers(all=True):
                 c_names = [name[1:] for name in container['Names'] or () if name.find('/', 2)]
                 c_status = container['Status']
-                if (((include_initial and c_status == '') or c_status.startswith('Exited') or c_status == 'Dead') and
+                if (((include_initial and c_status in ('', 'Created'))
+                     or c_status.startswith('Exited')
+                     or c_status == 'Dead') and
                         exclude_names.isdisjoint(c_names)):
                     c_id = container['Id']
                     c_name = primary_container_name(c_names, default=c_id, strip_trailing_slash=False)
