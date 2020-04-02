@@ -3,6 +3,39 @@ from __future__ import unicode_literals
 
 import six
 
+from .map import SimpleEnum
+
+
+class CmdArgMappings(SimpleEnum):
+    DEBIAN = 'debian'
+    BUSYBOX = 'busybox'
+    CENTOS = 'centos'
+
+
+CMD_ARG_MAPPING = {
+    CmdArgMappings.DEBIAN: {
+        'no_login': '--disabled-login',
+        'no_create_home': '--no-create-home',
+        'no_password': '--disabled-password',
+        'gecos': '--gecos',
+        'system_user': '--system',
+    },
+    CmdArgMappings.CENTOS: {
+        'no_login': '--disabled-login',
+        'no_create_home': '--no-create-home',
+        'no_password': None,
+        'gecos': '--comment',
+        'system_user': '--system',
+    },
+    CmdArgMappings.BUSYBOX: {
+        'no_login': '-s /bin/false',
+        'no_create_home': '-H',
+        'no_password': '-D',
+        'gecos': '-g',
+        'system_user': '-S',
+    },
+}
+
 
 def str_arg(arg):
     return six.text_type(arg).replace(' ', '\\ ')
@@ -27,25 +60,28 @@ def _format_cmd(cmd, *args, **kwargs):
     return '{0} {1}'.format(cmd, arg_str)
 
 
-_NO_LOGIN = '--disabled-login'
-_NO_CREATE_HOME = '--no-create-home'
-_NO_PASSWORD = '--disabled-password'
-
 rm = lambda path, recursive=False, force=False: _format_cmd('rm', path, _R=bool(recursive), _f=bool(force))
 chown = lambda user_group, path, recursive=True: _format_cmd('chown', get_user_group(user_group), path,
                                                              _R=bool(recursive))
 chmod = lambda mode, path, recursive=True: _format_cmd('chmod', mode, path, _R=bool(recursive))
 
-addgroup = lambda groupname, gid, system=False: _format_cmd('groupadd', groupname, __system=bool(system), __gid=gid)
-assignuser = lambda username, groupnames: _format_cmd('usermod', username, _aG=','.join(groupnames))
-
 curl = lambda url, filename=None: _format_cmd('curl', url, _o=filename)
 wget = lambda url, filename=None: _format_cmd('wget', url, _o=filename)
-targz = lambda filename, source: _format_cmd('tar', filename, source, _czf=True)
-untargz = lambda filename, target=None: _format_cmd('tar', filename, _xzf=True, _C=target)
 
 
-def adduser(username, uid=None, system=False, no_login=True, no_password=False, group=False, gecos=None, **kwargs):
+def _replace_mapped_cmd_args(cmd_kwargs, arg_mapping):
+    mapped_cmds = CMD_ARG_MAPPING.get(arg_mapping)
+    if mapped_cmds:
+        for arg_key, cmd_arg in six.iteritems(mapped_cmds):
+            arg_val = cmd_kwargs.pop(arg_key, None)
+            if arg_val is not None and arg_val is not False:
+                if cmd_arg is None:
+                    raise ValueError("Argument {0} is not supported on {1}.".format(arg_key, arg_mapping))
+                cmd_kwargs[cmd_arg] = arg_val
+
+
+def adduser(username, uid=None, system=False, no_login=True, no_password=False, gecos=None,
+            arg_mapping=CmdArgMappings.DEBIAN, **kwargs):
     """
     Formats an ``adduser`` command.
 
@@ -55,24 +91,55 @@ def adduser(username, uid=None, system=False, no_login=True, no_password=False, 
     :type uid: long | int
     :param system: Create a system user account.
     :type system: bool
-    :param no_login: Disable the login for this user. Not compatible with CentOS. Implies setting '--no-create-home',
-      and ``no_password``.
+    :param no_login: Disable the login for this user. Not compatible with CentOS. Implies setting '--no-create-home'.
     :type no_login: bool
     :param no_password: Disable the password for this user. Not compatible with CentOS.
     :type no_password: bool
-    :param group: Create a group along with the user. Not compatible with CentOS.
-    :type group: bool
-    :param gecos: Set GECOS information in order to suppress an interactive prompt. On CentOS, use ``__comment``
-      instead.
+    :param gecos: Set GECOS information in order to suppress an interactive prompt.
     :type gecos: unicode | str
     :param kwargs: Additional keyword arguments which are converted to the command line.
     :return: A formatted ``adduser`` command with arguments.
     :rtype: unicode | str
     """
-    return _format_cmd('adduser', username, __system=bool(system), __uid=uid, __group=bool(group), __gid=uid,
-                       no_login=(no_login, _NO_CREATE_HOME, _NO_LOGIN),
-                       __disabled_password=no_login or bool(no_password),
-                       __gecos=gecos, **kwargs)
+    cmd_kwargs = dict(
+        system_user=bool(system), no_password=bool(no_password), gecos=gecos, _u=uid
+    )
+    if arg_mapping == CmdArgMappings.BUSYBOX:
+        cmd_kwargs['_G'] = username
+    else:
+        cmd_kwargs['_g'] = uid
+    if no_login:
+        cmd_kwargs.update(
+            no_create_home=True,
+            no_login=True,
+        )
+        if arg_mapping != CmdArgMappings.CENTOS:
+            cmd_kwargs['no_password'] = True
+    cmd_kwargs.update(kwargs)
+    _replace_mapped_cmd_args(cmd_kwargs, arg_mapping)
+    return _format_cmd('adduser', username, **cmd_kwargs)
+
+
+def addgroup(groupname, gid=None, system=False, arg_mapping=CmdArgMappings.DEBIAN, **kwargs):
+    cmd_kwargs = dict(
+        system_user=bool(system), _g=gid
+    )
+    cmd_kwargs.update(kwargs)
+    _replace_mapped_cmd_args(cmd_kwargs, arg_mapping)
+    return _format_cmd('addgroup', groupname, **cmd_kwargs)
+
+
+def assignuser(username, groupnames, arg_mapping=CmdArgMappings.DEBIAN, return_list=False, **kwargs):
+    if arg_mapping == CmdArgMappings.BUSYBOX:
+        cmds = [
+            _format_cmd('adduser', username, group_name, **kwargs)
+            for group_name in groupnames
+        ]
+    else:
+        cmds = [_format_cmd('usermod', username, _aG=','.join(groupnames), **kwargs)]
+    if return_list:
+        return cmds
+    return ' && '.join(cmds)
 
 
 def get_user_group(user_group):
@@ -94,8 +161,8 @@ def get_user_group(user_group):
     return user_group
 
 
-def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no_password=False, gecos=None, sudo=False,
-                 **kwargs):
+def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no_password=False, gecos=None,
+                 arg_mapping=CmdArgMappings.DEBIAN, return_list=False, **kwargs):
     """
     Generates a unix command line for creating user and group with the same name, assigning the user to the group.
     Has the same effect as combining :func:`~addgroup`, :func:`~adduser`, and :func:`~assignuser`.
@@ -114,19 +181,27 @@ def addgroupuser(username, uid, groupnames=None, system=False, no_login=True, no
     :type: no_password: bool
     :param gecos: Provide GECOS info and suppress prompt.
     :type gecos: unicode | str
-    :param sudo: Prepend `sudo` to the command. Default is ``False``. When using Fabric, use its `sudo` command instead.
-    :type sudo: bool
     :param kwargs: Additional keyword arguments for command line arguments.
     :return: Unix shell command line.
     :rtype: unicode | str
     """
-    group = addgroup(username, uid, system)
-    user = adduser(username, uid, system, no_login, no_password, False, gecos, **kwargs)
-    prefix = 'sudo ' if sudo else ''
+    cmds = [addgroup(username, gid=uid, system=system, arg_mapping=arg_mapping)]
+    adduser_kwargs = dict(uid=uid, system=system, no_login=no_login, no_password=no_password, gecos=gecos,
+                          arg_mapping=arg_mapping, **kwargs)
     if groupnames:
-        usermod = assignuser(username, groupnames)
-        return '{0}{1} && {0}{2} && {0}{3}'.format(prefix, group, user, usermod)
-    return '{0}{1} && {0}{2}'.format(prefix, group, user)
+        if arg_mapping == CmdArgMappings.BUSYBOX:
+            usermod = assignuser(username, groupnames, arg_mapping=arg_mapping, return_list=True)
+        else:
+            adduser_kwargs.update(_G=','.join(groupnames))
+            usermod = None
+    else:
+        usermod = None
+    cmds.append(adduser(username, **adduser_kwargs))
+    if usermod:
+        cmds.extend(usermod)
+    if return_list:
+        return cmds
+    return ' && '.join(cmds)
 
 
 def mkdir(path, create_parent=True, check_if_exists=False):
@@ -183,3 +258,19 @@ def mkdir_chown(paths, user_group=None, permissions='ug=rwX,o=rX', create_parent
     if isinstance(paths, (tuple, list)):
         return '; '.join((_generate_str(path) for path in paths))
     return _generate_str(paths)
+
+
+def tar(filename, source, **kwargs):
+    return _format_cmd('tar', source, _cf=filename, **kwargs)
+
+
+def untar(filename, target=None, **kwargs):
+    return _format_cmd('tar', _xf=filename, _C=target, **kwargs)
+
+
+def targz(filename, source, **kwargs):
+    return tar(filename, source, _z=True, **kwargs)
+
+
+def untargz(filename, target=None, **kwargs):
+    return untar(filename, target=target, _z=True, **kwargs)
