@@ -61,8 +61,7 @@ Contents
 
 Status
 ======
-Docker-Map is being used for small-scale deployment scenarios in test and production. It should currently considered
-beta, due to pending new features, generalizations, and unit tests.
+Docker-Map is being used for small-scale deployment scenarios in test and production.
 
 
 Indices and tables

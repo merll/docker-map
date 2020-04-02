@@ -49,7 +49,9 @@ Run commands
 In order to insert ``RUN`` commands for execution during the build process, use
 :meth:`~dockermap.build.dockerfile.DockerFile.run` and
 :meth:`~dockermap.build.dockerfile.DockerFile.run_all`. They are convenience methods for ``prefix('RUN', 'command')``
-and ``prefix_all('RUN', 'command 1', 'command 2', ...)``.
+and ``prefix_all('RUN', 'command 1', 'command 2', ...)``. For avoiding the creation of intermediate images and
+containers, use :meth:`~dockermap.build.dockerfile.DockerFile.run_join` that concatenates multiple commands into
+one line.
 
 Adding files
 ^^^^^^^^^^^^

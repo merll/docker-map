@@ -2,6 +2,15 @@
 
 Change History
 ==============
+1.1.0
+-----
+* Compatibility with latest Docker SDK versions (3.x and 4.x).
+* Added :attr:`~dockermap.map.client.MappingDockerClient.map_defaults` and
+  :attr:`~dockermap.map.client.MappingDockerClient.option_defaults`.
+* Adapted some shortcuts to different OS environments (currently Debian, CentOS, Busybox).
+* Added :meth:`~dockermap.build.dockerfile.DockerFile.run_join`.
+* More Python 3 fixes.
+
 1.0.0
 -----
 * Implemented update of container settings (i.e. memory limit, cpu shares) without a need for resetting the container,

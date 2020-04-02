@@ -20,7 +20,7 @@ The current stable release, published on PyPI_, can be installed using the follo
 
    pip install docker-map[docker]
 
-This also installs the Docker SDK for Python 2.x. If you want to install the older implementation (version 1.x),
+This also installs the Docker SDK for Python 4.x. If you want to install the older implementation (version 1.x),
 use the following instead:
 
 .. code-block:: bash
@@ -38,7 +38,7 @@ For importing YAML configurations, you can install Docker-Map using
 Upgrading
 ---------
 If you were using an older version (< 1.0.0) of Docker-Map and want to migrate from ``docker-py`` (1.x) to the new
-``docker`` (2.x) library, uninstall the older one first, and then reinstall:
+``docker`` (>2.x) library, uninstall the older one first, and then reinstall:
 
 .. code-block:: bash
 

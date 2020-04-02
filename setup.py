@@ -1,6 +1,5 @@
 from distutils.spawn import find_executable
 import os
-import sys
 from setuptools import setup, find_packages
 
 from dockermap import __version__
@@ -54,6 +53,7 @@ setup(
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
     ],
     include_package_data=True,
 )

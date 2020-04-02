@@ -11,3 +11,7 @@ Thanks to the following contributors
   [PR #10](https://github.com/merll/docker-map/pull/10). Also published a good
   [use case](https://github.com/hsoft/wordpress-template-docker).
 * [Technology Admin](https://github.com/ambsw-technology): Many detailed issue reports and suggestions for improvement.
+* [Clayton Daley](https://github.com/claytondaley): Contributions to
+  [PR #21](https://github.com/merll/docker-map/pull/21).
+* [KaiSzuttor](https://github.com/KaiSzuttor): Correct source path in add_file.
+  [PR #23](https://github.com/merll/docker-map/pull/23)

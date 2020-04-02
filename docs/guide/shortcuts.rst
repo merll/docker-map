@@ -63,8 +63,9 @@ code creates that group and assigns the web server user to it::
    these settings, but instead refer to variables.
 
 .. note::
-   `adduser` and `addgroup` are specific to Debian-based Linux distributions. Therefore, they will be replaced with
-   more system-independent commands in future versions.
+   `adduser`, `addgroup`, and `assignuser` are expanded to shell commands specific to Linux flavors. By default the
+   commands are generated as Debian-compatible. For using CentOS, add ``arg_mapping=CmdArgMappings.CENTOS``. For
+   Busybox-based containers (sometimes also necessary for Alpine-based images), use ``CmdArgMappings.BUSYBOX``.
 
 
 User names of most Docker-Map functions are formatted by :func:`~dockermap.shortcuts.get_user_group`. It accepts the
