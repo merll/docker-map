@@ -9,13 +9,13 @@ def include_readme():
     try:
         import pandoc
     except ImportError:
-        return ''
+        return b''
     pandoc.core.PANDOC_PATH = find_executable('pandoc')
     readme_file = os.path.join(os.path.dirname(__file__), 'README.md')
     doc = pandoc.Document()
     with open(readme_file, 'r') as rf:
         doc.markdown = rf.read()
-        return doc.rst
+        return doc.rst.decode('utf-8')
 
 
 REQUIRED_PACKAGES = ['six', 'enum34;python_version<"3.4"']
