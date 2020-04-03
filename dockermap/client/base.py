@@ -117,7 +117,11 @@ class DockerClientWrapper(DockerUtilityMixin, APIClient):
         else:
             last_log = self._docker_log_stream(response, raise_on_error)
             if last_log and last_log.startswith('Successfully built '):
-                image_id = last_log[19:]  # Remove prefix
+                # Remove prefix
+                if last_log[-1] == '\n':
+                    image_id = last_log[19:-1]
+                else:
+                    image_id = last_log[19:]
             else:
                 image_id = None
 
