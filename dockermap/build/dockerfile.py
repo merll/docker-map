@@ -251,7 +251,7 @@ class DockerFile(DockerStringBuffer):
             context_path = prepare_path(ctx_path, replace_space, True, expandvars, expanduser)
         else:
             context_path = target_path
-        self.prefix('ADD', source_path, target_path)
+        self.prefix('ADD', context_path, target_path)
         self._files.append((source_path, context_path))
         if remove_final:
             self._remove_files.add(target_path)
