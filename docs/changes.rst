@@ -2,6 +2,12 @@
 
 Change History
 ==============
+1.1.1
+-----
+* Tests and fixes for shortcuts.
+* Fixed :meth:`~dockermap.build.dockerfile.DockerFile.add_file` (issue introduced in
+  1.1.0).
+
 1.1.0
 -----
 * Compatibility with latest Docker SDK versions (3.x and 4.x).
