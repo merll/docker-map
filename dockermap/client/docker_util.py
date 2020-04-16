@@ -254,12 +254,14 @@ class DockerUtilityMixin(object):
                 removed_images.append(iid)
         return removed_images
 
-    def remove_all_containers(self, stop_timeout=10, list_only=False):
+    def remove_all_containers(self, stop_timeout=10, raise_on_error=False, list_only=False):
         """
         First stops (if necessary) and them removes all containers present on the Docker instance.
 
         :param stop_timeout: Timeout to stopping each container.
         :type stop_timeout: int
+        :param raise_on_error: Forward errors raised by the client and cancel the process. By default only logs errors.
+        :type raise_on_error: bool
         :param list_only: When set to ``True`` only lists containers, but does not actually stop or remove them.
         :type list_only: bool
         :return: A tuple of two lists: Stopped container ids, and removed container ids.
@@ -284,7 +286,8 @@ class DockerUtilityMixin(object):
                     pass
             except:
                 exc_info = sys.exc_info()
-                raise PartialResultsError(exc_info, (stopped_containers, []))
+                if raise_on_error:
+                    raise PartialResultsError(exc_info, (stopped_containers, []))
             else:
                 stopped_containers.append(c_id)
         removed_containers = []
@@ -293,7 +296,8 @@ class DockerUtilityMixin(object):
                 self.remove_container(c_id)
             except:
                 exc_info = sys.exc_info()
-                raise PartialResultsError(exc_info, (stopped_containers, removed_containers))
+                if raise_on_error:
+                    raise PartialResultsError(exc_info, (stopped_containers, removed_containers))
             else:
                 removed_containers.append(c_id)
         return stopped_containers, removed_containers
