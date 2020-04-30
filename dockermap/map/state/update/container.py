@@ -31,6 +31,8 @@ CONTAINER_UPDATE_VARS = [
     ('MemoryReservation', 'mem_reservation', False, docker_utils.parse_bytes),
     ('MemorySwap', 'memswap_limit', True, docker_utils.parse_bytes),
     ('KernelMemory', 'kernel_memory', False, docker_utils.parse_bytes),
+    ('OomKillDisable', 'oom_kill_disable', False, None),
+    ('PidsLimit', 'pids_limit', False, None),
 ]
 
 
