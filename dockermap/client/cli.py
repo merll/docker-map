@@ -42,7 +42,7 @@ def _quoted_arg_format(key, value):
 
 _CONTAINER_FIELDS = ['ID', 'Image', 'CreatedAt', 'Status', 'Names', 'Command', 'Ports']
 CONTAINER_FORMAT_ARG = _quoted_arg_format('format', '||'.join('{{{{.{0}}}}}'.format(f) for f in _CONTAINER_FIELDS))
-VERSION_FORMAT_ARG = _quoted_arg_format('format', '{{json .}}')
+JSON_FORMAT_ARG = _quoted_arg_format('format', '{{json .}}')
 
 
 def _summarize_tags(image_id, image_lines):
@@ -336,6 +336,19 @@ def parse_version_output(out):
     return {}
 
 
+def parse_info_output(out):
+    """
+    Parses the output of 'docker info --format="{{json .}}"'. Essentially just returns the parsed JSON string,
+    like the Docker API does. Fields are slightly different however.
+
+    :param out: CLI output.
+    :type out: unicode | str
+    :return: Parsed result.
+    :rtype: dict
+    """
+    return json.loads(out, encoding='utf-8')
+
+
 def parse_top_output(out):
     """
     Parses the output of the Docker CLI 'docker top <container>'. Note that if 'ps' output columns are modified and
@@ -428,8 +441,8 @@ class DockerCommandLineOutput(object):
                 if cli_cmd == 'ps':
                     cmd_args.append(CONTAINER_FORMAT_ARG)
                 p_args = None
-            elif cli_cmd == 'version':
-                cmd_args.append(VERSION_FORMAT_ARG)
+            elif cli_cmd in ('version', 'info'):
+                cmd_args.append(JSON_FORMAT_ARG)
                 p_args = None
             else:
                 if cli_cmd == 'wait':
