@@ -11,6 +11,18 @@ CLIENT_FEATURES = [
     ('container_update', '1.22'),
     ('stop_signal', '1.21')
 ]
+CLIENT_CONSTRAINTS = [
+    ('mem_limit', 'MemoryLimit'),
+    ('memswap_limit', 'SwapLimit'),
+    ('kernel_memory', 'KernelMemory'),
+    ('cpu_period', 'CpuCfsPeriod'),
+    ('cpu_quota', 'CpuCfsQuota'),
+    ('cpu_shares', 'CPUShares'),
+    ('cpuset_cpus', 'CPUSet'),
+    ('cpuset_mems', 'CPUSet'),
+    ('oom_kill_disable', 'OomKillDisable'),
+    ('pids_limit', 'PidsLimit'),
+]
 
 
 if docker.version_info[0] == 1:

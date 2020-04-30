@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from distutils.version import StrictVersion
 
 from ...client.base import DockerClientWrapper
-from ...docker_api import CLIENT_FEATURES
+from ...docker_api import CLIENT_FEATURES, CLIENT_CONSTRAINTS
 from .. import DictMap
 
 USE_HC_MERGE = 'merge'
@@ -37,6 +37,8 @@ class ClientConfiguration(DictMap):
         self._base_url = base_url
         self._version = version
         self._features = features = kwargs.pop('features', {})
+        info = kwargs.pop('info', None)
+        self._constraints = kwargs.pop('constraints', {})
         for f_name, __ in FEATURE_VERSIONS:
             if f_name in kwargs:
                 features[f_name] = kwargs.pop(f_name)
@@ -52,7 +54,7 @@ class ClientConfiguration(DictMap):
         self._auth_configs = kwargs.pop('auth_configs', None) or {}
         self._client = kwargs.pop('client', None)
         super(ClientConfiguration, self).__init__(*args, **kwargs)
-        self.update_settings(version=version)
+        self.update_settings(version=version, info=info)
 
     @classmethod
     def from_client(cls, client):
@@ -85,6 +87,11 @@ class ClientConfiguration(DictMap):
                 features = self._features
                 for f_name, f_version in FEATURE_VERSIONS:
                     features.setdefault(f_name, version_str >= f_version)
+        info = kwargs.pop('info', None)
+        if info:
+            self._constraints = support = {}
+            for i_name, i_label in CLIENT_CONSTRAINTS:
+                support.setdefault(i_name, info.get(i_label, False))
 
     def get_init_kwargs(self):
         """
@@ -236,3 +243,16 @@ class ClientConfiguration(DictMap):
         if not self._client:
             self.get_client()
         return self._features
+
+    @property
+    def constraints(self):
+        """
+        Container resource constraints supported by the client.
+
+        :return: Support dict.
+        :rtype: dict
+        """
+        if not self._constraints:
+            info = self.get_client().info()
+            self.update_settings(info=info)
+        return self._constraints

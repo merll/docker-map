@@ -20,19 +20,20 @@ log = logging.getLogger(__name__)
 
 
 CONTAINER_UPDATE_VARS = [
-    # Key in inspect output, docker-py kwarg, whether to also check create kwargs, conversion function
-    ('BlkioWeight', 'blkio_weight', False, None),
-    ('CpuPeriod', 'cpu_period', False, None),
-    ('CpuQuota', 'cpu_quota', False, None),
-    ('CpuShares', 'cpu_shares', True, None),
-    ('CpusetCpus', 'cpuset_cpus', False, None),
-    ('CpusetMems', 'cpuset_mems', False, None),
-    ('Memory', 'mem_limit', True, docker_utils.parse_bytes),
-    ('MemoryReservation', 'mem_reservation', False, docker_utils.parse_bytes),
-    ('MemorySwap', 'memswap_limit', True, docker_utils.parse_bytes),
-    ('KernelMemory', 'kernel_memory', False, docker_utils.parse_bytes),
-    ('OomKillDisable', 'oom_kill_disable', False, None),
-    ('PidsLimit', 'pids_limit', False, None),
+    # Key in inspect output, docker-py kwarg, whether to also check create kwargs, check client for constraints support,
+    # conversion function
+    ('BlkioWeight', 'blkio_weight', False, False, None),
+    ('CpuPeriod', 'cpu_period', False, True, None),
+    ('CpuQuota', 'cpu_quota', False, True, None),
+    ('CpuShares', 'cpu_shares', True, True, None),
+    ('CpusetCpus', 'cpuset_cpus', False, True, None),
+    ('CpusetMems', 'cpuset_mems', False, True, None),
+    ('Memory', 'mem_limit', True, True, docker_utils.parse_bytes),
+    ('MemoryReservation', 'mem_reservation', False, False, docker_utils.parse_bytes),
+    ('MemorySwap', 'memswap_limit', True, True, docker_utils.parse_bytes),
+    ('KernelMemory', 'kernel_memory', False, True, docker_utils.parse_bytes),
+    ('OomKillDisable', 'oom_kill_disable', False, True, None),
+    ('PidsLimit', 'pids_limit', False, True, None),
 ]
 
 
@@ -124,13 +125,17 @@ def _check_container_network_ports(container_config, client_config, instance_det
     return True
 
 
-def _check_limits(container_config, instance_detail):
+def _check_limits(container_config, instance_detail, client_config):
+    constraints = client_config.constraints
     i_host_config = instance_detail['HostConfig']
     c_host_config = container_config.host_config
     c_create_options = container_config.create_options
     update_dict = {}
     needs_reset = False
-    for inspect_key, config_key, check_co, input_func in CONTAINER_UPDATE_VARS:
+    for inspect_key, config_key, check_co, check_cs, input_func in CONTAINER_UPDATE_VARS:
+        if check_cs and not constraints.get(config_key):
+            log.debug("Skipping check for {0} - not supported by the client.".format(config_key))
+            continue
         i_value = i_host_config.get(inspect_key) or None
         c_value = c_host_config.get(config_key) or None
         if not c_value and check_co:
@@ -318,7 +323,7 @@ class UpdateContainerState(ContainerBaseState):
                 extra.update(net_extra)
             elif not self._check_container_network_mode():
                 state_flags |= StateFlags.MISC_MISMATCH
-            hc_update, hc_needs_reset = _check_limits(self.config, self.detail)
+            hc_update, hc_needs_reset = _check_limits(self.config, self.detail, self.client_config)
             restart_policy_update = _check_restart_policy(self.config, self.detail)
             hc_update.update(restart_policy_update)
             if not self.client_config.features['container_update_restart_policy'] and restart_policy_update:
