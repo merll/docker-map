@@ -203,7 +203,8 @@ class VolumeUpdateState(VolumeBaseState):
         if self.detail['Driver'] != self.config.driver:
             log.debug("Volume driver %s does not match configuration %s.", self.detail['Driver'], self.config.driver)
             return base_state, state_flags | StateFlags.MISC_MISMATCH, extra
-        elif self.detail['Options'] != self.config.driver_options:
+        elif ((self.detail['Options'] or self.config.driver_options) and
+              (self.detail['Options'] != self.config.driver_options)):
             log.debug("Volume driver options %s do not match the configured options: %s.",
                       self.detail['Options'], self.config.driver_options)
             return base_state, state_flags | StateFlags.MISC_MISMATCH, extra
